@@ -808,7 +808,7 @@ function startSok(q, hendelse) {
   toppTekst = q ? "Søk: " + q : "";
   // Sok gjelder nyheter. Star du i fotball, skal treffene ogsa vises.
   if (aktivVisning !== "nyheter") settFane("nyheter");
-  else document.getElementById("filterTag").textContent = toppTekst;
+  else visToppTekst();
   track(q ? hendelse : "Sok tomt", { ord: q.slice(0, 40) });
   closeMenu();
   loadFeed();
@@ -914,6 +914,50 @@ document.getElementById("detailCard").addEventListener("click", async (e) => {
   }
 });
 
+/* ---------- filterbrikken i toppfeltet ---------- */
+
+// Toppfeltet viste hva som filtrerte feeden, men ikke veien ut: et sok
+// ble stande til man apnet menyen og fant «Alle saker». Na er teksten en
+// knapp med kryss. I fotball er den ren tekst — ligaen er ikke et filter
+// man fjerner, den byttes.
+function visToppTekst() {
+  const tag = document.getElementById("filterTag");
+
+  if (aktivVisning === "fotball") {
+    tag.replaceChildren(document.createTextNode(LIGAER[fotballLiga].navn));
+    return;
+  }
+  if (!toppTekst) {
+    tag.replaceChildren();
+    return;
+  }
+
+  const knapp = el("button", "filter-chip");
+  knapp.type = "button";
+  knapp.setAttribute("aria-label", toppTekst + " — trykk for å vise alle saker");
+  knapp.appendChild(el("span", "filter-navn", toppTekst));
+
+  const kryss = el("span", "filter-kryss", "×");
+  kryss.setAttribute("aria-hidden", "true");
+  knapp.appendChild(kryss);
+
+  knapp.addEventListener("click", visAlleSaker);
+  tag.replaceChildren(knapp);
+}
+
+function visAlleSaker() {
+  sokeord = "";
+  activeCategory = null;
+  lastSignature = null;
+  toppTekst = "";
+  document.getElementById("sokFelt").value = "";
+
+  merkValgtKategori(null);
+  visToppTekst();
+  track("Filter fjernet");
+  loadFeed();
+}
+
 /* ---------- visninger ---------- */
 
 // Nyheter og fotball bytter plass i det samme kortet. Begge ligger i
@@ -946,13 +990,8 @@ function visFane(visning, liga, del) {
   merkFane("fanenNyheter", visning === "nyheter");
   merkFane("fanenFotball", visning === "fotball");
 
-  const tag = document.getElementById("filterTag");
-  if (visning === "fotball") {
-    tag.textContent = LIGAER[fotballLiga].navn;
-    visFotball(fotballLiga, fotballDel);
-  } else {
-    tag.textContent = toppTekst;
-  }
+  visToppTekst();
+  if (visning === "fotball") visFotball(fotballLiga, fotballDel);
 
   // Menyen beskriver den visningen du star i. Star den apen nar du bytter,
   // skal innholdet folge med.
@@ -1079,7 +1118,7 @@ function selectCategory(cat) {
 
   // Vis i toppen hvilken del av feeden man star i.
   toppTekst = id ? cat.name : "";
-  document.getElementById("filterTag").textContent = toppTekst;
+  visToppTekst();
 
   track("Kategori valgt", { kategori: id ? cat.name : "alle" });
   closeMenu();

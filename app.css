@@ -384,6 +384,54 @@ body {
   color: var(--on-brand-dim);
   font-weight: 600;
   letter-spacing: 0.02em;
+  min-width: 0;
+}
+
+/* Filteret er en knapp fordi det er en handling: trykk, og feeden viser
+   alt igjen. Den ligger oppa toppfeltets gradient, sa fargene kommer fra
+   --on-brand og ikke fra temaets tekstfarge — gradienten er mork i begge
+   temaer. */
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 150px;
+  padding: 3px 5px 3px 9px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  color: var(--on-brand);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+/* Lange sok kuttes, krysset gjor det aldri: uten det er brikken en
+   blindvei. */
+.filter-navn {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-kryss {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.filter-chip:focus-visible {
+  outline: 2px solid var(--on-brand);
+  outline-offset: 2px;
 }
 
 .header {
