@@ -680,9 +680,40 @@ const SAK_8 = await kjor("fotball-feil", FELLES + FOTBALL + `
   }, 900); });
 `);
 
+/* ---------------- 9. ferdigspilt sesong ---------------- */
+
+// Gratisnivaet gir en sesong som er over. Da har den ingen neste runde, og
+// «ingen kamper er satt opp» ville sett ut som en feil hos oss.
+const SAK_9 = await kjor("fotball-ferdig", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2024, sisteSesong: false, del: del,
+                    oppdatert: new Date().toISOString(), kamper: [] };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+
+  window.addEventListener("load", function () { setTimeout(function () {
+    var tekst = document.getElementById("fotballInnhold").textContent;
+    ok("ferdigspilt sesong forklares", tekst.indexOf("ferdigspilt") > -1, tekst.slice(0, 80));
+    ok("sesongen navngis i forklaringen", tekst.indexOf("2024") > -1, tekst.slice(0, 80));
+    ok("ingen tom kampliste tegnes", !document.querySelector(".kamper"));
+    ferdig();
+  }, 1200); });
+`);
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8];
+const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9];
 let feilet = 0;
 
 for (const t of alle) {
