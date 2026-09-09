@@ -34,39 +34,48 @@
   :root {
     --fs: 1;
 
-    --bg-page:      #0B1210;
-    --bg-app:       #0F1A16;
-    --bg-raised:    #16211C;
-    --bg-ad:        #121D18;
-    --bg-ad-stripe: #101E19;
+    /* Merkefarger lest av sportsbibelen.no. Toppfeltet der gar fra dyp
+       marinebla til klar bla, siden er lys blahvit og kortene hvite. */
+    --bg-page:      #E9F0FA;
+    --bg-app:       #FFFFFF;
+    --bg-raised:    #DFE8F6;
+    --bg-ad:        #F4F7FD;
+    --bg-ad-stripe: #EDF3FB;
 
-    --border:        #1B2621;
-    --border-strong: #223029;
-    --border-ad:     #26332C;
-    --border-btn:    #2C3E36;
-    --border-faint:  #16201C;
+    --border:        #DCE5F2;
+    --border-strong: #C9D6EA;
+    --border-ad:     #D3DFF1;
+    --border-btn:    #C3D1E8;
+    --border-faint:  #E7EDF7;
 
-    --text:        #EAF0ED;
-    --text-strong: #F5F8F6;
-    --text-body:   #C4D2CB;
-    --text-dim:    #9FB3A9;
-    --text-dimmer: #86998F;
-    --text-faint:  #6F8279;
+    --text:        #16224A;
+    --text-strong: #0E1836;
+    --text-body:   #2E3A5E;
+    --text-dim:    #5A6785;
+    --text-dimmer: #6E7B99;
+    --text-faint:  #8A95AE;
 
-    --accent:        #34D399;
-    --accent-ink:    #0B1F17;
-    --accent-soft:   #A8E8CB;
-    --accent-bright: #CFF7E4;
+    --accent:        #2A50D8;
+    --accent-ink:    #FFFFFF;
+    --accent-soft:   #1B2A87;
+    --accent-bright: #FFFFFF;
 
-    --ad-g1: #14332A;
-    --ad-g2: #2E7357;
-    --ad-g3: #1B4A3A;
+    --ad-g1: #1B2A87;
+    --ad-g2: #2A50D8;
+    --ad-g3: #223AA8;
 
-    --overlay-hero:  rgba(6,10,8,0.92);
-    --overlay-scrim: rgba(4,8,6,0.7);
+    --overlay-hero:  rgba(8,14,38,0.92);
+    --on-overlay:     #FFFFFF;
+    --on-overlay-dim: #C6D2EA;
+    --overlay-scrim: rgba(10,18,45,0.55);
 
-    /* Tekststorrelser skaleres av en enkelt faktor, sa storre skrift er
-       ett tall a endre og ikke tjue. Avstander skaleres ikke. */
+    /* Toppfeltet og det som ligger oppa det. */
+    --header-bg:     linear-gradient(100deg, #1B2A87 0%, #2A50D8 100%);
+    --header-border: transparent;
+    --on-brand:      #FFFFFF;
+    --on-brand-dim:  #BFD0FF;
+    --logo-ink:      #1B2A87;
+
     --t-hero:   calc(21px   * var(--fs));
     --t-row:    calc(15.5px * var(--fs));
     --t-detail: calc(20px   * var(--fs));
@@ -100,17 +109,26 @@
     --text-dimmer: #A0A0A0;
     --text-faint:  #8A8A8A;
 
-    --accent:        #4ADE9B;
-    --accent-ink:    #062012;
-    --accent-soft:   #BDECD5;
-    --accent-bright: #DFF7EA;
+    /* Aksenten lysnes for a holde kontrasten mot svart. */
+    --accent:        #5C82FF;
+    --accent-ink:    #00081F;
+    --accent-soft:   #9DB4FF;
+    --accent-bright: #FFFFFF;
 
     --ad-g1: #101010;
     --ad-g2: #2A2A2A;
     --ad-g3: #161616;
 
     --overlay-hero:  rgba(0,0,0,0.94);
+    --on-overlay:     #FFFFFF;
+    --on-overlay-dim: #B9B9B9;
     --overlay-scrim: rgba(0,0,0,0.78);
+
+    --header-bg:     #000000;
+    --header-border: #242424;
+    --on-brand:      #FFFFFF;
+    --on-brand-dim:  #9DB4FF;
+    --logo-ink:      #000000;
   }
 
   [data-font="stor"] { --fs: 1.2; }
@@ -169,7 +187,7 @@
     display: block;
     width: 17px;
     height: 1.5px;
-    background: var(--text);
+    background: var(--on-brand);
     border-radius: 1px;
   }
 
@@ -184,7 +202,12 @@
   .bars::before { top: -5.5px; }
   .bars::after  { top: 5.5px; }
 
-  .menu-btn:focus-visible, .menu-close:focus-visible, .menu-item:focus-visible {
+  .menu-btn:focus-visible {
+    outline: 2px solid var(--on-brand);
+    outline-offset: 2px;
+  }
+
+  .menu-close:focus-visible, .menu-item:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
@@ -332,7 +355,7 @@
   /* Viser hvilken del av feeden du star i, nar det ikke er alle saker. */
   .filter-tag {
     font-size: 11px;
-    color: var(--accent);
+    color: var(--on-brand-dim);
     font-weight: 600;
     letter-spacing: 0.02em;
   }
@@ -341,18 +364,37 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 18px 18px 14px;
-    border-bottom: 1px solid var(--border);
+    padding: 14px 16px;
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--header-border);
     flex-shrink: 0;
   }
 
+  /* Ordmerket fra nettsiden: hvit ramme, SPORTS hvit pa bla og BIBELEN
+     bla pa hvit blokk. */
   .logo {
+    display: inline-flex;
+    align-items: stretch;
+    margin: 0;
+    border: 2px solid var(--on-brand);
+    border-radius: 2px;
+    overflow: hidden;
     font-family: 'Barlow Condensed', sans-serif;
     font-weight: 700;
-    font-size: 22px;
-    color: var(--text);
-    letter-spacing: 0.3px;
-    margin: 0;
+    font-size: 17px;
+    line-height: 1;
+    letter-spacing: 0.04em;
+  }
+
+  .logo-a {
+    padding: 5px 5px 4px 6px;
+    color: var(--on-brand);
+  }
+
+  .logo-b {
+    padding: 5px 6px 4px 5px;
+    background: var(--on-brand);
+    color: var(--logo-ink);
   }
 
   .feed {
@@ -431,13 +473,15 @@
     font-weight: 600;
     font-size: var(--t-hero);
     line-height: 1.2;
-    color: var(--text-strong);
+    /* Ligger oppa gradienten, ikke pa kortbakgrunnen. */
+    color: var(--on-overlay);
     margin: 0;
   }
 
+  /* Kun i toppsakens overlegg. */
   .meta {
     font-size: var(--t-meta);
-    color: var(--text-dim);
+    color: var(--on-overlay-dim);
     margin-top: 6px;
   }
 
@@ -777,7 +821,7 @@
                 aria-label="Åpne meny" aria-expanded="false" aria-controls="menuPanel">
           <span class="bars" aria-hidden="true"></span>
         </button>
-        <h1 class="logo">Sportsbibelen</h1>
+        <h1 class="logo"><span class="logo-a">SPORTS</span><span class="logo-b">BIBELEN</span></h1>
         <span class="filter-tag" id="filterTag"></span>
       </div>
     </div>
