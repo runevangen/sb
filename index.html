@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sportsbibelen</title>
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#1B2A87">
+<meta name="theme-color" content="#243B98">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Sportsbibelen">
@@ -75,7 +75,7 @@
     --overlay-scrim: rgba(10,18,45,0.55);
 
     /* Toppfeltet og det som ligger oppa det. */
-    --header-bg:     linear-gradient(100deg, #1B2A87 0%, #2A50D8 100%);
+    --header-bg:     #243B98;
     --header-border: transparent;
     --on-brand:      #FFFFFF;
     --on-brand-dim:  #BFD0FF;
@@ -419,32 +419,18 @@
     flex-shrink: 0;
   }
 
-  /* Ordmerket fra nettsiden: hvit ramme, SPORTS hvit pa bla og BIBELEN
-     bla pa hvit blokk. */
+  /* Den ekte logofila. Den har sin egen gradient bakt inn, sa toppfeltet
+     bruker de samme fargene for at skjoten ikke skal synes. */
   .logo {
-    display: inline-flex;
-    align-items: stretch;
+    display: block;
     margin: 0;
-    border: 2px solid var(--on-brand);
-    border-radius: 2px;
-    overflow: hidden;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 700;
-    font-size: 17px;
-    line-height: 1;
-    letter-spacing: 0.04em;
+    line-height: 0;
   }
 
-  .logo-a {
-    padding: 5px 6px 4px 7px;
-    background: var(--on-brand);
-    color: var(--logo-ink);
-  }
-
-  .logo-b {
-    padding: 5px 7px 4px 6px;
-    border-left: 2px solid var(--on-brand);
-    color: var(--on-brand);
+  .logo img {
+    display: block;
+    height: 30px;
+    width: auto;
   }
 
   .feed {
@@ -904,7 +890,7 @@
                 aria-label="Åpne meny" aria-expanded="false" aria-controls="menuPanel">
           <span class="bars" aria-hidden="true"></span>
         </button>
-        <h1 class="logo"><span class="logo-a">SPORTS</span><span class="logo-b">BIBELEN</span></h1>
+        <h1 class="logo"><img src="/SB-logos-h-whiteonblue.png" alt="Sportsbibelen"></h1>
         <span class="filter-tag" id="filterTag"></span>
       </div>
     </div>
