@@ -17,12 +17,127 @@
   for at den mangler.
 -->
 <script defer data-domain="mvp-sb.netlify.app" src="https://plausible.io/js/script.js"></script>
+<script>
+  // Kjores for rendering. Uten dette rekker standardtemaet a vises et
+  // oyeblikk for valget leses inn.
+  try {
+    var lagret = JSON.parse(localStorage.getItem("sb-visning")) || {};
+    if (lagret.svart) document.documentElement.setAttribute("data-theme", "svart");
+    if (lagret.stor)  document.documentElement.setAttribute("data-font", "stor");
+  } catch (e) { /* privat modus: standardvisning */ }
+</script>
 <style>
+  /* ---------- tema ----------
+     Fargene ligger som variabler slik at et tema kun trenger a overstyre
+     dem. Verdiene under er appens opprinnelige palett; ekte merkefarger
+     fra sportsbibelen.no settes her nar de foreligger. */
+  :root {
+    --fs: 1;
+
+    /* Merkefarger lest av sportsbibelen.no. Toppfeltet der gar fra dyp
+       marinebla til klar bla, siden er lys blahvit og kortene hvite. */
+    --bg-page:      #E9F0FA;
+    --bg-app:       #FFFFFF;
+    --bg-raised:    #DFE8F6;
+    --bg-ad:        #F4F7FD;
+    --bg-ad-stripe: #EDF3FB;
+
+    --border:        #DCE5F2;
+    --border-strong: #C9D6EA;
+    --border-ad:     #D3DFF1;
+    --border-btn:    #C3D1E8;
+    --border-faint:  #E7EDF7;
+
+    --text:        #16224A;
+    --text-strong: #0E1836;
+    --text-body:   #2E3A5E;
+    --text-dim:    #5A6785;
+    --text-dimmer: #6E7B99;
+    --text-faint:  #8A95AE;
+
+    --accent:        #2A50D8;
+    --accent-ink:    #FFFFFF;
+    --accent-soft:   #1B2A87;
+    --accent-bright: #FFFFFF;
+
+    --ad-g1: #1B2A87;
+    --ad-g2: #2A50D8;
+    --ad-g3: #223AA8;
+
+    --overlay-hero:  rgba(8,14,38,0.92);
+    --on-overlay:     #FFFFFF;
+    --on-overlay-dim: #C6D2EA;
+    --overlay-scrim: rgba(10,18,45,0.55);
+
+    /* Toppfeltet og det som ligger oppa det. */
+    --header-bg:     linear-gradient(100deg, #1B2A87 0%, #2A50D8 100%);
+    --header-border: transparent;
+    --on-brand:      #FFFFFF;
+    --on-brand-dim:  #BFD0FF;
+    --logo-ink:      #1B2A87;
+
+    --t-hero:   calc(21px   * var(--fs));
+    --t-row:    calc(15.5px * var(--fs));
+    --t-detail: calc(20px   * var(--fs));
+    --t-body:   calc(15px   * var(--fs));
+    --t-excerpt:calc(14px   * var(--fs));
+    --t-ad:     calc(16.5px * var(--fs));
+    --t-menu:   calc(17px   * var(--fs));
+    --t-meta:   calc(11.5px * var(--fs));
+    --t-label:  calc(11px   * var(--fs));
+  }
+
+  /* Svart lesemodus: ekte svart bunn og hoyere kontrast. Aksenten beholdes,
+     ellers mister kategoriene signalet sitt. */
+  [data-theme="svart"] {
+    --bg-page:      #000000;
+    --bg-app:       #000000;
+    --bg-raised:    #141414;
+    --bg-ad:        #0D0D0D;
+    --bg-ad-stripe: #0A0A0A;
+
+    --border:        #242424;
+    --border-strong: #303030;
+    --border-ad:     #303030;
+    --border-btn:    #3A3A3A;
+    --border-faint:  #1C1C1C;
+
+    --text:        #FFFFFF;
+    --text-strong: #FFFFFF;
+    --text-body:   #E4E4E4;
+    --text-dim:    #B8B8B8;
+    --text-dimmer: #A0A0A0;
+    --text-faint:  #8A8A8A;
+
+    /* Aksenten lysnes for a holde kontrasten mot svart. */
+    --accent:        #5C82FF;
+    --accent-ink:    #00081F;
+    --accent-soft:   #9DB4FF;
+    --accent-bright: #FFFFFF;
+
+    --ad-g1: #101010;
+    --ad-g2: #2A2A2A;
+    --ad-g3: #161616;
+
+    --overlay-hero:  rgba(0,0,0,0.94);
+    --on-overlay:     #FFFFFF;
+    --on-overlay-dim: #B9B9B9;
+    --overlay-scrim: rgba(0,0,0,0.78);
+
+    --header-bg:     #000000;
+    --header-border: #242424;
+    --on-brand:      #FFFFFF;
+    --on-brand-dim:  #9DB4FF;
+    --logo-ink:      #000000;
+  }
+
+  [data-font="stor"] { --fs: 1.2; }
+
   * { box-sizing: border-box; }
 
   body {
     margin: 0;
-    background: #0B1210;
+    background: var(--bg-page);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     display: flex;
     justify-content: center;
@@ -34,9 +149,9 @@
     position: relative;
     width: 390px;
     max-width: 100%;
-    background: #0F1A16;
+    background: var(--bg-app);
     border-radius: 28px;
-    border: 1px solid #223029;
+    border: 1px solid var(--border-strong);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -72,7 +187,7 @@
     display: block;
     width: 17px;
     height: 1.5px;
-    background: #EAF0ED;
+    background: var(--on-brand);
     border-radius: 1px;
   }
 
@@ -87,8 +202,13 @@
   .bars::before { top: -5.5px; }
   .bars::after  { top: 5.5px; }
 
-  .menu-btn:focus-visible, .menu-close:focus-visible, .menu-item:focus-visible {
-    outline: 2px solid #34D399;
+  .menu-btn:focus-visible {
+    outline: 2px solid var(--on-brand);
+    outline-offset: 2px;
+  }
+
+  .menu-close:focus-visible, .menu-item:focus-visible {
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
 
@@ -98,7 +218,7 @@
     position: absolute;
     inset: 0;
     z-index: 20;
-    background: #0F1A16;
+    background: var(--bg-app);
     display: flex;
     flex-direction: column;
     visibility: hidden;
@@ -124,7 +244,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 18px 18px 14px;
-    border-bottom: 1px solid #1B2621;
+    border-bottom: 1px solid var(--border);
     flex-shrink: 0;
   }
 
@@ -134,20 +254,57 @@
     font-size: 18px;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #EAF0ED;
+    color: var(--text);
     margin: 0;
   }
 
   .menu-close {
     background: none;
     border: 0;
-    color: #9FB3A9;
+    color: var(--text-dim);
     font-size: 22px;
     line-height: 1;
     padding: 4px 6px;
     cursor: pointer;
     border-radius: 6px;
   }
+
+  .menu-tools {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Bevisst i faste piksler: dette er ramme rundt innholdet, ikke innhold,
+     og skal ikke vokse nar leseren ber om storre tekst. */
+  .tool-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 9px;
+    border: 1px solid var(--border-btn);
+    border-radius: 999px;
+    background: none;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .tool-btn[aria-pressed="true"] {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .tool-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .tool-ico { font-size: 12px; line-height: 1; }
 
   .menu-list {
     list-style: none;
@@ -166,12 +323,12 @@
     padding: 13px 18px;
     background: none;
     border: 0;
-    border-bottom: 1px solid #16201C;
+    border-bottom: 1px solid var(--border-faint);
     font-family: 'Barlow Condensed', sans-serif;
     font-weight: 600;
-    font-size: 17px;
+    font-size: var(--t-menu);
     letter-spacing: 0.01em;
-    color: #EAF0ED;
+    color: var(--text);
     text-align: left;
     cursor: pointer;
   }
@@ -180,25 +337,25 @@
     font-family: 'Inter', sans-serif;
     font-weight: 500;
     font-size: 11px;
-    color: #86998F;
+    color: var(--text-dimmer);
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
   }
 
-  .menu-item[aria-current="true"] { color: #34D399; }
+  .menu-item[aria-current="true"] { color: var(--accent); }
 
-  .menu-item[aria-current="true"] .count { color: #34D399; }
+  .menu-item[aria-current="true"] .count { color: var(--accent); }
 
   .menu-state {
     padding: 20px 18px;
     font-size: 13px;
-    color: #86998F;
+    color: var(--text-dimmer);
   }
 
   /* Viser hvilken del av feeden du star i, nar det ikke er alle saker. */
   .filter-tag {
     font-size: 11px;
-    color: #34D399;
+    color: var(--on-brand-dim);
     font-weight: 600;
     letter-spacing: 0.02em;
   }
@@ -207,18 +364,37 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 18px 18px 14px;
-    border-bottom: 1px solid #1B2621;
+    padding: 14px 16px;
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--header-border);
     flex-shrink: 0;
   }
 
+  /* Ordmerket fra nettsiden: hvit ramme, SPORTS hvit pa bla og BIBELEN
+     bla pa hvit blokk. */
   .logo {
+    display: inline-flex;
+    align-items: stretch;
+    margin: 0;
+    border: 2px solid var(--on-brand);
+    border-radius: 2px;
+    overflow: hidden;
     font-family: 'Barlow Condensed', sans-serif;
     font-weight: 700;
-    font-size: 22px;
-    color: #EAF0ED;
-    letter-spacing: 0.3px;
-    margin: 0;
+    font-size: 17px;
+    line-height: 1;
+    letter-spacing: 0.04em;
+  }
+
+  .logo-a {
+    padding: 5px 5px 4px 6px;
+    color: var(--on-brand);
+  }
+
+  .logo-b {
+    padding: 5px 6px 4px 5px;
+    background: var(--on-brand);
+    color: var(--logo-ink);
   }
 
   .feed {
@@ -228,7 +404,7 @@
   }
 
   .state {
-    color: #86998F;
+    color: var(--text-dimmer);
     font-size: 14px;
     text-align: center;
     padding: 60px 20px;
@@ -252,7 +428,7 @@
   }
 
   .card-btn:focus-visible {
-    outline: 2px solid #34D399;
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
 
@@ -261,7 +437,7 @@
     border-radius: 16px;
     overflow: hidden;
     margin-bottom: 18px;
-    background: #16211C;
+    background: var(--bg-raised);
     height: 220px;
   }
 
@@ -278,14 +454,14 @@
     right: 0;
     bottom: 0;
     padding: 16px;
-    background: linear-gradient(transparent, rgba(6,10,8,0.92));
+    background: linear-gradient(transparent, var(--overlay-hero));
   }
 
   .cat-pill {
     display: inline-block;
-    font-size: 11.5px;
-    color: #0B1F17;
-    background: #34D399;
+    font-size: var(--t-label);
+    color: var(--accent-ink);
+    background: var(--accent);
     padding: 3px 9px;
     border-radius: 5px;
     font-weight: 600;
@@ -295,15 +471,17 @@
   .hero-title {
     font-family: 'Barlow Condensed', sans-serif;
     font-weight: 600;
-    font-size: 21px;
+    font-size: var(--t-hero);
     line-height: 1.2;
-    color: #F5F8F6;
+    /* Ligger oppa gradienten, ikke pa kortbakgrunnen. */
+    color: var(--on-overlay);
     margin: 0;
   }
 
+  /* Kun i toppsakens overlegg. */
   .meta {
-    font-size: 12px;
-    color: #9FB3A9;
+    font-size: var(--t-meta);
+    color: var(--on-overlay-dim);
     margin-top: 6px;
   }
 
@@ -311,7 +489,7 @@
     display: flex;
     gap: 12px;
     padding: 12px 0;
-    border-bottom: 1px solid #1B2621;
+    border-bottom: 1px solid var(--border);
   }
 
   .row img, .row .thumb-empty {
@@ -320,7 +498,7 @@
     border-radius: 10px;
     object-fit: cover;
     flex-shrink: 0;
-    background: #16211C;
+    background: var(--bg-raised);
   }
 
   .row-body {
@@ -331,8 +509,8 @@
   }
 
   .row-cat {
-    font-size: 11px;
-    color: #34D399;
+    font-size: var(--t-label);
+    color: var(--accent);
     font-weight: 600;
     margin-bottom: 4px;
   }
@@ -340,9 +518,9 @@
   .row-title {
     font-family: 'Barlow Condensed', sans-serif;
     font-weight: 600;
-    font-size: 15.5px;
+    font-size: var(--t-row);
     line-height: 1.25;
-    color: #EAF0ED;
+    color: var(--text);
     margin: 0;
     display: -webkit-box;
     -webkit-line-clamp: 3;
@@ -352,8 +530,8 @@
   }
 
   .row-meta {
-    font-size: 11.5px;
-    color: #86998F;
+    font-size: var(--t-meta);
+    color: var(--text-dimmer);
     margin-top: 6px;
   }
 
@@ -368,15 +546,15 @@
     font-weight: 600;
     letter-spacing: 0.13em;
     text-transform: uppercase;
-    color: #86998F;
+    color: var(--text-dimmer);
   }
 
   .ad-banner {
     margin: 14px 0;
     border-radius: 12px;
     overflow: hidden;
-    background: #121D18;
-    border: 1px solid #26332C;
+    background: var(--bg-ad);
+    border: 1px solid var(--border-ad);
   }
 
   .ad-banner .ad-label { padding: 9px 13px 0; }
@@ -391,8 +569,8 @@
     font-weight: 700;
     font-size: 27px;
     letter-spacing: 0.1em;
-    color: #CFF7E4;
-    background: linear-gradient(125deg, #14332A 0%, #2E7357 55%, #1B4A3A 100%);
+    color: var(--accent-bright);
+    background: linear-gradient(125deg, var(--ad-g1) 0%, var(--ad-g2) 55%, var(--ad-g3) 100%);
   }
 
   .ad-banner .ad-body {
@@ -405,9 +583,9 @@
   .ad-headline {
     font-family: 'Barlow Condensed', sans-serif;
     font-weight: 600;
-    font-size: 16.5px;
+    font-size: var(--t-ad);
     line-height: 1.2;
-    color: #EAF0ED;
+    color: var(--text);
     margin: 0;
   }
 
@@ -415,8 +593,8 @@
     align-self: flex-start;
     font-size: 11.5px;
     font-weight: 600;
-    color: #0B1F17;
-    background: #34D399;
+    color: var(--accent-ink);
+    background: var(--accent);
     padding: 6px 12px;
     border-radius: 5px;
   }
@@ -426,9 +604,9 @@
   .ad-stripe {
     margin: 14px -14px;
     padding: 14px;
-    background: #101E19;
-    border-top: 1px solid #26332C;
-    border-bottom: 1px solid #26332C;
+    background: var(--bg-ad-stripe);
+    border-top: 1px solid var(--border-ad);
+    border-bottom: 1px solid var(--border-ad);
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -446,15 +624,15 @@
     font-weight: 700;
     font-size: 16px;
     letter-spacing: 0.08em;
-    color: #A8E8CB;
+    color: var(--accent-soft);
   }
 
-  .ad-sub { font-size: 11.5px; color: #86998F; }
+  .ad-sub { font-size: 11.5px; color: var(--text-dimmer); }
 
   .detail-wrap {
     position: fixed;
     inset: 0;
-    background: rgba(4,8,6,0.7);
+    background: var(--overlay-scrim);
     display: none;
     align-items: center;
     justify-content: center;
@@ -470,9 +648,9 @@
     max-width: 92%;
     max-height: 88%;
     overflow-y: auto;
-    background: #0F1A16;
+    background: var(--bg-app);
     border-radius: 18px;
-    border: 1px solid #223029;
+    border: 1px solid var(--border-strong);
     padding: 0 0 20px;
   }
 
@@ -490,22 +668,22 @@
   .detail-title {
     font-family: 'Barlow Condensed', sans-serif;
     font-weight: 600;
-    font-size: 20px;
+    font-size: var(--t-detail);
     line-height: 1.25;
-    color: #F5F8F6;
+    color: var(--text-strong);
     margin: 0 0 8px;
   }
 
   .detail-excerpt {
-    font-size: 14px;
+    font-size: var(--t-excerpt);
     line-height: 1.6;
-    color: #C4D2CB;
+    color: var(--text-body);
   }
 
   .detail-content {
-    font-size: 15px;
+    font-size: var(--t-body);
     line-height: 1.7;
-    color: #C4D2CB;
+    color: var(--text-body);
   }
 
   .detail-content p { margin: 0 0 14px; }
@@ -515,7 +693,7 @@
   .detail-content h4 {
     font-family: 'Barlow Condensed', sans-serif;
     font-weight: 600;
-    color: #EAF0ED;
+    color: var(--text);
     line-height: 1.3;
     margin: 22px 0 8px;
   }
@@ -537,7 +715,7 @@
   .detail-content figcaption {
     font-size: 12px;
     line-height: 1.45;
-    color: #86998F;
+    color: var(--text-dimmer);
   }
 
   .detail-content iframe {
@@ -548,10 +726,10 @@
     border: 0;
     border-radius: 10px;
     margin: 6px 0 14px;
-    background: #16211C;
+    background: var(--bg-raised);
   }
 
-  .detail-content a { color: #34D399; }
+  .detail-content a { color: var(--accent); }
 
   .detail-content ul, .detail-content ol {
     margin: 0 0 14px;
@@ -563,13 +741,13 @@
   .detail-content blockquote {
     margin: 0 0 14px;
     padding-left: 14px;
-    border-left: 2px solid #2C3E36;
-    color: #9FB3A9;
+    border-left: 2px solid var(--border-btn);
+    color: var(--text-dim);
   }
 
   .detail-content pre {
     overflow-x: auto;
-    background: #16211C;
+    background: var(--bg-raised);
     padding: 10px 12px;
     border-radius: 8px;
     font-size: 12.5px;
@@ -583,7 +761,7 @@
   }
 
   .detail-content th, .detail-content td {
-    border-bottom: 1px solid #1B2621;
+    border-bottom: 1px solid var(--border);
     padding: 6px 8px;
     text-align: left;
   }
@@ -593,15 +771,15 @@
     margin-top: 4px;
     font-size: 13px;
     font-weight: 600;
-    color: #34D399;
+    color: var(--accent);
   }
 
   .close-btn, .retry-btn {
     display: block;
     margin: 16px auto 0;
     background: none;
-    border: 1px solid #2C3E36;
-    color: #9FB3A9;
+    border: 1px solid var(--border-btn);
+    color: var(--text-dim);
     border-radius: 8px;
     padding: 8px 16px;
     font-size: 13px;
@@ -610,7 +788,7 @@
   }
 
   .close-btn:focus-visible, .retry-btn:focus-visible, .read-link:focus-visible {
-    outline: 2px solid #34D399;
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
 
@@ -618,7 +796,7 @@
     margin-top: 22px;
     text-align: left;
     font-size: 11.5px;
-    color: #6F8279;
+    color: var(--text-faint);
   }
 
   .err-details summary {
@@ -643,7 +821,7 @@
                 aria-label="Åpne meny" aria-expanded="false" aria-controls="menuPanel">
           <span class="bars" aria-hidden="true"></span>
         </button>
-        <h1 class="logo">Sportsbibelen</h1>
+        <h1 class="logo"><span class="logo-a">SPORTS</span><span class="logo-b">BIBELEN</span></h1>
         <span class="filter-tag" id="filterTag"></span>
       </div>
     </div>
@@ -651,7 +829,15 @@
     <nav class="menu-panel" id="menuPanel" aria-label="Hovedmeny">
       <div class="menu-head">
         <p class="menu-title">Meny</p>
-        <button class="menu-close" id="menuClose" type="button" aria-label="Lukk meny">&times;</button>
+        <div class="menu-tools">
+          <button class="tool-btn" id="themeBtn" type="button" aria-pressed="false">
+            <span class="tool-ico" aria-hidden="true">◐</span>Svart
+          </button>
+          <button class="tool-btn" id="fontBtn" type="button" aria-pressed="false">
+            <span class="tool-ico" aria-hidden="true">A</span>Større
+          </button>
+          <button class="menu-close" id="menuClose" type="button" aria-label="Lukk meny">&times;</button>
+        </div>
       </div>
       <ul class="menu-list" id="menuList">
         <li><p class="menu-state">Henter meny …</p></li>
@@ -1239,6 +1425,57 @@
 
     feed.replaceChildren(state);
   }
+
+  /* ---------- visningsvalg ---------- */
+
+  const PREF_KEY = "sb-visning";
+
+  function readPrefs() {
+    try {
+      return JSON.parse(localStorage.getItem(PREF_KEY)) || {};
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function savePrefs(value) {
+    try {
+      localStorage.setItem(PREF_KEY, JSON.stringify(value));
+    } catch (err) {
+      // Privat modus eller blokkerte informasjonskapsler: valget gjelder
+      // da bare denne økta, og det er greit.
+    }
+  }
+
+  function applyPrefs(value) {
+    const root = document.documentElement;
+
+    if (value.svart) root.setAttribute("data-theme", "svart");
+    else root.removeAttribute("data-theme");
+
+    if (value.stor) root.setAttribute("data-font", "stor");
+    else root.removeAttribute("data-font");
+
+    document.getElementById("themeBtn").setAttribute("aria-pressed", value.svart ? "true" : "false");
+    document.getElementById("fontBtn").setAttribute("aria-pressed", value.stor ? "true" : "false");
+  }
+
+  const prefs = readPrefs();
+  applyPrefs(prefs);
+
+  document.getElementById("themeBtn").addEventListener("click", () => {
+    prefs.svart = !prefs.svart;
+    applyPrefs(prefs);
+    savePrefs(prefs);
+    track("Tema byttet", { tema: prefs.svart ? "svart" : "original" });
+  });
+
+  document.getElementById("fontBtn").addEventListener("click", () => {
+    prefs.stor = !prefs.stor;
+    applyPrefs(prefs);
+    savePrefs(prefs);
+    track("Skriftstørrelse byttet", { størrelse: prefs.stor ? "stor" : "normal" });
+  });
 
   /* ---------- meny ---------- */
 
