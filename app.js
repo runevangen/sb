@@ -789,24 +789,30 @@ folgMedPaRulling();
 
 document.getElementById("sokForm").addEventListener("submit", (e) => {
   e.preventDefault();
-  const felt = document.getElementById("sokFelt");
-  const q = felt.value.trim();
+  const q = document.getElementById("sokFelt").value.trim();
+  startSok(q, "Sok");
+});
 
+// Ett sted for alle sok, sa et lagnavn fra tabellen oppforer seg nøyaktig
+// som et sok skrevet i feltet — samme nullstilling, samme toppfelt, samme
+// vei tilbake.
+function startSok(q, hendelse) {
   sokeord = q;
   // Et sok gar pa tvers av kategorier. Ellers ville treffene stilltiende
   // vaert begrenset til den kategorien man tilfeldigvis sto i.
   activeCategory = null;
   lastSignature = null;
+  document.getElementById("sokFelt").value = q;
 
   merkValgtKategori(null);
   toppTekst = q ? "Søk: " + q : "";
   // Sok gjelder nyheter. Star du i fotball, skal treffene ogsa vises.
   if (aktivVisning !== "nyheter") settFane("nyheter");
   else document.getElementById("filterTag").textContent = toppTekst;
-  track(q ? "Sok" : "Sok tomt", { ord: q.slice(0, 40) });
+  track(q ? hendelse : "Sok tomt", { ord: q.slice(0, 40) });
   closeMenu();
   loadFeed();
-});
+}
 
 /* ---------- del og installer ---------- */
 
@@ -1230,7 +1236,12 @@ function fangFokus(e) {
 
 /* ---------- oppstart ---------- */
 
-initFotball((liga, del) => settFane("fotball", liga, del));
+initFotball(
+  (liga, del) => settFane("fotball", liga, del),
+  // Et lag i tabellen er en inngang til nyhetene om det laget. Sokefeltet
+  // finnes allerede, sa dette koster ingen nye kall mot WordPress utover
+  // det soket ville kostet uansett.
+  (lag) => startSok(lag, "Lagsok"));
 
 document.getElementById("fanenNyheter").addEventListener("click", () => {
   if (aktivVisning !== "nyheter") settFane("nyheter");
