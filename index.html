@@ -215,6 +215,100 @@
     margin-top: 6px;
   }
 
+  /* ---------- annonseplasser ---------- */
+
+  /* Merket star forst i leseretningen, over selve annonsen, og er lest opp
+     av skjermleser via aria-label pa blokka. Markedsforingsloven krever at
+     reklame tydelig framstar som reklame, sa dette er ikke bare pynt. */
+  .ad-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: #86998F;
+  }
+
+  .ad-banner {
+    margin: 14px 0;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #121D18;
+    border: 1px solid #26332C;
+  }
+
+  .ad-banner .ad-label { padding: 9px 13px 0; }
+
+  .ad-banner .ad-creative {
+    height: 120px;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 27px;
+    letter-spacing: 0.1em;
+    color: #CFF7E4;
+    background: linear-gradient(125deg, #14332A 0%, #2E7357 55%, #1B4A3A 100%);
+  }
+
+  .ad-banner .ad-body {
+    padding: 12px 13px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .ad-headline {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 16.5px;
+    line-height: 1.2;
+    color: #EAF0ED;
+    margin: 0;
+  }
+
+  .ad-cta {
+    align-self: flex-start;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #0B1F17;
+    background: #34D399;
+    padding: 6px 12px;
+    border-radius: 5px;
+  }
+
+  /* Stripa gar helt ut i kanten og bryter feedens marg. Det ene grepet er
+     det som gjor den umiskjennelig, uten at den trenger a vaere stor. */
+  .ad-stripe {
+    margin: 14px -14px;
+    padding: 14px;
+    background: #101E19;
+    border-top: 1px solid #26332C;
+    border-bottom: 1px solid #26332C;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .ad-stripe .ad-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .ad-stripe .ad-brand {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 0.08em;
+    color: #A8E8CB;
+  }
+
+  .ad-sub { font-size: 11.5px; color: #86998F; }
+
   .detail-wrap {
     position: fixed;
     inset: 0;
@@ -745,6 +839,69 @@
     showError(problems);
   }
 
+  /* ---------- annonser ---------- */
+
+  // Én annonseplass etter hver fjerde sak, med toppsaken talt som den
+  // første. Feeden henter tolv saker, så det gir to plasser per lasting.
+  const ADS_EVERY = 4;
+
+  // Plassholdere. Annonsørene her er oppdiktede. Når ekte annonser skal inn,
+  // erstattes denne listen av data fra annonsesystemet — formatet er det
+  // samme, og rekkefølgen i listen bestemmer blandingen av de to formatene.
+  const ADS = [
+    {
+      format: "banner",
+      brand: "NORDBANE",
+      headline: "Tre måneder trening. Ingen binding.",
+      cta: "Se tilbudet"
+    },
+    {
+      format: "stripe",
+      brand: "PADELHUSET",
+      headline: "Fire nye baner åpner i Bergen i oktober",
+      sub: "Book time · padelhuset.no"
+    },
+    {
+      format: "banner",
+      brand: "SPRINTA",
+      headline: "Nye Sprinta Terreng. Bygget for norsk høst.",
+      cta: "Se skoene"
+    },
+    {
+      format: "stripe",
+      brand: "TRIBUNE",
+      headline: "Billetter til høstens toppkamper",
+      sub: "tribune.no"
+    }
+  ];
+
+  function buildAd(ad, slot) {
+    const box = el("div", "ad-" + ad.format);
+    box.setAttribute("role", "group");
+    // Merkingen må også nå skjermlesere, ikke bare øyet.
+    box.setAttribute("aria-label", "Reklame fra " + ad.brand);
+
+    if (ad.format === "stripe") {
+      const top = el("div", "ad-top");
+      top.appendChild(el("span", "ad-label", "Reklame"));
+      top.appendChild(el("span", "ad-brand", ad.brand));
+      box.appendChild(top);
+      box.appendChild(el("p", "ad-headline", ad.headline));
+      if (ad.sub) box.appendChild(el("span", "ad-sub", ad.sub));
+    } else {
+      box.appendChild(el("span", "ad-label", "Reklame"));
+      // Plassholder-flate. Ekte annonsemateriell settes inn her.
+      box.appendChild(el("div", "ad-creative", ad.brand));
+      const body = el("div", "ad-body");
+      body.appendChild(el("p", "ad-headline", ad.headline));
+      if (ad.cta) body.appendChild(el("span", "ad-cta", ad.cta));
+      box.appendChild(body);
+    }
+
+    track("Annonse vist", { annonsor: ad.brand, plass: String(slot) });
+    return box;
+  }
+
   /* ---------- rendering ---------- */
 
   function renderFeed(posts) {
@@ -759,7 +916,23 @@
     }
 
     feed.appendChild(buildHero(posts[0]));
-    posts.slice(1).forEach((post) => feed.appendChild(buildRow(post)));
+
+    const rows = posts.slice(1);
+    let shown = 1;      // toppsaken teller som den første saken
+    let slot = 0;
+
+    rows.forEach((post, index) => {
+      feed.appendChild(buildRow(post));
+      shown += 1;
+
+      // Ingen annonse etter siste sak: der ville den bare sett ut som en
+      // avslutning på feeden.
+      const isLast = index === rows.length - 1;
+      if (!isLast && shown % ADS_EVERY === 0) {
+        feed.appendChild(buildAd(ADS[slot % ADS.length], slot + 1));
+        slot += 1;
+      }
+    });
   }
 
   function buildHero(post) {
