@@ -78,6 +78,7 @@ const HARNESS = `
       if (n.classList.contains("row")) return "sak";
       if (n.classList.contains("ad-banner")) return "banner";
       if (n.classList.contains("ad-stripe")) return "stripe";
+      if (n.classList.contains("vis-flere")) return "mer";
       return "?";
     }).join(" ");
   }
@@ -181,9 +182,13 @@ const SAK_1 = await kjor("feed", FELLES + `
     ok("tidsstempel bruker date_gmt", tid.textContent === "2t siden", tid.textContent);
 
     ok("annonse etter hver fjerde sak",
-       sekvens() === "topp sak sak sak banner sak sak sak sak stripe sak sak sak sak", sekvens());
+       sekvens() === "topp sak sak sak banner sak sak sak sak stripe sak sak sak sak mer", sekvens());
+
+    // Intensjonen er at feeden ikke skal avsluttes med reklame. "Vis flere"
+    // er en knapp, ikke innhold, sa den ser vi bort fra her.
+    var innhold = sekvens().split(" ").filter(function (n) { return n !== "mer"; });
     ok("ingen annonse nederst",
-       document.getElementById("feed").lastElementChild.classList.contains("row"));
+       innhold[innhold.length - 1] === "sak", innhold[innhold.length - 1]);
     ferdig();
   }, 900); });
 `);
@@ -310,9 +315,84 @@ const SAK_3 = await kjor("oppdatering", FELLES + `
   }
 `, "390,844");
 
+/* ---------------- 4. ruting, paginering og interne lenker ---------------- */
+
+const SAK_4 = await kjor("ruting", FELLES + `
+  var saker = lagSaker(12);
+  saker[0].content.rendered =
+    "<p>Se ogsa <a href=\\"https://sportsbibelen.no/annen-sak/\\">denne saken</a> " +
+    "og <a href=\\"https://vg.no/noe/\\">en ekstern</a>.</p>";
+  var side2 = lagSaker(12).map(function (p, i) { p.id = 100 + i; p.slug = "side2-" + i; return p; });
+
+  window.__kall = [];
+  window.fetch = function (u) {
+    u = String(u);
+    window.__kall.push(u);
+    var svar;
+    if (u.indexOf("/wp-api/categories") === 0) svar = KATEGORIER;
+    else if (u.indexOf("slug=annen-sak") > -1) {
+      var s = lagSaker(1)[0]; s.slug = "annen-sak"; s.id = 999;
+      s.title = { rendered: "Den andre saken" };
+      svar = [s];
+    }
+    else if (u.indexOf("page=2") > -1) svar = side2;
+    else if (u.indexOf("_fields=") > -1) svar = saker.map(function (p) { return { id: p.id, modified_gmt: p.modified_gmt }; });
+    else svar = saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+
+  window.addEventListener("load", function () { setTimeout(function () {
+    var feed = document.getElementById("feed");
+
+    // --- paginering ---
+    var forSider = feed.querySelectorAll(".row").length;
+    feed.scrollTop = 300;
+    document.querySelector(".vis-flere").click();
+
+    setTimeout(function () {
+      var etterSider = feed.querySelectorAll(".row").length;
+      ok("Vis flere legger til flere saker", etterSider > forSider,
+         forSider + " -> " + etterSider);
+      ok("henter side 2, ikke side 1 pa nytt",
+         window.__kall.filter(function (u) { return u.indexOf("page=2") > -1; }).length === 1);
+      ok("paginering beholder rulleposisjonen", feed.scrollTop > 100, feed.scrollTop);
+
+      // --- ruting: apne en sak ---
+      document.querySelector(".hero").click();
+      setTimeout(function () {
+        ok("artikkel gir egen adresse", location.hash.indexOf("#/sak/") === 0, location.hash);
+
+        // --- interne lenker markeres, eksterne ikke ---
+        var intern = document.querySelector(".detail-content a[data-slug]");
+        var ekstern = document.querySelector('.detail-content a[target="_blank"]');
+        ok("intern lenke merkes for apning i appen",
+           !!intern && intern.dataset.slug === "annen-sak",
+           intern ? intern.dataset.slug : "mangler");
+        ok("ekstern lenke apnes fortsatt utenfor",
+           !!ekstern && ekstern.href.indexOf("vg.no") > -1);
+
+        // --- tilbakeknappen ---
+        // Uten vakten navigerer history.back() bort fra testsiden hvis
+        // ruteren er odelagt, og da gar alle resultatene tapt. Da feiler
+        // suiten med en krasj i stedet for en navngitt pastand.
+        if (location.hash.indexOf("#/sak/") !== 0) { ferdig(); return; }
+        history.back();
+        setTimeout(function () {
+          ok("tilbakeknappen lukker artikkelen",
+             !document.getElementById("detailWrap").classList.contains("open"));
+          ok("tilbakeknappen forlater ikke artikkeladressen bak seg",
+             location.hash.indexOf("#/sak/") !== 0, location.hash);
+          ferdig();
+        }, 400);
+      }, 500);
+    }, 600);
+  }, 900); });
+`);
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_2, ...SAK_3];
+const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4];
 let feilet = 0;
 
 for (const t of alle) {

@@ -7,7 +7,7 @@
 // millisekunder framfor de titalls sekundene nettlesertestene bruker.
 // Alt som trenger DOM ligger i test/run.mjs.
 
-import { safeUrl, videoUrl, postDate, timeAgo, feedSignature } from "../lib.js";
+import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug } from "../lib.js";
 
 let feilet = 0;
 
@@ -104,8 +104,29 @@ ok("ny sak endrer signaturen",
 ok("faller tilbake til date_gmt nar modified_gmt mangler",
    feedSignature([{ id: 1, date_gmt: "2026-01-01T00:00:00" }]) === "1:2026-01-01T00:00:00");
 
+/* ---------------- internSlug ---------------- */
+
+const VERT = "sportsbibelen.no";
+
+ok("egen artikkel gir slug",
+   internSlug("https://sportsbibelen.no/brann-snudde-kampen/", VERT) === "brann-snudde-kampen");
+ok("www teller som samme vert",
+   internSlug("https://www.sportsbibelen.no/en-sak/", VERT) === "en-sak");
+ok("datoprefiks hopper til sluggen",
+   internSlug("https://sportsbibelen.no/2026/09/09/en-sak/", VERT) === "en-sak");
+ok("fremmed domene gir null",
+   internSlug("https://vg.no/en-sak/", VERT) === null);
+ok("forsiden gir null", internSlug("https://sportsbibelen.no/", VERT) === null);
+ok("kategoriside gir null",
+   internSlug("https://sportsbibelen.no/category/fotball/", VERT) === null);
+ok("forfatterside gir null",
+   internSlug("https://sportsbibelen.no/author/kjetil/", VERT) === null);
+ok("rent tall er datosegment, ikke slug",
+   internSlug("https://sportsbibelen.no/2026/09/", VERT) === null);
+ok("soppel gir null, ikke unntak", internSlug("ikke en url", VERT) === null);
+
 /* ---------------- rapport ---------------- */
 
-const antall = 31;
+const antall = 40;
 console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);
