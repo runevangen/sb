@@ -17,7 +17,12 @@ jobs:
 
       # Google Chrome folger med ubuntu-runneren. Skriptet leter gjennom en
       # liste med kjente stier, sa CHROME settes bare for a slippe gjettingen.
-      - name: Kjor regresjonstestene
+      # Enhetstestene forst: de tar millisekunder, sa en apenbar feil
+      # stopper kjoringen for nettleseren i det hele tatt starter.
+      - name: Enhetstester
+        run: node test/unit.mjs
+
+      - name: Nettlesertester
         env:
           CHROME: /usr/bin/google-chrome
         run: node test/run.mjs

@@ -9,6 +9,9 @@ const CACHE = "sb-skall-v1";
 const SKALL = [
   "/",
   "/index.html",
+  "/app.css",
+  "/app.js",
+  "/lib.js",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
