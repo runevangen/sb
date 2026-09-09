@@ -30,7 +30,7 @@ Ingen byggesteg. Hostes på Netlify som prosjektet `mvp-sb`.
 
     node test/run.mjs
 
-16 regresjonstester, ingen avhengigheter. De laster index.html med et
+19 regresjonstester, ingen avhengigheter. De laster index.html med et
 mocket `window.fetch` inn i headless Chromium og rapporterer via
 exit-kode. Sett `CHROME` hvis nettleseren ligger et annet sted enn de
 stiene skriptet prøver.

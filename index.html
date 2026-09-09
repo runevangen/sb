@@ -75,7 +75,8 @@
     --overlay-scrim: rgba(10,18,45,0.55);
 
     /* Toppfeltet og det som ligger oppa det. */
-    --header-bg:     #243B98;
+    /* Samme gradient som logofila: #16297B til #2D51CE, malt av fila. */
+    --header-bg:     linear-gradient(to right, #16297B 0%, #2D51CE 100%);
     --header-border: transparent;
     --on-brand:      #FFFFFF;
     --on-brand-dim:  #BFD0FF;
@@ -419,8 +420,10 @@
     flex-shrink: 0;
   }
 
-  /* Den ekte logofila. Den har sin egen gradient bakt inn, sa toppfeltet
-     bruker de samme fargene for at skjoten ikke skal synes. */
+  /* Logoen er den ekte fila med bakgrunnen fjernet: de bla flatene er
+     gjennomsiktige, sa toppfeltets gradient skinner gjennom der de var.
+     Da kan det ikke oppsta en synlig kant rundt merket, uansett hvilken
+     bakgrunn feltet har. Det er ogsa derfor den virker i svart tema. */
   .logo {
     display: block;
     margin: 0;
@@ -890,7 +893,7 @@
                 aria-label="Åpne meny" aria-expanded="false" aria-controls="menuPanel">
           <span class="bars" aria-hidden="true"></span>
         </button>
-        <h1 class="logo"><img src="/SB-logos-h-whiteonblue.png" alt="Sportsbibelen"></h1>
+        <h1 class="logo"><img src="/logo-mark.png" alt="Sportsbibelen"></h1>
         <span class="filter-tag" id="filterTag"></span>
       </div>
     </div>
