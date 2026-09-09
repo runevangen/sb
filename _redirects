@@ -1,0 +1,8 @@
+# Proxy WordPress REST API via samme domene.
+# Fjerner behovet for CORS-headere på WP og for en offentlig tredjepartsproxy.
+#
+# Regelen er bevisst smal: den slipper kun gjennom /posts, ikke hele wp/v2/*.
+# En bred /wp-api/* -> wp-json/wp/v2/:splat ville gjort dette domenet til en
+# åpen vei inn til blant annet /users, som lister opp brukernavn.
+# Netlify videresender query-strengen automatisk.
+/wp-api/posts  https://sportsbibelen.no/wp-json/wp/v2/posts  200

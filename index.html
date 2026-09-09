@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="no">
+<html lang="nb">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -29,7 +29,10 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    /* Fast høyde stakk utenfor lave skjermer. Krymp med viewporten i stedet. */
     height: 780px;
+    height: min(780px, calc(100vh - 48px));
+    height: min(780px, calc(100dvh - 48px));
   }
 
   .header {
@@ -79,12 +82,33 @@
     padding: 60px 20px;
   }
 
+  .state p { margin: 0 0 14px; }
+
+  /* Felles nullstilling for de klikkbare kortene, som nå er ekte
+     <button>-elementer slik at de kan nås med tastatur. */
+  .card-btn {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .card-btn:focus-visible {
+    outline: 2px solid #34D399;
+    outline-offset: 2px;
+  }
+
   .hero {
     position: relative;
     border-radius: 16px;
     overflow: hidden;
     margin-bottom: 18px;
-    cursor: pointer;
     background: #16211C;
     height: 220px;
   }
@@ -136,7 +160,6 @@
     gap: 12px;
     padding: 12px 0;
     border-bottom: 1px solid #1B2621;
-    cursor: pointer;
   }
 
   .row img, .row .thumb-empty {
@@ -171,6 +194,7 @@
     margin: 0;
     display: -webkit-box;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
@@ -232,7 +256,15 @@
     color: #C4D2CB;
   }
 
-  .close-btn {
+  .read-link {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #34D399;
+  }
+
+  .close-btn, .retry-btn {
     display: block;
     margin: 16px auto 0;
     background: none;
@@ -241,7 +273,32 @@
     border-radius: 8px;
     padding: 8px 16px;
     font-size: 13px;
+    font-family: inherit;
     cursor: pointer;
+  }
+
+  .close-btn:focus-visible, .retry-btn:focus-visible, .read-link:focus-visible {
+    outline: 2px solid #34D399;
+    outline-offset: 2px;
+  }
+
+  .err-details {
+    margin-top: 22px;
+    text-align: left;
+    font-size: 11.5px;
+    color: #6F8279;
+  }
+
+  .err-details summary {
+    cursor: pointer;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  .err-line {
+    margin: 0 0 6px;
+    word-break: break-word;
+    line-height: 1.45;
   }
 </style>
 </head>
@@ -249,137 +306,343 @@
 
   <div class="phone">
     <div class="header">
-      <p class="logo">Sportsbibelen</p>
+      <h1 class="logo">Sportsbibelen</h1>
       <div class="live-tag"><span class="dot"></span>LIVE</div>
     </div>
-    <div class="feed" id="feed">
-      <p class="state">Henter nyheter …</p>
+    <div class="feed" id="feed" aria-live="polite" aria-busy="true">
+      <div class="state"><p>Henter nyheter …</p></div>
     </div>
   </div>
 
   <div class="detail-wrap" id="detailWrap">
-    <div class="detail-card" id="detailCard"></div>
+    <div class="detail-card" id="detailCard" role="dialog" aria-modal="true" aria-labelledby="detailTitle"></div>
   </div>
 
 <script>
-  // Bytt WP_URL til din egen WordPress-side når som helst.
-  const WP_URL = "https://sportsbibelen.no/wp-json/wp/v2/posts?_embed&per_page=12";
+  "use strict";
 
-  // Midlertidig CORS-proxy. WordPress-servere sender som regel ikke
-  // CORS-headere som tillater fetch fra et annet domene (som Netlify),
-  // så dette mellomleddet er nødvendig med mindre serveren din
-  // eksplisitt tillater det (se merknad nederst i filen).
-  const API_URL = "https://api.allorigins.win/raw?url=" + encodeURIComponent(WP_URL);
+  // Bytt WP_HOST til din egen WordPress-side når som helst.
+  const WP_HOST  = "https://sportsbibelen.no";
+  const WP_QUERY = "?_embed=1&per_page=12&orderby=date&order=desc";
+  const WP_URL   = WP_HOST + "/wp-json/wp/v2/posts" + WP_QUERY;
 
-  function decodeEntities(str) {
-    const txt = document.createElement("textarea");
-    txt.innerHTML = str;
-    return txt.value;
+  // Feeden hentes fra første kilde som svarer med gyldig JSON.
+  //  1. Samme domene via Netlify-redirect (se _redirects) — ingen tredjepart,
+  //     ingen CORS-problemer. Dette er den anbefalte veien.
+  //  2. Direkte mot WordPress — virker kun hvis serveren sender
+  //     Access-Control-Allow-Origin.
+  //  3. Offentlig CORS-proxy som siste utvei. Den er ratelimitet og uten SLA,
+  //     så den bør ikke være den eneste kilden.
+  const SOURCES = [
+    { name: "Netlify-proxy (/wp-api)", url: "/wp-api/posts" + WP_QUERY },
+    { name: "Direkte mot WordPress",   url: WP_URL },
+    { name: "allorigins (reserve)",    url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(WP_URL) }
+  ];
+
+  const REQUEST_TIMEOUT_MS = 12000;
+  const REFRESH_MS = 5 * 60 * 1000;
+
+  let hasContent = false;
+  let lastFocused = null;
+
+  /* ---------- små DOM-hjelpere ---------- */
+
+  // Alt tekstinnhold settes via textContent, aldri via innerHTML. Det er det
+  // som gjør feeden trygg selv om innholdet kommer via en tredjepartsproxy.
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
   }
 
+  // Slipper kun gjennom http/https, slik at en manipulert respons ikke kan
+  // smugle inn javascript:-URL-er i src eller href.
+  function safeUrl(value) {
+    if (!value) return null;
+    try {
+      const u = new URL(value, location.href);
+      return (u.protocol === "http:" || u.protocol === "https:") ? u.href : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function imageEl(url, lazy) {
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = "";
+    img.loading = lazy ? "lazy" : "eager";
+    return img;
+  }
+
+  /* ---------- innholdshjelpere ---------- */
+
+  // WordPress leverer titler som HTML. Vi henter ut ren tekst med textContent,
+  // som allerede dekoder entiteter én gang — å dekode en gang til ville gjort
+  // "&lt;img onerror=...&gt;" om til en levende tag igjen.
   function stripHtml(html) {
+    if (!html) return "";
     const div = document.createElement("div");
     div.innerHTML = html;
-    return decodeEntities(div.textContent || div.innerText || "");
+    return (div.textContent || "").trim();
   }
 
-  function timeAgo(dateStr) {
-    const diffMs = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(diffMs / 60000);
+  // `date` er sidens lokale tid uten tidssone, og ble tolket som leserens
+  // lokale tid. `date_gmt` er UTC og gir riktig tidspunkt for alle.
+  function postDate(post) {
+    const raw = post.date_gmt ? post.date_gmt + "Z" : post.date;
+    const d = new Date(raw);
+    return Number.isFinite(d.getTime()) ? d : null;
+  }
+
+  function timeAgo(date) {
+    if (!date) return "";
+    const mins = Math.floor((Date.now() - date.getTime()) / 60000);
     if (mins < 1) return "nå nettopp";
     if (mins < 60) return mins + " min siden";
     const hours = Math.floor(mins / 60);
     if (hours < 24) return hours + "t siden";
     const days = Math.floor(hours / 24);
-    return days + "d siden";
+    if (days < 7) return days + "d siden";
+    return date.toLocaleDateString("nb-NO", { day: "numeric", month: "short" });
+  }
+
+  function timeEl(post, className) {
+    const date = postDate(post);
+    const node = el("time", className, timeAgo(date));
+    if (date) node.dateTime = date.toISOString();
+    return node;
   }
 
   function getImage(post) {
-    const media = post._embedded && post._embedded["wp:featuredmedia"] && post._embedded["wp:featuredmedia"][0];
-    return (media && media.source_url) || null;
+    const embedded = post._embedded || {};
+    const media = embedded["wp:featuredmedia"] && embedded["wp:featuredmedia"][0];
+    return safeUrl(media && media.source_url);
   }
 
   function getCategory(post) {
-    const terms = post._embedded && post._embedded["wp:term"] && post._embedded["wp:term"][0];
-    return terms && terms.length > 0 ? terms[0].name : null;
+    const embedded = post._embedded || {};
+    const terms = embedded["wp:term"] && embedded["wp:term"][0];
+    return terms && terms.length > 0 ? stripHtml(terms[0].name) : null;
   }
+
+  function getTitle(post) {
+    return stripHtml(post.title && post.title.rendered) || "Uten tittel";
+  }
+
+  /* ---------- henting ---------- */
+
+  function timeoutSignal(ms) {
+    if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) {
+      return AbortSignal.timeout(ms);
+    }
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), ms);
+    return controller.signal;
+  }
+
+  // Kaster med en beskrivende melding i stedet for å svelge feilen, slik at
+  // en tom feed faktisk kan feilsøkes.
+  async function fetchPosts(url) {
+    const res = await fetch(url, {
+      headers: { "Accept": "application/json" },
+      signal: timeoutSignal(REQUEST_TIMEOUT_MS)
+    });
+    const text = await res.text();
+
+    if (!res.ok) throw new Error("HTTP " + res.status + " " + res.statusText);
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (err) {
+      const preview = text.slice(0, 70).replace(/\s+/g, " ");
+      throw new Error("Svaret var ikke JSON (fikk: " + preview + "…)");
+    }
+
+    if (data && !Array.isArray(data) && data.code) {
+      throw new Error("WordPress svarte med feilen «" + data.code + "»");
+    }
+    if (!Array.isArray(data)) {
+      throw new Error("Forventet en liste med artikler, fikk " + typeof data);
+    }
+    return data;
+  }
+
+  async function loadFeed(options) {
+    const silent = options && options.silent;
+    const feed = document.getElementById("feed");
+
+    if (!silent) {
+      const loading = el("div", "state");
+      loading.appendChild(el("p", null, "Henter nyheter …"));
+      feed.setAttribute("aria-busy", "true");
+      feed.replaceChildren(loading);
+    }
+
+    const problems = [];
+    for (const source of SOURCES) {
+      try {
+        const posts = await fetchPosts(source.url);
+        renderFeed(posts);
+        hasContent = posts.length > 0;
+        feed.setAttribute("aria-busy", "false");
+        return;
+      } catch (err) {
+        console.error("[Sportsbibelen] " + source.name + " feilet:", err);
+        problems.push(source.name + " — " + (err && err.message ? err.message : String(err)));
+      }
+    }
+
+    feed.setAttribute("aria-busy", "false");
+    // Ved bakgrunnsoppdatering beholder vi det som allerede står på skjermen.
+    if (silent && hasContent) return;
+    showError(problems);
+  }
+
+  /* ---------- rendering ---------- */
 
   function renderFeed(posts) {
     const feed = document.getElementById("feed");
-    feed.innerHTML = "";
+    feed.replaceChildren();
 
     if (!posts.length) {
-      feed.innerHTML = '<p class="state">Ingen artikler funnet.</p>';
+      const state = el("div", "state");
+      state.appendChild(el("p", null, "Ingen artikler funnet."));
+      feed.appendChild(state);
       return;
     }
 
-    const hero = posts[0];
-    const heroImg = getImage(hero);
-    const heroCat = getCategory(hero);
-
-    const heroEl = document.createElement("div");
-    heroEl.className = "hero";
-    heroEl.innerHTML =
-      (heroImg ? '<img src="' + heroImg + '" alt="">' : "") +
-      '<div class="hero-overlay">' +
-      (heroCat ? '<span class="cat-pill">' + heroCat + "</span>" : "") +
-      '<h2 class="hero-title">' + stripHtml(hero.title.rendered) + "</h2>" +
-      '<p class="meta">' + timeAgo(hero.date) + "</p>" +
-      "</div>";
-    heroEl.addEventListener("click", () => openDetail(hero));
-    feed.appendChild(heroEl);
-
-    posts.slice(1).forEach((post) => {
-      const img = getImage(post);
-      const cat = getCategory(post);
-      const row = document.createElement("div");
-      row.className = "row";
-      row.innerHTML =
-        (img ? '<img src="' + img + '" alt="">' : '<div class="thumb-empty"></div>') +
-        '<div class="row-body">' +
-        (cat ? '<span class="row-cat">' + cat + "</span>" : "") +
-        '<h3 class="row-title">' + stripHtml(post.title.rendered) + "</h3>" +
-        '<p class="row-meta">' + timeAgo(post.date) + "</p>" +
-        "</div>";
-      row.addEventListener("click", () => openDetail(post));
-      feed.appendChild(row);
-    });
+    feed.appendChild(buildHero(posts[0]));
+    posts.slice(1).forEach((post) => feed.appendChild(buildRow(post)));
   }
 
-  function openDetail(post) {
+  function buildHero(post) {
+    const button = el("button", "card-btn hero");
+    button.type = "button";
+
     const img = getImage(post);
+    if (img) button.appendChild(imageEl(img, false));
+
+    const overlay = el("div", "hero-overlay");
     const cat = getCategory(post);
+    if (cat) overlay.appendChild(el("span", "cat-pill", cat));
+    overlay.appendChild(el("h2", "hero-title", getTitle(post)));
+    overlay.appendChild(timeEl(post, "meta"));
+    button.appendChild(overlay);
+
+    button.addEventListener("click", () => openDetail(post, button));
+    return button;
+  }
+
+  function buildRow(post) {
+    const button = el("button", "card-btn row");
+    button.type = "button";
+
+    const img = getImage(post);
+    button.appendChild(img ? imageEl(img, true) : el("div", "thumb-empty"));
+
+    const body = el("div", "row-body");
+    const cat = getCategory(post);
+    if (cat) body.appendChild(el("span", "row-cat", cat));
+    body.appendChild(el("h3", "row-title", getTitle(post)));
+    body.appendChild(timeEl(post, "row-meta"));
+    button.appendChild(body);
+
+    button.addEventListener("click", () => openDetail(post, button));
+    return button;
+  }
+
+  function showError(problems) {
+    const feed = document.getElementById("feed");
+    const state = el("div", "state");
+    state.appendChild(el("p", null, "Klarte ikke å hente nyheter akkurat nå."));
+
+    const retry = el("button", "retry-btn", "Prøv igjen");
+    retry.type = "button";
+    retry.addEventListener("click", () => loadFeed());
+    state.appendChild(retry);
+
+    if (problems.length) {
+      const details = document.createElement("details");
+      details.className = "err-details";
+      details.appendChild(el("summary", null, "Tekniske detaljer"));
+      problems.forEach((line) => details.appendChild(el("p", "err-line", line)));
+      state.appendChild(details);
+    }
+
+    feed.replaceChildren(state);
+  }
+
+  /* ---------- detaljvisning ---------- */
+
+  function openDetail(post, trigger) {
+    lastFocused = trigger || document.activeElement;
+
     const card = document.getElementById("detailCard");
-    card.innerHTML =
-      (img ? '<img src="' + img + '" alt="">' : "") +
-      '<div class="detail-body">' +
-      (cat ? '<span class="row-cat">' + cat + "</span>" : "") +
-      '<h2 class="detail-title">' + stripHtml(post.title.rendered) + "</h2>" +
-      '<p class="detail-excerpt">' + stripHtml(post.excerpt.rendered) + "</p>" +
-      '<button class="close-btn" id="closeBtn">Lukk</button>' +
-      "</div>";
+    card.replaceChildren();
+
+    const img = getImage(post);
+    if (img) card.appendChild(imageEl(img, false));
+
+    const body = el("div", "detail-body");
+    const cat = getCategory(post);
+    if (cat) body.appendChild(el("span", "row-cat", cat));
+
+    const title = el("h2", "detail-title", getTitle(post));
+    title.id = "detailTitle";
+    body.appendChild(title);
+
+    const excerpt = stripHtml(post.excerpt && post.excerpt.rendered);
+    if (excerpt) body.appendChild(el("p", "detail-excerpt", excerpt));
+
+    const link = safeUrl(post.link);
+    if (link) {
+      const anchor = el("a", "read-link", "Les hele saken →");
+      anchor.href = link;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      body.appendChild(anchor);
+    }
+
+    const close = el("button", "close-btn", "Lukk");
+    close.type = "button";
+    close.addEventListener("click", closeDetail);
+    body.appendChild(close);
+
+    card.appendChild(body);
     document.getElementById("detailWrap").classList.add("open");
-    document.getElementById("closeBtn").addEventListener("click", closeDetail);
+    close.focus();
   }
 
   function closeDetail() {
     document.getElementById("detailWrap").classList.remove("open");
+    if (lastFocused && lastFocused.isConnected) lastFocused.focus();
+    lastFocused = null;
+  }
+
+  function isDetailOpen() {
+    return document.getElementById("detailWrap").classList.contains("open");
   }
 
   document.getElementById("detailWrap").addEventListener("click", (e) => {
     if (e.target.id === "detailWrap") closeDetail();
   });
 
-  fetch(API_URL)
-    .then((res) => {
-      if (!res.ok) throw new Error("Nettverksfeil");
-      return res.json();
-    })
-    .then(renderFeed)
-    .catch(() => {
-      document.getElementById("feed").innerHTML =
-        '<p class="state">Klarte ikke å hente nyheter akkurat nå.</p>';
-    });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && isDetailOpen()) closeDetail();
+  });
+
+  /* ---------- oppstart ---------- */
+
+  loadFeed();
+
+  // «LIVE» stod tidligere stille: feeden ble hentet én gang. Nå oppdateres den
+  // så lenge fanen er synlig.
+  setInterval(() => {
+    if (!document.hidden) loadFeed({ silent: true });
+  }, REFRESH_MS);
 </script>
 </body>
 </html>
