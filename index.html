@@ -221,22 +221,6 @@
     margin: 0;
   }
 
-  .live-tag {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: #FF8A3D;
-    font-weight: 500;
-  }
-
-  .dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #FF8A3D;
-  }
-
   .feed {
     overflow-y: auto;
     flex: 1;
@@ -662,7 +646,6 @@
         <h1 class="logo">Sportsbibelen</h1>
         <span class="filter-tag" id="filterTag"></span>
       </div>
-      <div class="live-tag"><span class="dot"></span>LIVE</div>
     </div>
 
     <nav class="menu-panel" id="menuPanel" aria-label="Hovedmeny">
@@ -998,9 +981,18 @@
     return data;
   }
 
+  // Hvor nar toppen leseren ma vaere for at en bakgrunnsoppdatering skal
+  // fa bygge feeden pa nytt.
+  const TOP_THRESHOLD = 40;
+
   async function loadFeed(options) {
     const silent = options && options.silent;
     const feed = document.getElementById("feed");
+
+    // Star leseren nede i listen, lar vi feeden vaere. Ellers ville nye
+    // saker blitt lagt inn over vedkommende, som da blir staende igjen
+    // langt nede i en liste som har endret seg under fottene pa dem.
+    if (silent && hasContent && feed.scrollTop > TOP_THRESHOLD) return;
 
     if (!silent) {
       const loading = el("div", "state");
@@ -1109,6 +1101,10 @@
       feed.appendChild(state);
       return;
     }
+
+    // Ny liste, ny start. Uten dette arver den nye feeden rulleposisjonen
+    // fra den forrige, som sjelden peker pa det samme innholdet.
+    feed.scrollTop = 0;
 
     feed.appendChild(buildHero(posts[0]));
 
@@ -1379,8 +1375,8 @@
 
   loadFeed();
 
-  // «LIVE» stod tidligere stille: feeden ble hentet én gang. Nå oppdateres den
-  // så lenge fanen er synlig.
+  // Feeden oppdateres i bakgrunnen så lenge fanen er synlig. loadFeed lar
+  // innholdet stå hvis leseren har scrollet ned i listen.
   setInterval(() => {
     if (!document.hidden) loadFeed({ silent: true });
   }, REFRESH_MS);
