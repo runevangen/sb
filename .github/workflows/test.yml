@@ -1,0 +1,23 @@
+name: Tester
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  regresjonstester:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Google Chrome folger med ubuntu-runneren. Skriptet leter gjennom en
+      # liste med kjente stier, sa CHROME settes bare for a slippe gjettingen.
+      - name: Kjor regresjonstestene
+        env:
+          CHROME: /usr/bin/google-chrome
+        run: node test/run.mjs

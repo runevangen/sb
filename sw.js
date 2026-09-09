@@ -11,7 +11,8 @@ const SKALL = [
   "/index.html",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
-  "/icons/icon-512.png"
+  "/icons/icon-512.png",
+  "/icons/icon-512-maskable.png"
 ];
 
 self.addEventListener("install", (e) => {

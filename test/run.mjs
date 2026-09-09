@@ -174,6 +174,15 @@ const SAK_2 = kjor("artikkel", FELLES + `
          !document.body.hasAttribute("pwned") && !document.body.hasAttribute("pwned2") && !document.body.hasAttribute("pwned3"));
       ok("redaksjonelt innhold beholdes", !!art.querySelector("h2") && !!art.querySelector("strong"));
       ok("javascript-lenke mister href", !art.querySelector("a[href]"));
+      // Fokusfella: handteren kaller preventDefault og flytter fokus selv,
+      // sa en utsendt Tab-hendelse tester den fullt ut.
+      var felt = document.querySelectorAll(".detail-shell a[href], .detail-shell button");
+      felt[felt.length - 1].focus();
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+      ok("fokus vandrer ikke ut av artikkelen",
+         document.activeElement === felt[0],
+         document.activeElement.className || document.activeElement.tagName);
+
       ok("YouTube slipper gjennom", rammer.length === 1 && rammer[0].indexOf("https://www.youtube.com/embed/") === 0, rammer.join(","));
       ok("forfalsket videovert blokkeres", rammer.join(",").indexOf("angriper") === -1, rammer.join(","));
       ferdig();
