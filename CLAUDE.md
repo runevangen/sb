@@ -35,20 +35,27 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   variabler. Tekst som ligger oppå bildegradienten bruker `--on-overlay`,
   ikke temaets tekstfarge — gradienten er mørk i begge temaer.
 - Tekststørrelser skaleres av `--fs`. Avstander og rammer skaleres ikke.
+- Ruting går på hash (`#/sak/<slug>`), ikke sti. En sti ville gitt 404 ved
+  oppfriskning uten en ny regel i `netlify.toml`, og den skal holdes smal.
+  Å åpne en sak legger en tilstand i historikken, så telefonens
+  tilbakeknapp lukker artikkelen i stedet for appen.
+- Lenker i artikkelteksten til vårt eget domene får `data-slug` og åpnes i
+  appen. `href` beholdes, så lenken virker om noe feiler, og lang-trykk
+  oppfører seg normalt.
 
 ## Testing
 
-    node test/unit.mjs    31 tester, ~90 ms, ingen nettleser
-    node test/run.mjs     23 tester, ~40 s, headless Chromium
+    node test/unit.mjs    40 tester, ~90 ms, ingen nettleser
+    node test/run.mjs     31 tester, ~55 s, headless Chromium
 
 Begge kjøres på hver pull request via `.github/workflows/test.yml`.
 Enhetstestene først, så en åpenbar feil stopper kjøringen før nettleseren
 i det hele tatt starter.
 
-`unit.mjs` dekker `lib.js`: URL-validering, videovertslisten, tidsstempler
-og endringssignaturen. `run.mjs` dekker alt som trenger DOM: XSS i titler
+`unit.mjs` dekker `lib.js`: URL-validering, videovertslisten, tidsstempler,
+endringssignaturen og gjenkjenning av interne lenker. `run.mjs` dekker alt som trenger DOM: XSS i titler
 og artikkel-HTML, annonseplassering, rulleoppførsel, artikkelvisningen,
-fokusfella, korthøyden og at toppfeltet krymper.
+fokusfella, korthøyden, at toppfeltet krymper, paginering og ruting.
 
 Testsidene serveres over HTTP, ikke fra `file://` — modul-script blokkeres
 av CORS på file-opphav, og appen ville aldri lastet.

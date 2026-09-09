@@ -3,7 +3,7 @@
 // De rene hjelpefunksjonene ligger i lib.js for a kunne enhetstestes uten
 // nettleser. Alt her nede rorer DOM, nettverk eller lagring.
 
-import { safeUrl, videoUrl, postDate, timeAgo, feedSignature } from "./lib.js";
+import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug } from "./lib.js";
 
 // Bytt WP_HOST til din egen WordPress-side når som helst.
 const WP_HOST  = "https://sportsbibelen.no";
@@ -23,8 +23,11 @@ function catParam(categoryId) {
   return categoryId ? "&categories=" + encodeURIComponent(categoryId) : "";
 }
 
-function postSources(categoryId) {
-  return sourcesFor(WP_QUERY + catParam(categoryId));
+function postSources(categoryId, sideNr) {
+  let q = WP_QUERY + catParam(categoryId);
+  if (sokeord) q += "&search=" + encodeURIComponent(sokeord);
+  if (sideNr && sideNr > 1) q += "&page=" + sideNr;
+  return sourcesFor(q);
 }
 
 // Samme vindu som feeden, men kun id og endringstidspunkt. _fields kutter
@@ -33,7 +36,9 @@ function postSources(categoryId) {
 const SIG_QUERY = "?per_page=12&orderby=date&order=desc&_fields=id,modified_gmt";
 
 function signatureSources(categoryId) {
-  return sourcesFor(SIG_QUERY + catParam(categoryId));
+  let q = SIG_QUERY + catParam(categoryId);
+  if (sokeord) q += "&search=" + encodeURIComponent(sokeord);
+  return sourcesFor(q);
 }
 
 function sourcesFor(query) {
@@ -65,7 +70,14 @@ const REFRESH_MS = 5 * 60 * 1000;
 let hasContent = false;
 let lastFocused = null;
 let activeCategory = null;      // null = alle saker
-let lastSignature = null;       // feedens tilstand ved forrige vellykkede lasting
+let lastSignature = null;
+let alleSaker = [];             // det som ligger i feeden na, pa tvers av sider
+let side = 1;
+let flereFinnes = true;
+let sokeord = "";
+let harPushet = false;
+const PER_SIDE = 12;
+const WP_VERT = new URL(WP_HOST).hostname;       // feedens tilstand ved forrige vellykkede lasting
 let menuLoaded = false;
 
 /* ---------- små DOM-hjelpere ---------- */
@@ -153,7 +165,7 @@ const ALLOWED = {
   BLOCKQUOTE: [], PRE: [], CODE: [],
   FIGURE: [], FIGCAPTION: [],
   TABLE: [], THEAD: [], TBODY: [], TFOOT: [], TR: [], TH: [], TD: [],
-  A: ["href"],
+  A: ["href", "data-slug"],
   IMG: ["src", "alt"],
   IFRAME: ["src", "title", "allowfullscreen"]
 };
@@ -215,8 +227,16 @@ function cleanChildren(root) {
       const href = safeUrl(node.getAttribute("href"));
       if (href) {
         node.setAttribute("href", href);
-        node.setAttribute("target", "_blank");
-        node.setAttribute("rel", "noopener noreferrer");
+        // Lenker til vare egne saker apnes i appen. href beholdes, sa
+        // lenken virker hvis noe skulle feile, og lang-trykk og "apne i ny
+        // fane" oppforer seg normalt.
+        const intern = internSlug(href, WP_VERT);
+        if (intern) {
+          node.setAttribute("data-slug", intern);
+        } else {
+          node.setAttribute("target", "_blank");
+          node.setAttribute("rel", "noopener noreferrer");
+        }
       } else {
         node.removeAttribute("href");
       }
@@ -340,6 +360,9 @@ async function loadFeed(options) {
   for (const source of postSources(activeCategory)) {
     try {
       const posts = await fetchList(source.url);
+      side = 1;
+      flereFinnes = posts.length >= PER_SIDE;
+      alleSaker = posts;
       renderFeed(posts);
       lastSignature = feedSignature(posts);
       hasContent = posts.length > 0;
@@ -427,10 +450,109 @@ function buildAd(ad, slot) {
   return box;
 }
 
+/* ---------- relaterte saker ---------- */
+
+async function visRelaterte(post, boks) {
+  const terms = (post._embedded || {})["wp:term"];
+  const kategori = terms && terms[0] && terms[0][0];
+  if (!kategori || !kategori.id) return;
+
+  const q = "?_embed=1&per_page=3&orderby=date&order=desc"
+          + "&categories=" + encodeURIComponent(kategori.id)
+          + "&exclude=" + encodeURIComponent(post.id);
+
+  for (const source of sourcesFor(q)) {
+    try {
+      const saker = await fetchList(source.url);
+      if (!saker.length || !boks.isConnected) return;
+
+      boks.appendChild(el("h3", "relatert-tittel", "Mer fra " + kategori.name));
+      saker.forEach((sak) => {
+        const rad = el("button", "relatert-rad");
+        rad.type = "button";
+        rad.appendChild(el("span", "relatert-navn", getTitle(sak)));
+        rad.appendChild(timeEl(sak, "relatert-tid"));
+        rad.addEventListener("click", () => {
+          closeDetail();
+          visArtikkel(sak);
+        });
+        boks.appendChild(rad);
+      });
+      return;
+    } catch (err) {
+      // Relaterte saker er en bonus. Feiler de, skal artikkelen sta.
+      console.error("[Sportsbibelen] relaterte saker feilet:", err);
+      return;
+    }
+  }
+}
+
+/* ---------- ruting ---------- */
+
+// Hash-ruting, ikke sti-ruting. En sti som /sak/<slug> ville gitt 404 ved
+// oppfriskning uten en ny regel i netlify.toml, og den regelen skal holdes
+// smal. Hash koster ingenting pa serversiden.
+function slugFraHash() {
+  const m = location.hash.match(/^#\/sak\/([^/?#]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function visArtikkel(post, trigger) {
+  const slug = post.slug || String(post.id);
+  history.pushState({ slug }, "", "#/sak/" + encodeURIComponent(slug));
+  harPushet = true;
+  openDetail(post, trigger);
+}
+
+function lukkArtikkel() {
+  // Lukk med en gang, sa visningen aldri henger etter historikken.
+  closeDetail();
+  if (harPushet) {
+    harPushet = false;
+    history.back();
+  } else if (slugFraHash()) {
+    history.replaceState({}, "", location.pathname + location.search);
+  }
+}
+
+// Slar opp en sak pa slug: forst blant de som alt er lastet, ellers hentes
+// den. Det siste er det som gjor dyplenker og interne lenker mulig.
+async function apneSlug(slug, trigger) {
+  const kjent = alleSaker.find((p) => p.slug === slug);
+  if (kjent) {
+    openDetail(kjent, trigger);
+    return true;
+  }
+  for (const source of sourcesFor(WP_QUERY + "&slug=" + encodeURIComponent(slug))) {
+    try {
+      const treff = await fetchList(source.url);
+      if (treff.length) {
+        openDetail(treff[0], trigger);
+        return true;
+      }
+    } catch (err) {
+      console.error("[Sportsbibelen] oppslag pa slug feilet:", err);
+    }
+  }
+  return false;
+}
+
+window.addEventListener("popstate", () => {
+  const slug = slugFraHash();
+  if (!slug) {
+    harPushet = false;
+    closeDetail();
+    return;
+  }
+  apneSlug(slug);
+});
+
 /* ---------- rendering ---------- */
 
-function renderFeed(posts) {
+function renderFeed(posts, opts) {
+  const behold = opts && opts.behold;
   const feed = document.getElementById("feed");
+  const forrigeRull = feed.scrollTop;
   feed.replaceChildren();
 
   if (!posts.length) {
@@ -441,7 +563,8 @@ function renderFeed(posts) {
   }
 
   // Ny liste, ny start. Uten dette arver den nye feeden rulleposisjonen
-  // fra den forrige, som sjelden peker pa det samme innholdet.
+  // fra den forrige, som sjelden peker pa det samme innholdet. Ved
+  // paginering er det motsatt: da er listen den samme, bare lengre.
   feed.scrollTop = 0;
 
   feed.appendChild(buildHero(posts[0]));
@@ -462,6 +585,44 @@ function renderFeed(posts) {
       slot += 1;
     }
   });
+
+  if (flereFinnes) feed.appendChild(byggVisFlere());
+  if (behold) feed.scrollTop = forrigeRull;
+}
+
+function byggVisFlere() {
+  const knapp = el("button", "vis-flere", "Vis flere saker");
+  knapp.type = "button";
+  knapp.addEventListener("click", async () => {
+    knapp.disabled = true;
+    knapp.textContent = "Henter …";
+    const fikk = await hentFlere();
+    if (!fikk) {
+      knapp.textContent = "Klarte ikke hente flere";
+      knapp.disabled = false;
+    }
+  });
+  return knapp;
+}
+
+// Henter neste side og legger den bak den vi har. Feeden bygges om i sin
+// helhet, ikke lappes pa, sa annonseplasseringen forblir en regel og ikke
+// to kodeveier.
+async function hentFlere() {
+  for (const source of postSources(activeCategory, side + 1)) {
+    try {
+      const nye = await fetchList(source.url);
+      side += 1;
+      flereFinnes = nye.length >= PER_SIDE;
+      alleSaker = alleSaker.concat(nye);
+      renderFeed(alleSaker, { behold: true });
+      track("Flere saker hentet", { side: String(side) });
+      return true;
+    } catch (err) {
+      console.error("[Sportsbibelen] flere saker feilet:", err);
+    }
+  }
+  return false;
 }
 
 function buildHero(post) {
@@ -478,7 +639,7 @@ function buildHero(post) {
   overlay.appendChild(timeEl(post, "meta"));
   button.appendChild(overlay);
 
-  button.addEventListener("click", () => openDetail(post, button));
+  button.addEventListener("click", () => visArtikkel(post, button));
   return button;
 }
 
@@ -496,7 +657,7 @@ function buildRow(post) {
   body.appendChild(timeEl(post, "row-meta"));
   button.appendChild(body);
 
-  button.addEventListener("click", () => openDetail(post, button));
+  button.addEventListener("click", () => visArtikkel(post, button));
   return button;
 }
 
@@ -593,6 +754,26 @@ function folgMedPaRulling() {
 
 folgMedPaRulling();
 
+/* ---------- sok ---------- */
+
+document.getElementById("sokForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const felt = document.getElementById("sokFelt");
+  const q = felt.value.trim();
+
+  sokeord = q;
+  // Et sok gar pa tvers av kategorier. Ellers ville treffene stilltiende
+  // vaert begrenset til den kategorien man tilfeldigvis sto i.
+  activeCategory = null;
+  lastSignature = null;
+
+  merkValgtKategori(null);
+  document.getElementById("filterTag").textContent = q ? "Søk: " + q : "";
+  track(q ? "Sok" : "Sok tomt", { ord: q.slice(0, 40) });
+  closeMenu();
+  loadFeed();
+});
+
 /* ---------- del og installer ---------- */
 
 const DEL_TEKST = "Sportsbibelen — siste nytt fra sportens verden";
@@ -675,6 +856,24 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+// En delegert lytter, ikke en per lenke: innholdet byttes ut hver gang en
+// artikkel apnes.
+document.getElementById("detailCard").addEventListener("click", async (e) => {
+  const lenke = e.target.closest("a[data-slug]");
+  if (!lenke) return;
+  e.preventDefault();
+  const slug = lenke.dataset.slug;
+  const fikk = await apneSlug(slug);
+  if (fikk) {
+    history.pushState({ slug }, "", "#/sak/" + encodeURIComponent(slug));
+    harPushet = true;
+    track("Intern lenke apnet", { artikkel: slug });
+  } else {
+    // Fant vi den ikke, skal leseren fortsatt komme dit.
+    window.open(lenke.href, "_blank", "noopener");
+  }
+});
+
 /* ---------- meny ---------- */
 
 async function loadMenu() {
@@ -735,16 +934,23 @@ function menuEntry(cat) {
   return item;
 }
 
-function selectCategory(cat) {
-  const id = cat.id || null;
-  activeCategory = id;
-
-  // Marker det valgte punktet uten å hente menyen på nytt.
+// Markerer valgt punkt uten a hente menyen pa nytt. Brukes bade av
+// menyvalg og av sok, som nullstiller kategorien.
+function merkValgtKategori(id) {
   const wanted = id ? String(id) : "";
   document.querySelectorAll(".menu-item").forEach((btn) => {
     if (btn.dataset.catId === wanted) btn.setAttribute("aria-current", "true");
     else btn.removeAttribute("aria-current");
   });
+}
+
+function selectCategory(cat) {
+  const id = cat.id || null;
+  activeCategory = id;
+  sokeord = "";
+  document.getElementById("sokFelt").value = "";
+
+  merkValgtKategori(id);
 
   // Vis i toppen hvilken del av feeden man star i.
   const tag = document.getElementById("filterTag");
@@ -827,9 +1033,15 @@ function openDetail(post, trigger) {
     body.appendChild(anchor);
   }
 
+  // Relaterte saker holder leseren i appen i stedet for a sende dem
+  // tilbake til feeden for a finne noe nytt.
+  const relatertBoks = el("div", "relatert");
+  body.appendChild(relatertBoks);
+  visRelaterte(post, relatertBoks);
+
   const close = el("button", "close-btn", "Lukk");
   close.type = "button";
-  close.addEventListener("click", closeDetail);
+  close.addEventListener("click", lukkArtikkel);
   body.appendChild(close);
 
   card.appendChild(body);
@@ -856,15 +1068,15 @@ function isDetailOpen() {
   return document.getElementById("detailWrap").classList.contains("open");
 }
 
-document.getElementById("cornerClose").addEventListener("click", closeDetail);
+document.getElementById("cornerClose").addEventListener("click", lukkArtikkel);
 
 document.getElementById("detailWrap").addEventListener("click", (e) => {
-  if (e.target.id === "detailWrap") closeDetail();
+  if (e.target.id === "detailWrap") lukkArtikkel();
 });
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    if (isDetailOpen()) closeDetail();
+    if (isDetailOpen()) lukkArtikkel();
     else if (isMenuOpen()) closeMenu();
     return;
   }
@@ -899,7 +1111,11 @@ function fangFokus(e) {
 
 /* ---------- oppstart ---------- */
 
-loadFeed();
+// Apner appen pa en dyplenke, apnes den saken med en gang feeden star.
+loadFeed().then(() => {
+  const slug = slugFraHash();
+  if (slug) apneSlug(slug);
+});
 
 // Feeden oppdateres i bakgrunnen så lenge fanen er synlig. loadFeed lar
 // innholdet stå hvis leseren har scrollet ned i listen.

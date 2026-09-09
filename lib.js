@@ -67,3 +67,30 @@ export function feedSignature(list) {
     String(post.id) + ":" + (post.modified_gmt || post.date_gmt || "")
   ).join(",");
 }
+
+// Henter artikkel-sluggen ut av en lenke til vart eget nettsted.
+// WordPress-permalenker kan ha datoprefiks eller ikke, sa vi tar siste
+// meningsfulle segment. Peker lenken et annet sted, eller pa forsiden,
+// gir den null og lenken skal apnes utenfor appen som for.
+export function internSlug(url, vertsnavn) {
+  if (!url) return null;
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch (err) {
+    return null;
+  }
+  const vert = (parsed.hostname || "").toLowerCase().replace(/^www\./, "");
+  if (vert !== vertsnavn.toLowerCase().replace(/^www\./, "")) return null;
+
+  const deler = parsed.pathname.split("/").filter(Boolean);
+  if (!deler.length) return null;
+
+  const siste = deler[deler.length - 1];
+  // Kategorisider, forfattersider og arkiv er ikke artikler.
+  if (["category", "author", "tag", "page", "feed", "wp-json"].indexOf(deler[0]) !== -1) return null;
+  // Rene tall er datosegmenter, ikke en slug.
+  if (/^\d+$/.test(siste)) return null;
+  return siste;
+}
+
