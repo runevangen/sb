@@ -11,6 +11,7 @@ import { LIGAER, DELER, DEL_NAVN } from "./fotball-data.js";
 import { timeAgo } from "./lib.js";
 
 let naviger = () => {};
+let sokEtterLag = () => {};
 let aktivLiga = "eliteserien";
 let aktivDel = "tabell";
 
@@ -28,8 +29,9 @@ function el(tag, klasse, tekst) {
 
 /* ---------- oppsett ---------- */
 
-export function initFotball(paNavigering) {
+export function initFotball(paNavigering, paLagsok) {
   naviger = paNavigering;
+  if (paLagsok) sokEtterLag = paLagsok;
 
   const ligaer = document.getElementById("ligaVelger");
   Object.keys(LIGAER).forEach((nokkel) => {
@@ -182,8 +184,16 @@ function tabell(rader) {
     const tr = el("tr");
     KOLONNER.forEach(([, felt]) => {
       if (felt === "lag") {
-        const td = el("td", "kol-lag", rad.lag);
+        const td = el("td", "kol-lag");
         td.scope = "row";
+        // En knapp, ikke en klikkbar rad: den nas med tastatur, leses opp
+        // som noe man kan trykke pa, og lar resten av raden markeres som
+        // vanlig tekst.
+        const knapp = el("button", "lag-knapp", rad.lag);
+        knapp.type = "button";
+        knapp.title = "Søk i nyhetene etter " + rad.lag;
+        knapp.addEventListener("click", () => sokEtterLag(rad.lag));
+        td.appendChild(knapp);
         tr.appendChild(td);
         return;
       }

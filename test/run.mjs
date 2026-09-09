@@ -489,6 +489,7 @@ function mockAlt(saker, fotballFeil) {
       `}
     }
     window.__kall.push(u.indexOf("_fields=") > -1 ? "sjekk" : "full");
+    window.__sokUrl = u;
     var svar;
     if (u.indexOf("/wp-api/categories") === 0) svar = KATEGORIER;
     else if (u.indexOf("_fields=") > -1) svar = ${saker}.map(function (p) { return { id: p.id, modified_gmt: p.modified_gmt }; });
@@ -575,6 +576,11 @@ const SAK_6 = await kjor("fotball", FELLES + FOTBALL + `
       ok("sist oppdatert vises",
          document.querySelector(".fotball-stempel").textContent.indexOf("Oppdatert") === 0,
          document.querySelector(".fotball-stempel").textContent);
+
+      // Et lag i tabellen er en inngang til nyhetene om det laget.
+      var lagKnapp = document.querySelector(".tabell .lag-knapp");
+      ok("lagnavnet er en knapp, ikke bare tekst",
+         lagKnapp && lagKnapp.tagName === "BUTTON", lagKnapp && lagKnapp.tagName);
 
       // Menyen skal beskrive visningen du star i.
       document.getElementById("menuBtn").click();
@@ -680,11 +686,45 @@ const SAK_8 = await kjor("fotball-feil", FELLES + FOTBALL + `
   }, 900); });
 `);
 
-/* ---------------- 9. ferdigspilt sesong ---------------- */
+/* ---------------- 9. lag i tabellen soker i nyhetene ---------------- */
+
+const SAK_9 = await kjor("fotball-lagsok", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  ` + mockAlt("saker") + `
+  location.hash = "#/fotball/eliteserien/tabell";
+
+  window.addEventListener("load", function () { setTimeout(function () {
+    var knapper = document.querySelectorAll(".tabell .lag-knapp");
+    ok("hvert lag har en knapp", knapper.length === 3, knapper.length);
+
+    var forSok = window.__kall.length;
+    knapper[1].click();   // "Brann"
+
+    setTimeout(function () {
+      ok("trykk pa lag bytter til nyheter",
+         !document.getElementById("feed").hidden && document.getElementById("fotball").hidden);
+      ok("toppfeltet viser soket",
+         document.getElementById("filterTag").textContent === "Søk: Brann",
+         document.getElementById("filterTag").textContent);
+      // Sokefeltet skal vise det samme, sa neste sok kan redigeres framfor
+      // a skrives pa nytt.
+      ok("sokefeltet fylles med lagnavnet",
+         document.getElementById("sokFelt").value === "Brann",
+         document.getElementById("sokFelt").value);
+      ok("feeden hentes pa nytt", window.__kall.length > forSok,
+         forSok + " -> " + window.__kall.length);
+      ok("soket gikk mot WordPress med lagnavnet",
+         window.__sokUrl.indexOf("search=Brann") > -1, window.__sokUrl);
+      ferdig();
+    }, 700);
+  }, 900); });
+`);
+
+/* ---------------- 10. ferdigspilt sesong ---------------- */
 
 // Gratisnivaet gir en sesong som er over. Da har den ingen neste runde, og
 // «ingen kamper er satt opp» ville sett ut som en feil hos oss.
-const SAK_9 = await kjor("fotball-ferdig", FELLES + FOTBALL + `
+const SAK_10 = await kjor("fotball-ferdig", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   window.fetch = function (u) {
     u = String(u);
@@ -713,7 +753,7 @@ const SAK_9 = await kjor("fotball-ferdig", FELLES + FOTBALL + `
 
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9];
+const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10];
 let feilet = 0;
 
 for (const t of alle) {

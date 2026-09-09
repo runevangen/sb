@@ -63,6 +63,11 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   en klippet lenke åpner noe framfor ingenting.
 - Menyen beskriver visningen du står i: kategorier i nyheter, ligaer i
   fotball.
+- Lagnavnet i tabellen er en knapp, ikke en klikkbar rad: den nås med
+  tastatur og leses opp som noe man kan trykke på. Den kaller samme
+  `startSok` som søkefeltet, så et lagsøk oppfører seg nøyaktig som et
+  søk man skriver selv — samme nullstilling, samme toppfelt, samme vei
+  tilbake.
 - Tabellen viser alle kolonnene og ruller vannrett i sitt eget felt.
   `.phone` klipper alt som stikker utenfor, så et felt uten `overflow-x`
   ville skjult de siste kolonnene uten vei tilbake — testen ruller derfor
@@ -89,7 +94,7 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
     node test/unit.mjs      84 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  33 tester, ~120 ms, ingen nettleser
-    node test/run.mjs       81 tester, ~110 s, headless Chromium
+    node test/run.mjs       88 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
 De raske først, så en åpenbar feil stopper kjøringen før nettleseren
