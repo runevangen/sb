@@ -1,0 +1,16 @@
+# Proxy WordPress REST API via samme domene som frontenden.
+# Fjerner behovet for CORS-headere på sportsbibelen.no og for en offentlig
+# tredjepartsproxy.
+#
+# Regelen ligger her og ikke i _redirects fordi netlify.toml i repo-roten
+# gjelder uavhengig av hvilken publiseringsmappe prosjektet er satt opp med.
+#
+# Den er bevisst smal: kun /posts slipper gjennom, ikke hele wp/v2/*. En bred
+# regel ville gjort dette domenet til en åpen vei inn til blant annet /users,
+# som lister opp brukernavn.
+
+[[redirects]]
+  from = "/wp-api/posts"
+  to = "https://sportsbibelen.no/wp-json/wp/v2/posts"
+  status = 200
+  force = true

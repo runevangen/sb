@@ -327,16 +327,17 @@
   const WP_URL   = WP_HOST + "/wp-json/wp/v2/posts" + WP_QUERY;
 
   // Feeden hentes fra første kilde som svarer med gyldig JSON.
-  //  1. Samme domene via Netlify-redirect (se _redirects) — ingen tredjepart,
-  //     ingen CORS-problemer. Dette er den anbefalte veien.
-  //  2. Direkte mot WordPress — virker kun hvis serveren sender
-  //     Access-Control-Allow-Origin.
-  //  3. Offentlig CORS-proxy som siste utvei. Den er ratelimitet og uten SLA,
-  //     så den bør ikke være den eneste kilden.
+  //  1. Samme domene via Netlify-proxyen (se netlify.toml) — ingen tredjepart,
+  //     ingen CORS-problemer. Dette er den normale veien.
+  //  2. Direkte mot WordPress som reserve. Virker kun hvis serveren sender
+  //     Access-Control-Allow-Origin, men koster ingenting å forsøke hvis
+  //     proxyen skulle svikte.
+  //
+  // Den tidligere offentlige CORS-proxyen er fjernet med vilje: den var
+  // ratelimitet og uten SLA, og var årsaken til at feeden ble stående tom.
   const SOURCES = [
     { name: "Netlify-proxy (/wp-api)", url: "/wp-api/posts" + WP_QUERY },
-    { name: "Direkte mot WordPress",   url: WP_URL },
-    { name: "allorigins (reserve)",    url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(WP_URL) }
+    { name: "Direkte mot WordPress",   url: WP_URL }
   ];
 
   const REQUEST_TIMEOUT_MS = 12000;
