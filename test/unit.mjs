@@ -9,7 +9,8 @@
 
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug } from "../lib.js";
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
-         apiSti, tolkKamper, nesteRunde, tolkFotballHash, fotballHash }
+         apiSti, tolkKamper, nesteRunde, tolkFotballHash, fotballHash,
+         tilgjengeligSesong, SESONGVINDU }
   from "../fotball-data.js";
 
 let feilet = 0;
@@ -155,6 +156,26 @@ ok("1. juli er ny sesong",
    sesongFor(LIGAER.premier, new Date(Date.UTC(2026, 6, 1))) === 2026,
    sesongFor(LIGAER.premier, new Date(Date.UTC(2026, 6, 1))));
 
+/* ---------------- fotball: sesongvinduet ---------------- */
+
+// Gratisnivaet svarer "season, try from 2022 to 2024" pa alt utenfor
+// vinduet. Da skal vi be om den nyeste sesongen abonnementet gir, ikke
+// vise leseren en feil vedkommende ikke kan gjore noe med.
+const VINDU = { fra: 2022, til: 2024 };
+ok("sesong etter vinduet klemmes ned til taket",
+   tilgjengeligSesong(LIGAER.eliteserien, new Date(Date.UTC(2026, 4, 1)), VINDU) === 2024,
+   tilgjengeligSesong(LIGAER.eliteserien, new Date(Date.UTC(2026, 4, 1)), VINDU));
+ok("sesong for vinduet klemmes opp til gulvet",
+   tilgjengeligSesong(LIGAER.eliteserien, new Date(Date.UTC(2019, 4, 1)), VINDU) === 2022,
+   tilgjengeligSesong(LIGAER.eliteserien, new Date(Date.UTC(2019, 4, 1)), VINDU));
+ok("sesong inne i vinduet star urort",
+   tilgjengeligSesong(LIGAER.eliteserien, new Date(Date.UTC(2023, 4, 1)), VINDU) === 2023);
+// Host-var-ligaer skal klemmes etter sesongen sin, ikke etter kalenderaret.
+ok("host-var-liga klemmes etter sesongen",
+   tilgjengeligSesong(LIGAER.premier, new Date(Date.UTC(2025, 0, 15)), VINDU) === 2024,
+   tilgjengeligSesong(LIGAER.premier, new Date(Date.UTC(2025, 0, 15)), VINDU));
+ok("vinduet har en fra og en til", SESONGVINDU.fra < SESONGVINDU.til);
+
 /* ---------------- fotball: dognkvoten ---------------- */
 
 // Gratisnivaet gir 100 kall i dognet. Slar denne ut, er en levetid satt
@@ -289,6 +310,6 @@ ok("hash bygges tilbake til samme rute",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 79;
+const antall = 84;
 console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);

@@ -107,6 +107,16 @@ ok("tabellen er med", Array.isArray(kropp.tabell) && kropp.tabell[0].lag === "Bo
 ok("sist oppdatert folger med", typeof kropp.oppdatert === "string" &&
    !Number.isNaN(Date.parse(kropp.oppdatert)), kropp.oppdatert);
 
+// Abonnementet dekker ikke inneværende sesong. Ber vi om den likevel,
+// svarer API-et "season, try from 2022 to 2024" og leseren far ingenting.
+const bedtOm = Number((kall[0].url.match(/season=(\d+)/) || [])[1]);
+ok("det sporres om en sesong abonnementet dekker",
+   bedtOm >= 2022 && bedtOm <= 2024, bedtOm);
+ok("sesongen star i svaret", kropp.sesong === bedtOm, kropp.sesong);
+// Leseren skal fa vite at tabellen ikke er fra sesongen vi star i.
+ok("svaret sier at sesongen ikke er inneværende",
+   kropp.sisteSesong === false, String(kropp.sisteSesong));
+
 const kant = r.headers.get("Netlify-CDN-Cache-Control") || "";
 ok("svaret caches pa kanten i tre timer", kant.indexOf("s-maxage=10800") > -1, kant);
 // Uten durable ville hver Netlify-region hentet sitt eget eksemplar, og
@@ -179,6 +189,6 @@ ok("ukjent datasett sporr ikke API-et", kall.length === 0, kall.length);
 
 /* ---------------- rapport ---------------- */
 
-const antall = 30;
+const antall = 33;
 console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);
