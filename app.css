@@ -996,3 +996,195 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* ---------- bunnfaner ---------- */
+
+/* Faneraden ligger som siste barn i .phone, sa den tar plass i stedet for
+   a legge seg over feeden. En overlagt rad ville skjult den siste saken. */
+.tabbar {
+  display: flex;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg-app);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 11px 8px;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.tab[aria-current="true"] { color: var(--accent); }
+
+.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+
+.tab-ico { font-size: 15px; line-height: 1; }
+
+/* Merkingen skal si «tidlig versjon» uten a rope. Den star bade her og i
+   toppfeltet nar modulen er apen. */
+.beta {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--bg-raised);
+  color: var(--text-dim);
+}
+
+.tab[aria-current="true"] .beta { background: var(--accent); color: var(--accent-ink); }
+
+/* ---------- fotball (beta) ---------- */
+
+.fotball {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* body setter ingen tekstfarge — hver del av appen setter sin egen. Uten
+     denne arver tallene i tabellen nettleserens svarte standard, som er
+     usynlig i morkt tema. */
+  color: var(--text-body);
+}
+
+/* Attributtet vinner over display: flex, ellers ville seksjonen statt
+   framme selv nar den er skrudd av. */
+.fotball[hidden] { display: none; }
+
+/* Ligaene og fanene star under hverandre, ikke ved siden av. Pa 390 piksler
+   ma «Premier League» og «Neste runde» ellers kuttes, og et kuttet valg
+   leses som et valg du ikke har. */
+.fotball-topp {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.fotball-topp .segment-del { flex: 1; text-align: center; }
+
+.fotball-innhold {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px 20px;
+}
+
+/* Tabellen er bredere enn en telefon. Den ruller i sitt eget felt, sa
+   selve siden aldri ruller sidelengs. */
+.tabell-skall {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tabell {
+  width: 100%;
+  /* Lavt nok til at alle atte kolonnene far plass pa en telefon nar
+     lagnavnene er korte, hoyt nok til at tallene ikke klemmes sammen. Er
+     navnene lange, vokser tabellen forbi feltet og felter ruller. */
+  min-width: 316px;
+  border-collapse: collapse;
+  font-size: calc(13px * var(--fs));
+  font-variant-numeric: tabular-nums;
+}
+
+.tabell th,
+.tabell td {
+  /* Trangt med vilje: fire piksler til pa hver side skjover poengkolonnen
+     ut av skjermen, og poeng er det forste man ser etter i en tabell. */
+  padding: 7px 4px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-faint);
+}
+
+.tabell th {
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Lagnavnet star helt. Kuttet det seg selv med ellipse, ville tabellen
+   aldri rullet — og et halvt lagnavn er verre enn en kolonne du drar til. */
+.tabell .kol-lag {
+  text-align: left;
+  width: 100%;
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.tabell .kol-poeng { color: var(--text-strong); font-weight: 700; }
+
+.tabell tbody tr:last-child td { border-bottom: 0; }
+
+/* ---------- kampliste ---------- */
+
+.kamper { list-style: none; margin: 0; padding: 0; }
+
+.kamp-dag {
+  margin: 14px 0 6px;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.kamper > .kamp-dag:first-child { margin-top: 0; }
+
+.kamp {
+  display: grid;
+  /* Resultatet i midten holder samme bredde uansett lagnavn, sa kolonnen
+     star loddrett ned gjennom listen. */
+  grid-template-columns: 1fr 76px 1fr;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border-faint);
+}
+
+.kamp-lag {
+  font-size: calc(13px * var(--fs));
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kamp-borte { text-align: right; }
+
+.kamp-tall {
+  text-align: center;
+  font-size: calc(13px * var(--fs));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.fotball-stempel {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 16px 0 0;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.fotball-kilde { color: var(--text-faint); }

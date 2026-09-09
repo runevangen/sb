@@ -22,6 +22,11 @@ jobs:
       - name: Enhetstester
         run: node test/unit.mjs
 
+      # Funksjonstestene kaller Netlify-funksjonen direkte med et stubbet
+      # fetch. Ingen nokkel, ingen nettverk, og de tar millisekunder.
+      - name: Funksjonstester
+        run: node test/funksjon.mjs
+
       - name: Nettlesertester
         env:
           CHROME: /usr/bin/google-chrome
