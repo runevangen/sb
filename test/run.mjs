@@ -65,13 +65,25 @@ function kjor(navn, skript, storrelse) {
   const fil = join(tmp, navn + ".html");
   writeFileSync(fil, app.replace("<head>", "<head>\n<script>" + HARNESS + skript + "<\/script>"));
   const argv = [
+    // --dump-dom virker bare i hodelos modus. Lokalt er binaerfila ofte
+    // headless_shell, som alltid er hodelos, men pa en CI-runner er det en
+    // full nettleser som uten dette prover a apne et vindu og feiler.
+    "--headless=new",
     "--no-sandbox", "--disable-gpu", "--force-prefers-reduced-motion",
     "--virtual-time-budget=12000", "--dump-dom",
   ];
   if (storrelse) argv.push("--window-size=" + storrelse);
   argv.push("file://" + fil);
-  const dom = execFileSync(CHROME, argv,
-    { encoding: "utf8", maxBuffer: 64e6, stdio: ["ignore", "pipe", "ignore"] });
+
+  let dom;
+  try {
+    dom = execFileSync(CHROME, argv,
+      { encoding: "utf8", maxBuffer: 64e6, stdio: ["ignore", "pipe", "pipe"] });
+  } catch (err) {
+    // Uten dette blir en nettleser som ikke starter en tom feilmelding.
+    const detalj = (err.stderr || "").toString().trim().split("\n").slice(-6).join("\n");
+    throw new Error(navn + ": nettleseren feilet (" + CHROME + ")\n" + detalj);
+  }
 
   const treff = dom.match(/data-result="([^"]*)"/);
   if (!treff) throw new Error(navn + ": testsiden rapporterte ingenting");
@@ -174,6 +186,15 @@ const SAK_2 = kjor("artikkel", FELLES + `
          !document.body.hasAttribute("pwned") && !document.body.hasAttribute("pwned2") && !document.body.hasAttribute("pwned3"));
       ok("redaksjonelt innhold beholdes", !!art.querySelector("h2") && !!art.querySelector("strong"));
       ok("javascript-lenke mister href", !art.querySelector("a[href]"));
+      // Fokusfella: handteren kaller preventDefault og flytter fokus selv,
+      // sa en utsendt Tab-hendelse tester den fullt ut.
+      var felt = document.querySelectorAll(".detail-shell a[href], .detail-shell button");
+      felt[felt.length - 1].focus();
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+      ok("fokus vandrer ikke ut av artikkelen",
+         document.activeElement === felt[0],
+         document.activeElement.className || document.activeElement.tagName);
+
       ok("YouTube slipper gjennom", rammer.length === 1 && rammer[0].indexOf("https://www.youtube.com/embed/") === 0, rammer.join(","));
       ok("forfalsket videovert blokkeres", rammer.join(",").indexOf("angriper") === -1, rammer.join(","));
       ferdig();

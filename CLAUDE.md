@@ -30,14 +30,17 @@ Ingen byggesteg. Hostes på Netlify som prosjektet `mvp-sb`.
 
     node test/run.mjs
 
-22 regresjonstester, ingen avhengigheter. De laster index.html med et
+23 regresjonstester, ingen avhengigheter. De laster index.html med et
 mocket `window.fetch` inn i headless Chromium og rapporterer via
 exit-kode. Sett `CHROME` hvis nettleseren ligger et annet sted enn de
 stiene skriptet prøver.
 
+Kjøres automatisk på hver pull request via `.github/workflows/test.yml`.
+
 Dekker: XSS i titler og artikkel-HTML, videovertslisten, tidsstempler fra
 `date_gmt`, annonseplassering, rulleoppførsel, artikkelvisningen,
-endringssjekken, korthøyden og at toppfeltet krymper.
+fokusfella i dialogen, endringssjekken, korthøyden og at toppfeltet
+krymper.
 
 `kjor()` tar en valgfri vindusstørrelse. Høydetesten kjøres i
 telefonformat, fordi taket på kortet ellers aldri binder og testen ville
