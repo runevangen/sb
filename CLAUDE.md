@@ -28,8 +28,20 @@ Ingen byggesteg. Hostes på Netlify som prosjektet `mvp-sb`.
 
 ## Testing
 
-Ingen testsuite. Endringer verifiseres i headless Chromium:
-`/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell`
-med mocket `window.fetch`. Merk at `--virtual-time-budget` ikke driver
-CSS-transisjoner fram; bruk `--force-prefers-reduced-motion` for
-skjermbilder av animerte paneler.
+    node test/run.mjs
+
+16 regresjonstester, ingen avhengigheter. De laster index.html med et
+mocket `window.fetch` inn i headless Chromium og rapporterer via
+exit-kode. Sett `CHROME` hvis nettleseren ligger et annet sted enn de
+stiene skriptet prøver.
+
+Dekker: XSS i titler og artikkel-HTML, videovertslisten, tidsstempler fra
+`date_gmt`, annonseplassering, rulleoppførsel og endringssjekken.
+
+Legger du til en test, sjekk at den kan feile: ødelegg linja den skal
+beskytte og se at den slår ut. Første versjon av rulletesten sjekket
+`scrollTop` rett etter første lasting, der den er null uansett — den
+passerte selv med beskyttelsen fjernet.
+
+Merk at `--virtual-time-budget` ikke driver CSS-transisjoner fram; bruk
+`--force-prefers-reduced-motion` for skjermbilder av animerte paneler.
