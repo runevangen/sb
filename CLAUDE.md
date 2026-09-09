@@ -46,6 +46,11 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 - Lenker i artikkelteksten til vårt eget domene får `data-slug` og åpnes i
   appen. `href` beholdes, så lenken virker om noe feiler, og lang-trykk
   oppfører seg normalt.
+- Filtrerer noe feeden — et søk eller en kategori — står det i toppfeltet
+  som en knapp med kryss, ikke som ren tekst. Et filter uten vei ut blir
+  stående til man åpner menyen og finner «Alle saker», og krysset i
+  søkefeltet på iOS tømmer bare teksten uten å kjøre søket på nytt. I
+  fotball er teksten ren: ligaen byttes, den fjernes ikke.
 
 ### Fotball (beta)
 
@@ -94,7 +99,7 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
     node test/unit.mjs      84 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  33 tester, ~120 ms, ingen nettleser
-    node test/run.mjs       88 tester, ~110 s, headless Chromium
+    node test/run.mjs       93 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
 De raske først, så en åpenbar feil stopper kjøringen før nettleseren

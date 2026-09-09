@@ -658,6 +658,9 @@ const SAK_7 = await kjor("fotball-lenke", FELLES + FOTBALL + `
     ok("ligaen star i toppfeltet",
        document.getElementById("filterTag").textContent === "Premier League",
        document.getElementById("filterTag").textContent);
+    // Ligaen byttes, den fjernes ikke. Da skal den heller ikke ha kryss.
+    ok("ligaen er ren tekst, ikke en filterbrikke",
+       !document.querySelector("#filterTag .filter-chip"));
 
     document.getElementById("fanenNyheter").click();
     setTimeout(function () {
@@ -704,7 +707,7 @@ const SAK_9 = await kjor("fotball-lagsok", FELLES + FOTBALL + `
       ok("trykk pa lag bytter til nyheter",
          !document.getElementById("feed").hidden && document.getElementById("fotball").hidden);
       ok("toppfeltet viser soket",
-         document.getElementById("filterTag").textContent === "Søk: Brann",
+         document.querySelector("#filterTag .filter-navn").textContent === "Søk: Brann",
          document.getElementById("filterTag").textContent);
       // Sokefeltet skal vise det samme, sa neste sok kan redigeres framfor
       // a skrives pa nytt.
@@ -715,7 +718,28 @@ const SAK_9 = await kjor("fotball-lagsok", FELLES + FOTBALL + `
          forSok + " -> " + window.__kall.length);
       ok("soket gikk mot WordPress med lagnavnet",
          window.__sokUrl.indexOf("search=Brann") > -1, window.__sokUrl);
-      ferdig();
+
+      // Veien ut av soket. Uten den blir feeden stande filtrert til man
+      // apner menyen og finner «Alle saker».
+      var brikke = document.querySelector("#filterTag .filter-chip");
+      ok("filteret er en knapp med kryss",
+         brikke && brikke.tagName === "BUTTON" &&
+         brikke.textContent.indexOf("×") > -1, brikke && brikke.textContent);
+
+      var forT\u00f8mming = window.__sokUrl;
+      brikke.click();
+      setTimeout(function () {
+        ok("brikken forsvinner nar filteret er borte",
+           !document.querySelector("#filterTag .filter-chip"),
+           document.getElementById("filterTag").textContent);
+        ok("sokefeltet tommes ogsa",
+           document.getElementById("sokFelt").value === "",
+           document.getElementById("sokFelt").value);
+        ok("feeden hentes uten sok",
+           window.__sokUrl !== forT\u00f8mming && window.__sokUrl.indexOf("search=") === -1,
+           window.__sokUrl);
+        ferdig();
+      }, 700);
     }, 700);
   }, 900); });
 `);
