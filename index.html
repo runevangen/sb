@@ -221,22 +221,6 @@
     margin: 0;
   }
 
-  .live-tag {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: #FF8A3D;
-    font-weight: 500;
-  }
-
-  .dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #FF8A3D;
-  }
-
   .feed {
     overflow-y: auto;
     flex: 1;
@@ -662,7 +646,6 @@
         <h1 class="logo">Sportsbibelen</h1>
         <span class="filter-tag" id="filterTag"></span>
       </div>
-      <div class="live-tag"><span class="dot"></span>LIVE</div>
     </div>
 
     <nav class="menu-panel" id="menuPanel" aria-label="Hovedmeny">
@@ -700,12 +683,36 @@
   //
   // Den tidligere offentlige CORS-proxyen er fjernet med vilje: den var
   // ratelimitet og uten SLA, og var årsaken til at feeden ble stående tom.
+  function catParam(categoryId) {
+    return categoryId ? "&categories=" + encodeURIComponent(categoryId) : "";
+  }
+
   function postSources(categoryId) {
-    const query = WP_QUERY + (categoryId ? "&categories=" + encodeURIComponent(categoryId) : "");
+    return sourcesFor(WP_QUERY + catParam(categoryId));
+  }
+
+  // Samme vindu som feeden, men kun id og endringstidspunkt. _fields kutter
+  // svaret fra full brodtekst for tolv saker til noen fa hundre byte, sa
+  // dette er billig nok til a kjore hvert femte minutt.
+  const SIG_QUERY = "?per_page=12&orderby=date&order=desc&_fields=id,modified_gmt";
+
+  function signatureSources(categoryId) {
+    return sourcesFor(SIG_QUERY + catParam(categoryId));
+  }
+
+  function sourcesFor(query) {
     return [
       { name: "Netlify-proxy (/wp-api)", url: "/wp-api/posts" + query },
       { name: "Direkte mot WordPress",   url: WP_HOST + "/wp-json/wp/v2/posts" + query }
     ];
+  }
+
+  // Fanger nye saker, redigerte saker, ny rekkefolge og saker som er
+  // fjernet - alt som ville endret feeden.
+  function feedSignature(list) {
+    return list.map((post) =>
+      String(post.id) + ":" + (post.modified_gmt || post.date_gmt || "")
+    ).join(",");
   }
 
   // Menyen bygges av kategoriene. WordPress sitt menyendepunkt
@@ -729,6 +736,7 @@
   let hasContent = false;
   let lastFocused = null;
   let activeCategory = null;      // null = alle saker
+  let lastSignature = null;       // feedens tilstand ved forrige vellykkede lasting
   let menuLoaded = false;
 
   /* ---------- små DOM-hjelpere ---------- */
@@ -972,11 +980,14 @@
 
   // Kaster med en beskrivende melding i stedet for å svelge feilen, slik at
   // en tom feed faktisk kan feilsøkes.
-  async function fetchList(url) {
-    const res = await fetch(url, {
+  async function fetchList(url, extra) {
+    const options = {
       headers: { "Accept": "application/json" },
       signal: timeoutSignal(REQUEST_TIMEOUT_MS)
-    });
+    };
+    if (extra && extra.cache) options.cache = extra.cache;
+
+    const res = await fetch(url, options);
     const text = await res.text();
 
     if (!res.ok) throw new Error("HTTP " + res.status + " " + res.statusText);
@@ -998,9 +1009,44 @@
     return data;
   }
 
+  // Hvor nar toppen leseren ma vaere for at en bakgrunnsoppdatering skal
+  // fa bygge feeden pa nytt.
+  const TOP_THRESHOLD = 40;
+
+  // Henter kun id og endringstidspunkt for de samme tolv sakene og
+  // sammenligner med forrige lasting. Klarer vi ikke å sjekke, sier vi at
+  // noe kan være nytt og henter alt som før — sjekken skal aldri kunne
+  // fryse feeden fast.
+  async function nothingNew() {
+    if (!lastSignature) return false;
+
+    for (const source of signatureSources(activeCategory)) {
+      try {
+        // Ingen mellomlagring på selve sjekken: et cachet svar ville sagt
+        // «uendret» i det uendelige.
+        const list = await fetchList(source.url, { cache: "no-store" });
+        return feedSignature(list) === lastSignature;
+      } catch (err) {
+        console.error("[Sportsbibelen] endringssjekk · " + source.name + " feilet:", err);
+      }
+    }
+    return false;
+  }
+
   async function loadFeed(options) {
     const silent = options && options.silent;
     const feed = document.getElementById("feed");
+
+    if (silent && hasContent) {
+      // Står leseren nede i listen, lar vi feeden være. Ellers ville nye
+      // saker blitt lagt inn over vedkommende, som da blir stående igjen
+      // langt nede i en liste som har endret seg under føttene på dem.
+      if (feed.scrollTop > TOP_THRESHOLD) return;
+
+      // Er ingenting endret, er det ingen grunn til å hente tolv saker med
+      // full brødtekst på nytt.
+      if (await nothingNew()) return;
+    }
 
     if (!silent) {
       const loading = el("div", "state");
@@ -1014,6 +1060,7 @@
       try {
         const posts = await fetchList(source.url);
         renderFeed(posts);
+        lastSignature = feedSignature(posts);
         hasContent = posts.length > 0;
         feed.setAttribute("aria-busy", "false");
         return;
@@ -1024,6 +1071,8 @@
     }
 
     feed.setAttribute("aria-busy", "false");
+    // Uten en kjent tilstand må neste oppdatering hente alt.
+    lastSignature = null;
 
     // Gjør feilen synlig i statistikken, slik at vi oppdager en feed som
     // slutter å virke uten å vente på at noen melder fra.
@@ -1109,6 +1158,10 @@
       feed.appendChild(state);
       return;
     }
+
+    // Ny liste, ny start. Uten dette arver den nye feeden rulleposisjonen
+    // fra den forrige, som sjelden peker pa det samme innholdet.
+    feed.scrollTop = 0;
 
     feed.appendChild(buildHero(posts[0]));
 
@@ -1379,8 +1432,8 @@
 
   loadFeed();
 
-  // «LIVE» stod tidligere stille: feeden ble hentet én gang. Nå oppdateres den
-  // så lenge fanen er synlig.
+  // Feeden oppdateres i bakgrunnen så lenge fanen er synlig. loadFeed lar
+  // innholdet stå hvis leseren har scrollet ned i listen.
   setInterval(() => {
     if (!document.hidden) loadFeed({ silent: true });
   }, REFRESH_MS);
