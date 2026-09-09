@@ -31,6 +31,7 @@
   }
 
   .phone {
+    position: relative;
     width: 390px;
     max-width: 100%;
     background: #0F1A16;
@@ -43,6 +44,163 @@
     height: 780px;
     height: min(780px, calc(100vh - 48px));
     height: min(780px, calc(100dvh - 48px));
+  }
+
+  .head-left {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    min-width: 0;
+  }
+
+  /* Hamburgerknappen. Tre streker tegnet i CSS, ingen ikonfil a laste. */
+  .menu-btn {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: 6px;
+  }
+
+  .bars, .bars::before, .bars::after {
+    display: block;
+    width: 17px;
+    height: 1.5px;
+    background: #EAF0ED;
+    border-radius: 1px;
+  }
+
+  .bars { position: relative; }
+
+  .bars::before, .bars::after {
+    content: "";
+    position: absolute;
+    left: 0;
+  }
+
+  .bars::before { top: -5.5px; }
+  .bars::after  { top: 5.5px; }
+
+  .menu-btn:focus-visible, .menu-close:focus-visible, .menu-item:focus-visible {
+    outline: 2px solid #34D399;
+    outline-offset: 2px;
+  }
+
+  /* ---------- menypanel ---------- */
+
+  .menu-panel {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    background: #0F1A16;
+    display: flex;
+    flex-direction: column;
+    visibility: hidden;
+    transform: translateX(-100%);
+    /* visibility slas av forst etter at panelet har skjovet seg ut, og pa
+       oyeblikkelig nar det apner. A transisjonere visibility direkte gir
+       udefinert oppforsel i kantene. */
+    transition: transform 0.22s ease, visibility 0s linear 0.22s;
+  }
+
+  .menu-panel.open {
+    visibility: visible;
+    transform: translateX(0);
+    transition: transform 0.22s ease, visibility 0s;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .menu-panel { transition: none; }
+  }
+
+  .menu-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 18px 14px;
+    border-bottom: 1px solid #1B2621;
+    flex-shrink: 0;
+  }
+
+  .menu-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #EAF0ED;
+    margin: 0;
+  }
+
+  .menu-close {
+    background: none;
+    border: 0;
+    color: #9FB3A9;
+    font-size: 22px;
+    line-height: 1;
+    padding: 4px 6px;
+    cursor: pointer;
+    border-radius: 6px;
+  }
+
+  .menu-list {
+    list-style: none;
+    margin: 0;
+    padding: 8px 0 24px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .menu-item {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    padding: 13px 18px;
+    background: none;
+    border: 0;
+    border-bottom: 1px solid #16201C;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 17px;
+    letter-spacing: 0.01em;
+    color: #EAF0ED;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .menu-item .count {
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 11px;
+    color: #86998F;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+
+  .menu-item[aria-current="true"] { color: #34D399; }
+
+  .menu-item[aria-current="true"] .count { color: #34D399; }
+
+  .menu-state {
+    padding: 20px 18px;
+    font-size: 13px;
+    color: #86998F;
+  }
+
+  /* Viser hvilken del av feeden du star i, nar det ikke er alle saker. */
+  .filter-tag {
+    font-size: 11px;
+    color: #34D399;
+    font-weight: 600;
+    letter-spacing: 0.02em;
   }
 
   .header {
@@ -496,9 +654,26 @@
 
   <div class="phone">
     <div class="header">
-      <h1 class="logo">Sportsbibelen</h1>
+      <div class="head-left">
+        <button class="menu-btn" id="menuBtn" type="button"
+                aria-label="Åpne meny" aria-expanded="false" aria-controls="menuPanel">
+          <span class="bars" aria-hidden="true"></span>
+        </button>
+        <h1 class="logo">Sportsbibelen</h1>
+        <span class="filter-tag" id="filterTag"></span>
+      </div>
       <div class="live-tag"><span class="dot"></span>LIVE</div>
     </div>
+
+    <nav class="menu-panel" id="menuPanel" aria-label="Hovedmeny">
+      <div class="menu-head">
+        <p class="menu-title">Meny</p>
+        <button class="menu-close" id="menuClose" type="button" aria-label="Lukk meny">&times;</button>
+      </div>
+      <ul class="menu-list" id="menuList">
+        <li><p class="menu-state">Henter meny …</p></li>
+      </ul>
+    </nav>
     <div class="feed" id="feed" aria-live="polite" aria-busy="true">
       <div class="state"><p>Henter nyheter …</p></div>
     </div>
@@ -525,16 +700,36 @@
   //
   // Den tidligere offentlige CORS-proxyen er fjernet med vilje: den var
   // ratelimitet og uten SLA, og var årsaken til at feeden ble stående tom.
-  const SOURCES = [
-    { name: "Netlify-proxy (/wp-api)", url: "/wp-api/posts" + WP_QUERY },
-    { name: "Direkte mot WordPress",   url: WP_URL }
-  ];
+  function postSources(categoryId) {
+    const query = WP_QUERY + (categoryId ? "&categories=" + encodeURIComponent(categoryId) : "");
+    return [
+      { name: "Netlify-proxy (/wp-api)", url: "/wp-api/posts" + query },
+      { name: "Direkte mot WordPress",   url: WP_HOST + "/wp-json/wp/v2/posts" + query }
+    ];
+  }
+
+  // Menyen bygges av kategoriene. WordPress sitt menyendepunkt
+  // (/wp/v2/menu-items) krever normalt innlogging, mens kategoriene er
+  // offentlige — og pa en nyhetsside er de i praksis toppmenyen.
+  // Har dere en handplukket meny som avviker, kan den settes her i stedet.
+  const MENU_OVERRIDE = null;   // f.eks. [{ id: 12, name: "Fotball" }, …]
+
+  const CAT_QUERY = "?per_page=20&orderby=count&order=desc&hide_empty=true";
+
+  function categorySources() {
+    return [
+      { name: "Netlify-proxy (/wp-api)", url: "/wp-api/categories" + CAT_QUERY },
+      { name: "Direkte mot WordPress",   url: WP_HOST + "/wp-json/wp/v2/categories" + CAT_QUERY }
+    ];
+  }
 
   const REQUEST_TIMEOUT_MS = 12000;
   const REFRESH_MS = 5 * 60 * 1000;
 
   let hasContent = false;
   let lastFocused = null;
+  let activeCategory = null;      // null = alle saker
+  let menuLoaded = false;
 
   /* ---------- små DOM-hjelpere ---------- */
 
@@ -777,7 +972,7 @@
 
   // Kaster med en beskrivende melding i stedet for å svelge feilen, slik at
   // en tom feed faktisk kan feilsøkes.
-  async function fetchPosts(url) {
+  async function fetchList(url) {
     const res = await fetch(url, {
       headers: { "Accept": "application/json" },
       signal: timeoutSignal(REQUEST_TIMEOUT_MS)
@@ -815,9 +1010,9 @@
     }
 
     const problems = [];
-    for (const source of SOURCES) {
+    for (const source of postSources(activeCategory)) {
       try {
-        const posts = await fetchPosts(source.url);
+        const posts = await fetchList(source.url);
         renderFeed(posts);
         hasContent = posts.length > 0;
         feed.setAttribute("aria-busy", "false");
@@ -992,6 +1187,112 @@
     feed.replaceChildren(state);
   }
 
+  /* ---------- meny ---------- */
+
+  async function loadMenu() {
+    if (menuLoaded) return;
+
+    const list = document.getElementById("menuList");
+
+    if (MENU_OVERRIDE) {
+      renderMenu(MENU_OVERRIDE);
+      menuLoaded = true;
+      return;
+    }
+
+    for (const source of categorySources()) {
+      try {
+        const cats = await fetchList(source.url);
+        renderMenu(cats);
+        menuLoaded = true;
+        return;
+      } catch (err) {
+        console.error("[Sportsbibelen] meny · " + source.name + " feilet:", err);
+      }
+    }
+
+    // Menyen er en bekvemmelighet. Feiler den, skal feeden fortsatt virke,
+    // sa vi lar "Alle saker" sta igjen alene.
+    renderMenu([]);
+    const note = document.createElement("li");
+    note.appendChild(el("p", "menu-state", "Klarte ikke å hente kategoriene."));
+    list.appendChild(note);
+  }
+
+  function renderMenu(categories) {
+    const list = document.getElementById("menuList");
+    list.replaceChildren();
+
+    list.appendChild(menuEntry({ id: null, name: "Alle saker" }));
+    categories.forEach((cat) => list.appendChild(menuEntry(cat)));
+  }
+
+  function menuEntry(cat) {
+    const item = document.createElement("li");
+    const button = el("button", "menu-item");
+    button.type = "button";
+    button.dataset.catId = cat.id ? String(cat.id) : "";
+    button.appendChild(el("span", null, cat.name || "Uten navn"));
+
+    if (typeof cat.count === "number") {
+      button.appendChild(el("span", "count", String(cat.count)));
+    }
+
+    if ((cat.id || null) === activeCategory) {
+      button.setAttribute("aria-current", "true");
+    }
+
+    button.addEventListener("click", () => selectCategory(cat));
+    item.appendChild(button);
+    return item;
+  }
+
+  function selectCategory(cat) {
+    const id = cat.id || null;
+    activeCategory = id;
+
+    // Marker det valgte punktet uten å hente menyen på nytt.
+    const wanted = id ? String(id) : "";
+    document.querySelectorAll(".menu-item").forEach((btn) => {
+      if (btn.dataset.catId === wanted) btn.setAttribute("aria-current", "true");
+      else btn.removeAttribute("aria-current");
+    });
+
+    // Vis i toppen hvilken del av feeden man star i.
+    const tag = document.getElementById("filterTag");
+    tag.textContent = id ? cat.name : "";
+
+    track("Kategori valgt", { kategori: id ? cat.name : "alle" });
+    closeMenu();
+    loadFeed();
+  }
+
+  function openMenu() {
+    const panel = document.getElementById("menuPanel");
+    const btn = document.getElementById("menuBtn");
+    panel.classList.add("open");
+    btn.setAttribute("aria-expanded", "true");
+    document.getElementById("menuClose").focus();
+    track("Meny åpnet");
+    loadMenu();
+  }
+
+  function closeMenu() {
+    const panel = document.getElementById("menuPanel");
+    const btn = document.getElementById("menuBtn");
+    if (!panel.classList.contains("open")) return;
+    panel.classList.remove("open");
+    btn.setAttribute("aria-expanded", "false");
+    btn.focus();
+  }
+
+  function isMenuOpen() {
+    return document.getElementById("menuPanel").classList.contains("open");
+  }
+
+  document.getElementById("menuBtn").addEventListener("click", openMenu);
+  document.getElementById("menuClose").addEventListener("click", closeMenu);
+
   /* ---------- detaljvisning ---------- */
 
   function openDetail(post, trigger) {
@@ -1069,7 +1370,9 @@
   });
 
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && isDetailOpen()) closeDetail();
+    if (e.key !== "Escape") return;
+    if (isDetailOpen()) closeDetail();
+    else if (isMenuOpen()) closeMenu();
   });
 
   /* ---------- oppstart ---------- */

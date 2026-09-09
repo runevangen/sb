@@ -14,3 +14,11 @@
   to = "https://sportsbibelen.no/wp-json/wp/v2/posts"
   status = 200
   force = true
+
+# Kategoriene brukes som meny i appen. Ogsa denne er smal og navngitt, av
+# samme grunn som /posts: ingen wildcard mot wp/v2.
+[[redirects]]
+  from = "/wp-api/categories"
+  to = "https://sportsbibelen.no/wp-json/wp/v2/categories"
+  status = 200
+  force = true
