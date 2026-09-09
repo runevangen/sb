@@ -712,26 +712,44 @@ function applyPrefs(value) {
   if (value.stor) root.setAttribute("data-font", "stor");
   else root.removeAttribute("data-font");
 
-  document.getElementById("themeBtn").setAttribute("aria-pressed", value.svart ? "true" : "false");
-  document.getElementById("fontBtn").setAttribute("aria-pressed", value.stor ? "true" : "false");
+  // aria-current, ikke aria-pressed: dette er et valg mellom to
+  // alternativer, ikke to uavhengige av- og pa-brytere.
+  merkSegment("temaLys", !value.svart);
+  merkSegment("temaSvart", !!value.svart);
+  merkSegment("skriftNormal", !value.stor);
+  merkSegment("skriftStor", !!value.stor);
+}
+
+function merkSegment(id, aktiv) {
+  const b = document.getElementById(id);
+  if (aktiv) b.setAttribute("aria-current", "true");
+  else b.removeAttribute("aria-current");
 }
 
 const prefs = readPrefs();
 applyPrefs(prefs);
 
-document.getElementById("themeBtn").addEventListener("click", () => {
-  prefs.svart = !prefs.svart;
+// Et segment velger en verdi, det veksler ikke. Da kan den som allerede
+// star der trykkes uten at noe skrives eller spores.
+function settVisning(felt, verdi, hendelse, navn) {
+  if (prefs[felt] === verdi) return;
+  prefs[felt] = verdi;
   applyPrefs(prefs);
   savePrefs(prefs);
-  track("Tema byttet", { tema: prefs.svart ? "svart" : "original" });
-});
+  track(hendelse, navn);
+}
 
-document.getElementById("fontBtn").addEventListener("click", () => {
-  prefs.stor = !prefs.stor;
-  applyPrefs(prefs);
-  savePrefs(prefs);
-  track("Skriftstørrelse byttet", { størrelse: prefs.stor ? "stor" : "normal" });
-});
+document.getElementById("temaLys").addEventListener("click", () =>
+  settVisning("svart", false, "Tema byttet", { tema: "lyst" }));
+
+document.getElementById("temaSvart").addEventListener("click", () =>
+  settVisning("svart", true, "Tema byttet", { tema: "svart" }));
+
+document.getElementById("skriftNormal").addEventListener("click", () =>
+  settVisning("stor", false, "Skriftstørrelse byttet", { størrelse: "normal" }));
+
+document.getElementById("skriftStor").addEventListener("click", () =>
+  settVisning("stor", true, "Skriftstørrelse byttet", { størrelse: "stor" }));
 
 /* ---------- toppfeltet krymper ved rulling ---------- */
 

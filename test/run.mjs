@@ -390,9 +390,59 @@ const SAK_4 = await kjor("ruting", FELLES + `
   }, 900); });
 `);
 
+/* ---------------- 5. visningsvalg ---------------- */
+
+const SAK_5 = await kjor("visning", FELLES + `
+  var saker = lagSaker(12);
+  ` + mockFetch("saker") + `
+  function aktiv(id) { return document.getElementById(id).getAttribute("aria-current") === "true"; }
+  // Statistikkroket star her fordi denne bolken kjorer for app.js lastes.
+  var sporet = [];
+  window.plausible = function (navn) { sporet.push(navn); };
+
+  window.addEventListener("load", function () { setTimeout(function () {
+    document.getElementById("menuBtn").click();
+    setTimeout(function () {
+      ok("lyst er markert som aktivt fra start", aktiv("temaLys") && !aktiv("temaSvart"));
+      ok("normal skrift er markert fra start", aktiv("skriftNormal") && !aktiv("skriftStor"));
+
+      var tittelFor = getComputedStyle(document.querySelector(".row-title")).fontSize;
+
+      document.getElementById("temaSvart").click();
+      ok("valg av morkt bytter tema",
+         document.documentElement.getAttribute("data-theme") === "svart");
+      ok("markeringen folger valget", aktiv("temaSvart") && !aktiv("temaLys"));
+
+      document.getElementById("skriftStor").click();
+      var tittelEtter = getComputedStyle(document.querySelector(".row-title")).fontSize;
+      ok("valg av stor skrift forstorrer teksten",
+         parseFloat(tittelEtter) > parseFloat(tittelFor), tittelFor + " -> " + tittelEtter);
+      ok("skriftmarkeringen folger valget", aktiv("skriftStor") && !aktiv("skriftNormal"));
+
+      // A velge det man allerede har skal ikke endre noe, og heller ikke
+      // sende en hendelse: tilstanden alene kan ikke skille de to, siden
+      // et nytt valg av samme verdi gir samme resultat uansett.
+      var antallFor = sporet.filter(function (n) { return n === "Tema byttet"; }).length;
+      document.getElementById("temaSvart").click();
+      var antallEtter = sporet.filter(function (n) { return n === "Tema byttet"; }).length;
+      ok("a velge samme igjen er en ikke-handling",
+         document.documentElement.getAttribute("data-theme") === "svart" &&
+         aktiv("temaSvart") && antallEtter === antallFor,
+         antallFor + " -> " + antallEtter);
+
+      document.getElementById("temaLys").click();
+      ok("valg av lyst gar tilbake",
+         !document.documentElement.getAttribute("data-theme") && aktiv("temaLys"));
+      ok("skriftvalget star igjen nar temaet byttes", aktiv("skriftStor"));
+
+      ferdig();
+    }, 500);
+  }, 900); });
+`);
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4];
+const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5];
 let feilet = 0;
 
 for (const t of alle) {

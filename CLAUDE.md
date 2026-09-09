@@ -46,7 +46,7 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 ## Testing
 
     node test/unit.mjs    40 tester, ~90 ms, ingen nettleser
-    node test/run.mjs     31 tester, ~55 s, headless Chromium
+    node test/run.mjs     40 tester, ~70 s, headless Chromium
 
 Begge kjøres på hver pull request via `.github/workflows/test.yml`.
 Enhetstestene først, så en åpenbar feil stopper kjøringen før nettleseren
@@ -55,7 +55,8 @@ i det hele tatt starter.
 `unit.mjs` dekker `lib.js`: URL-validering, videovertslisten, tidsstempler,
 endringssignaturen og gjenkjenning av interne lenker. `run.mjs` dekker alt som trenger DOM: XSS i titler
 og artikkel-HTML, annonseplassering, rulleoppførsel, artikkelvisningen,
-fokusfella, korthøyden, at toppfeltet krymper, paginering og ruting.
+fokusfella, korthøyden, at toppfeltet krymper, paginering, ruting og
+visningsvalgene i menyen.
 
 Testsidene serveres over HTTP, ikke fra `file://` — modul-script blokkeres
 av CORS på file-opphav, og appen ville aldri lastet.

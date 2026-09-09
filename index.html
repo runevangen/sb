@@ -53,12 +53,14 @@
       <div class="menu-head">
         <p class="menu-title">Meny</p>
         <div class="menu-tools">
-          <button class="tool-btn" id="themeBtn" type="button" aria-pressed="false">
-            <span class="tool-ico" aria-hidden="true">◐</span>Svart
-          </button>
-          <button class="tool-btn" id="fontBtn" type="button" aria-pressed="false">
-            <span class="tool-ico" aria-hidden="true">A</span>Større
-          </button>
+          <div class="segment" role="group" aria-label="Fargetema">
+            <button class="segment-del" id="temaLys" type="button">Lyst</button>
+            <button class="segment-del" id="temaSvart" type="button">Mørkt</button>
+          </div>
+          <div class="segment" role="group" aria-label="Skriftstørrelse">
+            <button class="segment-del" id="skriftNormal" type="button" aria-label="Normal skrift">A</button>
+            <button class="segment-del segment-stor" id="skriftStor" type="button" aria-label="Større skrift">A+</button>
+          </div>
           <button class="menu-close" id="menuClose" type="button" aria-label="Lukk meny">&times;</button>
         </div>
       </div>
