@@ -58,13 +58,20 @@ function avkod(s) {
           .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
 }
 
-function kjor(navn, skript) {
+// storrelse settes der vindushoyden er en del av det som testes. Standard
+// er nettleserens eget vindu; hoydetesten trenger et telefonformat for at
+// taket pa kortet i det hele tatt skal binde.
+function kjor(navn, skript, storrelse) {
   const fil = join(tmp, navn + ".html");
   writeFileSync(fil, app.replace("<head>", "<head>\n<script>" + HARNESS + skript + "<\/script>"));
-  const dom = execFileSync(CHROME, [
+  const argv = [
     "--no-sandbox", "--disable-gpu", "--force-prefers-reduced-motion",
-    "--virtual-time-budget=12000", "--dump-dom", "file://" + fil,
-  ], { encoding: "utf8", maxBuffer: 64e6, stdio: ["ignore", "pipe", "ignore"] });
+    "--virtual-time-budget=12000", "--dump-dom",
+  ];
+  if (storrelse) argv.push("--window-size=" + storrelse);
+  argv.push("file://" + fil);
+  const dom = execFileSync(CHROME, argv,
+    { encoding: "utf8", maxBuffer: 64e6, stdio: ["ignore", "pipe", "ignore"] });
 
   const treff = dom.match(/data-result="([^"]*)"/);
   if (!treff) throw new Error(navn + ": testsiden rapporterte ingenting");
@@ -181,6 +188,24 @@ const SAK_3 = kjor("oppdatering", FELLES + `
   ` + mockFetch("saker") + `
   window.addEventListener("load", function () { setTimeout(function () {
     var f = document.getElementById("feed");
+    var telefon = document.querySelector(".phone");
+    var topp = document.querySelector(".header");
+
+    var kortH = Math.round(telefon.getBoundingClientRect().height);
+    ok("kortet fyller hoyden", Math.abs(kortH - (window.innerHeight - 20)) <= 2,
+       kortH + " av " + (window.innerHeight - 20));
+
+    var toppFor = Math.round(topp.getBoundingClientRect().height);
+    f.scrollTop = 200;
+    f.dispatchEvent(new Event("scroll"));
+    var toppEtter = Math.round(topp.getBoundingClientRect().height);
+    ok("toppfeltet krymper ved rulling", toppEtter < toppFor,
+       toppFor + " -> " + toppEtter);
+
+    f.scrollTop = 0;
+    f.dispatchEvent(new Event("scroll"));
+    ok("toppfeltet kommer tilbake pa toppen",
+       Math.round(topp.getBoundingClientRect().height) === toppFor);
 
     // Rull ned og hent en ny liste. Uten nullstillingen arver den nye
     // listen posisjonen fra den forrige. A sjekke scrollTop rett etter
@@ -229,7 +254,7 @@ const SAK_3 = kjor("oppdatering", FELLES + `
       }, 600);
     }, 600);
   }
-`);
+`, "390,844");
 
 /* ---------------- rapport ---------------- */
 

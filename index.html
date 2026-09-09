@@ -2,12 +2,13 @@
 <html lang="nb">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Sportsbibelen</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#243B98">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Sportsbibelen">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -143,11 +144,11 @@
 
   body {
     margin: 0;
+    padding: 10px;
     background: var(--bg-page);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     display: flex;
     justify-content: center;
-    padding: 24px 12px;
     min-height: 100vh;
   }
 
@@ -161,10 +162,12 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    /* Fast høyde stakk utenfor lave skjermer. Krymp med viewporten i stedet. */
-    height: 780px;
-    height: min(780px, calc(100vh - 48px));
-    height: min(780px, calc(100dvh - 48px));
+    /* Fyller hoyden i stedet for a stoppe pa 780 piksler, som lot 64
+       piksler sta ubrukt pa en vanlig telefonskjerm. Taket pa 900 er der
+       for at kortet ikke skal bli absurd hoyt pa en stor skjerm. */
+    height: calc(100vh - 20px);
+    height: calc(100dvh - 20px);
+    max-height: 900px;
   }
 
   .head-left {
@@ -414,10 +417,38 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 16px;
+    /* Hoyden styres av en variabel, sa den komprimerte tilstanden endrer
+       ett tall. Safe-area legges pa toppen, ikke i bunnen av feltet. */
+    padding: calc(var(--header-pad, 14px) + var(--safe-top, 0px)) 16px var(--header-pad, 14px);
     background: var(--header-bg);
     border-bottom: 1px solid var(--header-border);
     flex-shrink: 0;
+    transition: padding 0.18s ease;
+  }
+
+  .logo img { transition: height 0.18s ease; }
+
+  /* Settes nar leseren har rullet et stykke ned i feeden. */
+  .phone.komprimert { --header-pad: 7px; }
+  .phone.komprimert .logo img { height: 22px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .header, .logo img { transition: none; }
+  }
+
+  /* Installert pa hjemskjerm: la merkefargen mote skjermkanten i stedet
+     for a stoppe under klokka. Rammen beholdes ellers. */
+  @media (display-mode: standalone) {
+    body { padding: 0; }
+    .phone {
+      --safe-top: env(safe-area-inset-top, 0px);
+      height: 100dvh;
+      max-height: none;
+      border: 0;
+      border-radius: 0;
+    }
+    .feed { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+    .menu-actions { padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
   }
 
   /* Logoen er den ekte fila med bakgrunnen fjernet: de bla flatene er
@@ -1560,6 +1591,27 @@
     savePrefs(prefs);
     track("Skriftstørrelse byttet", { størrelse: prefs.stor ? "stor" : "normal" });
   });
+
+  /* ---------- toppfeltet krymper ved rulling ---------- */
+
+  // Terskelen har en dodsone: uten den ville feltet blinke fram og tilbake
+  // nar leseren star akkurat pa grensen, siden krympingen selv flytter
+  // innholdet noen piksler.
+  const KRYMP_NED = 64;
+  const KRYMP_OPP = 20;
+
+  function folgMedPaRulling() {
+    const feed = document.getElementById("feed");
+    const telefon = document.querySelector(".phone");
+
+    feed.addEventListener("scroll", () => {
+      const y = feed.scrollTop;
+      if (y > KRYMP_NED) telefon.classList.add("komprimert");
+      else if (y < KRYMP_OPP) telefon.classList.remove("komprimert");
+    }, { passive: true });
+  }
+
+  folgMedPaRulling();
 
   /* ---------- del og installer ---------- */
 
