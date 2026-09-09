@@ -51,8 +51,10 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 - Data hentes fra API-Football via en Netlify Function, ikke via en
   redirect: en redirect kan ikke sette en hemmelig header, og nøkkelen
-  skal aldri nå nettleseren. Den ligger i `FOOTBALL_API_KEY` i
-  Netlify-miljøet. Uten den svarer funksjonen 503 med en synlig melding.
+  skal aldri nå nettleseren. Den ligger i `api_football_key` i
+  Netlify-miljøet; funksjonen godtar også `API_FOOTBALL_KEY`, siden
+  miljøvariabler er versalfølsomme. Uten nøkkel svarer funksjonen 503 med
+  en synlig melding.
 - Nyheter og fotball er to visninger i det samme kortet, valgt med
   bunnfanene. Begge ligger i DOM-en hele tiden — feeden skal stå klar bak
   fanen, med rulleposisjonen der leseren forlot den.
@@ -79,7 +81,7 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 ## Testing
 
     node test/unit.mjs      79 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  28 tester, ~120 ms, ingen nettleser
+    node test/funksjon.mjs  30 tester, ~120 ms, ingen nettleser
     node test/run.mjs       75 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
