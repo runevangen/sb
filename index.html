@@ -7,6 +7,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<!--
+  Cookielos statistikk. Plausible setter ingen informasjonskapsler og lagrer
+  ingen personopplysninger, sa appen trenger ingen samtykkebanner.
+
+  For dette samler noe som helst ma domenet mvp-sb.netlify.app legges til i
+  en Plausible-konto. Inntil da er skriptet en stille no-op.
+  Skru av statistikk helt: slett denne script-taggen. Koden under tar hoyde
+  for at den mangler.
+-->
+<script defer data-domain="mvp-sb.netlify.app" src="https://plausible.io/js/script.js"></script>
 <style>
   * { box-sizing: border-box; }
 
@@ -294,6 +304,17 @@
     color: #86998F;
   }
 
+  .detail-content iframe {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    height: auto;
+    border: 0;
+    border-radius: 10px;
+    margin: 6px 0 14px;
+    background: #16211C;
+  }
+
   .detail-content a { color: #34D399; }
 
   .detail-content ul, .detail-content ol {
@@ -507,6 +528,20 @@
     return stripHtml(post.title && post.title.rendered) || "Uten tittel";
   }
 
+  /* ---------- statistikk ---------- */
+
+  // Sender en hendelse hvis Plausible er lastet, og gjør ingenting hvis den
+  // ikke er det. Appen skal aldri feile fordi statistikk mangler.
+  function track(event, props) {
+    try {
+      if (typeof window.plausible === "function") {
+        window.plausible(event, props ? { props: props } : undefined);
+      }
+    } catch (err) {
+      /* statistikk skal aldri velte lesingen */
+    }
+  }
+
   /* ---------- rensing av artikkel-HTML ---------- */
 
   // Artikkelteksten fra WordPress er HTML, og skal rendres som HTML. Derfor
@@ -522,13 +557,35 @@
     FIGURE: [], FIGCAPTION: [],
     TABLE: [], THEAD: [], TBODY: [], TFOOT: [], TR: [], TH: [], TD: [],
     A: ["href"],
-    IMG: ["src", "alt"]
+    IMG: ["src", "alt"],
+    IFRAME: ["src", "title", "allowfullscreen"]
   };
+
+  // iframe er den farligste taggen vi slipper gjennom, sa src ma peke pa et
+  // av disse vertsnavnene. Sammenligningen er mot hele hostname, ikke en
+  // delstreng: ellers ville youtube.com.angriper.no sluppet gjennom.
+  const VIDEO_HOSTS = [
+    "youtube.com", "www.youtube.com",
+    "youtube-nocookie.com", "www.youtube-nocookie.com",
+    "player.vimeo.com", "vimeo.com"
+  ];
+
+  function videoUrl(value) {
+    const url = safeUrl(value);
+    if (!url) return null;
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "https:") return null;
+      return VIDEO_HOSTS.indexOf(parsed.hostname.toLowerCase()) === -1 ? null : url;
+    } catch (err) {
+      return null;
+    }
+  }
 
   // Disse fjernes med innholdet sitt. For alle andre ukjente tagger beholder
   // vi teksten inni, men kaster selve elementet.
   const DROPPED = {
-    SCRIPT: 1, STYLE: 1, IFRAME: 1, OBJECT: 1, EMBED: 1, LINK: 1, META: 1,
+    SCRIPT: 1, STYLE: 1, OBJECT: 1, EMBED: 1, LINK: 1, META: 1,
     BASE: 1, FORM: 1, INPUT: 1, BUTTON: 1, SELECT: 1, TEXTAREA: 1,
     NOSCRIPT: 1, TEMPLATE: 1, SVG: 1, MATH: 1
   };
@@ -595,6 +652,18 @@
         }
         node.setAttribute("src", src);
         node.setAttribute("loading", "lazy");
+      }
+
+      if (tag === "IFRAME") {
+        const src = videoUrl(node.getAttribute("src"));
+        if (!src) {
+          node.remove();      // alt annet enn YouTube og Vimeo faller bort
+          return;
+        }
+        node.setAttribute("src", src);
+        node.setAttribute("loading", "lazy");
+        node.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+        node.setAttribute("allowfullscreen", "");
       }
 
       cleanChildren(node);
@@ -666,6 +735,11 @@
     }
 
     feed.setAttribute("aria-busy", "false");
+
+    // Gjør feilen synlig i statistikken, slik at vi oppdager en feed som
+    // slutter å virke uten å vente på at noen melder fra.
+    track("Feed feilet", { årsak: (problems[0] || "ukjent").slice(0, 80) });
+
     // Ved bakgrunnsoppdatering beholder vi det som allerede står på skjermen.
     if (silent && hasContent) return;
     showError(problems);
@@ -785,6 +859,9 @@
       anchor.href = link;
       anchor.target = "_blank";
       anchor.rel = "noopener noreferrer";
+      anchor.addEventListener("click", () => {
+        track("Les på nettsiden", { artikkel: post.slug || String(post.id || "") });
+      });
       body.appendChild(anchor);
     }
 
@@ -795,6 +872,11 @@
 
     card.appendChild(body);
     card.scrollTop = 0;
+
+    track("Artikkel åpnet", {
+      artikkel: post.slug || String(post.id || ""),
+      kategori: cat || "uten kategori"
+    });
     document.getElementById("detailWrap").classList.add("open");
     close.focus();
   }
