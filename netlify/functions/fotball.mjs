@@ -1,7 +1,7 @@
 // Henter fotballdata fra API-Football og legger Netlifys varige cache
 // foran.
 //
-// Nokkelen ligger i miljovariabelen FOOTBALL_API_KEY og forlater aldri
+// Nokkelen ligger i miljovariabelen API_FOOTBALL_KEY og forlater aldri
 // denne funksjonen: nettleseren snakker bare med oss, aldri med API-et.
 // Det er ogsa derfor dette er en funksjon og ikke en redirect slik
 // WordPress-proxyen i netlify.toml er — en redirect kan ikke sette en
@@ -16,6 +16,18 @@ import {
 
 const API = "https://v3.football.api-sports.io";
 
+// Miljovariabler er versalfolsomme pa Linux, og navnet er lett a taste i
+// feil skrivemate. Begge godtas, sa en riktig satt nokkel ikke leses som
+// en manglende nokkel.
+const NOKKELNAVN = ["API_FOOTBALL_KEY", "api_football_key"];
+
+function apiNokkel() {
+  for (const navn of NOKKELNAVN) {
+    if (process.env[navn]) return process.env[navn];
+  }
+  return null;
+}
+
 export default async (req) => {
   const url = new URL(req.url);
   const del = url.pathname.split("/").filter(Boolean).pop();
@@ -25,7 +37,7 @@ export default async (req) => {
   const liga = ligaFor(ligaNokkel);
   if (!liga) return svar({ feil: "Ukjent liga" }, 400, 0);
 
-  const nokkel = process.env.FOOTBALL_API_KEY;
+  const nokkel = apiNokkel();
   if (!nokkel) return svar({ feil: "Tjenesten mangler API-nokkel" }, 503, 0);
 
   const sesong = sesongFor(liga);

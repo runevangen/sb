@@ -56,7 +56,7 @@ function be(sti) {
 
 /* ---------------- ukjent liga ---------------- */
 
-process.env.FOOTBALL_API_KEY = NOKKEL;
+process.env.API_FOOTBALL_KEY = NOKKEL;
 let kall = stub(SVAR);
 
 let r = await fotball(be("/api/fotball/tabell?liga=serie-a"));
@@ -70,15 +70,26 @@ ok("manglende liga gir 400", r.status === 400, r.status);
 
 /* ---------------- manglende nokkel ---------------- */
 
-delete process.env.FOOTBALL_API_KEY;
+delete process.env.API_FOOTBALL_KEY;
+delete process.env.api_football_key;
 kall = stub(SVAR);
 r = await fotball(be("/api/fotball/tabell?liga=eliteserien"));
 ok("uten nokkel svarer tjenesten 503", r.status === 503, r.status);
 ok("uten nokkel sporres ikke API-et", kall.length === 0, kall.length);
 
+// Navnet er satt med sma bokstaver i Netlify. Leses bare den store
+// skrivematen, svarer tjenesten 503 selv om nokkelen star der.
+kall = stub(SVAR);
+process.env.api_football_key = NOKKEL;
+r = await fotball(be("/api/fotball/tabell?liga=eliteserien"));
+ok("nokkel med sma bokstaver godtas ogsa", r.status === 200, r.status);
+ok("den nokkelen brukes i kallet",
+   kall[0].opsjoner.headers["x-apisports-key"] === NOKKEL);
+delete process.env.api_football_key;
+
 /* ---------------- vanlig svar ---------------- */
 
-process.env.FOOTBALL_API_KEY = NOKKEL;
+process.env.API_FOOTBALL_KEY = NOKKEL;
 kall = stub(SVAR);
 r = await fotball(be("/api/fotball/tabell?liga=eliteserien"));
 const kropp = await r.json();
@@ -168,6 +179,6 @@ ok("ukjent datasett sporr ikke API-et", kall.length === 0, kall.length);
 
 /* ---------------- rapport ---------------- */
 
-const antall = 28;
+const antall = 30;
 console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);
