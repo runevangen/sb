@@ -479,7 +479,7 @@ function mockAlt(saker, fotballFeil) {
       return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
         text: function () { return Promise.resolve(JSON.stringify({ feil: "Fikk ikke svar fra API-Football" })); } });
       ` : `
-      var kropp = { liga: "Eliteserien", sesong: 2026, del: del,
+      var kropp = { liga: "Eliteserien", sesong: 2024, sisteSesong: false, del: del,
                     oppdatert: new Date(Date.now() - 3600000).toISOString() };
       if (del === "tabell") kropp.tabell = TABELL;
       else if (del === "resultater") kropp.kamper = RESULTATER;
@@ -560,6 +560,18 @@ const SAK_6 = await kjor("fotball", FELLES + FOTBALL + `
       ok("siden ruller ikke sidelengs",
          document.documentElement.scrollWidth <= window.innerWidth,
          document.documentElement.scrollWidth + " av " + window.innerWidth);
+      // Abonnementet gir ikke inneværende sesong. En tabell fra i fjor som
+      // ser ut som arets er verre enn ingen tabell, sa sesongen ma sta over
+      // tallene — ikke under dem.
+      var merke = document.querySelector(".fotball-sesong");
+      ok("sesongen star over tabellen",
+         merke.textContent.indexOf("Sesong 2024") === 0, merke.textContent);
+      ok("det star at sesongen ikke er inneværende",
+         merke.textContent.indexOf("ikke inneværende") > -1, merke.textContent);
+      ok("sesongmerket star for tabellen",
+         merke.compareDocumentPosition(document.querySelector(".tabell")) &
+         Node.DOCUMENT_POSITION_FOLLOWING, "tabellen kom forst");
+
       ok("sist oppdatert vises",
          document.querySelector(".fotball-stempel").textContent.indexOf("Oppdatert") === 0,
          document.querySelector(".fotball-stempel").textContent);

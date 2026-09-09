@@ -11,7 +11,8 @@
 // netlify.toml. Da holder redirect-reglene seg like smale som for.
 
 import {
-  ligaFor, sesongFor, apiSti, tolkTabell, tolkKamper, nesteRunde, LEVETID, DELER,
+  ligaFor, sesongFor, tilgjengeligSesong, apiSti, tolkTabell, tolkKamper,
+  nesteRunde, LEVETID, DELER,
 } from "../../fotball-data.js";
 
 const API = "https://v3.football.api-sports.io";
@@ -40,7 +41,10 @@ export default async (req) => {
   const nokkel = apiNokkel();
   if (!nokkel) return svar({ feil: "Tjenesten mangler API-nokkel" }, 503, 0);
 
-  const sesong = sesongFor(liga);
+  // Abonnementet dekker ikke alle sesonger. Vi ber om den nyeste det gir,
+  // og sier fra i svaret nar det ikke er den vi star i.
+  const sesong = tilgjengeligSesong(liga);
+  const naSesong = sesongFor(liga);
 
   let json;
   try {
@@ -69,6 +73,7 @@ export default async (req) => {
     ligaNokkel,
     land: liga.land,
     sesong,
+    sisteSesong: sesong === naSesong,
     del,
     oppdatert: new Date().toISOString(),
   }, innhold), 200, LEVETID[del]);

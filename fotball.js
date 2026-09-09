@@ -119,6 +119,8 @@ function tilstand(tekst) {
 
 function tegn(rot, del, data) {
   const deler = [];
+  const sesong = sesongmerke(data);
+  if (sesong) deler.push(sesong);
   if (del === "tabell") deler.push(tabell(data.tabell || []));
   else deler.push(kampliste(data.kamper || [], del));
   deler.push(stempel(data));
@@ -134,6 +136,18 @@ function stempel(data) {
   const nar = tid && !Number.isNaN(tid.getTime()) ? timeAgo(tid) : "ukjent tid";
   rad.appendChild(el("span", null, "Oppdatert " + nar));
   rad.appendChild(el("span", "fotball-kilde", "API-Football"));
+  return rad;
+}
+
+// Sesongen star over innholdet, ikke under: er tabellen fra en annen
+// sesong enn den vi star i, ma det sta for man leser tallene — ikke etter.
+function sesongmerke(data) {
+  if (!data.sesong) return null;
+  const rad = el("p", "fotball-sesong");
+  rad.appendChild(el("span", null, "Sesong " + data.sesong));
+  if (data.sisteSesong === false) {
+    rad.appendChild(el("span", "fotball-gammel", "ikke inneværende"));
+  }
   return rad;
 }
 

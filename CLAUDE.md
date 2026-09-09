@@ -69,6 +69,13 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   faktisk feltet framfor bare å måle bredden.
 - Adressen settes av `export const config` i funksjonen. Da slipper
   `netlify.toml` en ny regel, og redirect-reglene der holder seg smale.
+- Gratisnivået dekker bare sesongene i `SESONGVINDU` (nå 2022–2024) og
+  svarer «season, try from 2022 to 2024» på alt utenfor. Funksjonen spør
+  derfor om nyeste sesong abonnementet gir, og sier fra i svaret
+  (`sisteSesong: false`) når det ikke er den vi står i. Visningen setter
+  sesongen over tabellen — en tabell fra i fjor som ser ut som årets er
+  verre enn ingen tabell. Utvides abonnementet, er `SESONGVINDU` det
+  eneste stedet tallene står.
 - Gratisnivået gir 100 kall i døgnet. Caching skjer på Netlifys kant med
   `Netlify-CDN-Cache-Control` og `durable`, som gir én delt cache i stedet
   for én per region. Levetidene står i `LEVETID` i `fotball-data.js`, og
@@ -80,9 +87,9 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      79 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  30 tester, ~120 ms, ingen nettleser
-    node test/run.mjs       75 tester, ~110 s, headless Chromium
+    node test/unit.mjs      84 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  33 tester, ~120 ms, ingen nettleser
+    node test/run.mjs       78 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
 De raske først, så en åpenbar feil stopper kjøringen før nettleseren

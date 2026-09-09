@@ -29,6 +29,25 @@ export function sesongFor(liga, naa) {
   return dato.getUTCMonth() >= 6 ? ar : ar - 1;
 }
 
+// Gratisnivaet hos API-Football dekker bare et vindu av sesonger, og
+// svarer "season, try from 2022 to 2024" pa alt utenfor. Vi ber derfor om
+// den nyeste sesongen abonnementet faktisk gir, framfor a vise en
+// feilmelding leseren ikke kan gjore noe med.
+//
+// Utvides abonnementet, er dette det eneste stedet tallene star.
+export const SESONGVINDU = { fra: 2022, til: 2024 };
+
+// Den ekte sesongen om abonnementet dekker den, ellers naermeste kant av
+// vinduet. Skille mellom de to hoerer hjemme i visningen, ikke her: den
+// som ser en tabell skal fa vite hvilken sesong den er fra.
+export function tilgjengeligSesong(liga, naa, vindu) {
+  const ramme = vindu || SESONGVINDU;
+  const ekte = sesongFor(liga, naa);
+  if (ekte < ramme.fra) return ramme.fra;
+  if (ekte > ramme.til) return ramme.til;
+  return ekte;
+}
+
 // Gratisnivaet gir 100 kall i dognet. Tre datasett for to ligaer, hvert
 // oppfrisket hver time, ville blitt 144 — over taket for noen har apnet
 // appen to ganger. Levetidene under gir 72, og lar tabellen stivne litt
