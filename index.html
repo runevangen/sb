@@ -693,10 +693,43 @@
     display: flex;
   }
 
-  .detail-card {
+  /* Knappen ligger utenfor kortet som ruller, sa den blir staende i
+     hjornet uansett hvor langt ned i artikkelen leseren er. */
+  .detail-shell {
+    position: relative;
     width: 390px;
     max-width: 92%;
+    /* Hoydegrensen ma sta her. Star den pa kortet, regnes prosenten mot
+       skallet, som ikke har egen hoyde, og kortet blir uendelig hoyt. */
     max-height: 88%;
+    display: flex;
+  }
+
+  .corner-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 3;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(8, 14, 38, 0.62);
+    color: #FFFFFF;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .corner-close:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .detail-card {
+    width: 100%;
+    max-height: 100%;
     overflow-y: auto;
     background: var(--bg-app);
     border-radius: 18px;
@@ -908,7 +941,10 @@
   </div>
 
   <div class="detail-wrap" id="detailWrap">
-    <div class="detail-card" id="detailCard" role="dialog" aria-modal="true" aria-labelledby="detailTitle"></div>
+    <div class="detail-shell">
+      <button class="corner-close" id="cornerClose" type="button" aria-label="Lukk artikkelen">&times;</button>
+      <div class="detail-card" id="detailCard" role="dialog" aria-modal="true" aria-labelledby="detailTitle"></div>
+    </div>
   </div>
 
 <script>
@@ -1778,12 +1814,15 @@
     card.appendChild(body);
     card.scrollTop = 0;
 
+    // Fokus ma til en knapp som ligger overst. Fokuseres knappen nederst,
+    // ruller nettleseren dit for a vise den, og artikkelen apner pa bunnen.
+    document.getElementById("cornerClose").focus({ preventScroll: true });
+
     track("Artikkel åpnet", {
       artikkel: post.slug || String(post.id || ""),
       kategori: cat || "uten kategori"
     });
     document.getElementById("detailWrap").classList.add("open");
-    close.focus();
   }
 
   function closeDetail() {
@@ -1795,6 +1834,8 @@
   function isDetailOpen() {
     return document.getElementById("detailWrap").classList.contains("open");
   }
+
+  document.getElementById("cornerClose").addEventListener("click", closeDetail);
 
   document.getElementById("detailWrap").addEventListener("click", (e) => {
     if (e.target.id === "detailWrap") closeDetail();

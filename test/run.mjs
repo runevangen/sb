@@ -142,6 +142,7 @@ const SAK_2 = kjor("artikkel", FELLES + `
   var saker = lagSaker(3);
   saker[0].content.rendered =
     "<h2>Mellomtittel</h2><p>Brann <strong>2-0</strong>.</p>" +
+    new Array(40).join("<p>Et avsnitt som gjor artikkelen lang nok til a kunne rulles.</p>") +
     "<script>document.body.setAttribute('pwned','ja')<\\/script>" +
     "<img src=x onerror=\\"document.body.setAttribute('pwned2','ja')\\">" +
     "<a href=\\"javascript:document.body.setAttribute('pwned3','ja')\\">Klikk</a>" +
@@ -152,6 +153,14 @@ const SAK_2 = kjor("artikkel", FELLES + `
   window.addEventListener("load", function () { setTimeout(function () {
     document.querySelector(".hero").click();
     setTimeout(function () {
+      var kort = document.getElementById("detailCard");
+      var rullbart = Math.round(kort.scrollHeight - kort.clientHeight);
+      // Uten rulling er scrollTop null uansett, og testen beviser ingenting.
+      ok("artikkelen er lang nok til a kunne rulles", rullbart > 200, rullbart);
+      ok("artikkelen starter pa toppen", kort.scrollTop === 0,
+         "scrollTop=" + Math.round(kort.scrollTop) + " av " + rullbart);
+      ok("lukkeknapp i hjornet finnes", !!document.querySelector(".corner-close"));
+
       var art = document.querySelector(".detail-content");
       var rammer = Array.prototype.map.call(art.querySelectorAll("iframe"), function (f) { return f.getAttribute("src"); });
       ok("artikkel-HTML kjorer ingen kode",
