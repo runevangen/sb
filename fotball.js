@@ -122,7 +122,7 @@ function tegn(rot, del, data) {
   const sesong = sesongmerke(data);
   if (sesong) deler.push(sesong);
   if (del === "tabell") deler.push(tabell(data.tabell || []));
-  else deler.push(kampliste(data.kamper || [], del));
+  else deler.push(kampliste(data.kamper || [], del, data));
   deler.push(stempel(data));
   rot.replaceChildren(...deler);
   rot.scrollTop = 0;
@@ -200,11 +200,9 @@ function tabell(rader) {
 
 /* ---------- kamper ---------- */
 
-function kampliste(kamper, del) {
+function kampliste(kamper, del, data) {
   if (!kamper.length) {
-    return tilstand(del === "resultater"
-      ? "Ingen spilte kamper enda."
-      : "Ingen kamper er satt opp.");
+    return tilstand(tomtekst(del, data));
   }
 
   const liste = el("ul", "kamper");
@@ -220,6 +218,16 @@ function kampliste(kamper, del) {
     liste.appendChild(kamprad(kamp, del));
   });
   return liste;
+}
+
+// En ferdigspilt sesong har ingen neste runde, og det er noe annet enn at
+// oppsettet ikke er klart. Sier vi det siste, ser det ut som en feil.
+function tomtekst(del, data) {
+  if (del === "resultater") return "Ingen spilte kamper enda.";
+  if (data && data.sisteSesong === false) {
+    return "Sesong " + data.sesong + " er ferdigspilt. Ingen flere kamper i denne.";
+  }
+  return "Ingen kamper er satt opp.";
 }
 
 function kamprad(kamp, del) {
