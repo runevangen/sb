@@ -1,0 +1,880 @@
+/* ---------- tema ----------
+   Fargene ligger som variabler slik at et tema kun trenger a overstyre
+   dem. Verdiene under er appens opprinnelige palett; ekte merkefarger
+   fra sportsbibelen.no settes her nar de foreligger. */
+:root {
+  --fs: 1;
+
+  /* Merkefarger lest av sportsbibelen.no. Toppfeltet der gar fra dyp
+     marinebla til klar bla, siden er lys blahvit og kortene hvite. */
+  --bg-page:      #E9F0FA;
+  --bg-app:       #FFFFFF;
+  --bg-raised:    #DFE8F6;
+  --bg-ad:        #F4F7FD;
+  --bg-ad-stripe: #EDF3FB;
+
+  --border:        #DCE5F2;
+  --border-strong: #C9D6EA;
+  --border-ad:     #D3DFF1;
+  --border-btn:    #C3D1E8;
+  --border-faint:  #E7EDF7;
+
+  --text:        #16224A;
+  --text-strong: #0E1836;
+  --text-body:   #2E3A5E;
+  --text-dim:    #5A6785;
+  --text-dimmer: #6E7B99;
+  --text-faint:  #8A95AE;
+
+  --accent:        #2A50D8;
+  --accent-ink:    #FFFFFF;
+  --accent-soft:   #1B2A87;
+  --accent-bright: #FFFFFF;
+
+  --ad-g1: #1B2A87;
+  --ad-g2: #2A50D8;
+  --ad-g3: #223AA8;
+
+  --overlay-hero:  rgba(8,14,38,0.92);
+  --on-overlay:     #FFFFFF;
+  --on-overlay-dim: #C6D2EA;
+  --overlay-scrim: rgba(10,18,45,0.55);
+
+  /* Toppfeltet og det som ligger oppa det. */
+  /* Samme gradient som logofila: #16297B til #2D51CE, malt av fila. */
+  --header-bg:     linear-gradient(to right, #16297B 0%, #2D51CE 100%);
+  --header-border: transparent;
+  --on-brand:      #FFFFFF;
+  --on-brand-dim:  #BFD0FF;
+  --logo-ink:      #1B2A87;
+
+  --t-hero:   calc(21px   * var(--fs));
+  --t-row:    calc(15.5px * var(--fs));
+  --t-detail: calc(20px   * var(--fs));
+  --t-body:   calc(15px   * var(--fs));
+  --t-excerpt:calc(14px   * var(--fs));
+  --t-ad:     calc(16.5px * var(--fs));
+  --t-menu:   calc(17px   * var(--fs));
+  --t-meta:   calc(11.5px * var(--fs));
+  --t-label:  calc(11px   * var(--fs));
+}
+
+/* Svart lesemodus: ekte svart bunn og hoyere kontrast. Aksenten beholdes,
+   ellers mister kategoriene signalet sitt. */
+[data-theme="svart"] {
+  --bg-page:      #000000;
+  --bg-app:       #000000;
+  --bg-raised:    #141414;
+  --bg-ad:        #0D0D0D;
+  --bg-ad-stripe: #0A0A0A;
+
+  --border:        #242424;
+  --border-strong: #303030;
+  --border-ad:     #303030;
+  --border-btn:    #3A3A3A;
+  --border-faint:  #1C1C1C;
+
+  --text:        #FFFFFF;
+  --text-strong: #FFFFFF;
+  --text-body:   #E4E4E4;
+  --text-dim:    #B8B8B8;
+  --text-dimmer: #A0A0A0;
+  --text-faint:  #8A8A8A;
+
+  /* Aksenten lysnes for a holde kontrasten mot svart. */
+  --accent:        #5C82FF;
+  --accent-ink:    #00081F;
+  --accent-soft:   #9DB4FF;
+  --accent-bright: #FFFFFF;
+
+  --ad-g1: #101010;
+  --ad-g2: #2A2A2A;
+  --ad-g3: #161616;
+
+  --overlay-hero:  rgba(0,0,0,0.94);
+  --on-overlay:     #FFFFFF;
+  --on-overlay-dim: #B9B9B9;
+  --overlay-scrim: rgba(0,0,0,0.78);
+
+  --header-bg:     #000000;
+  --header-border: #242424;
+  --on-brand:      #FFFFFF;
+  --on-brand-dim:  #9DB4FF;
+  --logo-ink:      #000000;
+}
+
+[data-font="stor"] { --fs: 1.2; }
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 10px;
+  background: var(--bg-page);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.phone {
+  position: relative;
+  width: 390px;
+  max-width: 100%;
+  background: var(--bg-app);
+  border-radius: 28px;
+  border: 1px solid var(--border-strong);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  /* Fyller hoyden i stedet for a stoppe pa 780 piksler, som lot 64
+     piksler sta ubrukt pa en vanlig telefonskjerm. Taket pa 900 er der
+     for at kortet ikke skal bli absurd hoyt pa en stor skjerm. */
+  height: calc(100vh - 20px);
+  height: calc(100dvh - 20px);
+  max-height: 900px;
+}
+
+.head-left {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+/* Hamburgerknappen. Tre streker tegnet i CSS, ingen ikonfil a laste. */
+.menu-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 6px;
+}
+
+.bars, .bars::before, .bars::after {
+  display: block;
+  width: 17px;
+  height: 1.5px;
+  background: var(--on-brand);
+  border-radius: 1px;
+}
+
+.bars { position: relative; }
+
+.bars::before, .bars::after {
+  content: "";
+  position: absolute;
+  left: 0;
+}
+
+.bars::before { top: -5.5px; }
+.bars::after  { top: 5.5px; }
+
+.menu-btn:focus-visible {
+  outline: 2px solid var(--on-brand);
+  outline-offset: 2px;
+}
+
+.menu-close:focus-visible, .menu-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- menypanel ---------- */
+
+.menu-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: var(--bg-app);
+  display: flex;
+  flex-direction: column;
+  visibility: hidden;
+  transform: translateX(-100%);
+  /* visibility slas av forst etter at panelet har skjovet seg ut, og pa
+     oyeblikkelig nar det apner. A transisjonere visibility direkte gir
+     udefinert oppforsel i kantene. */
+  transition: transform 0.22s ease, visibility 0s linear 0.22s;
+}
+
+.menu-panel.open {
+  visibility: visible;
+  transform: translateX(0);
+  transition: transform 0.22s ease, visibility 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-panel { transition: none; }
+}
+
+.menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.menu-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin: 0;
+}
+
+.menu-close {
+  background: none;
+  border: 0;
+  color: var(--text-dim);
+  font-size: 22px;
+  line-height: 1;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.menu-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Bevisst i faste piksler: dette er ramme rundt innholdet, ikke innhold,
+   og skal ikke vokse nar leseren ber om storre tekst. */
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border: 1px solid var(--border-btn);
+  border-radius: 999px;
+  background: none;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tool-btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tool-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tool-ico { font-size: 12px; line-height: 1; }
+
+.menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.menu-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 18px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--border-faint);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+  font-size: var(--t-menu);
+  letter-spacing: 0.01em;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-item .count {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--text-dimmer);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.menu-item[aria-current="true"] { color: var(--accent); }
+
+.menu-item[aria-current="true"] .count { color: var(--accent); }
+
+.menu-actions {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding: 12px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--border-btn);
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.action-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.action-ico {
+  font-size: 15px;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.action-note {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.menu-state {
+  padding: 20px 18px;
+  font-size: 13px;
+  color: var(--text-dimmer);
+}
+
+/* Viser hvilken del av feeden du star i, nar det ikke er alle saker. */
+.filter-tag {
+  font-size: 11px;
+  color: var(--on-brand-dim);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Hoyden styres av en variabel, sa den komprimerte tilstanden endrer
+     ett tall. Safe-area legges pa toppen, ikke i bunnen av feltet. */
+  padding: calc(var(--header-pad, 12px) + var(--safe-top, 0px)) 16px var(--header-pad, 12px);
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--header-border);
+  flex-shrink: 0;
+  transition: padding 0.18s ease;
+}
+
+.logo img { transition: height 0.18s ease; }
+
+/* Settes nar leseren har rullet et stykke ned i feeden. */
+.phone.komprimert { --header-pad: 6px; }
+.phone.komprimert .logo img { height: 30px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .header, .logo img { transition: none; }
+}
+
+/* Installert pa hjemskjerm: la merkefargen mote skjermkanten i stedet
+   for a stoppe under klokka. Rammen beholdes ellers. */
+@media (display-mode: standalone) {
+  body { padding: 0; }
+  .phone {
+    --safe-top: env(safe-area-inset-top, 0px);
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
+  .feed { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+  .menu-actions { padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* Logoen er den ekte fila med bakgrunnen fjernet: de bla flatene er
+   gjennomsiktige, sa toppfeltets gradient skinner gjennom der de var.
+   Da kan det ikke oppsta en synlig kant rundt merket, uansett hvilken
+   bakgrunn feltet har. Det er ogsa derfor den virker i svart tema. */
+.logo {
+  display: block;
+  margin: 0;
+  line-height: 0;
+}
+
+.logo img {
+  display: block;
+  height: 46px;
+  width: auto;
+}
+
+.feed {
+  overflow-y: auto;
+  flex: 1;
+  padding: 14px 14px 24px;
+}
+
+.state {
+  color: var(--text-dimmer);
+  font-size: 14px;
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.state p { margin: 0 0 14px; }
+
+/* Felles nullstilling for de klikkbare kortene, som nå er ekte
+   <button>-elementer slik at de kan nås med tastatur. */
+.card-btn {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.card-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.hero {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 18px;
+  background: var(--bg-raised);
+  height: 220px;
+}
+
+.hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hero-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16px;
+  background: linear-gradient(transparent, var(--overlay-hero));
+}
+
+.cat-pill {
+  display: inline-block;
+  font-size: var(--t-label);
+  color: var(--accent-ink);
+  background: var(--accent);
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.hero-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+  font-size: var(--t-hero);
+  line-height: 1.2;
+  /* Ligger oppa gradienten, ikke pa kortbakgrunnen. */
+  color: var(--on-overlay);
+  margin: 0;
+}
+
+/* Kun i toppsakens overlegg. */
+.meta {
+  font-size: var(--t-meta);
+  color: var(--on-overlay-dim);
+  margin-top: 6px;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.row img, .row .thumb-empty {
+  width: 76px;
+  height: 76px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--bg-raised);
+}
+
+.row-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+.row-cat {
+  font-size: var(--t-label);
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.row-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+  font-size: var(--t-row);
+  line-height: 1.25;
+  color: var(--text);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.row-meta {
+  font-size: var(--t-meta);
+  color: var(--text-dimmer);
+  margin-top: 6px;
+}
+
+/* ---------- annonseplasser ---------- */
+
+/* Merket star forst i leseretningen, over selve annonsen, og er lest opp
+   av skjermleser via aria-label pa blokka. Markedsforingsloven krever at
+   reklame tydelig framstar som reklame, sa dette er ikke bare pynt. */
+.ad-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-dimmer);
+}
+
+.ad-banner {
+  margin: 14px 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-ad);
+  border: 1px solid var(--border-ad);
+}
+
+.ad-banner .ad-label { padding: 9px 13px 0; }
+
+.ad-banner .ad-creative {
+  height: 120px;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 27px;
+  letter-spacing: 0.1em;
+  color: var(--accent-bright);
+  background: linear-gradient(125deg, var(--ad-g1) 0%, var(--ad-g2) 55%, var(--ad-g3) 100%);
+}
+
+.ad-banner .ad-body {
+  padding: 12px 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.ad-headline {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+  font-size: var(--t-ad);
+  line-height: 1.2;
+  color: var(--text);
+  margin: 0;
+}
+
+.ad-cta {
+  align-self: flex-start;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent-ink);
+  background: var(--accent);
+  padding: 6px 12px;
+  border-radius: 5px;
+}
+
+/* Stripa gar helt ut i kanten og bryter feedens marg. Det ene grepet er
+   det som gjor den umiskjennelig, uten at den trenger a vaere stor. */
+.ad-stripe {
+  margin: 14px -14px;
+  padding: 14px;
+  background: var(--bg-ad-stripe);
+  border-top: 1px solid var(--border-ad);
+  border-bottom: 1px solid var(--border-ad);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ad-stripe .ad-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ad-stripe .ad-brand {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  color: var(--accent-soft);
+}
+
+.ad-sub { font-size: 11.5px; color: var(--text-dimmer); }
+
+.detail-wrap {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-scrim);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.detail-wrap.open {
+  display: flex;
+}
+
+/* Knappen ligger utenfor kortet som ruller, sa den blir staende i
+   hjornet uansett hvor langt ned i artikkelen leseren er. */
+.detail-shell {
+  position: relative;
+  width: 390px;
+  max-width: 92%;
+  /* Hoydegrensen ma sta her. Star den pa kortet, regnes prosenten mot
+     skallet, som ikke har egen hoyde, og kortet blir uendelig hoyt. */
+  max-height: 88%;
+  display: flex;
+}
+
+.corner-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(8, 14, 38, 0.62);
+  color: #FFFFFF;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.corner-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.detail-card {
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  background: var(--bg-app);
+  border-radius: 18px;
+  border: 1px solid var(--border-strong);
+  padding: 0 0 20px;
+}
+
+.detail-card img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+}
+
+.detail-body {
+  padding: 16px 18px 0;
+}
+
+.detail-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+  font-size: var(--t-detail);
+  line-height: 1.25;
+  color: var(--text-strong);
+  margin: 0 0 8px;
+}
+
+.detail-excerpt {
+  font-size: var(--t-excerpt);
+  line-height: 1.6;
+  color: var(--text-body);
+}
+
+.detail-content {
+  font-size: var(--t-body);
+  line-height: 1.7;
+  color: var(--text-body);
+}
+
+.detail-content p { margin: 0 0 14px; }
+
+.detail-content h2,
+.detail-content h3,
+.detail-content h4 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+  margin: 22px 0 8px;
+}
+
+.detail-content h2 { font-size: 18px; }
+.detail-content h3 { font-size: 16.5px; }
+.detail-content h4 { font-size: 15px; }
+
+.detail-content img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 10px;
+  margin: 6px 0 12px;
+}
+
+.detail-content figure { margin: 0 0 14px; }
+
+.detail-content figcaption {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-dimmer);
+}
+
+.detail-content iframe {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border: 0;
+  border-radius: 10px;
+  margin: 6px 0 14px;
+  background: var(--bg-raised);
+}
+
+.detail-content a { color: var(--accent); }
+
+.detail-content ul, .detail-content ol {
+  margin: 0 0 14px;
+  padding-left: 20px;
+}
+
+.detail-content li { margin-bottom: 6px; }
+
+.detail-content blockquote {
+  margin: 0 0 14px;
+  padding-left: 14px;
+  border-left: 2px solid var(--border-btn);
+  color: var(--text-dim);
+}
+
+.detail-content pre {
+  overflow-x: auto;
+  background: var(--bg-raised);
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+
+.detail-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.detail-content th, .detail-content td {
+  border-bottom: 1px solid var(--border);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.read-link {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.close-btn, .retry-btn {
+  display: block;
+  margin: 16px auto 0;
+  background: none;
+  border: 1px solid var(--border-btn);
+  color: var(--text-dim);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.close-btn:focus-visible, .retry-btn:focus-visible, .read-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.err-details {
+  margin-top: 22px;
+  text-align: left;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.err-details summary {
+  cursor: pointer;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.err-line {
+  margin: 0 0 6px;
+  word-break: break-word;
+  line-height: 1.45;
+}

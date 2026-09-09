@@ -8,7 +8,11 @@
 // exit-kode. Sett CHROME hvis nettleseren ligger et annet sted.
 
 import { readFileSync, writeFileSync, mkdtempSync, existsSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
+import { createServer } from "node:http";
+import { promisify } from "node:util";
+
+const kjorProsess = promisify(execFile);
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,6 +20,33 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const app = readFileSync(join(root, "index.html"), "utf8");
 const tmp = mkdtempSync(join(tmpdir(), "sb-test-"));
+
+// Testsidene serveres over HTTP, ikke fra file://. Modul-script blokkeres
+// av CORS pa file://-opphav, sa appen ville aldri lastet. HTTP gjor i
+// tillegg testmiljoet likere produksjon: absolutte stier som /app.css
+// loser seg som de skal.
+const MIME = {
+  ".html": "text/html", ".js": "text/javascript", ".css": "text/css",
+  ".png": "image/png", ".json": "application/json", ".webmanifest": "application/manifest+json",
+};
+
+function startTjener() {
+  const tjener = createServer((req, res) => {
+    const sti = decodeURIComponent(req.url.split("?")[0]);
+    // Testsidene ligger i temp; alt annet hentes fra repoet.
+    const rot = sti.endsWith(".html") ? tmp : root;
+    const fil = join(rot, sti.replace(/^\/+/, ""));
+    try {
+      const innhold = readFileSync(fil);
+      const type = MIME[fil.slice(fil.lastIndexOf("."))] || "application/octet-stream";
+      res.writeHead(200, { "Content-Type": type });
+      res.end(innhold);
+    } catch (err) {
+      res.writeHead(404).end("ikke funnet");
+    }
+  });
+  return new Promise((ok) => tjener.listen(0, "127.0.0.1", () => ok(tjener)));
+}
 
 const KANDIDATER = [
   process.env.CHROME,
@@ -61,9 +92,10 @@ function avkod(s) {
 // storrelse settes der vindushoyden er en del av det som testes. Standard
 // er nettleserens eget vindu; hoydetesten trenger et telefonformat for at
 // taket pa kortet i det hele tatt skal binde.
-function kjor(navn, skript, storrelse) {
+async function kjor(navn, skript, storrelse) {
   const fil = join(tmp, navn + ".html");
   writeFileSync(fil, app.replace("<head>", "<head>\n<script>" + HARNESS + skript + "<\/script>"));
+
   const argv = [
     // --dump-dom virker bare i hodelos modus. Lokalt er binaerfila ofte
     // headless_shell, som alltid er hodelos, men pa en CI-runner er det en
@@ -73,14 +105,12 @@ function kjor(navn, skript, storrelse) {
     "--virtual-time-budget=12000", "--dump-dom",
   ];
   if (storrelse) argv.push("--window-size=" + storrelse);
-  argv.push("file://" + fil);
+  argv.push("http://127.0.0.1:" + PORT + "/" + navn + ".html");
 
   let dom;
   try {
-    dom = execFileSync(CHROME, argv,
-      { encoding: "utf8", maxBuffer: 64e6, stdio: ["ignore", "pipe", "pipe"] });
+    dom = (await kjorProsess(CHROME, argv, { maxBuffer: 64e6 })).stdout;
   } catch (err) {
-    // Uten dette blir en nettleser som ikke starter en tom feilmelding.
     const detalj = (err.stderr || "").toString().trim().split("\n").slice(-6).join("\n");
     throw new Error(navn + ": nettleseren feilet (" + CHROME + ")\n" + detalj);
   }
@@ -89,6 +119,9 @@ function kjor(navn, skript, storrelse) {
   if (!treff) throw new Error(navn + ": testsiden rapporterte ingenting");
   return JSON.parse(avkod(treff[1]));
 }
+
+const tjener = await startTjener();
+const PORT = tjener.address().port;
 
 /* ---------------- felles testdata ---------------- */
 
@@ -134,7 +167,7 @@ function mockFetch(saker) {
 
 /* ---------------- 1. feed, tidsstempler, annonser, XSS i tittel ---------------- */
 
-const SAK_1 = kjor("feed", FELLES + `
+const SAK_1 = await kjor("feed", FELLES + `
   var saker = lagSaker(12);
   // Slik WordPress returnerer en tittel som bokstavelig inneholder en img-tag.
   saker[0].title.rendered = "&lt;img src=x onerror=&quot;document.body.setAttribute('pwned','ja')&quot;&gt; Toppsak";
@@ -157,7 +190,7 @@ const SAK_1 = kjor("feed", FELLES + `
 
 /* ---------------- 2. rensing av artikkel-HTML ---------------- */
 
-const SAK_2 = kjor("artikkel", FELLES + `
+const SAK_2 = await kjor("artikkel", FELLES + `
   var saker = lagSaker(3);
   saker[0].content.rendered =
     "<h2>Mellomtittel</h2><p>Brann <strong>2-0</strong>.</p>" +
@@ -204,7 +237,7 @@ const SAK_2 = kjor("artikkel", FELLES + `
 
 /* ---------------- 3. rulling og endringssjekk ---------------- */
 
-const SAK_3 = kjor("oppdatering", FELLES + `
+const SAK_3 = await kjor("oppdatering", FELLES + `
   var saker = lagSaker(12);
   ` + mockFetch("saker") + `
   window.addEventListener("load", function () { setTimeout(function () {
@@ -233,7 +266,7 @@ const SAK_3 = kjor("oppdatering", FELLES + `
     // forste lasting beviser ingenting: der er den null uansett.
     f.scrollTop = f.scrollHeight;
     var forSpranget = f.scrollTop;
-    loadFeed();
+    app.loadFeed();
 
     setTimeout(function () {
       ok("rullet ned for ny lasting", forSpranget > 100, forSpranget);
@@ -247,7 +280,7 @@ const SAK_3 = kjor("oppdatering", FELLES + `
     f.firstElementChild.__merke = "original";
     f.scrollTop = f.scrollHeight;
     window.__kall = [];
-    loadFeed({ silent: true });
+    app.loadFeed({ silent: true });
 
     setTimeout(function () {
       ok("oppdatering rorer ikke feeden mens leseren star nede",
@@ -257,7 +290,7 @@ const SAK_3 = kjor("oppdatering", FELLES + `
 
       f.scrollTop = 0;
       window.__kall = [];
-      loadFeed({ silent: true });
+      app.loadFeed({ silent: true });
 
       setTimeout(function () {
         ok("uendret feed hentes ikke pa nytt",
@@ -265,7 +298,7 @@ const SAK_3 = kjor("oppdatering", FELLES + `
 
         saker[0].modified_gmt = "2026-02-02T00:00:00";
         window.__kall = [];
-        loadFeed({ silent: true });
+        app.loadFeed({ silent: true });
 
         setTimeout(function () {
           ok("endret feed hentes pa nytt",
@@ -292,4 +325,5 @@ for (const t of alle) {
 }
 
 console.log("\n" + (alle.length - feilet) + " av " + alle.length + " tester passerte");
+tjener.close();
 process.exit(feilet ? 1 : 0);
