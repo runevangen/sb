@@ -10,7 +10,8 @@ prosjektet `mvp-sb`.
     sw.js         service worker
     netlify.toml  proxy mot WordPress
 
-    fotball-data.js               fotballmodulen (beta): rene funksjoner
+    fotball.js                    fotballmodulen (beta): visningen
+    fotball-data.js               samme modul: rene funksjoner
     netlify/functions/fotball.mjs samme modul: henting og caching
 
 `lib.js` finnes for å kunne enhetstestes uten nettleser. Hører en funksjon
@@ -51,7 +52,19 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 - Data hentes fra API-Football via en Netlify Function, ikke via en
   redirect: en redirect kan ikke sette en hemmelig header, og nøkkelen
   skal aldri nå nettleseren. Den ligger i `FOOTBALL_API_KEY` i
-  Netlify-miljøet.
+  Netlify-miljøet. Uten den svarer funksjonen 503 med en synlig melding.
+- Nyheter og fotball er to visninger i det samme kortet, valgt med
+  bunnfanene. Begge ligger i DOM-en hele tiden — feeden skal stå klar bak
+  fanen, med rulleposisjonen der leseren forlot den.
+- Ruting: `#/fotball/<liga>/<del>`, begge ledd valgfrie og gjenkjent på
+  innhold framfor rekkefølge. Ukjente ledd faller tilbake til standard, så
+  en klippet lenke åpner noe framfor ingenting.
+- Menyen beskriver visningen du står i: kategorier i nyheter, ligaer i
+  fotball.
+- Tabellen viser alle kolonnene og ruller vannrett i sitt eget felt.
+  `.phone` klipper alt som stikker utenfor, så et felt uten `overflow-x`
+  ville skjult de siste kolonnene uten vei tilbake — testen ruller derfor
+  faktisk feltet framfor bare å måle bredden.
 - Adressen settes av `export const config` i funksjonen. Da slipper
   `netlify.toml` en ny regel, og redirect-reglene der holder seg smale.
 - Gratisnivået gir 100 kall i døgnet. Caching skjer på Netlifys kant med
@@ -65,9 +78,9 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      59 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  18 tester, ~120 ms, ingen nettleser
-    node test/run.mjs       40 tester, ~70 s, headless Chromium
+    node test/unit.mjs      79 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  28 tester, ~120 ms, ingen nettleser
+    node test/run.mjs       75 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
 De raske først, så en åpenbar feil stopper kjøringen før nettleseren
@@ -79,10 +92,12 @@ leseren. Ingen nøkkel og ingen nettverk kreves.
 
 `unit.mjs` dekker `lib.js` og `fotball-data.js`: URL-validering, videovertslisten, tidsstempler,
 endringssignaturen, gjenkjenning av interne lenker, sesongvinduet per
-liga, tolkning av API-Football-svaret og at døgnkvoten holder. `run.mjs` dekker alt som trenger DOM: XSS i titler
+liga, tolkning av API-Football-svaret, hvilken runde som er «neste», og at
+døgnkvoten holder. `run.mjs` dekker alt som trenger DOM: XSS i titler
 og artikkel-HTML, annonseplassering, rulleoppførsel, artikkelvisningen,
-fokusfella, korthøyden, at toppfeltet krymper, paginering, ruting og
-visningsvalgene i menyen.
+fokusfella, korthøyden, at toppfeltet krymper, paginering, ruting,
+visningsvalgene i menyen og hele fotballmodulen — fanebytte, tabell,
+resultater, neste runde, dyplenker og feilmelding fra tjenesten.
 
 Testsidene serveres over HTTP, ikke fra `file://` — modul-script blokkeres
 av CORS på file-opphav, og appen ville aldri lastet.

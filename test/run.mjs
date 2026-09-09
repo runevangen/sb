@@ -440,9 +440,237 @@ const SAK_5 = await kjor("visning", FELLES + `
   }, 900); });
 `);
 
+/* ---------------- 6. fotball (beta) ---------------- */
+
+// Fotballdata, i den formen Netlify-funksjonen leverer dem.
+const FOTBALL = `
+  var TABELL = [
+    { plass: 1, lag: "Bodo/Glimt", kamper: 30, seier: 21, uavgjort: 5, tap: 4,
+      scoret: 74, sluppet: 33, differanse: 41, poeng: 68 },
+    { plass: 2, lag: "Brann", kamper: 30, seier: 18, uavgjort: 6, tap: 6,
+      scoret: 55, sluppet: 33, differanse: 22, poeng: 60 },
+    { plass: 3, lag: "Kristiansund Ballklubb Elite", kamper: 30, seier: 9, uavgjort: 8, tap: 13,
+      scoret: 40, sluppet: 48, differanse: -8, poeng: 35 }
+  ];
+  var RESULTATER = [
+    { id: 1, dato: "2026-09-08T17:00:00+00:00", runde: "Runde 20", hjemme: "Molde",
+      borte: "Rosenborg", malHjemme: 2, malBorte: 2, spilt: true },
+    { id: 2, dato: "2026-09-06T15:00:00+00:00", runde: "Runde 19", hjemme: "Brann",
+      borte: "Viking", malHjemme: 1, malBorte: 0, spilt: true }
+  ];
+  var KOMMENDE = [
+    { id: 3, dato: "2026-09-20T17:00:00+00:00", runde: "Runde 21", hjemme: "Brann",
+      borte: "Bodo/Glimt", malHjemme: null, malBorte: null, spilt: false },
+    { id: 4, dato: "2026-09-21T17:00:00+00:00", runde: "Runde 21", hjemme: "Molde",
+      borte: "Rosenborg", malHjemme: null, malBorte: null, spilt: false }
+  ];
+`;
+
+function mockAlt(saker, fotballFeil) {
+  return `
+  window.__kall = [];
+  window.__fotball = [];
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("/api/fotball/") === 0) {
+      window.__fotball.push(u);
+      var del = u.split("?")[0].split("/").pop();
+      ${fotballFeil ? `
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve(JSON.stringify({ feil: "Fikk ikke svar fra API-Football" })); } });
+      ` : `
+      var kropp = { liga: "Eliteserien", sesong: 2026, del: del,
+                    oppdatert: new Date(Date.now() - 3600000).toISOString() };
+      if (del === "tabell") kropp.tabell = TABELL;
+      else if (del === "resultater") kropp.kamper = RESULTATER;
+      else { kropp.kamper = KOMMENDE; kropp.runde = "Runde 21"; }
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+      `}
+    }
+    window.__kall.push(u.indexOf("_fields=") > -1 ? "sjekk" : "full");
+    var svar;
+    if (u.indexOf("/wp-api/categories") === 0) svar = KATEGORIER;
+    else if (u.indexOf("_fields=") > -1) svar = ${saker}.map(function (p) { return { id: p.id, modified_gmt: p.modified_gmt }; });
+    else svar = ${saker};
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };`;
+}
+
+const SAK_6 = await kjor("fotball", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  ` + mockAlt("saker") + `
+
+  function synlig(id) { return !document.getElementById(id).hidden; }
+  function fane(id) { return document.getElementById(id).getAttribute("aria-current") === "true"; }
+  function valgt(rot) {
+    var n = document.querySelector("#" + rot + " .segment-del[aria-current='true']");
+    return n ? n.dataset.verdi : null;
+  }
+
+  window.addEventListener("load", function () { setTimeout(function () {
+    ok("appen starter i nyheter", synlig("feed") && !synlig("fotball") && fane("fanenNyheter"));
+
+    document.getElementById("fanenFotball").click();
+    setTimeout(function () {
+      ok("fotballfanen bytter visning",
+         !synlig("feed") && synlig("fotball") && fane("fanenFotball"));
+      ok("adressen folger fanen", location.hash.indexOf("#/fotball/") === 0, location.hash);
+      ok("tabellen er forstevalget", valgt("fotballFaner") === "tabell", valgt("fotballFaner"));
+
+      var rader = document.querySelectorAll(".tabell tbody tr");
+      ok("tabellen har en rad per lag", rader.length === 3, rader.length);
+      ok("lagnavnet star i raden",
+         rader[0].querySelector(".kol-lag").textContent === "Bodo/Glimt",
+         rader[0].querySelector(".kol-lag").textContent);
+      ok("poengsummen star sist",
+         rader[0].querySelector(".kol-poeng").textContent === "68",
+         rader[0].querySelector(".kol-poeng").textContent);
+      // Uten fortegnet leses +41 og -8 likt pa et blikk.
+      var celler = Array.prototype.map.call(rader[0].querySelectorAll("td"), function (c) { return c.textContent; });
+      ok("positiv malforskjell far pluss", celler.indexOf("+41") > -1, celler.join(" "));
+      var siste = Array.prototype.map.call(rader[2].querySelectorAll("td"), function (c) { return c.textContent; });
+      ok("negativ malforskjell beholder minus", siste.indexOf("-8") > -1, siste.join(" "));
+
+      // Tabellen skal rulle i sitt eget felt. .phone klipper alt som stikker
+      // utenfor, sa uten et rullbart felt ville de siste kolonnene bare vaert
+      // borte — og det ser likt ut i DOM-en. Derfor rulles det faktisk her.
+      var skall = document.querySelector(".tabell-skall");
+      // Med normal skrift skal alle atte kolonnene fa plass: poeng er det
+      // forste man ser etter, og en tabell man ma dra i for a se det er en
+      // darligere tabell.
+      ok("alle kolonnene far plass med normal skrift",
+         skall.scrollWidth <= skall.clientWidth, skall.scrollWidth + " av " + skall.clientWidth);
+
+      // Med storre skrift gjor de ikke det. Da ma feltet rulle: .phone
+      // klipper alt som stikker utenfor, sa uten rulling ville de siste
+      // kolonnene bare vaert borte, og det ser likt ut i DOM-en.
+      document.documentElement.setAttribute("data-font", "stor");
+      ok("storre skrift gjor tabellen bredere enn feltet",
+         skall.scrollWidth > skall.clientWidth, skall.scrollWidth + " av " + skall.clientWidth);
+      skall.scrollLeft = 999;
+      ok("feltet lar seg rulle sidelengs", skall.scrollLeft > 0, skall.scrollLeft);
+      var sisteKol = document.querySelector(".tabell tbody tr .kol-poeng").getBoundingClientRect();
+      var feltet = skall.getBoundingClientRect();
+      ok("poengkolonnen er innenfor skjermen etter rulling",
+         sisteKol.right <= feltet.right + 1, Math.round(sisteKol.right) + " av " + Math.round(feltet.right));
+      skall.scrollLeft = 0;
+      document.documentElement.removeAttribute("data-font");
+      ok("siden ruller ikke sidelengs",
+         document.documentElement.scrollWidth <= window.innerWidth,
+         document.documentElement.scrollWidth + " av " + window.innerWidth);
+      ok("sist oppdatert vises",
+         document.querySelector(".fotball-stempel").textContent.indexOf("Oppdatert") === 0,
+         document.querySelector(".fotball-stempel").textContent);
+
+      // Menyen skal beskrive visningen du star i.
+      document.getElementById("menuBtn").click();
+      setTimeout(function () {
+        var punkter = document.querySelectorAll(".menu-item");
+        var navn = Array.prototype.map.call(punkter, function (b) { return b.dataset.liga; });
+        ok("menyen viser ligaer i fotball", navn.indexOf("premier") > -1, navn.join(","));
+        ok("nyhetskategoriene er ute av veien",
+           !document.querySelector(".menu-item[data-cat-id]"));
+        document.getElementById("menuClose").click();
+
+        document.querySelector("#fotballFaner .segment-del[data-verdi='resultater']").click();
+        setTimeout(function () {
+          ok("resultatfanen er valgt", valgt("fotballFaner") === "resultater", valgt("fotballFaner"));
+          var kamper = document.querySelectorAll(".kamp");
+          ok("resultatene listes", kamper.length === 2, kamper.length);
+          ok("stillingen star mellom lagene",
+             kamper[0].querySelector(".kamp-tall").textContent === "2 – 2",
+             kamper[0].querySelector(".kamp-tall").textContent);
+          ok("kampene grupperes pa dag",
+             document.querySelectorAll(".kamp-dag").length === 2,
+             document.querySelectorAll(".kamp-dag").length);
+
+          document.querySelector("#fotballFaner .segment-del[data-verdi='neste']").click();
+          setTimeout(function () {
+            var neste = document.querySelectorAll(".kamp");
+            ok("neste runde listes", neste.length === 2, neste.length);
+            // En kamp som ikke er spilt har klokkeslett, ikke resultat.
+            ok("kommende kamp viser klokkeslett",
+               /^\\d{2}[:.]\\d{2}$/.test(neste[0].querySelector(".kamp-tall").textContent),
+               neste[0].querySelector(".kamp-tall").textContent);
+
+            var forFanebytte = window.__fotball.length;
+            document.querySelector("#fotballFaner .segment-del[data-verdi='tabell']").click();
+            setTimeout(function () {
+              ok("fanebytte tilbake henter ikke pa nytt",
+                 window.__fotball.length === forFanebytte,
+                 forFanebytte + " -> " + window.__fotball.length);
+
+              document.querySelector("#ligaVelger .segment-del[data-verdi='premier']").click();
+              setTimeout(function () {
+                ok("ny liga hentes", window.__fotball.length > forFanebytte,
+                   window.__fotball.join(" "));
+                ok("liga folger med i adressen",
+                   location.hash.indexOf("premier") > -1, location.hash);
+
+                history.back();
+                setTimeout(function () {
+                  ok("tilbakeknappen forlater ikke fotball med en gang",
+                     synlig("fotball"), location.hash);
+                  ferdig();
+                }, 300);
+              }, 400);
+            }, 300);
+          }, 400);
+        }, 400);
+      }, 300);
+    }, 500);
+  }, 900); });
+`, "390,844");   // telefonbredde: det er der tabellen ma rulle
+
+/* ---------------- 7. fotball: dyplenke og feil ---------------- */
+
+const SAK_7 = await kjor("fotball-lenke", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  ` + mockAlt("saker") + `
+  location.hash = "#/fotball/premier/neste";
+
+  window.addEventListener("load", function () { setTimeout(function () {
+    ok("dyplenke apner fotball", !document.getElementById("fotball").hidden);
+    var fane = document.querySelector("#fotballFaner .segment-del[aria-current='true']");
+    ok("dyplenke velger riktig fane", fane.dataset.verdi === "neste", fane.dataset.verdi);
+    var liga = document.querySelector("#ligaVelger .segment-del[aria-current='true']");
+    ok("dyplenke velger riktig liga", liga.dataset.verdi === "premier", liga.dataset.verdi);
+    ok("ligaen star i toppfeltet",
+       document.getElementById("filterTag").textContent === "Premier League",
+       document.getElementById("filterTag").textContent);
+
+    document.getElementById("fanenNyheter").click();
+    setTimeout(function () {
+      ok("veien tilbake til nyheter virker", !document.getElementById("feed").hidden);
+      // Feeden lastes selv om appen apnet i fotball, sa byttet er umiddelbart.
+      ok("feeden sto klar bak fanen", document.querySelectorAll(".row").length > 0,
+         document.querySelectorAll(".row").length);
+      ferdig();
+    }, 400);
+  }, 900); });
+`);
+
+const SAK_8 = await kjor("fotball-feil", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  ` + mockAlt("saker", true) + `
+
+  window.addEventListener("load", function () { setTimeout(function () {
+    document.getElementById("fanenFotball").click();
+    setTimeout(function () {
+      var tekst = document.getElementById("fotballInnhold").textContent;
+      // En feil skal si fra. En tom tabell ser ut som en liga uten kamper.
+      ok("feil fra tjenesten vises", tekst.indexOf("API-Football") > -1, tekst.slice(0, 60));
+      ok("ingen tom tabell tegnes", !document.querySelector(".tabell"));
+      ferdig();
+    }, 600);
+  }, 900); });
+`);
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5];
+const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8];
 let feilet = 0;
 
 for (const t of alle) {

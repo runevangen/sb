@@ -119,8 +119,55 @@ kall = stub({ errors: { token: "Missing application key." } });
 r = await fotball(be("/api/fotball/tabell?liga=premier"));
 ok("feil i kroppen blir en feil, ikke en tom tabell", r.status === 502, r.status);
 
+/* ---------------- resultater og neste runde ---------------- */
+
+function kamp(id, dato, runde, hjemme, borte, mh, mb, kode) {
+  return {
+    fixture: { id, date: dato, status: { short: kode || "NS" } },
+    league: { round: runde },
+    teams: { home: { name: hjemme }, away: { name: borte } },
+    goals: { home: mh === undefined ? null : mh, away: mb === undefined ? null : mb },
+  };
+}
+
+kall = stub({ errors: [], response: [
+  kamp(1, "2026-09-06T15:00:00+00:00", "Runde 19", "Brann", "Viking", 1, 0, "FT"),
+  kamp(2, "2026-09-08T17:00:00+00:00", "Runde 20", "Molde", "Rosenborg", 2, 2, "FT"),
+] });
+r = await fotball(be("/api/fotball/resultater?liga=eliteserien"));
+const res = await r.json();
+ok("resultater svarer 200", r.status === 200, r.status);
+ok("resultater sporr om spilte kamper",
+   kall[0].url.indexOf("status=FT") > -1, kall[0].url);
+// Nyeste forst: API-et gir dem i stigende rekkefolge, og en resultatliste
+// som begynner med den eldste kampen leses feil vei.
+ok("nyeste resultat star forst", res.kamper[0].hjemme === "Molde", res.kamper[0].hjemme);
+ok("resultater caches en time",
+   (r.headers.get("Netlify-CDN-Cache-Control") || "").indexOf("s-maxage=3600") > -1,
+   r.headers.get("Netlify-CDN-Cache-Control"));
+
+kall = stub({ errors: [], response: [
+  kamp(3, "2026-09-20T17:00:00+00:00", "Runde 21", "Brann", "Bodo/Glimt"),
+  kamp(4, "2026-09-21T17:00:00+00:00", "Runde 21", "Molde", "Rosenborg"),
+  kamp(5, "2026-09-28T17:00:00+00:00", "Runde 22", "Viking", "Sarpsborg"),
+] });
+r = await fotball(be("/api/fotball/neste?liga=premier"));
+const nes = await r.json();
+ok("neste runde svarer 200", r.status === 200, r.status);
+ok("neste runde sporr om kamper som ikke er spilt",
+   kall[0].url.indexOf("status=NS") > -1, kall[0].url);
+ok("bare den forste runden er med", nes.kamper.length === 2, nes.kamper.length);
+ok("runden navngis i svaret", nes.runde === "Runde 21", nes.runde);
+
+/* ---------------- ukjent datasett ---------------- */
+
+kall = stub(SVAR);
+r = await fotball(be("/api/fotball/toppscorere?liga=premier"));
+ok("ukjent datasett gir 404", r.status === 404, r.status);
+ok("ukjent datasett sporr ikke API-et", kall.length === 0, kall.length);
+
 /* ---------------- rapport ---------------- */
 
-const antall = 18;
+const antall = 28;
 console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);

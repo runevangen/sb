@@ -4,6 +4,8 @@
 // nettleser. Alt her nede rorer DOM, nettverk eller lagring.
 
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug } from "./lib.js";
+import { LIGAER, tolkFotballHash, fotballHash } from "./fotball-data.js";
+import { initFotball, visFotball } from "./fotball.js";
 
 // Bytt WP_HOST til din egen WordPress-side når som helst.
 const WP_HOST  = "https://sportsbibelen.no";
@@ -79,6 +81,11 @@ let harPushet = false;
 const PER_SIDE = 12;
 const WP_VERT = new URL(WP_HOST).hostname;       // feedens tilstand ved forrige vellykkede lasting
 let menuLoaded = false;
+let kategorier = null;          // hentet meny, sa den kan tegnes pa nytt uten a hentes
+let toppTekst = "";             // det som star i toppfeltet nar du er i nyheter
+let aktivVisning = "nyheter";   // "nyheter" eller "fotball"
+let fotballLiga = "eliteserien";
+let fotballDel = "tabell";
 
 /* ---------- små DOM-hjelpere ---------- */
 
@@ -538,6 +545,12 @@ async function apneSlug(slug, trigger) {
 }
 
 window.addEventListener("popstate", () => {
+  // Visningen forst: en tilbakeknapp fra fotball til nyheter skal bytte
+  // fane, ikke bare lukke et eventuelt artikkeloverlegg.
+  const rute = tolkFotballHash(location.hash);
+  if (rute) visFane("fotball", rute.liga, rute.del);
+  else if (aktivVisning === "fotball") visFane("nyheter");
+
   const slug = slugFraHash();
   if (!slug) {
     harPushet = false;
@@ -786,7 +799,10 @@ document.getElementById("sokForm").addEventListener("submit", (e) => {
   lastSignature = null;
 
   merkValgtKategori(null);
-  document.getElementById("filterTag").textContent = q ? "Søk: " + q : "";
+  toppTekst = q ? "Søk: " + q : "";
+  // Sok gjelder nyheter. Star du i fotball, skal treffene ogsa vises.
+  if (aktivVisning !== "nyheter") settFane("nyheter");
+  else document.getElementById("filterTag").textContent = toppTekst;
   track(q ? "Sok" : "Sok tomt", { ord: q.slice(0, 40) });
   closeMenu();
   loadFeed();
@@ -892,6 +908,57 @@ document.getElementById("detailCard").addEventListener("click", async (e) => {
   }
 });
 
+/* ---------- visninger ---------- */
+
+// Nyheter og fotball bytter plass i det samme kortet. Begge ligger i
+// DOM-en hele tiden; det er billigere enn a bygge feeden pa nytt hver
+// gang, og rulleposisjonen i den star igjen der leseren forlot den.
+function settFane(visning, liga, del) {
+  const adresse = visning === "fotball"
+    ? fotballHash(liga || fotballLiga, del || fotballDel)
+    : location.pathname + location.search;
+
+  // pushState, ikke replaceState: tilbakeknappen skal ta deg dit du kom
+  // fra, slik den gjor nar en artikkel apnes.
+  if (location.href !== new URL(adresse, location.href).href) {
+    history.pushState({ visning }, "", adresse);
+  }
+  track("Fane valgt", { fane: visning });
+  visFane(visning, liga, del);
+}
+
+function visFane(visning, liga, del) {
+  aktivVisning = visning;
+  if (visning === "fotball") {
+    fotballLiga = liga || fotballLiga;
+    fotballDel = del || fotballDel;
+  }
+
+  document.getElementById("feed").hidden = visning !== "nyheter";
+  document.getElementById("fotball").hidden = visning !== "fotball";
+
+  merkFane("fanenNyheter", visning === "nyheter");
+  merkFane("fanenFotball", visning === "fotball");
+
+  const tag = document.getElementById("filterTag");
+  if (visning === "fotball") {
+    tag.textContent = LIGAER[fotballLiga].navn;
+    visFotball(fotballLiga, fotballDel);
+  } else {
+    tag.textContent = toppTekst;
+  }
+
+  // Menyen beskriver den visningen du star i. Star den apen nar du bytter,
+  // skal innholdet folge med.
+  if (document.getElementById("menuPanel").classList.contains("open")) visMeny();
+}
+
+function merkFane(id, aktiv) {
+  const knapp = document.getElementById(id);
+  if (aktiv) knapp.setAttribute("aria-current", "true");
+  else knapp.removeAttribute("aria-current");
+}
+
 /* ---------- meny ---------- */
 
 async function loadMenu() {
@@ -908,6 +975,7 @@ async function loadMenu() {
   for (const source of categorySources()) {
     try {
       const cats = await fetchList(source.url);
+      kategorier = cats;
       renderMenu(cats);
       menuLoaded = true;
       return;
@@ -922,6 +990,39 @@ async function loadMenu() {
   const note = document.createElement("li");
   note.appendChild(el("p", "menu-state", "Klarte ikke å hente kategoriene."));
   list.appendChild(note);
+}
+
+// Menyen viser det du kan velge i den visningen du star i: kategorier i
+// nyheter, ligaer i fotball. Ellers ville et menyvalg tatt deg ut av
+// visningen du nettopp valgte.
+function visMeny() {
+  if (aktivVisning === "fotball") {
+    renderLigameny();
+    return;
+  }
+  if (kategorier) renderMenu(kategorier);
+  loadMenu();
+}
+
+function renderLigameny() {
+  const list = document.getElementById("menuList");
+  list.replaceChildren();
+
+  Object.keys(LIGAER).forEach((nokkel) => {
+    const item = document.createElement("li");
+    const knapp = el("button", "menu-item");
+    knapp.type = "button";
+    knapp.dataset.liga = nokkel;
+    knapp.appendChild(el("span", null, LIGAER[nokkel].navn));
+    knapp.appendChild(el("span", "count", LIGAER[nokkel].land));
+    if (nokkel === fotballLiga) knapp.setAttribute("aria-current", "true");
+    knapp.addEventListener("click", () => {
+      settFane("fotball", nokkel, fotballDel);
+      closeMenu();
+    });
+    item.appendChild(knapp);
+    list.appendChild(item);
+  });
 }
 
 function renderMenu(categories) {
@@ -971,8 +1072,8 @@ function selectCategory(cat) {
   merkValgtKategori(id);
 
   // Vis i toppen hvilken del av feeden man star i.
-  const tag = document.getElementById("filterTag");
-  tag.textContent = id ? cat.name : "";
+  toppTekst = id ? cat.name : "";
+  document.getElementById("filterTag").textContent = toppTekst;
 
   track("Kategori valgt", { kategori: id ? cat.name : "alle" });
   closeMenu();
@@ -986,7 +1087,7 @@ function openMenu() {
   btn.setAttribute("aria-expanded", "true");
   document.getElementById("menuClose").focus();
   track("Meny åpnet");
-  loadMenu();
+  visMeny();
 }
 
 function closeMenu() {
@@ -1129,7 +1230,22 @@ function fangFokus(e) {
 
 /* ---------- oppstart ---------- */
 
-// Apner appen pa en dyplenke, apnes den saken med en gang feeden star.
+initFotball((liga, del) => settFane("fotball", liga, del));
+
+document.getElementById("fanenNyheter").addEventListener("click", () => {
+  if (aktivVisning !== "nyheter") settFane("nyheter");
+});
+
+document.getElementById("fanenFotball").addEventListener("click", () => {
+  if (aktivVisning !== "fotball") settFane("fotball", fotballLiga, fotballDel);
+});
+
+// Apner appen pa en fotballenke, star modulen framme med en gang.
+const startrute = tolkFotballHash(location.hash);
+if (startrute) visFane("fotball", startrute.liga, startrute.del);
+
+// Feeden lastes uansett: den skal sta klar bak fanen, sa et bytte tilbake
+// ikke koster en ny henting.
 loadFeed().then(() => {
   const slug = slugFraHash();
   if (slug) apneSlug(slug);
@@ -1138,7 +1254,9 @@ loadFeed().then(() => {
 // Feeden oppdateres i bakgrunnen så lenge fanen er synlig. loadFeed lar
 // innholdet stå hvis leseren har scrollet ned i listen.
 setInterval(() => {
-  if (!document.hidden) loadFeed({ silent: true });
+  // Star du i fotball, skal feeden vaere i fred: den er ikke synlig, og en
+  // henting ville brukt nett uten at noen ser resultatet.
+  if (!document.hidden && aktivVisning === "nyheter") loadFeed({ silent: true });
 }, REFRESH_MS);
 
 // Testflate. Modulen har ingen globale variabler, sa nettlesertestene

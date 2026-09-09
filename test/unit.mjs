@@ -8,7 +8,8 @@
 // Alt som trenger DOM ligger i test/run.mjs.
 
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug } from "../lib.js";
-import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID }
+import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
+         apiSti, tolkKamper, nesteRunde, tolkFotballHash, fotballHash }
   from "../fotball-data.js";
 
 let feilet = 0;
@@ -207,8 +208,87 @@ function kaster(fn) {
   try { fn(); return false; } catch (err) { return true; }
 }
 
+/* ---------------- fotball: adresser hos API-et ---------------- */
+
+ok("tabell spor om standings",
+   apiSti("tabell", LIGAER.premier, 2026) === "/standings?league=39&season=2026",
+   apiSti("tabell", LIGAER.premier, 2026));
+// last og next gir et vindu rundt naet. Uten dem ville hele sesongen blitt
+// hentet for a vise ti kamper.
+ok("resultater spor om de siste spilte",
+   apiSti("resultater", LIGAER.premier, 2026).indexOf("status=FT&last=10") > -1,
+   apiSti("resultater", LIGAER.premier, 2026));
+ok("neste spor om de kommende",
+   apiSti("neste", LIGAER.premier, 2026).indexOf("status=NS&next=") > -1,
+   apiSti("neste", LIGAER.premier, 2026));
+ok("ukjent datasett gir null", apiSti("toppscorere", LIGAER.premier, 2026) === null);
+
+/* ---------------- fotball: kamper ---------------- */
+
+function kampsvar(rader) {
+  return { errors: [], response: rader };
+}
+
+function lagKamp(id, dato, runde, hjemme, borte, mh, mb, kode) {
+  return {
+    fixture: { id, date: dato, status: { short: kode || "NS" } },
+    league: { round: runde },
+    teams: { home: { name: hjemme }, away: { name: borte } },
+    goals: { home: mh === undefined ? null : mh, away: mb === undefined ? null : mb },
+  };
+}
+
+const KAMPER = tolkKamper(kampsvar([
+  lagKamp(1, "2026-09-08T17:00:00+00:00", "Runde 20", "Brann", "Viking", 2, 1, "FT"),
+  lagKamp(2, "2026-09-08T19:00:00+00:00", "Runde 20", "Molde", "Valerenga", 0, 0, "AET"),
+]));
+
+ok("kampene tolkes", KAMPER.length === 2, KAMPER.length);
+ok("lag og mal leses ut",
+   KAMPER[0].hjemme === "Brann" && KAMPER[0].borte === "Viking" &&
+   KAMPER[0].malHjemme === 2 && KAMPER[0].malBorte === 1);
+// Uten AET og PEN ville en kamp avgjort etter ekstraomganger sett ut som
+// at den ikke var spilt.
+ok("ekstraomganger teller som spilt", KAMPER[1].spilt === true);
+ok("kamp uten lag faller ut",
+   tolkKamper(kampsvar([lagKamp(3, "2026-09-08T17:00:00+00:00", "Runde 20", "", "Viking")])).length === 0);
+ok("feil i kroppen kaster ogsa for kamper",
+   kaster(() => tolkKamper({ errors: { token: "Missing application key." } })));
+
+// Neste runde er runden til forste kommende kamp, ikke de N neste
+// kampene: ellers ville en utsatt kamp fra forrige runde blandet seg inn.
+const KOMMENDE = tolkKamper(kampsvar([
+  lagKamp(4, "2026-09-20T17:00:00+00:00", "Runde 21", "Brann", "Bodo/Glimt"),
+  lagKamp(5, "2026-09-21T17:00:00+00:00", "Runde 21", "Molde", "Rosenborg"),
+  lagKamp(6, "2026-09-28T17:00:00+00:00", "Runde 22", "Viking", "Sarpsborg"),
+]));
+const NESTE = nesteRunde(KOMMENDE);
+ok("neste runde tar bare den forste runden", NESTE.length === 2, NESTE.length);
+ok("neste runde er den som kommer forst", NESTE[0].runde === "Runde 21", NESTE[0].runde);
+ok("tom liste gir tom runde", nesteRunde([]).length === 0);
+
+/* ---------------- fotball: ruting ---------------- */
+
+ok("naken fotballenke gir standardvalg",
+   JSON.stringify(tolkFotballHash("#/fotball")) ===
+   JSON.stringify({ liga: "eliteserien", del: "tabell" }),
+   JSON.stringify(tolkFotballHash("#/fotball")));
+ok("liga og del leses ut",
+   tolkFotballHash("#/fotball/premier/resultater").liga === "premier" &&
+   tolkFotballHash("#/fotball/premier/resultater").del === "resultater");
+// Leddene kjennes igjen pa innhold, ikke pa rekkefolge, sa en lenke med
+// bare det ene leddet fortsatt apner riktig sted.
+ok("del alene virker", tolkFotballHash("#/fotball/neste").del === "neste");
+ok("liga alene virker", tolkFotballHash("#/fotball/premier").liga === "premier");
+ok("ukjent ledd faller tilbake, ikke tomt",
+   tolkFotballHash("#/fotball/serie-a/toppscorere").liga === "eliteserien");
+ok("artikkelruter er ikke fotballruter", tolkFotballHash("#/sak/en-sak") === null);
+ok("tom hash er ikke en fotballrute", tolkFotballHash("") === null);
+ok("hash bygges tilbake til samme rute",
+   tolkFotballHash(fotballHash("premier", "neste")).del === "neste");
+
 /* ---------------- rapport ---------------- */
 
-const antall = 59;
+const antall = 79;
 console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);

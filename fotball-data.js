@@ -79,6 +79,92 @@ export function tolkTabell(json) {
   return grupper[0].map(tabellrad);
 }
 
+// Datasettene modulen viser, i den rekkefolgen fanene star.
+export const DELER = ["tabell", "resultater", "neste"];
+
+export const DEL_NAVN = {
+  tabell: "Tabell",
+  resultater: "Resultater",
+  neste: "Neste runde",
+};
+
+// Adressen hos API-Football for hvert datasett. Bygges her, ikke i
+// funksjonen, sa den kan kontrolleres uten a kalle noe.
+export function apiSti(del, liga, sesong) {
+  const felles = "league=" + liga.id + "&season=" + sesong;
+  if (del === "tabell") return "/standings?" + felles;
+  // last og next gir oss et vindu rundt naet uten a hente hele sesongen.
+  if (del === "resultater") return "/fixtures?" + felles + "&status=FT&last=10";
+  if (del === "neste") return "/fixtures?" + felles + "&status=NS&next=20";
+  return null;
+}
+
+// Kampene fra /fixtures, redusert til det visningen bruker.
+export function tolkKamper(json) {
+  const feil = apiFeil(json);
+  if (feil) throw new Error(feil);
+  if (!json || !Array.isArray(json.response)) {
+    throw new Error("Uventet svar: fant ingen kamper");
+  }
+  return json.response.map(kamp).filter((k) => k.hjemme && k.borte);
+}
+
+function kamp(rad) {
+  const info = (rad && rad.fixture) || {};
+  const lag = (rad && rad.teams) || {};
+  const mal = (rad && rad.goals) || {};
+  const kode = (info.status && info.status.short) || "";
+  return {
+    id: tall(info.id),
+    dato: info.date || null,
+    runde: tekst(rad && rad.league && rad.league.round),
+    hjemme: tekst(lag.home && lag.home.name),
+    borte: tekst(lag.away && lag.away.name),
+    malHjemme: maal(mal.home),
+    malBorte: maal(mal.away),
+    // AET og PEN er ferdigspilt de ogsa. Uten dem ville en cupkamp avgjort
+    // etter ekstraomganger sett ut som at den ikke var spilt.
+    spilt: kode === "FT" || kode === "AET" || kode === "PEN",
+  };
+}
+
+function maal(verdi) {
+  return verdi === null || verdi === undefined ? null : tall(verdi);
+}
+
+// "Neste runde" er runden til den forste kampen som kommer, ikke de ti
+// neste kampene: ellers ville halve neste runde blitt blandet med de siste
+// utsatte kampene fra denne.
+export function nesteRunde(kamper) {
+  if (!kamper.length) return [];
+  const sortert = kamper.slice().sort(
+    (a, b) => String(a.dato).localeCompare(String(b.dato)));
+  const runde = sortert[0].runde;
+  return runde ? sortert.filter((k) => k.runde === runde) : sortert;
+}
+
+// Ruting for modulen: #/fotball/<liga>/<del>, begge valgfrie. Ukjente ledd
+// faller tilbake til standard i stedet for a gi en tom visning, sa en
+// gammel eller klippet lenke fortsatt apner noe.
+export function tolkFotballHash(hash) {
+  const m = String(hash || "").match(/^#\/fotball(?:\/([^/?#]+))?(?:\/([^/?#]+))?/);
+  if (!m) return null;
+
+  const ledd = [m[1], m[2]].filter(Boolean).map(decodeURIComponent);
+  let liga = "eliteserien";
+  let del = "tabell";
+
+  for (const bit of ledd) {
+    if (ligaFor(bit)) liga = bit;
+    else if (DELER.indexOf(bit) !== -1) del = bit;
+  }
+  return { liga, del };
+}
+
+export function fotballHash(liga, del) {
+  return "#/fotball/" + encodeURIComponent(liga) + "/" + encodeURIComponent(del);
+}
+
 function tabellrad(rad) {
   const alle = (rad && rad.all) || {};
   const mal = alle.goals || {};

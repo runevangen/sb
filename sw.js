@@ -5,13 +5,15 @@
 // ferskhetslogikk, og en cache oppa den ville gitt to sannheter om hva som
 // er nyeste sak.
 
-const CACHE = "sb-skall-v1";
+const CACHE = "sb-skall-v2";
 const SKALL = [
   "/",
   "/index.html",
   "/app.css",
   "/app.js",
   "/lib.js",
+  "/fotball.js",
+  "/fotball-data.js",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -39,6 +41,10 @@ self.addEventListener("fetch", (e) => {
 
   const url = new URL(e.request.url);
   if (url.pathname.indexOf("/wp-api/") === 0) return;   // aldri mellomlagre feeden
+  // Fotballdataene caches pa Netlifys kant med en levetid per datasett. En
+  // cache til her ville gitt to sannheter om hva som er ferskt, og
+  // "sist oppdatert" i visningen ville lyvd.
+  if (url.pathname.indexOf("/api/fotball/") === 0) return;
 
   // Nett forst, cache som reserve. Motsatt rekkefolge ville servert en
   // gammel index.html i det uendelige etter neste utrulling.

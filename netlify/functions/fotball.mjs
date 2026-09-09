@@ -1,4 +1,5 @@
-// Henter tabellen fra API-Football og legger Netlifys varige cache foran.
+// Henter fotballdata fra API-Football og legger Netlifys varige cache
+// foran.
 //
 // Nokkelen ligger i miljovariabelen FOOTBALL_API_KEY og forlater aldri
 // denne funksjonen: nettleseren snakker bare med oss, aldri med API-et.
@@ -6,27 +7,32 @@
 // WordPress-proxyen i netlify.toml er — en redirect kan ikke sette en
 // hemmelig header.
 //
-// Adressen defineres av config nederst, ikke av en ny regel i
+// Adressene defineres av config nederst, ikke av nye regler i
 // netlify.toml. Da holder redirect-reglene seg like smale som for.
 
-import { ligaFor, sesongFor, tolkTabell, LEVETID } from "../../fotball-data.js";
+import {
+  ligaFor, sesongFor, apiSti, tolkTabell, tolkKamper, nesteRunde, LEVETID, DELER,
+} from "../../fotball-data.js";
 
 const API = "https://v3.football.api-sports.io";
 
 export default async (req) => {
   const url = new URL(req.url);
-  const liga = ligaFor(url.searchParams.get("liga") || "");
+  const del = url.pathname.split("/").filter(Boolean).pop();
+  if (DELER.indexOf(del) === -1) return svar({ feil: "Ukjent datasett" }, 404, 0);
+
+  const ligaNokkel = url.searchParams.get("liga") || "";
+  const liga = ligaFor(ligaNokkel);
   if (!liga) return svar({ feil: "Ukjent liga" }, 400, 0);
 
   const nokkel = process.env.FOOTBALL_API_KEY;
   if (!nokkel) return svar({ feil: "Tjenesten mangler API-nokkel" }, 503, 0);
 
   const sesong = sesongFor(liga);
-  const kilde = API + "/standings?league=" + liga.id + "&season=" + sesong;
 
   let json;
   try {
-    const respons = await fetch(kilde, {
+    const respons = await fetch(API + apiSti(del, liga, sesong), {
       headers: { "x-apisports-key": nokkel, "Accept": "application/json" },
     });
     if (!respons.ok) throw new Error("HTTP " + respons.status);
@@ -38,22 +44,35 @@ export default async (req) => {
     return svar({ feil: "Fikk ikke svar fra API-Football" }, 502, 0);
   }
 
-  let tabell;
+  let innhold;
   try {
-    tabell = tolkTabell(json);
+    innhold = tolk(del, json);
   } catch (err) {
     console.error("[fotball] uventet svar:", err);
     return svar({ feil: err.message }, 502, 0);
   }
 
-  return svar({
+  return svar(Object.assign({
     liga: liga.navn,
+    ligaNokkel,
     land: liga.land,
     sesong,
+    del,
     oppdatert: new Date().toISOString(),
-    tabell,
-  }, 200, LEVETID.tabell);
+  }, innhold), 200, LEVETID[del]);
 };
+
+function tolk(del, json) {
+  if (del === "tabell") return { tabell: tolkTabell(json) };
+  if (del === "resultater") {
+    // Nyeste forst: API-et gir de siste kampene i stigende rekkefolge.
+    const kamper = tolkKamper(json).slice().sort(
+      (a, b) => String(b.dato).localeCompare(String(a.dato)));
+    return { kamper };
+  }
+  const kommende = nesteRunde(tolkKamper(json));
+  return { kamper: kommende, runde: kommende.length ? kommende[0].runde : "" };
+}
 
 function svar(kropp, status, levetid) {
   const headere = { "Content-Type": "application/json; charset=utf-8" };
@@ -76,4 +95,6 @@ function svar(kropp, status, levetid) {
   return new Response(JSON.stringify(kropp), { status, headers: headere });
 }
 
-export const config = { path: "/api/fotball/tabell" };
+export const config = {
+  path: ["/api/fotball/tabell", "/api/fotball/resultater", "/api/fotball/neste"],
+};

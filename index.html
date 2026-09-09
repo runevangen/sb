@@ -86,6 +86,26 @@
     <div class="feed" id="feed" aria-live="polite" aria-busy="true">
       <div class="state"><p>Henter nyheter …</p></div>
     </div>
+
+    <!-- Fotballmodulen ligger som soster til feeden og bytter plass med
+         den. Innholdet bygges av fotball.js. -->
+    <section class="fotball" id="fotball" aria-label="Fotball, beta" hidden>
+      <div class="fotball-topp">
+        <div class="segment" id="ligaVelger" role="group" aria-label="Liga"></div>
+        <div class="segment" id="fotballFaner" role="group" aria-label="Visning"></div>
+      </div>
+      <div class="fotball-innhold" id="fotballInnhold" aria-live="polite"></div>
+    </section>
+
+    <nav class="tabbar" aria-label="Hovedvisning">
+      <button class="tab" id="fanenNyheter" type="button" aria-current="true">
+        <span class="tab-ico" aria-hidden="true">📰</span>Nyheter
+      </button>
+      <button class="tab" id="fanenFotball" type="button">
+        <span class="tab-ico" aria-hidden="true">⚽</span>Fotball
+        <span class="beta" aria-label="beta">beta</span>
+      </button>
+    </nav>
   </div>
 
   <div class="detail-wrap" id="detailWrap">
