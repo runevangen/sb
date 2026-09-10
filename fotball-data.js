@@ -157,14 +157,53 @@ function maal(verdi) {
 /* ---------- TheSportsDB ---------- */
 
 // Gratisnivaet hos API-Football stopper ved SESONGVINDU. TheSportsDB gir
-// de neste kampene i en liga for inneværende sesong uten nokkel (testnokkel
-// "3"), sa «neste runde» kan vaere arets selv om tabellen er fjorarets.
-// Feltnavnene under er fra dokumentasjonen, ikke fra et svar vi har sett
-// selv: funksjonen faller tilbake til API-Football om de ikke stemmer.
-export function tsdbSti(liga, nokkel) {
+// tabell, siste resultater og neste kamper for inneværende sesong uten
+// nokkel (testnokkel "3"), sa fotballfanen kan vaere arets. Neste runde er
+// sett virke i prod; tabell og resultater bygger pa samme dokumentasjon.
+// Funksjonen faller tilbake til API-Football om formen ikke stemmer.
+export function tsdbSti(del, liga, nokkel, naa) {
   if (!liga || !liga.tsdb) return null;
-  return "/api/v1/json/" + encodeURIComponent(nokkel || "3") +
-    "/eventsnextleague.php?id=" + liga.tsdb;
+  const rot = "/api/v1/json/" + encodeURIComponent(nokkel || "3") + "/";
+  if (del === "tabell") {
+    return rot + "lookuptable.php?l=" + liga.tsdb + "&s=" + encodeURIComponent(tsdbSesong(liga, naa));
+  }
+  if (del === "resultater") return rot + "eventspastleague.php?id=" + liga.tsdb;
+  if (del === "neste") return rot + "eventsnextleague.php?id=" + liga.tsdb;
+  return null;
+}
+
+// TheSportsDB skriver sesongen som «2026» for kalenderligaer og
+// «2025-2026» for dem som krysser nyttar.
+export function tsdbSesong(liga, naa) {
+  const start = sesongFor(liga, naa);
+  return liga && liga.sesong === "host-var" ? start + "-" + (start + 1) : String(start);
+}
+
+// Tabellen fra lookuptable.php, i samme form som tolkTabell gir. table er
+// null nar sesongen ikke finnes hos dem — det er «ingen tabell», ikke feil,
+// sa funksjonen kan ga videre til API-Football.
+export function tolkTabellTsdb(json) {
+  if (!json || typeof json !== "object") throw new Error("Tomt svar fra TheSportsDB");
+  if (json.table === null || json.table === undefined) return [];
+  if (!Array.isArray(json.table)) throw new Error("Uventet svar fra TheSportsDB");
+  return json.table.map(tsdbRad).filter((r) => r.lag);
+}
+
+function tsdbRad(rad) {
+  const r = rad || {};
+  return {
+    plass: tall(r.intRank),
+    lag: redaksjonsnavn(tekst(r.strTeam)),
+    merke: r.strBadge || null,
+    kamper: tall(r.intPlayed),
+    seier: tall(r.intWin),
+    uavgjort: tall(r.intDraw),
+    tap: tall(r.intLoss),
+    scoret: tall(r.intGoalsFor),
+    sluppet: tall(r.intGoalsAgainst),
+    differanse: tall(r.intGoalDifference),
+    poeng: tall(r.intPoints),
+  };
 }
 
 // Samme form som tolkKamper gir, sa visningen ikke vet hvor kampene kom

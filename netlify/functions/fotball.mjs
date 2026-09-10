@@ -12,7 +12,7 @@
 
 import {
   ligaFor, sesongFor, tilgjengeligSesong, apiSti, tolkTabell, tolkKamper,
-  nesteRunde, LEVETID, DELER, tsdbSti, tolkKamperTsdb,
+  nesteRunde, LEVETID, DELER, tsdbSti, tolkKamperTsdb, tolkTabellTsdb,
 } from "../../fotball-data.js";
 
 const API = "https://v3.football.api-sports.io";
@@ -47,19 +47,17 @@ export default async (req) => {
   const sesong = tilgjengeligSesong(liga);
   const naSesong = sesongFor(liga);
 
-  // Neste runde for en sesong abonnementet ikke dekker: prov TheSportsDB
-  // forst, som gir arets kamper gratis. Svikter den — nettverk, uventet
-  // form, ingen kamper — far leseren det API-Football har, som for.
-  if (del === "neste" && sesong !== naSesong && liga.tsdb) {
-    const arets = await hentTsdb(liga);
-    if (arets && arets.length) {
-      const kommende = nesteRunde(arets);
-      return svar({
+  // En sesong abonnementet ikke dekker: prov TheSportsDB forst, som gir
+  // arets tabell, resultater og kamper gratis. Svikter den — nettverk,
+  // uventet form, ingenting — far leseren det API-Football har, som for.
+  if (sesong !== naSesong && liga.tsdb) {
+    const arets = await hentTsdb(del, liga);
+    if (arets) {
+      return svar(Object.assign({
         liga: liga.navn, ligaNokkel, land: liga.land,
         sesong: naSesong, sisteSesong: true, del, kilde: "TheSportsDB",
         oppdatert: new Date().toISOString(),
-        kamper: kommende, runde: kommende[0].runde,
-      }, 200, LEVETID[del]);
+      }, arets), 200, LEVETID[del]);
     }
   }
 
@@ -97,14 +95,26 @@ export default async (req) => {
   }, innhold), 200, LEVETID[del]);
 };
 
-// null ved enhver feil: den som kaller har en vei videre uansett.
-async function hentTsdb(liga) {
+// null ved enhver feil og nar det ikke finnes noe: den som kaller har en
+// vei videre uansett.
+async function hentTsdb(del, liga) {
   try {
-    const respons = await fetch(TSDB + tsdbSti(liga, process.env.THESPORTSDB_KEY), {
+    const respons = await fetch(TSDB + tsdbSti(del, liga, process.env.THESPORTSDB_KEY), {
       headers: { "Accept": "application/json" },
     });
     if (!respons.ok) throw new Error("HTTP " + respons.status);
-    return tolkKamperTsdb(await respons.json()).filter((k) => !k.spilt);
+    const json = await respons.json();
+    if (del === "tabell") {
+      const tabell = tolkTabellTsdb(json);
+      return tabell.length ? { tabell } : null;
+    }
+    if (del === "resultater") {
+      const kamper = tolkKamperTsdb(json).filter((k) => k.spilt).sort(
+        (a, b) => String(b.dato).localeCompare(String(a.dato)));
+      return kamper.length ? { kamper } : null;
+    }
+    const kommende = nesteRunde(tolkKamperTsdb(json).filter((k) => !k.spilt));
+    return kommende.length ? { kamper: kommende, runde: kommende[0].runde } : null;
   } catch (err) {
     console.error("[fotball] TheSportsDB feilet, bruker API-Football:", err);
     return null;

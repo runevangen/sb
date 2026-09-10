@@ -127,14 +127,15 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   sesongen over tabellen — en tabell fra i fjor som ser ut som årets er
   verre enn ingen tabell. Utvides abonnementet, er `SESONGVINDU` det
   eneste stedet tallene står.
-- «Neste runde» for en sesong utenfor vinduet hentes først fra
-  TheSportsDB (liga-id i `tsdb` i `LIGAER`, testnøkkel «3», eller
-  `THESPORTSDB_KEY`), som gir årets kamper gratis. Svikter den — nettverk,
-  uventet form, ingen kamper — får leseren API-Footballs svar som før.
+- En sesong utenfor vinduet hentes først fra TheSportsDB (liga-id i
+  `tsdb` i `LIGAER`, testnøkkel «3», eller `THESPORTSDB_KEY`), som gir
+  årets tabell, resultater og neste runde gratis. Svikter den — nettverk,
+  uventet form, ingenting — får leseren API-Footballs svar som før.
   Svaret sier hvor det kom fra (`kilde`), og stempelet under viser det.
-  Sett virke i prod 10. september 2026. Tabell og resultater kommer
-  fortsatt bare fra API-Football, og er fjorårets til abonnementet
-  utvides eller de også hentes fra TheSportsDB.
+  Neste runde er sett virke i prod 10. september 2026; tabell og
+  resultater bygger på samme dokumentasjon og er `uverifisert` til de er
+  sett. TheSportsDB skriver sesongen «2026» for kalenderligaer og
+  «2026-2027» for dem som krysser nyttår (`tsdbSesong`).
 - «Hvor ser du kampen?» Årets kommende kamper har en delingsknapp som
   åpner ett spørsmål under raden: hjemme, på pub (med navn) eller på
   stadion (med arena). Svaret deles som tekst inn i gruppechatten leseren
@@ -154,8 +155,8 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      155 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  50 tester, ~120 ms, ingen nettleser
+    node test/unit.mjs      165 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  57 tester, ~120 ms, ingen nettleser
     node test/run.mjs       130 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
