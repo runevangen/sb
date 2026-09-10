@@ -12,7 +12,7 @@ import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          apiSti, tolkKamper, nesteRunde, tolkFotballHash, fotballHash,
          tilgjengeligSesong, SESONGVINDU, redaksjonsnavn, normaliserLagnavn,
-         tsdbSti, tolkKamperTsdb, tolkTabellTsdb, tsdbSesong, delingstekst, tidstekst, HVOR }
+         tsdbSti, tsdbHeadere, tolkKamperTsdb, tolkTabellTsdb, tsdbSesong, delingstekst, tidstekst, HVOR }
   from "../fotball-data.js";
 
 import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
@@ -272,9 +272,19 @@ ok("ingen lag gir tom tekst", listeTekst([]) === "" && listeTekst(null) === "");
 ok("adressen bruker testnokkelen 3 som standard",
    tsdbSti("neste", LIGAER.eliteserien) === "/api/v1/json/3/eventsnextleague.php?id=4358",
    tsdbSti("neste", LIGAER.eliteserien));
-ok("egen nokkel legges i adressen, url-kodet",
-   tsdbSti("neste", LIGAER.premier, "a b") === "/api/v1/json/a%20b/eventsnextleague.php?id=4328",
-   tsdbSti("neste", LIGAER.premier, "a b"));
+// Med nokkel: v2, og nokkelen star ikke i adressen — den gar i en header.
+ok("med nokkel brukes v2 for neste",
+   tsdbSti("neste", LIGAER.premier, "hemmelig") === "/api/v2/json/schedule/next/league/4328",
+   tsdbSti("neste", LIGAER.premier, "hemmelig"));
+ok("med nokkel brukes v2 for resultater",
+   tsdbSti("resultater", LIGAER.eliteserien, "hemmelig") === "/api/v2/json/schedule/previous/league/4358");
+ok("med nokkel brukes v2 for tabellen, med sesongen i stien",
+   tsdbSti("tabell", LIGAER.eliteserien, "hemmelig", new Date(Date.UTC(2026, 8, 10))) === "/api/v2/json/lookup/table/4358/2026",
+   tsdbSti("tabell", LIGAER.eliteserien, "hemmelig", new Date(Date.UTC(2026, 8, 10))));
+ok("nokkelen star aldri i adressen",
+   ["tabell", "resultater", "neste"].every((d) => tsdbSti(d, LIGAER.eliteserien, "hemmelig").indexOf("hemmelig") === -1));
+ok("nokkelen gar i X-API-KEY", tsdbHeadere("hemmelig")["X-API-KEY"] === "hemmelig");
+ok("uten nokkel sendes ingen X-API-KEY", !("X-API-KEY" in tsdbHeadere("")) && !("X-API-KEY" in tsdbHeadere()));
 ok("liga uten TheSportsDB-id gir null", tsdbSti("neste", { id: 1 }) === null);
 ok("ukjent datasett gir null", tsdbSti("toppscorere", LIGAER.eliteserien) === null);
 ok("resultater har egen adresse",
@@ -299,6 +309,12 @@ ok("tabellraden far samme form som API-Footballs",
    TAB.scoret === 50 && TAB.sluppet === 20 && TAB.differanse === 30 && TAB.poeng === 45,
    JSON.stringify(TAB));
 ok("table: null er tom tabell, ikke feil", tolkTabellTsdb({ table: null }).length === 0);
+// v2 legger lista under et annet navn. Vi tar den forste lista vi finner.
+ok("v2-formen med lookup leses ogsa", tolkTabellTsdb({ lookup: [RAD] })[0].lag === "Bodø/Glimt");
+ok("ukjent navn pa lista leses nar det er den eneste", tolkTabellTsdb({ standings: [RAD] })[0].lag === "Bodø/Glimt");
+ok("tomt objekt er tom tabell", tolkTabellTsdb({}).length === 0);
+ok("v2-formen med schedule leses ogsa",
+   tolkKamperTsdb({ schedule: [hendelse()] })[0].hjemme === "Brann");
 ok("rad uten lag filtreres bort", tolkTabellTsdb({ table: [{ intRank: "1" }] }).length === 0);
 ok("tabell som ikke er liste kaster", kaster(() => tolkTabellTsdb({ table: {} })));
 
@@ -601,6 +617,6 @@ ok("hash bygges tilbake til samme rute",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 196;
+const antall = 205;
 console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);

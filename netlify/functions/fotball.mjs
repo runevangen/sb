@@ -12,7 +12,7 @@
 
 import {
   ligaFor, sesongFor, tilgjengeligSesong, apiSti, tolkTabell, tolkKamper,
-  nesteRunde, LEVETID, DELER, tsdbSti, tolkKamperTsdb, tolkTabellTsdb, TSDB_MINST,
+  nesteRunde, LEVETID, DELER, tsdbSti, tsdbHeadere, tolkKamperTsdb, tolkTabellTsdb, TSDB_MINST,
 } from "../../fotball-data.js";
 
 const API = "https://v3.football.api-sports.io";
@@ -101,8 +101,9 @@ export default async (req) => {
 // videre uansett.
 async function hentTsdb(del, liga) {
   try {
-    const respons = await fetch(TSDB + tsdbSti(del, liga, process.env.THESPORTSDB_KEY), {
-      headers: { "Accept": "application/json" },
+    const nokkel = process.env.THESPORTSDB_KEY || "";
+    const respons = await fetch(TSDB + tsdbSti(del, liga, nokkel), {
+      headers: tsdbHeadere(nokkel),
     });
     if (!respons.ok) throw new Error("HTTP " + respons.status);
     const json = await respons.json();
