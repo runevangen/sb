@@ -132,8 +132,9 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   `THESPORTSDB_KEY`), som gir årets kamper gratis. Svikter den — nettverk,
   uventet form, ingen kamper — får leseren API-Footballs svar som før.
   Svaret sier hvor det kom fra (`kilde`), og stempelet under viser det.
-  Feltnavnene er fra dokumentasjonen, ikke fra et svar vi har sett selv;
-  til det er sett i prod er dette `uverifisert`.
+  Sett virke i prod 10. september 2026. Tabell og resultater kommer
+  fortsatt bare fra API-Football, og er fjorårets til abonnementet
+  utvides eller de også hentes fra TheSportsDB.
 - «Hvor ser du kampen?» Årets kommende kamper har en delingsknapp som
   åpner ett spørsmål under raden: hjemme, på pub (med navn) eller på
   stadion (med arena). Svaret deles som tekst inn i gruppechatten leseren
