@@ -10,7 +10,7 @@ prosjektet `mvp-sb`.
     sw.js         service worker
     netlify.toml  proxy mot WordPress
 
-    BACKLOGG.md   bestemt, men ikke bygget. Nyeste øverst.
+    BACKLOGG.md   peker til issues, som er den ekte backloggen
 
     fotball.js                    fotballmodulen (beta): visningen
     fotball-data.js               samme modul: rene funksjoner
