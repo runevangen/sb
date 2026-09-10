@@ -10,6 +10,8 @@ prosjektet `mvp-sb`.
     sw.js         service worker
     netlify.toml  proxy mot WordPress
 
+    BACKLOGG.md   bestemt, men ikke bygget. Nyeste øverst.
+
     fotball.js                    fotballmodulen (beta): visningen
     fotball-data.js               samme modul: rene funksjoner
     netlify/functions/fotball.mjs samme modul: henting og caching
