@@ -12,7 +12,7 @@
 
 import {
   ligaFor, sesongFor, tilgjengeligSesong, apiSti, tolkTabell, tolkKamper,
-  nesteRunde, LEVETID, DELER, tsdbSti, tolkKamperTsdb, tolkTabellTsdb,
+  nesteRunde, LEVETID, DELER, tsdbSti, tolkKamperTsdb, tolkTabellTsdb, TSDB_MINST,
 } from "../../fotball-data.js";
 
 const API = "https://v3.football.api-sports.io";
@@ -95,8 +95,10 @@ export default async (req) => {
   }, innhold), 200, LEVETID[del]);
 };
 
-// null ved enhver feil og nar det ikke finnes noe: den som kaller har en
-// vei videre uansett.
+// null ved enhver feil, nar det ikke finnes noe, og nar svaret er for
+// lite til a vaere helt: gratisnokkelen kapper svarene, og et avkortet
+// svar skal ikke vises som om det var helt. Den som kaller har en vei
+// videre uansett.
 async function hentTsdb(del, liga) {
   try {
     const respons = await fetch(TSDB + tsdbSti(del, liga, process.env.THESPORTSDB_KEY), {
@@ -106,19 +108,30 @@ async function hentTsdb(del, liga) {
     const json = await respons.json();
     if (del === "tabell") {
       const tabell = tolkTabellTsdb(json);
-      return tabell.length ? { tabell } : null;
+      if (tabell.length < TSDB_MINST.tabell) return avkortet(del, tabell.length);
+      return { tabell };
     }
+    const alle = tolkKamperTsdb(json);
+    // Grensen gjelder det som kom, ikke det som ble igjen etter filtrering:
+    // en runde med en kamp igjen er ekte nar svaret ellers er fullt.
+    if (alle.length < TSDB_MINST[del]) return avkortet(del, alle.length);
     if (del === "resultater") {
-      const kamper = tolkKamperTsdb(json).filter((k) => k.spilt).sort(
+      const kamper = alle.filter((k) => k.spilt).sort(
         (a, b) => String(b.dato).localeCompare(String(a.dato)));
       return kamper.length ? { kamper } : null;
     }
-    const kommende = nesteRunde(tolkKamperTsdb(json).filter((k) => !k.spilt));
+    const kommende = nesteRunde(alle.filter((k) => !k.spilt));
     return kommende.length ? { kamper: kommende, runde: kommende[0].runde } : null;
   } catch (err) {
     console.error("[fotball] TheSportsDB feilet, bruker API-Football:", err);
     return null;
   }
+}
+
+function avkortet(del, antall) {
+  console.warn("[fotball] TheSportsDB ga bare " + antall + " for " + del +
+    " — trolig gratisnokkelen. Sett THESPORTSDB_KEY. Bruker API-Football.");
+  return null;
 }
 
 function tolk(del, json) {

@@ -323,6 +323,16 @@ ok("et tidspunkt som allerede har sone rores ikke",
    === "2026-09-13T17:00:00+02:00");
 ok("spilt kamp gjenkjennes",
    tolkKamperTsdb({ events: [hendelse({ strStatus: "Match Finished", intHomeScore: "2", intAwayScore: "1" })] })[0].spilt === true);
+// Status er ikke alltid fylt ut hos TheSportsDB. Et resultat pa en kamp
+// som er spilt etter klokka, er en spilt kamp.
+const KLOKKA = Date.parse("2026-09-14T00:00:00Z");
+ok("resultat pa en kamp som er spilt teller som spilt",
+   tolkKamperTsdb({ events: [hendelse({ strStatus: "", intHomeScore: "2", intAwayScore: "1" })] }, KLOKKA)[0].spilt === true);
+ok("resultat pa en kamp fram i tid teller ikke",
+   tolkKamperTsdb({ events: [hendelse({ strStatus: "", intHomeScore: "0", intAwayScore: "0" })] },
+     Date.parse("2026-09-01T00:00:00Z"))[0].spilt === false);
+ok("uten resultat og uten status er kampen ikke spilt",
+   tolkKamperTsdb({ events: [hendelse({ strStatus: "" })] }, KLOKKA)[0].spilt === false);
 ok("events: null er tom liste, ikke feil", tolkKamperTsdb({ events: null }).length === 0);
 ok("hendelse uten lag filtreres bort",
    tolkKamperTsdb({ events: [hendelse({ strHomeTeam: "" })] }).length === 0);
@@ -591,6 +601,6 @@ ok("hash bygges tilbake til samme rute",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 193;
+const antall = 196;
 console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);
