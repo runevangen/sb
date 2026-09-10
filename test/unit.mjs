@@ -10,7 +10,7 @@
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug } from "../lib.js";
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          apiSti, tolkKamper, nesteRunde, tolkFotballHash, fotballHash,
-         tilgjengeligSesong, SESONGVINDU }
+         tilgjengeligSesong, SESONGVINDU, redaksjonsnavn, normaliserLagnavn }
   from "../fotball-data.js";
 
 let feilet = 0;
@@ -176,6 +176,29 @@ ok("host-var-liga klemmes etter sesongen",
    tilgjengeligSesong(LIGAER.premier, new Date(Date.UTC(2025, 0, 15)), VINDU));
 ok("vinduet har en fra og en til", SESONGVINDU.fra < SESONGVINDU.til);
 
+/* ---------------- fotball: lagnavn ---------------- */
+
+ok("norske tegn foldes til ascii i nokkelen",
+   normaliserLagnavn("Bodø/Glimt") === "bodoglimt", normaliserLagnavn("Bodø/Glimt"));
+ok("skilletegn og mellomrom faller bort",
+   normaliserLagnavn("Bodo / Glimt") === "bodoglimt", normaliserLagnavn("Bodo / Glimt"));
+ok("æ blir ae, ikke a", normaliserLagnavn("Stabæk") === "stabaek", normaliserLagnavn("Stabæk"));
+
+// Samme rad uansett hvordan API-et skriver det. Lista skal ikke ga i
+// stykker om de begynner a sende norske bokstaver selv.
+ok("API-ets form oversettes", redaksjonsnavn("Bodo/Glimt") === "Bodø/Glimt");
+ok("riktig form star igjen som riktig", redaksjonsnavn("Bodø/Glimt") === "Bodø/Glimt");
+ok("annen tegnsetting treffer ogsa", redaksjonsnavn("Bodo Glimt") === "Bodø/Glimt");
+ok("Tromso blir Tromsø", redaksjonsnavn("Tromso") === "Tromsø");
+ok("Lillestrom blir Lillestrøm", redaksjonsnavn("Lillestrom") === "Lillestrøm");
+ok("Valerenga blir Vålerenga", redaksjonsnavn("Valerenga") === "Vålerenga");
+ok("ukjent navn gar uendret gjennom",
+   redaksjonsnavn("Manchester City") === "Manchester City");
+ok("tomt navn gir tomt navn, ikke unntak", redaksjonsnavn("") === "");
+// Uten hasOwnProperty-sjekken ville "constructor" gitt en funksjon.
+ok("arvede navn oversettes ikke",
+   redaksjonsnavn("constructor") === "constructor", redaksjonsnavn("constructor"));
+
 /* ---------------- fotball: dognkvoten ---------------- */
 
 // Gratisnivaet gir 100 kall i dognet. Slar denne ut, er en levetid satt
@@ -207,6 +230,12 @@ const SVAR = {
 
 const TABELL = tolkTabell(SVAR);
 ok("tabellen far en rad per lag", TABELL.length === 2, TABELL.length);
+// API-et skriver "Bodo/Glimt"; redaksjonen skriver "Bodø/Glimt". Sendes
+// API-ets form inn i nyhetssoket, gir det null treff.
+ok("lagnavnet oversettes til redaksjonens skrivemate",
+   TABELL[0].lag === "Bodø/Glimt", TABELL[0].lag);
+ok("lag uten avvik gar uendret gjennom", TABELL[1].lag === "Brann", TABELL[1].lag);
+
 ok("plassering og poeng leses ut",
    TABELL[0].plass === 1 && TABELL[0].poeng === 68, JSON.stringify(TABELL[0]));
 ok("V-U-T og mal leses ut",
@@ -286,6 +315,8 @@ const KOMMENDE = tolkKamper(kampsvar([
 const NESTE = nesteRunde(KOMMENDE);
 ok("neste runde tar bare den forste runden", NESTE.length === 2, NESTE.length);
 ok("neste runde er den som kommer forst", NESTE[0].runde === "Runde 21", NESTE[0].runde);
+// Kampene oversettes ogsa, sa hjemme- og bortelag matcher tabellen.
+ok("lagnavn i kamper oversettes", KOMMENDE[0].borte === "Bodø/Glimt", KOMMENDE[0].borte);
 ok("tom liste gir tom runde", nesteRunde([]).length === 0);
 
 /* ---------------- fotball: ruting ---------------- */
@@ -310,6 +341,6 @@ ok("hash bygges tilbake til samme rute",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 84;
+const antall = 99;
 console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);

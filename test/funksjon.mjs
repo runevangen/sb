@@ -102,7 +102,9 @@ ok("nokkelen sendes som header",
 // Det viktigste i hele funksjonen: nokkelen skal aldri ut til leseren.
 ok("nokkelen lekker ikke ut i svaret",
    JSON.stringify(kropp).indexOf(NOKKEL) === -1);
-ok("tabellen er med", Array.isArray(kropp.tabell) && kropp.tabell[0].lag === "Bodo/Glimt",
+// Svaret gar rett til soket i appen, sa navnet ma vaere redaksjonens.
+ok("tabellen er med, med redaksjonens lagnavn",
+   Array.isArray(kropp.tabell) && kropp.tabell[0].lag === "Bodø/Glimt",
    JSON.stringify(kropp.tabell));
 ok("sist oppdatert folger med", typeof kropp.oppdatert === "string" &&
    !Number.isNaN(Date.parse(kropp.oppdatert)), kropp.oppdatert);
@@ -178,6 +180,7 @@ ok("neste runde svarer 200", r.status === 200, r.status);
 ok("neste runde sporr om kamper som ikke er spilt",
    kall[0].url.indexOf("status=NS") > -1, kall[0].url);
 ok("bare den forste runden er med", nes.kamper.length === 2, nes.kamper.length);
+ok("lagnavn i kampene oversettes ogsa", nes.kamper[0].borte === "Bodø/Glimt", nes.kamper[0].borte);
 ok("runden navngis i svaret", nes.runde === "Runde 21", nes.runde);
 
 /* ---------------- ukjent datasett ---------------- */
@@ -189,6 +192,6 @@ ok("ukjent datasett sporr ikke API-et", kall.length === 0, kall.length);
 
 /* ---------------- rapport ---------------- */
 
-const antall = 33;
+const antall = 34;
 console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);
