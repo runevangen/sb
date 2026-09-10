@@ -141,7 +141,11 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   Patreon-nøkkel i `THESPORTSDB_KEY` brukes v2 (`/api/v2/json/`), der
   nøkkelen går i `X-API-KEY`-headeren og aldri i adressen — den skal ikke
   ende i en logg eller en cache-nøkkel. Da kommer full tabell, hele
-  runder, og dermed deling og vær: det er den ene bryteren, uten deploy.
+  runder, og dermed deling og vær: det er den ene bryteren. Men
+  funksjonene leser miljøet ved deploy, og kant-cachen holder forrige
+  svar i inntil tre timer — så etter at nøkkelen er satt, må det
+  deployes på nytt (Netlify → Deploys → Trigger deploy) før noe endrer
+  seg. En deploy tømmer også cachen.
   v2-formen er fra dokumentasjonen; parserne tar den første lista de
   finner i svaret, så et annet feltnavn ikke velter noe. `uverifisert`
   til nøkkelen er satt og sett virke. TheSportsDB skriver sesongen «2026»
