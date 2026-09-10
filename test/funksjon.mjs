@@ -9,6 +9,7 @@
 // API-et og ikke til leseren — uten a deploye noe.
 
 import fotball from "../netlify/functions/fotball.mjs";
+import vaer from "../netlify/functions/vaer.mjs";
 
 let feilet = 0;
 
@@ -313,8 +314,56 @@ r = await fotball(be("/api/fotball/toppscorere?liga=premier"));
 ok("ukjent datasett gir 404", r.status === 404, r.status);
 ok("ukjent datasett sporr ikke API-et", kall.length === 0, kall.length);
 
+/* ---------------- vaer ---------------- */
+
+function metSvar() {
+  return { properties: { timeseries: [
+    { time: "2026-09-13T15:00:00Z", data: { instant: { details: { air_temperature: 8.4, wind_speed: 9.1 } },
+      next_1_hours: { summary: { symbol_code: "lightrain" }, details: { precipitation_amount: 0.4 } } } },
+  ] } };
+}
+
+kall = stub(metSvar());
+r = await vaer(be("/api/vaer?arena=Ukjent%20Park&naar=2026-09-13T15:00:00Z"));
+ok("ukjent arena gir 400", r.status === 400, r.status);
+ok("ukjent arena sporr ikke MET", kall.length === 0, kall.length);
+ok("feil caches ikke", r.headers.get("Cache-Control") === "no-store");
+r = await vaer(be("/api/vaer?arena=Lerkendal&naar=snart"));
+ok("ugyldig tidspunkt gir 400", r.status === 400, r.status);
+
+kall = stub(metSvar());
+r = await vaer(be("/api/vaer?arena=Lerkendal%20Stadion&naar=2026-09-13T15:00:00Z"));
+const v = await r.json();
+ok("vaeret svarer 200", r.status === 200, r.status);
+// MET krever a vite hvem som sporr, og blokkerer uten.
+ok("MET far en User-Agent som identifiserer appen",
+   String(kall[0].opsjoner.headers["User-Agent"]).indexOf("sportsbibelen-app") === 0 &&
+   String(kall[0].opsjoner.headers["User-Agent"]).indexOf("mvp-sb.netlify.app") > -1,
+   kall[0].opsjoner.headers["User-Agent"]);
+ok("koordinatene har tre desimaler",
+   kall[0].url.indexOf("lat=63.413&lon=10.406") > -1, kall[0].url);
+ok("svaret har tekst, rad og kilde",
+   v.tekst.indexOf("8°, føles som 4°") === 0 && v.rad.indexOf("Ta regnjakke.") > -1 &&
+   v.kilde === "MET Norway" && v.arena === "Lerkendal", JSON.stringify(v));
+ok("vaeret caches en time pa kanten",
+   (r.headers.get("Netlify-CDN-Cache-Control") || "").indexOf("s-maxage=3600") > -1 &&
+   (r.headers.get("Netlify-CDN-Cache-Control") || "").indexOf("durable") > -1,
+   r.headers.get("Netlify-CDN-Cache-Control"));
+
+// Kampen er lenger fram enn varselet rekker: et gyldig, tomt svar.
+kall = stub(metSvar());
+r = await vaer(be("/api/vaer?arena=Lerkendal&naar=2026-09-25T15:00:00Z"));
+const langt = await r.json();
+ok("ingen varsel sa langt fram er 200 med tom tekst",
+   r.status === 200 && langt.tekst === "" && typeof langt.grunn === "string", JSON.stringify(langt));
+
+kall = stub({ message: "nede" }, 503);
+r = await vaer(be("/api/vaer?arena=Lerkendal&naar=2026-09-13T15:00:00Z"));
+ok("feil hos MET gir 502 uten cache",
+   r.status === 502 && r.headers.get("Cache-Control") === "no-store", r.status);
+
 /* ---------------- rapport ---------------- */
 
-const antall = 57;
+const antall = 69;
 console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);

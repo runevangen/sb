@@ -16,6 +16,8 @@ prosjektet `mvp-sb`.
     fotball.js                    fotballmodulen (beta): visningen
     fotball-data.js               samme modul: rene funksjoner
     netlify/functions/fotball.mjs samme modul: henting og caching
+    vaer-data.js                  været ved avspark: arenaer, varsel, kleråd
+    netlify/functions/vaer.mjs    samme: henting fra MET og caching
 
 `lib.js` finnes for å kunne enhetstestes uten nettleser. Hører en funksjon
 hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
@@ -144,6 +146,20 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   er testet: det er det leseren faktisk sender. Fjorårets runde kan ikke
   deles; det står hvorfor. Delingen går gjennom samme `delTekst()` i
   `app.js` som «Del appen», med utklippstavle som reserve.
+- Været ved avspark står under hver kamp i årets neste runde, og går
+  inn i delingsteksten. Kilden er MET Norway (Locationforecast 2.0) via
+  `netlify/functions/vaer.mjs`: MET krever en User-Agent som sier hvem
+  som spør, og den kan ikke settes fra nettleseren. Ingen nøkkel, men
+  lisensen krever kreditering, og «Vær: MET Norway» står i stempelet.
+  Koordinatene ligger i `ARENAER` i `vaer-data.js`, skrevet inn for hånd
+  med tre desimaler (MET vil ikke ha flere) og slått opp på arenanavnet
+  slik API-ene skriver det; ukjent arena gir ingen vær, ikke feil sted.
+  Kleråd og følt temperatur (JAG/TI, som yr bruker) er rene funksjoner
+  med tester. Varselet rekker rundt ni dager; en kamp lenger fram får et
+  gyldig, tomt svar. Cache-nøkkelen er adressen med arena og tidspunkt,
+  så hver kamp er én nøkkel, og MET spørres høyst en gang i timen per
+  kamp. `uverifisert` til det er sett i prod: sandkassen når ikke
+  api.met.no.
 - Gratisnivået gir 100 kall i døgnet. Caching skjer på Netlifys kant med
   `Netlify-CDN-Cache-Control` og `durable`, som gir én delt cache i stedet
   for én per region. Levetidene står i `LEVETID` i `fotball-data.js`, og
@@ -155,20 +171,21 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      165 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  57 tester, ~120 ms, ingen nettleser
-    node test/run.mjs       130 tester, ~110 s, headless Chromium
+    node test/unit.mjs      193 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  69 tester, ~120 ms, ingen nettleser
+    node test/run.mjs       135 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
 De raske først, så en åpenbar feil stopper kjøringen før nettleseren
 i det hele tatt starter.
 
-`funksjon.mjs` kaller Netlify-funksjonen direkte med et stubbet `fetch`:
+`funksjon.mjs` kaller Netlify-funksjonene direkte med et stubbet `fetch`:
 statuskoder, cache-headere, at API-nøkkelen går til API-et og ikke til
 leseren, og at TheSportsDB prøves først for årets neste runde og faller
-tilbake når den svikter. Ingen nøkkel og ingen nettverk kreves.
+tilbake når den svikter, og at værfunksjonen identifiserer seg for MET.
+Ingen nøkkel og ingen nettverk kreves.
 
-`unit.mjs` dekker `lib.js` og `fotball-data.js`: URL-validering, videovertslisten, tidsstempler,
+`unit.mjs` dekker `lib.js`, `fotball-data.js` og `vaer-data.js`: URL-validering, videovertslisten, tidsstempler,
 endringssignaturen, gjenkjenning av interne lenker, rangering av søketreff og favorittlag, sesongvinduet per
 liga, tolkning av API-Football-svaret, hvilken runde som er «neste», og at
 døgnkvoten holder. `run.mjs` dekker alt som trenger DOM: XSS i titler

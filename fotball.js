@@ -146,6 +146,10 @@ function stempel(data) {
   const nar = tid && !Number.isNaN(tid.getTime()) ? timeAgo(tid) : "ukjent tid";
   rad.appendChild(el("span", null, "Oppdatert " + nar));
   rad.appendChild(el("span", "fotball-kilde", data.kilde || "API-Football"));
+  // METs lisens krever kreditering der dataene vises.
+  if (data.del === "neste" && data.sisteSesong !== false) {
+    rad.appendChild(el("span", "fotball-kilde", "Vær: MET Norway"));
+  }
   return rad;
 }
 
@@ -344,7 +348,10 @@ function delPanel(kamp) {
   send.addEventListener("click", async () => {
     if (!hvor) return;
     const url = location.origin + location.pathname + fotballHash(aktivLiga, "neste");
-    const tekst = delingstekst(kamp, hvor, pubFelt.value.trim(), url);
+    // Vaeret er allerede hentet for linja under kampen; er det ikke der,
+    // deles teksten uten. Ingen skal vente pa MET for a sende en melding.
+    const vaer = kamp.arena ? await hentVaer(kamp) : null;
+    const tekst = delingstekst(kamp, hvor, pubFelt.value.trim(), url, vaer && vaer.tekst);
     send.disabled = true;
     const utfall = await deling(tekst, url);
     send.disabled = false;
@@ -381,8 +388,47 @@ function kamprad(kamp, del, delbar) {
   }
 
   rad.appendChild(el("span", "kamp-lag kamp-borte", kamp.borte));
-  if (delbar) rad.appendChild(delKnapp(kamp, rad));
+  if (delbar) {
+    rad.appendChild(delKnapp(kamp, rad));
+    if (kamp.arena) rad.appendChild(vaerlinje(kamp));
+  }
   return rad;
+}
+
+/* ---------- vaeret ved avspark ---------- */
+
+// Hentet per kamp, husket per kamp: et fanebytte skal ikke koste nye
+// kall. Kanten cacher uansett, men leseren skal slippe a se «henter».
+const vaerHusket = new Map();
+
+function vaerlinje(kamp) {
+  const linje = el("div", "kamp-vaer");
+  linje.hidden = true;
+  hentVaer(kamp).then((v) => {
+    if (!v || !v.tekst) { linje.remove(); return; }
+    linje.textContent = v.tekst;
+    linje.title = "Varsel for " + v.arena + " ved avspark. Basert på data fra MET Norway.";
+    linje.hidden = false;
+  });
+  return linje;
+}
+
+async function hentVaer(kamp) {
+  const nokkel = kamp.id + "@" + kamp.dato;
+  if (vaerHusket.has(nokkel)) return vaerHusket.get(nokkel);
+  const lofte = (async () => {
+    try {
+      const respons = await fetch("/api/vaer?arena=" + encodeURIComponent(kamp.arena) +
+        "&naar=" + encodeURIComponent(kamp.dato), { headers: { "Accept": "application/json" } });
+      if (!respons.ok) return null;
+      const data = JSON.parse(await respons.text());
+      return data && !data.feil ? data : null;
+    } catch (err) {
+      return null;
+    }
+  })();
+  vaerHusket.set(nokkel, lofte);
+  return lofte;
 }
 
 // Datoene kommer som ISO med sone fra API-et. new Date tolker dem riktig,

@@ -870,13 +870,24 @@ const SAK_11 = await kjor("favorittlag", FELLES + FOTBALL + `
 // gruppechatten. Delingsmenyen stubbes, sa teksten kan kontrolleres.
 const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
   var saker = lagSaker(12);
+  // Kampene har arena, sa vaeret hentes og star under dem.
+  var ARETS = KOMMENDE.map(function (k, i) {
+    return Object.assign({}, k, { arena: i === 0 ? "Brann Stadion" : "" });
+  });
+  window.__vaerKall = 0;
   window.fetch = function (u) {
     u = String(u);
+    if (u.indexOf("/api/vaer?") === 0) {
+      window.__vaerKall += 1;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ arena: "Brann Stadion",
+          tekst: "8°, føles som 4°. Regn. Jakke, og gjerne lue. Ta regnjakke.", rad: "Ta regnjakke.", kilde: "MET Norway" })); } });
+    }
     if (u.indexOf("/api/fotball/") === 0) {
       var del = u.split("?")[0].split("/").pop();
       var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
                     kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
-                    kamper: KOMMENDE, runde: "Runde 21" };
+                    kamper: ARETS, runde: "Runde 21" };
       if (del === "tabell") kropp.tabell = TABELL;
       return Promise.resolve({ ok: true, status: 200, statusText: "OK",
         text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
@@ -897,6 +908,15 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
        document.querySelector(".fotball-kilde").textContent);
     ok("ingen notis nar deling er mulig", !document.querySelector(".kamp-notis"));
 
+    // Vaeret star under kampen som har arena, og bare der.
+    var vaer = document.querySelectorAll(".kamp-vaer");
+    ok("vaeret star under kampen med arena",
+       vaer.length === 1 && !vaer[0].hidden && vaer[0].textContent.indexOf("8°, føles som 4°") === 0,
+       vaer.length + " " + (vaer[0] ? vaer[0].textContent : ""));
+    ok("vaeret hentes en gang per kamp", window.__vaerKall === 1, window.__vaerKall);
+    ok("MET krediteres",
+       document.getElementById("fotballInnhold").textContent.indexOf("Vær: MET Norway") > -1);
+
     knapper[0].click();
     var panel = document.querySelector(".kamp-panel");
     ok("trykk apner panelet rett under kampen",
@@ -904,7 +924,7 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
        knapper[0].getAttribute("aria-expanded") === "true");
     ok("del er sperret til et sted er valgt", panel.querySelector(".kamp-send").disabled);
     ok("stadion har arenaens navn nar vi har det",
-       panel.querySelectorAll(".hvor-valg")[2].textContent === "På stadion",
+       panel.querySelectorAll(".hvor-valg")[2].textContent === "På Brann Stadion",
        panel.querySelectorAll(".hvor-valg")[2].textContent);
 
     panel.querySelectorAll(".hvor-valg")[1].click();   // pa pub
@@ -928,6 +948,8 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
          String(d.text).indexOf("Brann – Bodo/Glimt") > -1 &&
          String(d.text).indexOf("Jeg ser den på Pub X.") > -1 &&
          String(d.text).indexOf("Hvor ser du?") > -1, d.text);
+      ok("vaeret er med i teksten som deles",
+         String(d.text).indexOf("Været ved avspark: 8°, føles som 4°.") > -1, d.text);
       ok("lenken apner neste runde i appen",
          String(d.url).indexOf("#/fotball/eliteserien/neste") > -1, d.url);
       ok("panelet lukkes etter deling", !document.querySelector(".kamp-panel"));
@@ -950,6 +972,7 @@ const SAK_13 = await kjor("kamp-deling-gammel", FELLES + FOTBALL + `
        notis ? notis.textContent : "ingen notis");
     ok("kilden er API-Football nar svaret ikke sier noe annet",
        document.querySelector(".fotball-kilde").textContent === "API-Football");
+    ok("fjorarets kamper far ikke vaer", !document.querySelector(".kamp-vaer"));
     ferdig();
   }, 1200); });
 `);
