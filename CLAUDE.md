@@ -48,6 +48,13 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 - Lenker i artikkelteksten til vårt eget domene får `data-slug` og åpnes i
   appen. `href` beholdes, så lenken virker om noe feiler, og lang-trykk
   oppfører seg normalt.
+- Ingen statistikkskript i `index.html`. Besøk telles av Netlify
+  Analytics, som måler på serveren: ingen tredjepart i nettleseren, ingen
+  informasjonskapsler, ingen samtykkebanner — og ingenting en
+  annonseblokker kan stoppe. Prisen er at den ikke ser noe som skjer inne
+  i appen. `track()` i `app.js` står igjen som en tom operasjon, så de
+  seksten hendelsene fortsatt er merket i koden om de skal samles inn
+  senere.
 - Filtrerer noe feeden — et søk eller en kategori — står det i toppfeltet
   som en knapp med kryss, ikke som ren tekst. Et filter uten vei ut blir
   stående til man åpner menyen og finner «Alle saker», og krysset i

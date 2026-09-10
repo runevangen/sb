@@ -146,8 +146,13 @@ function getTitle(post) {
 
 /* ---------- statistikk ---------- */
 
-// Sender en hendelse hvis Plausible er lastet, og gjør ingenting hvis den
-// ikke er det. Appen skal aldri feile fordi statistikk mangler.
+// Hendelsene appen sender. Uten et statistikkskript lastet er dette en
+// tom operasjon — besok telles av Netlify Analytics, som maler pa
+// serveren og ikke ser noe herfra.
+//
+// Kallene star igjen med vilje: de er merkelapper pa det som er verdt a
+// vite, og de koster ingenting sa lenge ingen lytter. Skal de samles inn
+// igjen, er det ett skript i index.html og ingenting her.
 function track(event, props) {
   try {
     if (typeof window.plausible === "function") {
