@@ -134,10 +134,14 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   årets tabell, resultater og neste runde gratis. Svikter den — nettverk,
   uventet form, ingenting — får leseren API-Footballs svar som før.
   Svaret sier hvor det kom fra (`kilde`), og stempelet under viser det.
-  Neste runde er sett virke i prod 10. september 2026; tabell og
-  resultater bygger på samme dokumentasjon og er `uverifisert` til de er
-  sett. TheSportsDB skriver sesongen «2026» for kalenderligaer og
-  «2026-2027» for dem som krysser nyttår (`tsdbSesong`).
+  Alle tre er sett virke i prod 10. september 2026 — men gratisnøkkelen
+  kapper svarene (fem tabellrader, én kamp i listene). Et avkortet svar
+  vises aldri som årets: `TSDB_MINST` i `fotball-data.js` er det minste
+  som regnes som helt, og under det brukes API-Football som før. Med en
+  betalt nøkkel i `THESPORTSDB_KEY` kommer full tabell, hele runder, og
+  dermed deling og vær — det er den ene bryteren. TheSportsDB skriver
+  sesongen «2026» for kalenderligaer og «2026-2027» for dem som krysser
+  nyttår (`tsdbSesong`).
 - «Hvor ser du kampen?» Årets kommende kamper har en delingsknapp som
   åpner ett spørsmål under raden: hjemme, på pub (med navn) eller på
   stadion (med arena). Svaret deles som tekst inn i gruppechatten leseren
@@ -171,8 +175,8 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      193 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  69 tester, ~120 ms, ingen nettleser
+    node test/unit.mjs      196 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  73 tester, ~120 ms, ingen nettleser
     node test/run.mjs       135 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.

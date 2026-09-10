@@ -217,6 +217,14 @@ const ARETS = { events: [
   tsdbHendelse(12, "2026-09-14T17:00:00", 21, "Molde", "Rosenborg", "Aker Stadion"),
   tsdbHendelse(13, "2026-09-20T15:00:00", 22, "Viking", "Sarpsborg 08", "SR-Bank Arena"),
 ] };
+// Gratisnokkelen gir en kamp og fem tabellrader. Det skal ikke vises som
+// arets: da star fem lag under «Sesong 2026».
+const AVKORTET_NESTE = { events: [ARETS.events[0]] };
+function tabellRader(n) {
+  return { table: Array.from({ length: n }, (_, i) => ({
+    intRank: String(i + 1), strTeam: "Lag " + (i + 1), intPlayed: "20", intWin: "10", intDraw: "5",
+    intLoss: "5", intGoalsFor: "30", intGoalsAgainst: "20", intGoalDifference: "10", intPoints: "35" })) };
+}
 
 kall = stub(SVAR, 200, { svar: ARETS });
 r = await fotball(be("/api/fotball/neste?liga=eliteserien"));
@@ -263,12 +271,9 @@ ok("uventet form fra TheSportsDB gir ogsa API-Footballs svar",
    r.status === 200 && (await r.json()).kilde === "API-Football", r.status);
 
 // Tabellen og resultatene har samme reserve.
-const ARETS_TABELL = { table: [
-  { intRank: "1", strTeam: "Bodo/Glimt", intPlayed: "20", intWin: "14", intDraw: "3", intLoss: "3",
-    intGoalsFor: "50", intGoalsAgainst: "20", intGoalDifference: "30", intPoints: "45" },
-  { intRank: "2", strTeam: "Brann", intPlayed: "20", intWin: "12", intDraw: "4", intLoss: "4",
-    intGoalsFor: "40", intGoalsAgainst: "22", intGoalDifference: "18", intPoints: "40" },
-] };
+const ARETS_TABELL = tabellRader(16);
+ARETS_TABELL.table[0].strTeam = "Bodo/Glimt";
+ARETS_TABELL.table[0].intPoints = "45";
 kall = stub(SVAR, 200, { svar: ARETS_TABELL });
 r = await fotball(be("/api/fotball/tabell?liga=eliteserien"));
 const aretsTabell = await r.json();
@@ -279,9 +284,26 @@ ok("tabellen sporr om arets sesong hos TheSportsDB",
    tsdbKall(kall)[0].url.indexOf("lookuptable.php?l=4358&s=" + new Date().getUTCFullYear()) > -1,
    tsdbKall(kall)[0].url);
 ok("tabellradene er oversatt og i samme form",
-   aretsTabell.tabell.length === 2 && aretsTabell.tabell[0].lag === "Bodø/Glimt" &&
+   aretsTabell.tabell.length === 16 && aretsTabell.tabell[0].lag === "Bodø/Glimt" &&
    aretsTabell.tabell[0].poeng === 45, JSON.stringify(aretsTabell.tabell[0]));
 ok("API-Football sporres ikke nar tabellen finnes", apiKall(kall).length === 0);
+
+// Gratisnokkelen: fem rader. Ikke arets tabell, men fjorarets hele.
+kall = stub(SVAR, 200, { svar: tabellRader(5) });
+r = await fotball(be("/api/fotball/tabell?liga=eliteserien"));
+const fem = await r.json();
+ok("en avkortet tabell vises ikke som arets",
+   r.status === 200 && fem.kilde === "API-Football" && fem.sisteSesong === false,
+   JSON.stringify([fem.kilde, fem.sisteSesong]));
+ok("API-Football ble spurt i stedet", apiKall(kall).length === 1);
+
+kall = stub({ errors: [], response: [
+  kamp(3, "2024-11-30T17:00:00+00:00", "Runde 30", "Brann", "Bodo/Glimt"),
+] }, 200, { svar: AVKORTET_NESTE });
+r = await fotball(be("/api/fotball/neste?liga=eliteserien"));
+const enKamp = await r.json();
+ok("en avkortet kampliste vises ikke som arets",
+   enKamp.kilde === "API-Football" && enKamp.sisteSesong === false, JSON.stringify([enKamp.kilde, enKamp.sisteSesong]));
 
 kall = stub(SVAR, 200, { svar: { table: null } });
 r = await fotball(be("/api/fotball/tabell?liga=eliteserien"));
@@ -306,6 +328,14 @@ ok("bare spilte kamper, nyeste forst",
    aretsRes.kamper.length === 2 && aretsRes.kamper[0].hjemme === "Molde" &&
    aretsRes.kamper[0].malHjemme === 2 && aretsRes.kamper[0].spilt === true,
    JSON.stringify(aretsRes.kamper));
+
+// Ett resultat er et avkortet svar, ikke arets resultater.
+kall = stub({ errors: [], response: [
+  kamp(1, "2024-11-30T17:00:00+00:00", "Runde 30", "Brann", "Viking", 1, 0, "FT"),
+] }, 200, { svar: { events: [ARETS_RESULTATER.events[0]] } });
+r = await fotball(be("/api/fotball/resultater?liga=eliteserien"));
+ok("ett resultat fra TheSportsDB gir fjorarets fra API-Football",
+   (await r.json()).kilde === "API-Football");
 
 /* ---------------- ukjent datasett ---------------- */
 
@@ -364,6 +394,6 @@ ok("feil hos MET gir 502 uten cache",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 69;
+const antall = 73;
 console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);

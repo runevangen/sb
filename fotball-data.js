@@ -157,10 +157,17 @@ function maal(verdi) {
 /* ---------- TheSportsDB ---------- */
 
 // Gratisnivaet hos API-Football stopper ved SESONGVINDU. TheSportsDB gir
-// tabell, siste resultater og neste kamper for inneværende sesong uten
-// nokkel (testnokkel "3"), sa fotballfanen kan vaere arets. Neste runde er
-// sett virke i prod; tabell og resultater bygger pa samme dokumentasjon.
-// Funksjonen faller tilbake til API-Football om formen ikke stemmer.
+// tabell, siste resultater og neste kamper for inneværende sesong, sa
+// fotballfanen kan vaere arets. Sett virke i prod for alle tre.
+//
+// Men gratisnokkelen («3») kapper svarene: fem rader i tabellen, en kamp
+// i listene. Et avkortet svar ma ikke vises som om det var helt — fem
+// lag under «Sesong 2026» er verre enn fjorarets fulle tabell. Funksjonen
+// bruker derfor bare svar som er store nok til a vaere hele (TSDB_MINST),
+// og faller ellers tilbake til API-Football. Med en betalt nokkel
+// (THESPORTSDB_KEY) kommer alt: full tabell, hele runder, og dermed
+// deling og vaer.
+export const TSDB_MINST = { tabell: 10, resultater: 2, neste: 2 };
 export function tsdbSti(del, liga, nokkel, naa) {
   if (!liga || !liga.tsdb) return null;
   const rot = "/api/v1/json/" + encodeURIComponent(nokkel || "3") + "/";
@@ -208,26 +215,33 @@ function tsdbRad(rad) {
 
 // Samme form som tolkKamper gir, sa visningen ikke vet hvor kampene kom
 // fra. events er null — ikke en tom liste — nar ligaen ikke har flere.
-export function tolkKamperTsdb(json) {
+export function tolkKamperTsdb(json, naa) {
   if (!json || typeof json !== "object") throw new Error("Tomt svar fra TheSportsDB");
   if (json.events === null || json.events === undefined) return [];
   if (!Array.isArray(json.events)) throw new Error("Uventet svar fra TheSportsDB");
-  return json.events.map(tsdbKamp).filter((k) => k.hjemme && k.borte && k.dato);
+  return json.events.map((e) => tsdbKamp(e, naa)).filter((k) => k.hjemme && k.borte && k.dato);
 }
 
-function tsdbKamp(e) {
+function tsdbKamp(e, naa) {
   const rad = e || {};
   const status = tekst(rad.strStatus);
+  const dato = tsdbTid(rad);
+  const malHjemme = maal(rad.intHomeScore);
+  const malBorte = maal(rad.intAwayScore);
+  // Status er ikke alltid fylt ut. Et resultat pa en kamp som er spilt
+  // etter klokka, er ogsa en spilt kamp.
+  const harResultat = malHjemme !== null && malBorte !== null &&
+    dato !== null && Date.parse(dato) < (naa || Date.now());
   return {
     id: tall(rad.idEvent),
-    dato: tsdbTid(rad),
+    dato,
     runde: rad.intRound ? "Runde " + tekst(rad.intRound) : "",
     hjemme: redaksjonsnavn(tekst(rad.strHomeTeam)),
     borte: redaksjonsnavn(tekst(rad.strAwayTeam)),
     arena: tekst(rad.strVenue),
-    malHjemme: maal(rad.intHomeScore),
-    malBorte: maal(rad.intAwayScore),
-    spilt: status === "Match Finished" || status === "FT",
+    malHjemme,
+    malBorte,
+    spilt: status === "Match Finished" || status === "FT" || harResultat,
   };
 }
 
