@@ -11,6 +11,7 @@ prosjektet `mvp-sb`.
     netlify.toml  proxy mot WordPress
 
     BACKLOGG.md   peker til issues, som er den ekte backloggen
+    docs/         dypdykk og notater som ikke er kode
 
     fotball.js                    fotballmodulen (beta): visningen
     fotball-data.js               samme modul: rene funksjoner
