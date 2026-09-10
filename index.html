@@ -14,15 +14,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <!--
-  Cookielos statistikk. Plausible setter ingen informasjonskapsler og lagrer
-  ingen personopplysninger, sa appen trenger ingen samtykkebanner.
+  Ingen statistikkskript her med vilje. Besok telles av Netlify Analytics,
+  som maler pa serveren: ingen tredjepart i nettleseren, ingen
+  informasjonskapsler, og ingenting a blokkere — men den ser heller ikke
+  hva som skjer inne i appen.
 
-  For dette samler noe som helst ma domenet mvp-sb.netlify.app legges til i
-  en Plausible-konto. Inntil da er skriptet en stille no-op.
-  Skru av statistikk helt: slett denne script-taggen. Koden under tar hoyde
-  for at den mangler.
+  track() i app.js star igjen som en tom skall-funksjon, sa de seksten
+  hendelsene appen allerede sender fortsatt finnes i koden. Skal de samles
+  inn, er det ett skript her og null endringer der.
 -->
-<script defer data-domain="mvp-sb.netlify.app" src="https://plausible.io/js/script.js"></script>
 <script>
   // Kjores for rendering. Uten dette rekker standardtemaet a vises et
   // oyeblikk for valget leses inn.
