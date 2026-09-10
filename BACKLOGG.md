@@ -116,19 +116,65 @@ Stemmer ikke det, må punkt 6 rettes.*
 
 ---
 
-## Øvrige punkter
+## Står ute i prod nå
 
-Mindre saker som har dukket opp underveis og som ingen har tatt tak i:
+- **Oppdiktede annonsører er synlige for ekte lesere.** Nordbane,
+  Padelhuset, Sprinta og Tribune vises på `mvp-sb.netlify.app`. De er
+  merket «REKLAME» og finnes ikke, så ingen blir lurt — men de er heller
+  ikke klikkbare, og de står der til noen bestemmer seg for ekte annonser
+  eller for å ta dem ned. Dette er punktet jeg ville tatt stilling til
+  først, rett og slett fordi det står ute.
+- **Statistikken samler null.** Hendelsene ligger klare i koden, men
+  ingenting registreres før `mvp-sb.netlify.app` legges til i en
+  Plausible-konto. Ett steg, ingen ny deploy.
 
-- **Plausible:** domenet `mvp-sb.netlify.app` må legges til i en
-  Plausible-konto. Skriptet ligger i `index.html` og er en stille no-op
-  til det er gjort.
-- **WordPress-kontoer:** `admin`-brukeren bør erstattes, og de ti
-  kontoene bør ha 2FA og ratebegrensning på innlogging.
-- **AdSense:** avgjørelse om ekte annonser. Krever samtykkebanner i EØS,
-  som er grunnen til at det ikke er gjort.
-- **Installasjonsknappen** er ikke verifisert på en ekte iPhone.
-- **Videoinnbygginger:** uavklart om redaksjonen faktisk bruker dem.
-- **Fotball:** lagmerker i tabellen, flere ligaer (krever lengre
-  levetider — se `LEVETID`), og inneværende sesong (krever betalt
-  abonnement — se `SESONGVINDU`).
+## Sikkerhet — utenfor appen, krever wp-admin
+
+Ingen av disse kan gjøres herfra; de hører hjemme på sportsbibelen.no.
+
+- **`admin`-kontoen** bør erstattes med et annet brukernavn.
+- **Tofaktor og ratebegrensning** på innlogging for de ti kontoene.
+- **Brukerlisten er offentlig:** `/wp-json/wp/v2/users` lister
+  brukernavnene til alle forfattere. Det er grunnen til at proxyen i
+  `netlify.toml` er smal og aldri får bli et wildcard mot `wp/v2` — men
+  endepunktet står fortsatt åpent på selve nettstedet.
+- **Tiltaksplanen** mangler ansvarlig og datoer før den kan sendes til
+  redaksjonen. PDF-en ligger hos deg, ikke i repoet — dette repoet er
+  offentlig, og en tiltaksplan som beskriver egne svakheter hører ikke
+  hjemme her.
+
+## Fotball
+
+- **Lagnavn stemmer ikke alltid overens.** API-Football skriver
+  «Bodo/Glimt», redaksjonen skriver «Bodø/Glimt». Lagsøket bruker API-ets
+  skrivemåte direkte, så et lag med ulik staving gir null treff. Løsningen
+  er en oversettelse fra API-navn til redaksjonens navn i
+  `fotball-data.js`, som kan enhetstestes.
+- **Lagsøk gir skjeve treff.** Et søk på «Fulham» ga Premier
+  League-saker generelt, ikke Fulham-saker. Samme problem som punkt (e) i
+  saken over, og de bør løses sammen.
+- **Lagmerker i tabellen.** API-et gir logo-URL per lag. Krever en
+  bildepolicy for eksterne bilder og plass til en kolonne til.
+- **Flere ligaer** krever lengre levetider først — se `LEVETID`, og
+  enhetstesten som vokter døgnkvoten.
+- **Inneværende sesong** krever betalt abonnement — se `SESONGVINDU`.
+
+## Uverifisert
+
+- **Installasjonsknappen** er aldri prøvd på en ekte iPhone. På iOS er
+  den bare en instruksjon.
+- **Videoinnbygginger:** YouTube og Vimeo slipper gjennom allowlisten,
+  men vi vet fortsatt ikke om redaksjonen faktisk bruker dem.
+
+## Vurdert og valgt bort
+
+Står her for at ingen skal utrede dem på nytt uten å vite at de har vært
+oppe.
+
+- **AdMob:** utelukket. Det er native-only; AdSense er
+  web-motstykket, og det krever samtykkebanner i EØS — altså det vi
+  unngikk med cookieløs statistikk. Selve AdSense-avgjørelsen er ikke
+  tatt.
+- **Tettere innhold** og **kantløs visning på mobil:** begge vurdert og
+  valgt bort. Dokumentert i [skjermplass-notatet](https://claude.ai/code/artifact/875ec3d2-508e-4491-aeee-6131c0d07e98)
+  om dere ombestemmer dere.
