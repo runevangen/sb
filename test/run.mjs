@@ -544,12 +544,22 @@ const SAK_6 = await kjor("fotball", FELLES + FOTBALL + `
       ok("alle kolonnene far plass med normal skrift",
          skall.scrollWidth <= skall.clientWidth, skall.scrollWidth + " av " + skall.clientWidth);
 
-      // Med storre skrift gjor de ikke det. Da ma feltet rulle: .phone
-      // klipper alt som stikker utenfor, sa uten rulling ville de siste
-      // kolonnene bare vaert borte, og det ser likt ut i DOM-en.
+      // Lange lagnavn brytes over to linjer, sa selv stor skrift far plass.
       document.documentElement.setAttribute("data-font", "stor");
-      ok("storre skrift gjor tabellen bredere enn feltet",
+      ok("stor skrift far ogsa plass nar navnene brytes",
+         skall.scrollWidth <= skall.clientWidth, skall.scrollWidth + " av " + skall.clientWidth);
+      // Blir feltet likevel for smalt — en eldre telefon, en enda storre
+      // skrift — ma det rulle: .phone klipper alt som stikker utenfor, sa
+      // uten rulling ville de siste kolonnene bare vaert borte, og det ser
+      // likt ut i DOM-en. Feltet gjores smalere her for a tvinge det fram.
+      skall.style.width = "220px";
+      ok("et smalere felt gjor tabellen bredere enn feltet",
          skall.scrollWidth > skall.clientWidth, skall.scrollWidth + " av " + skall.clientWidth);
+      // scrollLeft virker fra skript ogsa med overflow: hidden, sa det
+      // alene beviser ikke at leseren kan dra. Stilen ma sjekkes i tillegg.
+      ok("feltet er rullbart for leseren, ikke bare for skript",
+         ["auto", "scroll"].indexOf(getComputedStyle(skall).overflowX) > -1,
+         getComputedStyle(skall).overflowX);
       skall.scrollLeft = 999;
       ok("feltet lar seg rulle sidelengs", skall.scrollLeft > 0, skall.scrollLeft);
       var sisteKol = document.querySelector(".tabell tbody tr .kol-poeng").getBoundingClientRect();
@@ -557,6 +567,7 @@ const SAK_6 = await kjor("fotball", FELLES + FOTBALL + `
       ok("poengkolonnen er innenfor skjermen etter rulling",
          sisteKol.right <= feltet.right + 1, Math.round(sisteKol.right) + " av " + Math.round(feltet.right));
       skall.scrollLeft = 0;
+      skall.style.width = "";
       document.documentElement.removeAttribute("data-font");
       ok("siden ruller ikke sidelengs",
          document.documentElement.scrollWidth <= window.innerWidth,
@@ -792,9 +803,70 @@ const SAK_10 = await kjor("fotball-ferdig", FELLES + FOTBALL + `
   }, 1200); });
 `);
 
+/* ---------------- 11. favorittlag ---------------- */
+
+// Stjernen i tabellen velger laget; valget lagres lokalt og lofter sakene
+// om laget i feeden bak fanen — men bare saker som handler om det.
+const SAK_11 = await kjor("favorittlag", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  saker[7].title.rendered = "Brann-jubel i Bergen";
+  // Nevnes bare i forbifarten. Skal ikke skyve dagens toppsak nedover.
+  saker[9].excerpt.rendered = "Brann nevnes i en bisetning";
+  ` + mockAlt("saker") + `
+  location.hash = "#/fotball/eliteserien/tabell";
+  function topp() { return document.querySelector(".hero-title").textContent; }
+  function andre() { return document.querySelector(".row .row-title").textContent; }
+  function lagredeLag() { return (JSON.parse(localStorage.getItem("sb-visning")) || {}).lag || []; }
+
+  // Et unntak underveis skal bli en testfeil med melding, ikke en side
+  // som rapporterer ingenting.
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var stjerner = document.querySelectorAll(".tabell .lag-stjerne");
+    var rader = document.querySelectorAll(".tabell tbody tr");
+    ok("hvert lag har en stjerne", stjerner.length === 3, stjerner.length);
+    ok("ingen er valgt fra start",
+       Array.prototype.every.call(stjerner, function (s) { return s.getAttribute("aria-pressed") === "false"; }));
+    // Stjernen har ingen tekst, sa lagnavnet i cellen star rent.
+    ok("lagnavnet i cellen er fortsatt rent",
+       rader[1].querySelector(".kol-lag").textContent === "Brann",
+       rader[1].querySelector(".kol-lag").textContent);
+    ok("uten favoritt er nyeste sak toppsak", topp() === "Sak 1", topp());
+    ok("ingen favorittlinje uten valg", !document.querySelector(".favoritt-linje"));
+
+    stjerner[1].click();   // Brann
+    ok("stjernen markeres som valgt", stjerner[1].getAttribute("aria-pressed") === "true");
+    ok("knappen forteller hva neste trykk gjor",
+       stjerner[1].getAttribute("aria-label") === "Slutt å følge Brann",
+       stjerner[1].getAttribute("aria-label"));
+    ok("valget lagres lokalt", lagredeLag().length === 1 && lagredeLag()[0] === "Brann", JSON.stringify(lagredeLag()));
+
+    // Feeden ligger bak fanen og skal allerede vaere bygget om.
+    ok("saken om laget er toppsak", topp() === "Brann-jubel i Bergen", topp());
+    ok("favorittlinja viser laget",
+       (document.querySelector(".favoritt-linje") || {}).textContent.indexOf("Brann øverst") > -1,
+       (document.querySelector(".favoritt-linje") || {}).textContent);
+    ok("sak som bare nevner laget i forbifarten loftes ikke", andre() === "Sak 1", andre());
+
+    // Linja er veien tilbake til tabellen, der valget gjores om.
+    document.getElementById("fanenNyheter").click();
+    document.querySelector(".favoritt-linje").click();
+    ok("favorittlinja forer til tabellen",
+       !document.getElementById("fotball").hidden && location.hash === "#/fotball/eliteserien/tabell",
+       location.hash);
+
+    stjerner[1].click();   // av igjen
+    ok("stjernen kan slas av", stjerner[1].getAttribute("aria-pressed") === "false");
+    ok("lagringen tommes", lagredeLag().length === 0, JSON.stringify(lagredeLag()));
+    ok("uten favoritt er nyeste sak toppsak igjen", topp() === "Sak 1", topp());
+    ok("favorittlinja forsvinner", !document.querySelector(".favoritt-linje"));
+    } catch (e) { ok("ingen unntak underveis", false, e.message + " @ " + (e.stack || "").split("\\n")[1]); }
+    ferdig();
+  }, 900); });
+`);
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10];
+const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11];
 let feilet = 0;
 
 for (const t of alle) {
