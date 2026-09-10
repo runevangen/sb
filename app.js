@@ -896,24 +896,33 @@ function erIos() {
   return /iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
-document.getElementById("shareBtn").addEventListener("click", async () => {
-  const data = { title: "Sportsbibelen", text: DEL_TEKST, url: location.origin + "/" };
+// Ett sted for all deling: appen fra menyen, en kamp fra fotball. Svarer
+// «delt», «kopiert», «avbrutt» eller «feil», sa den som kaller kan si
+// noe riktig til leseren der leseren star.
+async function delTekst(data, hendelse) {
   try {
     if (navigator.share) {
       await navigator.share(data);
-      track("App delt", { metode: "deling" });
-      return;
+      track(hendelse, { metode: "deling" });
+      return "delt";
     }
-    // Ingen delingsmeny: legg lenken på utklippstavlen i stedet.
-    await navigator.clipboard.writeText(data.url);
-    visNotat("Lenken er kopiert: " + data.url);
-    track("App delt", { metode: "utklippstavle" });
+    // Ingen delingsmeny: legg teksten på utklippstavlen i stedet.
+    await navigator.clipboard.writeText(data.text ? data.text : data.url);
+    track(hendelse, { metode: "utklippstavle" });
+    return "kopiert";
   } catch (err) {
     // Avbrutt deling er ikke en feil, men manglende utklippstavle er noe
     // leseren må kunne komme videre fra.
-    if (err && err.name === "AbortError") return;
-    visNotat("Kopier lenken selv: " + data.url);
+    if (err && err.name === "AbortError") return "avbrutt";
+    return "feil";
   }
+}
+
+document.getElementById("shareBtn").addEventListener("click", async () => {
+  const data = { title: "Sportsbibelen", text: DEL_TEKST, url: location.origin + "/" };
+  const utfall = await delTekst(data, "App delt");
+  if (utfall === "kopiert") visNotat("Lenken er kopiert: " + data.url);
+  else if (utfall === "feil") visNotat("Kopier lenken selv: " + data.url);
 });
 
 const installKnapp = document.getElementById("installBtn");
@@ -1343,7 +1352,10 @@ initFotball(
   // finnes allerede, sa dette koster ingen nye kall mot WordPress utover
   // det soket ville kostet uansett.
   (lag) => startSok(lag, "Lagsok"),
-  { er: erFavoritt, veksle: vekslFavoritt });
+  { er: erFavoritt, veksle: vekslFavoritt },
+  // «Hvor ser du kampen?» gar inn i gruppechatten leseren allerede har.
+  // Ingen konto, ingen lagring: chatten er vennegruppa.
+  (tekst, url) => delTekst({ title: "Sportsbibelen", text: tekst, url }, "Kamp delt"));
 
 document.getElementById("fanenNyheter").addEventListener("click", () => {
   if (aktivVisning !== "nyheter") settFane("nyheter");

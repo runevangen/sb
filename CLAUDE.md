@@ -127,6 +127,21 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   sesongen over tabellen — en tabell fra i fjor som ser ut som årets er
   verre enn ingen tabell. Utvides abonnementet, er `SESONGVINDU` det
   eneste stedet tallene står.
+- «Neste runde» for en sesong utenfor vinduet hentes først fra
+  TheSportsDB (liga-id i `tsdb` i `LIGAER`, testnøkkel «3», eller
+  `THESPORTSDB_KEY`), som gir årets kamper gratis. Svikter den — nettverk,
+  uventet form, ingen kamper — får leseren API-Footballs svar som før.
+  Svaret sier hvor det kom fra (`kilde`), og stempelet under viser det.
+  Feltnavnene er fra dokumentasjonen, ikke fra et svar vi har sett selv;
+  til det er sett i prod er dette `uverifisert`.
+- «Hvor ser du kampen?» Årets kommende kamper har en delingsknapp som
+  åpner ett spørsmål under raden: hjemme, på pub (med navn) eller på
+  stadion (med arena). Svaret deles som tekst inn i gruppechatten leseren
+  allerede har — ingen konto, ingen lagring, chatten er vennegruppa.
+  Teksten lages av `delingstekst()` i `fotball-data.js`, i norsk tid, og
+  er testet: det er det leseren faktisk sender. Fjorårets runde kan ikke
+  deles; det står hvorfor. Delingen går gjennom samme `delTekst()` i
+  `app.js` som «Del appen», med utklippstavle som reserve.
 - Gratisnivået gir 100 kall i døgnet. Caching skjer på Netlifys kant med
   `Netlify-CDN-Cache-Control` og `durable`, som gir én delt cache i stedet
   for én per region. Levetidene står i `LEVETID` i `fotball-data.js`, og
@@ -138,17 +153,18 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      131 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  34 tester, ~120 ms, ingen nettleser
-    node test/run.mjs       115 tester, ~110 s, headless Chromium
+    node test/unit.mjs      155 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  50 tester, ~120 ms, ingen nettleser
+    node test/run.mjs       130 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
 De raske først, så en åpenbar feil stopper kjøringen før nettleseren
 i det hele tatt starter.
 
 `funksjon.mjs` kaller Netlify-funksjonen direkte med et stubbet `fetch`:
-statuskoder, cache-headere og at API-nøkkelen går til API-et og ikke til
-leseren. Ingen nøkkel og ingen nettverk kreves.
+statuskoder, cache-headere, at API-nøkkelen går til API-et og ikke til
+leseren, og at TheSportsDB prøves først for årets neste runde og faller
+tilbake når den svikter. Ingen nøkkel og ingen nettverk kreves.
 
 `unit.mjs` dekker `lib.js` og `fotball-data.js`: URL-validering, videovertslisten, tidsstempler,
 endringssignaturen, gjenkjenning av interne lenker, rangering av søketreff og favorittlag, sesongvinduet per
@@ -156,7 +172,8 @@ liga, tolkning av API-Football-svaret, hvilken runde som er «neste», og at
 døgnkvoten holder. `run.mjs` dekker alt som trenger DOM: XSS i titler
 og artikkel-HTML, annonseplassering, rulleoppførsel, artikkelvisningen,
 fokusfella, korthøyden, at toppfeltet krymper, paginering, ruting,
-visningsvalgene i menyen, favorittlag fra stjerne til feed, og hele
+visningsvalgene i menyen, favorittlag fra stjerne til feed, deling av en
+kamp med sted, og hele
 fotballmodulen — fanebytte, tabell, resultater, neste runde, dyplenker og
 feilmelding fra tjenesten.
 

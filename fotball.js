@@ -7,7 +7,7 @@
 // app.js gjennom naviger(), som setter adressen — da virker tilbakeknappen
 // likt her som i resten av appen.
 
-import { LIGAER, DELER, DEL_NAVN } from "./fotball-data.js";
+import { LIGAER, DELER, DEL_NAVN, HVOR, delingstekst, fotballHash } from "./fotball-data.js";
 import { timeAgo } from "./lib.js";
 
 let naviger = () => {};
@@ -15,6 +15,9 @@ let sokEtterLag = () => {};
 // Favorittlag eies av app.js (det er lagring). Modulen far bare to
 // sporsmal: er dette laget valgt, og bytt.
 let favoritter = { er: () => false, veksle: () => false };
+// Deling eies ogsa av app.js: samme delingsmeny og samme utklippstavle-
+// fallback som «Del appen». Svarer med hva som skjedde.
+let deling = async () => "feil";
 let aktivLiga = "eliteserien";
 let aktivDel = "tabell";
 
@@ -32,10 +35,11 @@ function el(tag, klasse, tekst) {
 
 /* ---------- oppsett ---------- */
 
-export function initFotball(paNavigering, paLagsok, paFavoritt) {
+export function initFotball(paNavigering, paLagsok, paFavoritt, paDeling) {
   naviger = paNavigering;
   if (paLagsok) sokEtterLag = paLagsok;
   if (paFavoritt) favoritter = paFavoritt;
+  if (paDeling) deling = paDeling;
 
   const ligaer = document.getElementById("ligaVelger");
   Object.keys(LIGAER).forEach((nokkel) => {
@@ -141,7 +145,7 @@ function stempel(data) {
   const tid = data.oppdatert ? new Date(data.oppdatert) : null;
   const nar = tid && !Number.isNaN(tid.getTime()) ? timeAgo(tid) : "ukjent tid";
   rad.appendChild(el("span", null, "Oppdatert " + nar));
-  rad.appendChild(el("span", "fotball-kilde", "API-Football"));
+  rad.appendChild(el("span", "fotball-kilde", data.kilde || "API-Football"));
   return rad;
 }
 
@@ -242,6 +246,10 @@ function kampliste(kamper, del, data) {
     return tilstand(tomtekst(del, data));
   }
 
+  // Deling gjelder kamper som faktisk skal spilles. En runde fra i fjor
+  // er ingenting a avtale rundt.
+  const delbar = del === "neste" && data && data.sisteSesong !== false;
+
   const liste = el("ul", "kamper");
   let forrigeDag = null;
 
@@ -252,9 +260,104 @@ function kampliste(kamper, del, data) {
       const skille = el("li", "kamp-dag", dag);
       liste.appendChild(skille);
     }
-    liste.appendChild(kamprad(kamp, del));
+    liste.appendChild(kamprad(kamp, del, delbar));
   });
+
+  if (del === "neste" && !delbar) {
+    liste.appendChild(el("li", "kamp-notis",
+      "Deling av kamper kommer når terminlisten for i år er på plass."));
+  }
   return liste;
+}
+
+/* ---------- deling: hvor ser du kampen? ---------- */
+
+// Ett panel om gangen. Apnes et nytt, lukkes det forrige — listen skal
+// ikke fylles med halvferdige valg.
+let apentPanel = null;
+
+function delKnapp(kamp, rad) {
+  const knapp = el("button", "kamp-del");
+  knapp.type = "button";
+  knapp.setAttribute("aria-label", "Del kampen " + kamp.hjemme + " – " + kamp.borte);
+  knapp.setAttribute("aria-expanded", "false");
+  knapp.title = "Hvor ser du kampen? Del med vennene dine";
+  knapp.appendChild(el("span", null, "↗"));
+  knapp.addEventListener("click", () => {
+    if (apentPanel && apentPanel.knapp === knapp) { lukkPanel(); return; }
+    lukkPanel();
+    const panel = delPanel(kamp);
+    rad.insertAdjacentElement("afterend", panel);
+    knapp.setAttribute("aria-expanded", "true");
+    apentPanel = { panel, knapp };
+    panel.querySelector(".hvor-valg").focus();
+  });
+  return knapp;
+}
+
+function lukkPanel() {
+  if (!apentPanel) return;
+  apentPanel.panel.remove();
+  apentPanel.knapp.setAttribute("aria-expanded", "false");
+  apentPanel = null;
+}
+
+function delPanel(kamp) {
+  const panel = el("li", "kamp-panel");
+  panel.appendChild(el("p", "kamp-panel-tittel", "Hvor ser du kampen?"));
+
+  let hvor = null;
+  const valg = el("div", "hvor-liste");
+  const pubFelt = el("input", "kamp-pub");
+  pubFelt.type = "text";
+  pubFelt.placeholder = "Hvilken pub?";
+  pubFelt.setAttribute("aria-label", "Hvilken pub?");
+  pubFelt.maxLength = 60;
+  pubFelt.hidden = true;
+  const send = el("button", "kamp-send", "Del");
+  send.type = "button";
+  send.disabled = true;
+  const svar = el("p", "kamp-svar");
+  svar.setAttribute("aria-live", "polite");
+
+  // Stadion far navnet sitt nar vi har det: «på Lerkendal» sier mer enn
+  // «på stadion».
+  const navn = { hjemme: "Hjemme", pub: "På pub",
+                 stadion: kamp.arena ? "På " + kamp.arena : "På stadion" };
+  Object.keys(HVOR).forEach((nokkel) => {
+    const b = el("button", "hvor-valg", navn[nokkel]);
+    b.type = "button";
+    b.dataset.hvor = nokkel;
+    b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", () => {
+      hvor = nokkel;
+      valg.querySelectorAll(".hvor-valg").forEach((k) =>
+        k.setAttribute("aria-pressed", k === b ? "true" : "false"));
+      pubFelt.hidden = nokkel !== "pub";
+      if (nokkel === "pub") pubFelt.focus();
+      send.disabled = false;
+      svar.textContent = "";
+    });
+    valg.appendChild(b);
+  });
+
+  send.addEventListener("click", async () => {
+    if (!hvor) return;
+    const url = location.origin + location.pathname + fotballHash(aktivLiga, "neste");
+    const tekst = delingstekst(kamp, hvor, pubFelt.value.trim(), url);
+    send.disabled = true;
+    const utfall = await deling(tekst, url);
+    send.disabled = false;
+    if (utfall === "delt") { lukkPanel(); return; }
+    if (utfall === "kopiert") svar.textContent = "Kopiert. Lim inn i chatten.";
+    else if (utfall !== "avbrutt") svar.textContent = "Fikk ikke delt. Kopier teksten selv: " + tekst;
+  });
+
+  panel.appendChild(valg);
+  panel.appendChild(pubFelt);
+  panel.appendChild(send);
+  panel.appendChild(svar);
+  return panel;
 }
 
 // En ferdigspilt sesong har ingen neste runde, og det er noe annet enn at
@@ -267,8 +370,8 @@ function tomtekst(del, data) {
   return "Ingen kamper er satt opp.";
 }
 
-function kamprad(kamp, del) {
-  const rad = el("li", "kamp");
+function kamprad(kamp, del, delbar) {
+  const rad = el("li", delbar ? "kamp delbar" : "kamp");
   rad.appendChild(el("span", "kamp-lag", kamp.hjemme));
 
   if (del === "resultater" && kamp.malHjemme !== null) {
@@ -278,6 +381,7 @@ function kamprad(kamp, del) {
   }
 
   rad.appendChild(el("span", "kamp-lag kamp-borte", kamp.borte));
+  if (delbar) rad.appendChild(delKnapp(kamp, rad));
   return rad;
 }
 
