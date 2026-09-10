@@ -137,8 +137,8 @@ function kamp(rad) {
     id: tall(info.id),
     dato: info.date || null,
     runde: tekst(rad && rad.league && rad.league.round),
-    hjemme: tekst(lag.home && lag.home.name),
-    borte: tekst(lag.away && lag.away.name),
+    hjemme: redaksjonsnavn(tekst(lag.home && lag.home.name)),
+    borte: redaksjonsnavn(tekst(lag.away && lag.away.name)),
     malHjemme: maal(mal.home),
     malBorte: maal(mal.away),
     // AET og PEN er ferdigspilt de ogsa. Uten dem ville en cupkamp avgjort
@@ -184,12 +184,50 @@ export function fotballHash(liga, del) {
   return "#/fotball/" + encodeURIComponent(liga) + "/" + encodeURIComponent(del);
 }
 
+/* ---------- lagnavn ---------- */
+
+// API-Football skriver lagnavn uten norske bokstaver: "Bodo/Glimt",
+// "Tromso", "Lillestrom". Redaksjonen skriver dem riktig. Sendes API-ets
+// form rett inn i nyhetssoket, gir det null treff — og det ser ut som at
+// det ikke finnes saker om laget.
+//
+// Nokkelen er navnet normalisert: sma bokstaver, norske tegn foldet til
+// ascii, alt annet enn bokstaver og tall fjernet. Da treffer bade
+// "Bodo/Glimt", "Bodø/Glimt" og "Bodo Glimt" samme rad, og lista er
+// robust mot at API-et endrer skrivemate. Ukjente navn gar uendret
+// gjennom. Kun lag der API-ets form faktisk avviker star her.
+const REDAKSJONSNAVN = {
+  bodoglimt: "Bodø/Glimt",
+  tromso: "Tromsø",
+  lillestrom: "Lillestrøm",
+  stromsgodset: "Strømsgodset",
+  valerenga: "Vålerenga",
+  mjondalen: "Mjøndalen",
+  stabaek: "Stabæk",
+};
+
+export function normaliserLagnavn(navn) {
+  return String(navn || "")
+    .toLowerCase()
+    .replace(/ø/g, "o").replace(/å/g, "a").replace(/æ/g, "ae")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+export function redaksjonsnavn(navn) {
+  const nokkel = normaliserLagnavn(navn);
+  return Object.prototype.hasOwnProperty.call(REDAKSJONSNAVN, nokkel)
+    ? REDAKSJONSNAVN[nokkel]
+    : navn;
+}
+
 function tabellrad(rad) {
   const alle = (rad && rad.all) || {};
   const mal = alle.goals || {};
   return {
     plass: tall(rad && rad.rank),
-    lag: tekst(rad && rad.team && rad.team.name),
+    // Oversettes her, i det ene stedet dataene formes, sa bade tabellen,
+    // kamplistene og soket ser samme navn.
+    lag: redaksjonsnavn(tekst(rad && rad.team && rad.team.name)),
     merke: (rad && rad.team && rad.team.logo) || null,
     kamper: tall(alle.played),
     seier: tall(alle.win),

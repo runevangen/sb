@@ -79,6 +79,13 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   en klippet lenke åpner noe framfor ingenting.
 - Menyen beskriver visningen du står i: kategorier i nyheter, ligaer i
   fotball.
+- API-Football skriver lagnavn uten norske bokstaver («Bodo/Glimt»,
+  «Tromso»). `redaksjonsnavn()` i `fotball-data.js` oversetter til
+  redaksjonens skrivemåte i det ene stedet dataene formes, så tabell,
+  kamplister og lagsøk ser samme navn. Nøkkelen er navnet normalisert
+  (små bokstaver, norske tegn foldet, tegnsetting fjernet), så lista
+  tåler at API-et endrer skrivemåte. Ukjente navn går uendret gjennom —
+  bare lag der API-ets form faktisk avviker står i lista.
 - Lagnavnet i tabellen er en knapp, ikke en klikkbar rad: den nås med
   tastatur og leses opp som noe man kan trykke på. Den kaller samme
   `startSok` som søkefeltet, så et lagsøk oppfører seg nøyaktig som et
@@ -108,8 +115,8 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      84 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  33 tester, ~120 ms, ingen nettleser
+    node test/unit.mjs      99 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  34 tester, ~120 ms, ingen nettleser
     node test/run.mjs       93 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
