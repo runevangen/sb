@@ -12,10 +12,11 @@
 
 import {
   ligaFor, sesongFor, tilgjengeligSesong, apiSti, tolkTabell, tolkKamper,
-  nesteRunde, LEVETID, DELER,
+  nesteRunde, LEVETID, DELER, tsdbSti, tolkKamperTsdb,
 } from "../../fotball-data.js";
 
 const API = "https://v3.football.api-sports.io";
+const TSDB = "https://www.thesportsdb.com";
 
 // Miljovariabler er versalfolsomme pa Linux, og navnet er lett a taste i
 // feil skrivemate. Begge godtas, sa en riktig satt nokkel ikke leses som
@@ -46,6 +47,22 @@ export default async (req) => {
   const sesong = tilgjengeligSesong(liga);
   const naSesong = sesongFor(liga);
 
+  // Neste runde for en sesong abonnementet ikke dekker: prov TheSportsDB
+  // forst, som gir arets kamper gratis. Svikter den — nettverk, uventet
+  // form, ingen kamper — far leseren det API-Football har, som for.
+  if (del === "neste" && sesong !== naSesong && liga.tsdb) {
+    const arets = await hentTsdb(liga);
+    if (arets && arets.length) {
+      const kommende = nesteRunde(arets);
+      return svar({
+        liga: liga.navn, ligaNokkel, land: liga.land,
+        sesong: naSesong, sisteSesong: true, del, kilde: "TheSportsDB",
+        oppdatert: new Date().toISOString(),
+        kamper: kommende, runde: kommende[0].runde,
+      }, 200, LEVETID[del]);
+    }
+  }
+
   let json;
   try {
     const respons = await fetch(API + apiSti(del, liga, sesong), {
@@ -75,9 +92,24 @@ export default async (req) => {
     sesong,
     sisteSesong: sesong === naSesong,
     del,
+    kilde: "API-Football",
     oppdatert: new Date().toISOString(),
   }, innhold), 200, LEVETID[del]);
 };
+
+// null ved enhver feil: den som kaller har en vei videre uansett.
+async function hentTsdb(liga) {
+  try {
+    const respons = await fetch(TSDB + tsdbSti(liga, process.env.THESPORTSDB_KEY), {
+      headers: { "Accept": "application/json" },
+    });
+    if (!respons.ok) throw new Error("HTTP " + respons.status);
+    return tolkKamperTsdb(await respons.json()).filter((k) => !k.spilt);
+  } catch (err) {
+    console.error("[fotball] TheSportsDB feilet, bruker API-Football:", err);
+    return null;
+  }
+}
 
 function tolk(del, json) {
   if (del === "tabell") return { tabell: tolkTabell(json) };

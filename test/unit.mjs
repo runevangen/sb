@@ -11,7 +11,8 @@ import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
          foldTekst, treffScore, rangerTreff, listeTekst } from "../lib.js";
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          apiSti, tolkKamper, nesteRunde, tolkFotballHash, fotballHash,
-         tilgjengeligSesong, SESONGVINDU, redaksjonsnavn, normaliserLagnavn }
+         tilgjengeligSesong, SESONGVINDU, redaksjonsnavn, normaliserLagnavn,
+         tsdbSti, tolkKamperTsdb, delingstekst, tidstekst, HVOR }
   from "../fotball-data.js";
 
 let feilet = 0;
@@ -263,6 +264,70 @@ ok("tre lag: komma, sa og",
    listeTekst(["Brann", "Viking", "Molde"]) === "Brann, Viking og Molde");
 ok("ingen lag gir tom tekst", listeTekst([]) === "" && listeTekst(null) === "");
 
+/* ---------------- fotball: TheSportsDB ---------------- */
+
+ok("adressen bruker testnokkelen 3 som standard",
+   tsdbSti(LIGAER.eliteserien) === "/api/v1/json/3/eventsnextleague.php?id=4358",
+   tsdbSti(LIGAER.eliteserien));
+ok("egen nokkel legges i adressen, url-kodet",
+   tsdbSti(LIGAER.premier, "a b") === "/api/v1/json/a%20b/eventsnextleague.php?id=4328",
+   tsdbSti(LIGAER.premier, "a b"));
+ok("liga uten TheSportsDB-id gir null", tsdbSti({ id: 1 }) === null);
+
+function hendelse(ekstra) {
+  return Object.assign({ idEvent: "7", strTimestamp: "2026-09-13T15:00:00", intRound: "21",
+    strHomeTeam: "Brann", strAwayTeam: "Bodo/Glimt", strVenue: "Brann Stadion",
+    strStatus: "Not Started", intHomeScore: null, intAwayScore: null }, ekstra);
+}
+const TSDB = tolkKamperTsdb({ events: [hendelse()] })[0];
+ok("TheSportsDB-kampen far samme form som API-Footballs",
+   TSDB.id === 7 && TSDB.runde === "Runde 21" && TSDB.hjemme === "Brann" &&
+   TSDB.arena === "Brann Stadion" && TSDB.spilt === false && TSDB.malHjemme === null,
+   JSON.stringify(TSDB));
+ok("lagnavn oversettes", TSDB.borte === "Bodø/Glimt", TSDB.borte);
+// strTimestamp er UTC uten sone. Uten Z ville leseren fatt feil klokkeslett.
+ok("tidspunktet far Z", TSDB.dato === "2026-09-13T15:00:00Z", TSDB.dato);
+ok("dato og klokkeslett brukes nar strTimestamp mangler",
+   tolkKamperTsdb({ events: [hendelse({ strTimestamp: "", dateEvent: "2026-09-13", strTime: "15:00:00" })] })[0].dato
+   === "2026-09-13T15:00:00Z");
+ok("et tidspunkt som allerede har sone rores ikke",
+   tolkKamperTsdb({ events: [hendelse({ strTimestamp: "2026-09-13T17:00:00+02:00" })] })[0].dato
+   === "2026-09-13T17:00:00+02:00");
+ok("spilt kamp gjenkjennes",
+   tolkKamperTsdb({ events: [hendelse({ strStatus: "Match Finished", intHomeScore: "2", intAwayScore: "1" })] })[0].spilt === true);
+ok("events: null er tom liste, ikke feil", tolkKamperTsdb({ events: null }).length === 0);
+ok("hendelse uten lag filtreres bort",
+   tolkKamperTsdb({ events: [hendelse({ strHomeTeam: "" })] }).length === 0);
+ok("hendelse uten gyldig tid filtreres bort",
+   tolkKamperTsdb({ events: [hendelse({ strTimestamp: "i morgen" })] }).length === 0);
+ok("tomt svar kaster", kaster(() => tolkKamperTsdb(null)));
+ok("events som ikke er liste kaster", kaster(() => tolkKamperTsdb({ events: "rart" })));
+
+/* ---------------- deling: hvor ser du kampen ---------------- */
+
+const KAMPEN = { hjemme: "Brann", borte: "Bodø/Glimt", dato: "2026-09-13T15:00:00Z", arena: "Brann Stadion" };
+const NAAR = tidstekst(KAMPEN.dato);
+// 15.00 UTC er 17.00 i Norge i september. Teksten skal vise norsk tid
+// uansett hvor leseren er.
+ok("tidsteksten er norsk tid", /søndag 13\. sep.* kl\. 17[.:]00/.test(NAAR), NAAR);
+ok("ugyldig tid gir tom tekst", tidstekst("nei") === "" && tidstekst(null) === "");
+
+const HJEMME = delingstekst(KAMPEN, "hjemme", "", "https://x/#/fotball/eliteserien/neste");
+ok("teksten har kamp, tid, sted, sporsmal og lenke",
+   HJEMME.indexOf("Brann – Bodø/Glimt") > -1 && HJEMME.indexOf(NAAR) > -1 &&
+   HJEMME.indexOf("Jeg ser den hjemme.") > -1 && HJEMME.indexOf("Hvor ser du?") > -1 &&
+   HJEMME.indexOf("https://x/#/fotball/eliteserien/neste") > -1, HJEMME);
+ok("pub med navn", delingstekst(KAMPEN, "pub", "Pub X", "").indexOf("Jeg ser den på Pub X.") > -1);
+ok("pub uten navn", delingstekst(KAMPEN, "pub", "", "").indexOf("Jeg ser den på pub.") > -1);
+ok("stadion far arenaens navn",
+   delingstekst(KAMPEN, "stadion", "", "").indexOf("Jeg ser den på Brann Stadion.") > -1);
+ok("stadion uten arena",
+   delingstekst({ hjemme: "A", borte: "B" }, "stadion", "", "").indexOf("Jeg ser den på stadion.") > -1);
+ok("ukjent sted utelates", delingstekst(KAMPEN, "rart", "", "").indexOf("Jeg ser") === -1);
+ok("uten lenke ender teksten med sporsmalet",
+   /Hvor ser du\?$/.test(delingstekst(KAMPEN, "hjemme", "", "")));
+ok("HVOR har de tre stedene", Object.keys(HVOR).join(",") === "hjemme,pub,stadion");
+
 /* ---------------- fotball: lagnavn ---------------- */
 
 ok("norske tegn foldes til ascii i nokkelen",
@@ -428,6 +493,6 @@ ok("hash bygges tilbake til samme rute",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 131;
+const antall = 155;
 console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);

@@ -37,17 +37,29 @@ const SVAR = {
 };
 
 // Stubber globalt fetch og husker hva funksjonen kalte, slik at bade
-// adressen og headeren kan kontrolleres.
-function stub(svar, status) {
+// adressen og headeren kan kontrolleres. TheSportsDB far sitt eget svar:
+// uten et oppgitt svarer den «ingen kamper», sa funksjonen gar videre til
+// API-Football som for.
+function stub(svar, status, tsdb) {
   const kall = [];
   global.fetch = async (url, opsjoner) => {
     kall.push({ url: String(url), opsjoner: opsjoner || {} });
-    return new Response(JSON.stringify(svar), {
-      status: status || 200,
+    const erTsdb = String(url).indexOf("thesportsdb.com") > -1;
+    const kropp = erTsdb ? (tsdb && tsdb.svar !== undefined ? tsdb.svar : { events: null }) : svar;
+    const kode = erTsdb ? (tsdb && tsdb.status) || 200 : status || 200;
+    return new Response(JSON.stringify(kropp), {
+      status: kode,
       headers: { "Content-Type": "application/json" },
     });
   };
   return kall;
+}
+
+function apiKall(kall) {
+  return kall.filter((k) => k.url.indexOf("api-sports.io") > -1);
+}
+function tsdbKall(kall) {
+  return kall.filter((k) => k.url.indexOf("thesportsdb.com") > -1);
 }
 
 function be(sti) {
@@ -178,10 +190,78 @@ r = await fotball(be("/api/fotball/neste?liga=premier"));
 const nes = await r.json();
 ok("neste runde svarer 200", r.status === 200, r.status);
 ok("neste runde sporr om kamper som ikke er spilt",
-   kall[0].url.indexOf("status=NS") > -1, kall[0].url);
+   apiKall(kall)[0].url.indexOf("status=NS") > -1, apiKall(kall)[0].url);
+ok("TheSportsDB ble provd forst for en sesong utenfor vinduet",
+   tsdbKall(kall).length === 1 && kall[0].url.indexOf("thesportsdb.com") > -1, kall[0].url);
+ok("uten kamper fra TheSportsDB er kilden API-Football",
+   nes.kilde === "API-Football" && nes.sisteSesong === false, nes.kilde);
 ok("bare den forste runden er med", nes.kamper.length === 2, nes.kamper.length);
 ok("lagnavn i kampene oversettes ogsa", nes.kamper[0].borte === "Bodø/Glimt", nes.kamper[0].borte);
 ok("runden navngis i svaret", nes.runde === "Runde 21", nes.runde);
+
+/* ---------------- neste runde fra TheSportsDB ---------------- */
+
+// Arets kamper, i formen TheSportsDB dokumenterer. strTimestamp er UTC
+// uten sone.
+function tsdbHendelse(id, ts, runde, hjemme, borte, arena) {
+  return { idEvent: String(id), strTimestamp: ts, intRound: String(runde),
+           strHomeTeam: hjemme, strAwayTeam: borte, strVenue: arena || "",
+           strStatus: "Not Started", intHomeScore: null, intAwayScore: null };
+}
+const ARETS = { events: [
+  tsdbHendelse(11, "2026-09-13T15:00:00", 21, "Brann", "Bodo/Glimt", "Brann Stadion"),
+  tsdbHendelse(12, "2026-09-14T17:00:00", 21, "Molde", "Rosenborg", "Aker Stadion"),
+  tsdbHendelse(13, "2026-09-20T15:00:00", 22, "Viking", "Sarpsborg 08", "SR-Bank Arena"),
+] };
+
+kall = stub(SVAR, 200, { svar: ARETS });
+r = await fotball(be("/api/fotball/neste?liga=eliteserien"));
+const arets = await r.json();
+ok("arets neste runde svarer 200", r.status === 200, r.status);
+ok("API-Football sporres ikke nar TheSportsDB har kamper",
+   apiKall(kall).length === 0, apiKall(kall).length);
+ok("testnokkelen 3 brukes uten egen nokkel",
+   tsdbKall(kall)[0].url.indexOf("/json/3/eventsnextleague.php?id=4358") > -1, tsdbKall(kall)[0].url);
+ok("svaret er merket med kilde og inneværende sesong",
+   arets.kilde === "TheSportsDB" && arets.sisteSesong === true &&
+   arets.sesong === new Date().getUTCFullYear(), JSON.stringify([arets.kilde, arets.sisteSesong, arets.sesong]));
+ok("bare forste runde er med", arets.kamper.length === 2 && arets.runde === "Runde 21",
+   arets.kamper.length + " " + arets.runde);
+ok("tidspunktet er UTC med sone", arets.kamper[0].dato === "2026-09-13T15:00:00Z", arets.kamper[0].dato);
+ok("lagnavn oversettes ogsa herfra", arets.kamper[0].borte === "Bodø/Glimt", arets.kamper[0].borte);
+ok("arenaen folger med", arets.kamper[0].arena === "Brann Stadion", arets.kamper[0].arena);
+ok("arets kamper caches som neste runde ellers",
+   (r.headers.get("Netlify-CDN-Cache-Control") || "").indexOf("s-maxage=21600") > -1,
+   r.headers.get("Netlify-CDN-Cache-Control"));
+
+// Egen nokkel i miljoet gar inn i adressen, ikke i en header.
+process.env.THESPORTSDB_KEY = "min-nokkel";
+kall = stub(SVAR, 200, { svar: ARETS });
+r = await fotball(be("/api/fotball/neste?liga=eliteserien"));
+ok("egen TheSportsDB-nokkel brukes",
+   tsdbKall(kall)[0].url.indexOf("/json/min-nokkel/") > -1, tsdbKall(kall)[0].url);
+delete process.env.THESPORTSDB_KEY;
+
+// Svikter TheSportsDB — nettverk eller uventet form — far leseren det
+// API-Football har, som for. Ingen feil ut.
+kall = stub({ errors: [], response: [
+  kamp(3, "2024-11-30T17:00:00+00:00", "Runde 30", "Brann", "Bodo/Glimt"),
+] }, 200, { svar: { message: "nede" }, status: 500 });
+r = await fotball(be("/api/fotball/neste?liga=eliteserien"));
+const reserve = await r.json();
+ok("feil hos TheSportsDB gir API-Footballs svar", r.status === 200 && reserve.kilde === "API-Football",
+   r.status + " " + reserve.kilde);
+ok("og sier at sesongen ikke er inneværende", reserve.sisteSesong === false);
+
+kall = stub(SVAR, 200, { svar: { events: "rart" } });
+r = await fotball(be("/api/fotball/neste?liga=eliteserien"));
+ok("uventet form fra TheSportsDB gir ogsa API-Footballs svar",
+   r.status === 200 && (await r.json()).kilde === "API-Football", r.status);
+
+// Tabellen har ingen slik reserve: den kommer bare fra API-Football.
+kall = stub(SVAR, 200, { svar: ARETS });
+r = await fotball(be("/api/fotball/tabell?liga=eliteserien"));
+ok("tabellen sporr ikke TheSportsDB", tsdbKall(kall).length === 0, tsdbKall(kall).length);
 
 /* ---------------- ukjent datasett ---------------- */
 
@@ -192,6 +272,6 @@ ok("ukjent datasett sporr ikke API-et", kall.length === 0, kall.length);
 
 /* ---------------- rapport ---------------- */
 
-const antall = 34;
+const antall = 50;
 console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);

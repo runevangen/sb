@@ -9,8 +9,10 @@ export const LIGAER = {
   // sesong: "kalender" for ligaer som spilles innenfor ett ar,
   // "host-var" for dem som krysser nyttar. API-Football vil ha aret
   // sesongen startet i begge tilfeller.
-  eliteserien: { id: 103, navn: "Eliteserien", land: "Norge", sesong: "kalender" },
-  premier: { id: 39, navn: "Premier League", land: "England", sesong: "host-var" },
+  // tsdb: ligaens id hos TheSportsDB, som gir kommende kamper for
+  // inneværende sesong gratis nar API-Footballs vindu ikke gjor det.
+  eliteserien: { id: 103, tsdb: 4358, navn: "Eliteserien", land: "Norge", sesong: "kalender" },
+  premier: { id: 39, tsdb: 4328, navn: "Premier League", land: "England", sesong: "host-var" },
 };
 
 // Slar opp en liga fra nokkelen i adressen. Ukjent nokkel gir null, sa
@@ -139,6 +141,7 @@ function kamp(rad) {
     runde: tekst(rad && rad.league && rad.league.round),
     hjemme: redaksjonsnavn(tekst(lag.home && lag.home.name)),
     borte: redaksjonsnavn(tekst(lag.away && lag.away.name)),
+    arena: tekst(info.venue && info.venue.name),
     malHjemme: maal(mal.home),
     malBorte: maal(mal.away),
     // AET og PEN er ferdigspilt de ogsa. Uten dem ville en cupkamp avgjort
@@ -149,6 +152,88 @@ function kamp(rad) {
 
 function maal(verdi) {
   return verdi === null || verdi === undefined ? null : tall(verdi);
+}
+
+/* ---------- TheSportsDB ---------- */
+
+// Gratisnivaet hos API-Football stopper ved SESONGVINDU. TheSportsDB gir
+// de neste kampene i en liga for inneværende sesong uten nokkel (testnokkel
+// "3"), sa «neste runde» kan vaere arets selv om tabellen er fjorarets.
+// Feltnavnene under er fra dokumentasjonen, ikke fra et svar vi har sett
+// selv: funksjonen faller tilbake til API-Football om de ikke stemmer.
+export function tsdbSti(liga, nokkel) {
+  if (!liga || !liga.tsdb) return null;
+  return "/api/v1/json/" + encodeURIComponent(nokkel || "3") +
+    "/eventsnextleague.php?id=" + liga.tsdb;
+}
+
+// Samme form som tolkKamper gir, sa visningen ikke vet hvor kampene kom
+// fra. events er null — ikke en tom liste — nar ligaen ikke har flere.
+export function tolkKamperTsdb(json) {
+  if (!json || typeof json !== "object") throw new Error("Tomt svar fra TheSportsDB");
+  if (json.events === null || json.events === undefined) return [];
+  if (!Array.isArray(json.events)) throw new Error("Uventet svar fra TheSportsDB");
+  return json.events.map(tsdbKamp).filter((k) => k.hjemme && k.borte && k.dato);
+}
+
+function tsdbKamp(e) {
+  const rad = e || {};
+  const status = tekst(rad.strStatus);
+  return {
+    id: tall(rad.idEvent),
+    dato: tsdbTid(rad),
+    runde: rad.intRound ? "Runde " + tekst(rad.intRound) : "",
+    hjemme: redaksjonsnavn(tekst(rad.strHomeTeam)),
+    borte: redaksjonsnavn(tekst(rad.strAwayTeam)),
+    arena: tekst(rad.strVenue),
+    malHjemme: maal(rad.intHomeScore),
+    malBorte: maal(rad.intAwayScore),
+    spilt: status === "Match Finished" || status === "FT",
+  };
+}
+
+// strTimestamp er UTC uten sone («2026-09-13T15:00:00»). Uten Z ville
+// new Date lest den som leserens lokale tid og bommet med to timer.
+function tsdbTid(rad) {
+  let t = tekst(rad.strTimestamp);
+  if (!t && rad.dateEvent) t = tekst(rad.dateEvent) + "T" + (tekst(rad.strTime) || "00:00:00");
+  if (!t) return null;
+  if (!/[zZ]$|[+-]\d\d:?\d\d$/.test(t)) t += "Z";
+  return Number.isNaN(Date.parse(t)) ? null : t;
+}
+
+/* ---------- deling ---------- */
+
+// Teksten som gar inn i gruppechatten. Ren funksjon, sa den kan testes:
+// den er det leseren faktisk sender, og en feil her er synlig for andre.
+export const HVOR = {
+  hjemme: "hjemme",
+  pub: "på pub",
+  stadion: "på stadion",
+};
+
+export function delingstekst(kamp, hvor, sted, url) {
+  const naar = tidstekst(kamp && kamp.dato);
+  let hvorTekst = HVOR[hvor] || "";
+  if (hvor === "pub" && sted) hvorTekst = "på " + sted;
+  if (hvor === "stadion" && (sted || (kamp && kamp.arena))) {
+    hvorTekst = "på " + (sted || kamp.arena);
+  }
+  return "⚽ " + kamp.hjemme + " – " + kamp.borte + (naar ? ", " + naar : "") + "." +
+    (hvorTekst ? " Jeg ser den " + hvorTekst + "." : "") +
+    " Hvor ser du?" + (url ? " " + url : "");
+}
+
+// «søndag 13. sep. kl. 17.00» i norsk tid, uansett hvor leseren er.
+// Kampene spilles i Norge, og det er den tiden avtalen gjelder.
+export function tidstekst(iso) {
+  const dato = iso ? new Date(iso) : null;
+  if (!dato || Number.isNaN(dato.getTime())) return "";
+  const dag = dato.toLocaleDateString("nb-NO",
+    { weekday: "long", day: "numeric", month: "short", timeZone: "Europe/Oslo" });
+  const kl = dato.toLocaleTimeString("nb-NO",
+    { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Oslo" });
+  return dag + " kl. " + kl;
 }
 
 // "Neste runde" er runden til den forste kampen som kommer, ikke de ti

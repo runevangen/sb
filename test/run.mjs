@@ -864,9 +864,99 @@ const SAK_11 = await kjor("favorittlag", FELLES + FOTBALL + `
   }, 900); });
 `);
 
+/* ---------------- 12. hvor ser du kampen ---------------- */
+
+// Arets neste runde (fra TheSportsDB) kan deles: velg sted, del inn i
+// gruppechatten. Delingsmenyen stubbes, sa teksten kan kontrolleres.
+const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: KOMMENDE, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  window.__delt = null;
+  navigator.share = function (d) { window.__delt = d; return Promise.resolve(); };
+  location.hash = "#/fotball/eliteserien/neste";
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var knapper = document.querySelectorAll(".kamp-del");
+    ok("hver kamp i arets runde kan deles", knapper.length === 2, knapper.length);
+    ok("kilden star i stempelet",
+       document.querySelector(".fotball-kilde").textContent === "TheSportsDB",
+       document.querySelector(".fotball-kilde").textContent);
+    ok("ingen notis nar deling er mulig", !document.querySelector(".kamp-notis"));
+
+    knapper[0].click();
+    var panel = document.querySelector(".kamp-panel");
+    ok("trykk apner panelet rett under kampen",
+       panel && panel.previousElementSibling === knapper[0].closest(".kamp") &&
+       knapper[0].getAttribute("aria-expanded") === "true");
+    ok("del er sperret til et sted er valgt", panel.querySelector(".kamp-send").disabled);
+    ok("stadion har arenaens navn nar vi har det",
+       panel.querySelectorAll(".hvor-valg")[2].textContent === "På stadion",
+       panel.querySelectorAll(".hvor-valg")[2].textContent);
+
+    panel.querySelectorAll(".hvor-valg")[1].click();   // pa pub
+    ok("pubfeltet kommer fram", !panel.querySelector(".kamp-pub").hidden);
+    ok("del er apnet", !panel.querySelector(".kamp-send").disabled);
+    panel.querySelector(".kamp-pub").value = "Pub X";
+
+    // Et annet panel apnes: det forste skal lukkes.
+    knapper[1].click();
+    ok("bare ett panel om gangen", document.querySelectorAll(".kamp-panel").length === 1 &&
+       knapper[0].getAttribute("aria-expanded") === "false");
+    knapper[0].click();
+    panel = document.querySelector(".kamp-panel");
+    panel.querySelectorAll(".hvor-valg")[1].click();
+    panel.querySelector(".kamp-pub").value = "Pub X";
+    panel.querySelector(".kamp-send").click();
+
+    setTimeout(function () {
+      var d = window.__delt || {};
+      ok("teksten som deles har kampen, puben og sporsmalet",
+         String(d.text).indexOf("Brann – Bodo/Glimt") > -1 &&
+         String(d.text).indexOf("Jeg ser den på Pub X.") > -1 &&
+         String(d.text).indexOf("Hvor ser du?") > -1, d.text);
+      ok("lenken apner neste runde i appen",
+         String(d.url).indexOf("#/fotball/eliteserien/neste") > -1, d.url);
+      ok("panelet lukkes etter deling", !document.querySelector(".kamp-panel"));
+      ferdig();
+    }, 300);
+  } catch (e) { ok("ingen unntak underveis", false, e.message + " @ " + (e.stack || "").split("\\n")[1]); ferdig(); }
+  }, 1200); });
+`);
+
+/* ---------------- 13. fjorarets runde kan ikke deles ---------------- */
+
+const SAK_13 = await kjor("kamp-deling-gammel", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  ` + mockAlt("saker") + `
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () {
+    ok("fjorarets kamper har ingen delingsknapp", !document.querySelector(".kamp-del"));
+    var notis = document.querySelector(".kamp-notis");
+    ok("det star hvorfor", notis && notis.textContent.indexOf("terminlisten") > -1,
+       notis ? notis.textContent : "ingen notis");
+    ok("kilden er API-Football nar svaret ikke sier noe annet",
+       document.querySelector(".fotball-kilde").textContent === "API-Football");
+    ferdig();
+  }, 1200); });
+`);
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11];
+const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13];
 let feilet = 0;
 
 for (const t of alle) {
