@@ -96,7 +96,7 @@ process.env.api_football_key = NOKKEL;
 r = await fotball(be("/api/fotball/tabell?liga=eliteserien"));
 ok("nokkel med sma bokstaver godtas ogsa", r.status === 200, r.status);
 ok("den nokkelen brukes i kallet",
-   kall[0].opsjoner.headers["x-apisports-key"] === NOKKEL);
+   apiKall(kall)[0].opsjoner.headers["x-apisports-key"] === NOKKEL);
 delete process.env.api_football_key;
 
 /* ---------------- vanlig svar ---------------- */
@@ -107,10 +107,13 @@ r = await fotball(be("/api/fotball/tabell?liga=eliteserien"));
 const kropp = await r.json();
 
 ok("tabellen svarer 200", r.status === 200, r.status);
+// TheSportsDB provdes forst (stubben svarer «ingen tabell»), sa selve
+// API-Football-kallet er ikke det forste.
+const api = apiKall(kall)[0];
 ok("riktig liga og sesong hentes",
-   kall[0].url.indexOf("league=103") > -1 && kall[0].url.indexOf("season=") > -1, kall[0].url);
+   api.url.indexOf("league=103") > -1 && api.url.indexOf("season=") > -1, api.url);
 ok("nokkelen sendes som header",
-   kall[0].opsjoner.headers["x-apisports-key"] === NOKKEL);
+   api.opsjoner.headers["x-apisports-key"] === NOKKEL);
 // Det viktigste i hele funksjonen: nokkelen skal aldri ut til leseren.
 ok("nokkelen lekker ikke ut i svaret",
    JSON.stringify(kropp).indexOf(NOKKEL) === -1);
@@ -123,7 +126,7 @@ ok("sist oppdatert folger med", typeof kropp.oppdatert === "string" &&
 
 // Abonnementet dekker ikke inneværende sesong. Ber vi om den likevel,
 // svarer API-et "season, try from 2022 to 2024" og leseren far ingenting.
-const bedtOm = Number((kall[0].url.match(/season=(\d+)/) || [])[1]);
+const bedtOm = Number((api.url.match(/season=(\d+)/) || [])[1]);
 ok("det sporres om en sesong abonnementet dekker",
    bedtOm >= 2022 && bedtOm <= 2024, bedtOm);
 ok("sesongen star i svaret", kropp.sesong === bedtOm, kropp.sesong);
@@ -173,7 +176,7 @@ r = await fotball(be("/api/fotball/resultater?liga=eliteserien"));
 const res = await r.json();
 ok("resultater svarer 200", r.status === 200, r.status);
 ok("resultater sporr om spilte kamper",
-   kall[0].url.indexOf("status=FT") > -1, kall[0].url);
+   apiKall(kall)[0].url.indexOf("status=FT") > -1, apiKall(kall)[0].url);
 // Nyeste forst: API-et gir dem i stigende rekkefolge, og en resultatliste
 // som begynner med den eldste kampen leses feil vei.
 ok("nyeste resultat star forst", res.kamper[0].hjemme === "Molde", res.kamper[0].hjemme);
@@ -258,10 +261,50 @@ r = await fotball(be("/api/fotball/neste?liga=eliteserien"));
 ok("uventet form fra TheSportsDB gir ogsa API-Footballs svar",
    r.status === 200 && (await r.json()).kilde === "API-Football", r.status);
 
-// Tabellen har ingen slik reserve: den kommer bare fra API-Football.
-kall = stub(SVAR, 200, { svar: ARETS });
+// Tabellen og resultatene har samme reserve.
+const ARETS_TABELL = { table: [
+  { intRank: "1", strTeam: "Bodo/Glimt", intPlayed: "20", intWin: "14", intDraw: "3", intLoss: "3",
+    intGoalsFor: "50", intGoalsAgainst: "20", intGoalDifference: "30", intPoints: "45" },
+  { intRank: "2", strTeam: "Brann", intPlayed: "20", intWin: "12", intDraw: "4", intLoss: "4",
+    intGoalsFor: "40", intGoalsAgainst: "22", intGoalDifference: "18", intPoints: "40" },
+] };
+kall = stub(SVAR, 200, { svar: ARETS_TABELL });
 r = await fotball(be("/api/fotball/tabell?liga=eliteserien"));
-ok("tabellen sporr ikke TheSportsDB", tsdbKall(kall).length === 0, tsdbKall(kall).length);
+const aretsTabell = await r.json();
+ok("arets tabell kommer fra TheSportsDB",
+   r.status === 200 && aretsTabell.kilde === "TheSportsDB" && aretsTabell.sisteSesong === true,
+   JSON.stringify([r.status, aretsTabell.kilde, aretsTabell.sisteSesong]));
+ok("tabellen sporr om arets sesong hos TheSportsDB",
+   tsdbKall(kall)[0].url.indexOf("lookuptable.php?l=4358&s=" + new Date().getUTCFullYear()) > -1,
+   tsdbKall(kall)[0].url);
+ok("tabellradene er oversatt og i samme form",
+   aretsTabell.tabell.length === 2 && aretsTabell.tabell[0].lag === "Bodø/Glimt" &&
+   aretsTabell.tabell[0].poeng === 45, JSON.stringify(aretsTabell.tabell[0]));
+ok("API-Football sporres ikke nar tabellen finnes", apiKall(kall).length === 0);
+
+kall = stub(SVAR, 200, { svar: { table: null } });
+r = await fotball(be("/api/fotball/tabell?liga=eliteserien"));
+ok("uten tabell hos TheSportsDB kommer fjorarets fra API-Football",
+   r.status === 200 && (await r.json()).kilde === "API-Football", r.status);
+
+const ARETS_RESULTATER = { events: [
+  Object.assign(tsdbHendelse(21, "2026-09-06T15:00:00", 19, "Brann", "Viking"),
+    { strStatus: "Match Finished", intHomeScore: "1", intAwayScore: "0" }),
+  Object.assign(tsdbHendelse(22, "2026-09-08T17:00:00", 20, "Molde", "Rosenborg"),
+    { strStatus: "Match Finished", intHomeScore: "2", intAwayScore: "2" }),
+  tsdbHendelse(23, "2026-09-13T15:00:00", 21, "Viking", "Molde"),   // ikke spilt
+] };
+kall = stub(SVAR, 200, { svar: ARETS_RESULTATER });
+r = await fotball(be("/api/fotball/resultater?liga=eliteserien"));
+const aretsRes = await r.json();
+ok("arets resultater kommer fra TheSportsDB",
+   r.status === 200 && aretsRes.kilde === "TheSportsDB", JSON.stringify([r.status, aretsRes.kilde]));
+ok("resultater sporr eventspastleague",
+   tsdbKall(kall)[0].url.indexOf("eventspastleague.php?id=4358") > -1, tsdbKall(kall)[0].url);
+ok("bare spilte kamper, nyeste forst",
+   aretsRes.kamper.length === 2 && aretsRes.kamper[0].hjemme === "Molde" &&
+   aretsRes.kamper[0].malHjemme === 2 && aretsRes.kamper[0].spilt === true,
+   JSON.stringify(aretsRes.kamper));
 
 /* ---------------- ukjent datasett ---------------- */
 
@@ -272,6 +315,6 @@ ok("ukjent datasett sporr ikke API-et", kall.length === 0, kall.length);
 
 /* ---------------- rapport ---------------- */
 
-const antall = 50;
+const antall = 57;
 console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);

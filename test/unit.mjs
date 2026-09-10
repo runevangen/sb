@@ -12,7 +12,7 @@ import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          apiSti, tolkKamper, nesteRunde, tolkFotballHash, fotballHash,
          tilgjengeligSesong, SESONGVINDU, redaksjonsnavn, normaliserLagnavn,
-         tsdbSti, tolkKamperTsdb, delingstekst, tidstekst, HVOR }
+         tsdbSti, tolkKamperTsdb, tolkTabellTsdb, tsdbSesong, delingstekst, tidstekst, HVOR }
   from "../fotball-data.js";
 
 let feilet = 0;
@@ -267,12 +267,37 @@ ok("ingen lag gir tom tekst", listeTekst([]) === "" && listeTekst(null) === "");
 /* ---------------- fotball: TheSportsDB ---------------- */
 
 ok("adressen bruker testnokkelen 3 som standard",
-   tsdbSti(LIGAER.eliteserien) === "/api/v1/json/3/eventsnextleague.php?id=4358",
-   tsdbSti(LIGAER.eliteserien));
+   tsdbSti("neste", LIGAER.eliteserien) === "/api/v1/json/3/eventsnextleague.php?id=4358",
+   tsdbSti("neste", LIGAER.eliteserien));
 ok("egen nokkel legges i adressen, url-kodet",
-   tsdbSti(LIGAER.premier, "a b") === "/api/v1/json/a%20b/eventsnextleague.php?id=4328",
-   tsdbSti(LIGAER.premier, "a b"));
-ok("liga uten TheSportsDB-id gir null", tsdbSti({ id: 1 }) === null);
+   tsdbSti("neste", LIGAER.premier, "a b") === "/api/v1/json/a%20b/eventsnextleague.php?id=4328",
+   tsdbSti("neste", LIGAER.premier, "a b"));
+ok("liga uten TheSportsDB-id gir null", tsdbSti("neste", { id: 1 }) === null);
+ok("ukjent datasett gir null", tsdbSti("toppscorere", LIGAER.eliteserien) === null);
+ok("resultater har egen adresse",
+   tsdbSti("resultater", LIGAER.eliteserien) === "/api/v1/json/3/eventspastleague.php?id=4358",
+   tsdbSti("resultater", LIGAER.eliteserien));
+const HOST = new Date(Date.UTC(2026, 8, 10));
+ok("tabellen sporr om arets sesong",
+   tsdbSti("tabell", LIGAER.eliteserien, "", HOST) === "/api/v1/json/3/lookuptable.php?l=4358&s=2026",
+   tsdbSti("tabell", LIGAER.eliteserien, "", HOST));
+// Premier League krysser nyttar, og TheSportsDB skriver den «2026-2027».
+ok("host-var-sesongen skrives med bindestrek",
+   tsdbSesong(LIGAER.premier, HOST) === "2026-2027", tsdbSesong(LIGAER.premier, HOST));
+ok("kalendersesongen er bare aret", tsdbSesong(LIGAER.eliteserien, HOST) === "2026");
+
+const RAD = { intRank: "1", strTeam: "Bodo/Glimt", strBadge: "https://x/b.png", intPlayed: "20",
+  intWin: "14", intDraw: "3", intLoss: "3", intGoalsFor: "50", intGoalsAgainst: "20",
+  intGoalDifference: "30", intPoints: "45" };
+const TAB = tolkTabellTsdb({ table: [RAD] })[0];
+ok("tabellraden far samme form som API-Footballs",
+   TAB.plass === 1 && TAB.lag === "Bodø/Glimt" && TAB.merke === "https://x/b.png" &&
+   TAB.kamper === 20 && TAB.seier === 14 && TAB.uavgjort === 3 && TAB.tap === 3 &&
+   TAB.scoret === 50 && TAB.sluppet === 20 && TAB.differanse === 30 && TAB.poeng === 45,
+   JSON.stringify(TAB));
+ok("table: null er tom tabell, ikke feil", tolkTabellTsdb({ table: null }).length === 0);
+ok("rad uten lag filtreres bort", tolkTabellTsdb({ table: [{ intRank: "1" }] }).length === 0);
+ok("tabell som ikke er liste kaster", kaster(() => tolkTabellTsdb({ table: {} })));
 
 function hendelse(ekstra) {
   return Object.assign({ idEvent: "7", strTimestamp: "2026-09-13T15:00:00", intRound: "21",
@@ -493,6 +518,6 @@ ok("hash bygges tilbake til samme rute",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 155;
+const antall = 165;
 console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);
