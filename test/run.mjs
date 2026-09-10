@@ -693,6 +693,10 @@ const SAK_8 = await kjor("fotball-feil", FELLES + FOTBALL + `
 
 const SAK_9 = await kjor("fotball-lagsok", FELLES + FOTBALL + `
   var saker = lagSaker(12);
+  // En sak lenger nede i feeden handler faktisk om laget. Etter et lagsok
+  // skal den sta overst — som toppsak — ikke der datoen tilfeldigvis
+  // plasserer den.
+  saker[7].title.rendered = "Brann-jubel i Bergen";
   ` + mockAlt("saker") + `
   location.hash = "#/fotball/eliteserien/tabell";
 
@@ -718,6 +722,14 @@ const SAK_9 = await kjor("fotball-lagsok", FELLES + FOTBALL + `
          forSok + " -> " + window.__kall.length);
       ok("soket gikk mot WordPress med lagnavnet",
          window.__sokUrl.indexOf("search=Brann") > -1, window.__sokUrl);
+      // Relevans, ikke dato: ellers fyller de tolv nyeste sakene som
+      // nevner laget i forbifarten forste side.
+      ok("soket sorteres etter relevans hos WordPress",
+         window.__sokUrl.indexOf("orderby=relevance") > -1 &&
+         window.__sokUrl.indexOf("orderby=date") === -1, window.__sokUrl);
+      ok("saken med laget i tittelen er toppsak",
+         document.querySelector(".hero-title").textContent === "Brann-jubel i Bergen",
+         document.querySelector(".hero-title").textContent);
 
       // Veien ut av soket. Uten den blir feeden stande filtrert til man
       // apner menyen og finner «Alle saker».
@@ -738,6 +750,11 @@ const SAK_9 = await kjor("fotball-lagsok", FELLES + FOTBALL + `
         ok("feeden hentes uten sok",
            window.__sokUrl !== forT\u00f8mming && window.__sokUrl.indexOf("search=") === -1,
            window.__sokUrl);
+        ok("uten sok sorteres feeden etter dato igjen",
+           window.__sokUrl.indexOf("orderby=date") > -1, window.__sokUrl);
+        ok("uten sok er nyeste sak toppsak igjen",
+           document.querySelector(".hero-title").textContent === "Sak 1",
+           document.querySelector(".hero-title").textContent);
         ferdig();
       }, 700);
     }, 700);

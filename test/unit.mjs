@@ -7,7 +7,8 @@
 // millisekunder framfor de titalls sekundene nettlesertestene bruker.
 // Alt som trenger DOM ligger i test/run.mjs.
 
-import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug } from "../lib.js";
+import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
+         foldTekst, treffScore, rangerTreff } from "../lib.js";
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          apiSti, tolkKamper, nesteRunde, tolkFotballHash, fotballHash,
          tilgjengeligSesong, SESONGVINDU, redaksjonsnavn, normaliserLagnavn }
@@ -176,6 +177,60 @@ ok("host-var-liga klemmes etter sesongen",
    tilgjengeligSesong(LIGAER.premier, new Date(Date.UTC(2025, 0, 15)), VINDU));
 ok("vinduet har en fra og en til", SESONGVINDU.fra < SESONGVINDU.til);
 
+/* ---------------- sok: rangering av treff ---------------- */
+
+function sak(id, tittel, dato, utdrag, innhold) {
+  return { id, date_gmt: dato, title: { rendered: tittel },
+           excerpt: { rendered: utdrag || "" }, content: { rendered: innhold || "" } };
+}
+
+ok("HTML-tagger fjernes for sammenlikning",
+   foldTekst("<p>Brann <b>vant</b></p>") === "brann vant", foldTekst("<p>Brann <b>vant</b></p>"));
+// WordPress sender titler som HTML: «Bodø» kommer som «Bod&#248;».
+ok("numeriske entiteter dekodes",
+   foldTekst("Bod&#248;/Glimt") === "bodo/glimt", foldTekst("Bod&#248;/Glimt"));
+ok("norske tegn foldes", foldTekst("Vålerenga–Tromsø") === "valerenga-tromso",
+   foldTekst("Vålerenga–Tromsø"));
+ok("tomt gir tomt", foldTekst(null) === "" && foldTekst(undefined) === "");
+
+const TITTEL   = sak(1, "Fulham slo Brentford", "2026-09-01T10:00:00");
+const TITTEL2  = sak(2, "Stor kveld for Fulham", "2026-09-05T10:00:00");
+const ORDENE   = sak(3, "Manchester feirer, City jubler", "2026-09-06T10:00:00");
+const KROPPEN  = sak(4, "Premier League-runden", "2026-09-08T10:00:00",
+                     "", "<p>Arsenal vant. Fulham tapte hjemme.</p>");
+const INGEN    = sak(5, "Eliteserien i dag", "2026-09-09T10:00:00", "<p>Brann vant.</p>");
+
+ok("treff i tittelen gir 3", treffScore(TITTEL, "Fulham") === 3, treffScore(TITTEL, "Fulham"));
+ok("alle ordene i tittelen, men spredt, gir 2",
+   treffScore(ORDENE, "Manchester City") === 2, treffScore(ORDENE, "Manchester City"));
+ok("ett ord alene gir ikke 2 for spredte ord",
+   treffScore(ORDENE, "City") === 3, treffScore(ORDENE, "City"));
+ok("treff bare i brodteksten gir 1", treffScore(KROPPEN, "Fulham") === 1, treffScore(KROPPEN, "Fulham"));
+ok("ingen treff gir 0", treffScore(INGEN, "Fulham") === 0, treffScore(INGEN, "Fulham"));
+ok("sok med norske tegn treffer tittel uten",
+   treffScore(sak(6, "Bodo/Glimt vant", "2026-09-01T10:00:00"), "Bodø/Glimt") === 3);
+ok("sok uten norske tegn treffer tittel med",
+   treffScore(sak(7, "Bod&#248;/Glimt vant", "2026-09-01T10:00:00"), "Bodo/Glimt") === 3);
+ok("store og sma bokstaver er det samme", treffScore(TITTEL, "fulham") === 3);
+ok("tomt sokeord gir 0", treffScore(TITTEL, "") === 0 && treffScore(TITTEL, "  ") === 0);
+ok("sak uten felter kaster ikke", treffScore({}, "Fulham") === 0);
+
+// Nyeste forst er utgangspunktet. Etter rangering star tittel-treffene
+// forst (nyeste av dem overst), sa brodtekst-treffet, og til slutt sakene
+// uten treff — fortsatt nyeste forst seg imellom.
+const FEED = [INGEN, KROPPEN, ORDENE, TITTEL2, TITTEL];
+const RANGERT = rangerTreff(FEED, "Fulham");
+ok("tittel-treff forst, sa brodtekst, sa resten etter dato",
+   RANGERT.map((p) => p.id).join(",") === "2,1,4,5,3", RANGERT.map((p) => p.id).join(","));
+ok("rangering endrer ikke original-lista",
+   FEED[0].id === 5, FEED[0].id);
+ok("tomt sokeord gir lista urort", rangerTreff(FEED, "") === FEED && rangerTreff(FEED, null) === FEED);
+// Sortering er stabil: uten dato og med lik score skal rekkefolgen sta.
+const UDATERT = [sak(8, "A", null), sak(9, "B", null), sak(10, "C", null)];
+ok("lik score og ingen dato beholder rekkefolgen",
+   rangerTreff(UDATERT, "x").map((p) => p.id).join(",") === "8,9,10",
+   rangerTreff(UDATERT, "x").map((p) => p.id).join(","));
+
 /* ---------------- fotball: lagnavn ---------------- */
 
 ok("norske tegn foldes til ascii i nokkelen",
@@ -341,6 +396,6 @@ ok("hash bygges tilbake til samme rute",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 99;
+const antall = 119;
 console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);

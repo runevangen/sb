@@ -3,7 +3,7 @@
 // De rene hjelpefunksjonene ligger i lib.js for a kunne enhetstestes uten
 // nettleser. Alt her nede rorer DOM, nettverk eller lagring.
 
-import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug } from "./lib.js";
+import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug, rangerTreff } from "./lib.js";
 import { LIGAER, tolkFotballHash, fotballHash } from "./fotball-data.js";
 import { initFotball, visFotball } from "./fotball.js";
 
@@ -25,9 +25,18 @@ function catParam(categoryId) {
   return categoryId ? "&categories=" + encodeURIComponent(categoryId) : "";
 }
 
+// Et sok sorteres etter relevans hos WordPress, ikke dato. Ellers ville
+// de tolv nyeste sakene som nevner laget i forbifarten fylt forste side,
+// mens saken som handler om laget la pa side to. Innenfor siden legger
+// rangerTreff() tittelen overst (se lib.js).
+function sokParam(q) {
+  if (!sokeord) return q;
+  return q.replace("orderby=date", "orderby=relevance") +
+    "&search=" + encodeURIComponent(sokeord);
+}
+
 function postSources(categoryId, sideNr) {
-  let q = WP_QUERY + catParam(categoryId);
-  if (sokeord) q += "&search=" + encodeURIComponent(sokeord);
+  let q = sokParam(WP_QUERY + catParam(categoryId));
   if (sideNr && sideNr > 1) q += "&page=" + sideNr;
   return sourcesFor(q);
 }
@@ -38,9 +47,7 @@ function postSources(categoryId, sideNr) {
 const SIG_QUERY = "?per_page=12&orderby=date&order=desc&_fields=id,modified_gmt";
 
 function signatureSources(categoryId) {
-  let q = SIG_QUERY + catParam(categoryId);
-  if (sokeord) q += "&search=" + encodeURIComponent(sokeord);
-  return sourcesFor(q);
+  return sourcesFor(sokParam(SIG_QUERY + catParam(categoryId)));
 }
 
 function sourcesFor(query) {
@@ -567,11 +574,16 @@ window.addEventListener("popstate", () => {
 
 /* ---------- rendering ---------- */
 
-function renderFeed(posts, opts) {
+function renderFeed(saker, opts) {
   const behold = opts && opts.behold;
   const feed = document.getElementById("feed");
   const forrigeRull = feed.scrollTop;
   feed.replaceChildren();
+
+  // Under et sok star saken med treff i tittelen overst — ogsa som
+  // toppsak. Rangeres her og ikke der dataene hentes, sa «Vis flere»
+  // rangerer hele lista pa nytt og ikke bare den nye siden.
+  const posts = rangerTreff(saker, sokeord);
 
   if (!posts.length) {
     const state = el("div", "state");

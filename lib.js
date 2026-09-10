@@ -94,3 +94,55 @@ export function internSlug(url, vertsnavn) {
   return siste;
 }
 
+
+/* ---------- sok ---------- */
+
+// WordPress-soket leter i tittel og brodtekst med samme vekt. Nevnes et lag
+// bare i forbifarten i en sak om noe annet, teller det som treff pa linje
+// med en sak som handler om laget. Rangeringen under legger tittelen
+// overst, sa det leseren sokte etter er det som star forst.
+//
+// Samme mekanisme skal brukes til a lofte favorittlag i feeden (#24), sa
+// den tar en liste og et ord, ikke en DOM.
+
+// Sammenlikningsform: sma bokstaver, norske tegn foldet til ascii sa
+// «Bodø» og «Bodo» er det samme ordet, HTML-tagger og entiteter fjernet.
+// Titler fra WordPress kommer som HTML («Bod&#248;/Glimt»), sa uten
+// foldingen ville et sok fra tabellen bommet pa sin egen tittel.
+export function foldTekst(verdi) {
+  return String(verdi === undefined || verdi === null ? "" : verdi)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&#(\d+);/g, (m, n) => String.fromCharCode(Number(n)))
+    .replace(/&amp;/g, "&").replace(/&nbsp;/g, " ")
+    .replace(/&#8211;|&#8212;|&ndash;|&mdash;|[\u2013\u2014]/g, "-")
+    .toLowerCase()
+    .replace(/ø/g, "o").replace(/å/g, "a").replace(/æ/g, "ae")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// 3: tittelen har hele uttrykket. 2: tittelen har alle ordene, men ikke
+// samlet. 1: bare utdraget eller brodteksten har det. 0: ingen treff.
+export function treffScore(post, ord) {
+  const uttrykk = foldTekst(ord);
+  if (!uttrykk) return 0;
+  const tittel = foldTekst(post && post.title && post.title.rendered);
+  if (tittel.indexOf(uttrykk) > -1) return 3;
+  const ordene = uttrykk.split(" ");
+  if (ordene.length > 1 && ordene.every((o) => tittel.indexOf(o) > -1)) return 2;
+  const kropp = foldTekst(post && post.excerpt && post.excerpt.rendered) + " " +
+    foldTekst(post && post.content && post.content.rendered);
+  return kropp.indexOf(uttrykk) > -1 ? 1 : 0;
+}
+
+// Hoyest score forst; like score beholder nyeste forst. Sorteringen er
+// stabil, sa to saker med samme score og samme tidspunkt star som for.
+// Tomt sokeord gir lista urort — da er det ingenting a rangere etter.
+export function rangerTreff(posts, ord) {
+  if (!ord || !foldTekst(ord)) return posts;
+  return posts
+    .map((post, i) => ({ post, i, score: treffScore(post, ord),
+                         tid: (postDate(post) || new Date(0)).getTime() }))
+    .sort((a, b) => b.score - a.score || b.tid - a.tid || a.i - b.i)
+    .map((r) => r.post);
+}
