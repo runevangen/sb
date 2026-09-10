@@ -246,12 +246,20 @@ ok("arets kamper caches som neste runde ellers",
    (r.headers.get("Netlify-CDN-Cache-Control") || "").indexOf("s-maxage=21600") > -1,
    r.headers.get("Netlify-CDN-Cache-Control"));
 
-// Egen nokkel i miljoet gar inn i adressen, ikke i en header.
+// Egen nokkel i miljoet: v2, med nokkelen i en header og aldri i
+// adressen. Svaret fra v2 har lista under «schedule».
 process.env.THESPORTSDB_KEY = "min-nokkel";
-kall = stub(SVAR, 200, { svar: ARETS });
+kall = stub(SVAR, 200, { svar: { schedule: ARETS.events } });
 r = await fotball(be("/api/fotball/neste?liga=eliteserien"));
-ok("egen TheSportsDB-nokkel brukes",
-   tsdbKall(kall)[0].url.indexOf("/json/min-nokkel/") > -1, tsdbKall(kall)[0].url);
+const v2 = await r.json();
+ok("med nokkel brukes v2",
+   tsdbKall(kall)[0].url.indexOf("/api/v2/json/schedule/next/league/4358") > -1, tsdbKall(kall)[0].url);
+ok("nokkelen sendes som X-API-KEY",
+   tsdbKall(kall)[0].opsjoner.headers["X-API-KEY"] === "min-nokkel");
+ok("nokkelen star ikke i adressen", tsdbKall(kall)[0].url.indexOf("min-nokkel") === -1);
+ok("nokkelen lekker ikke ut til leseren", JSON.stringify(v2).indexOf("min-nokkel") === -1);
+ok("v2-svaret leses", r.status === 200 && v2.kilde === "TheSportsDB" && v2.kamper.length === 2,
+   JSON.stringify([r.status, v2.kilde, v2.kamper && v2.kamper.length]));
 delete process.env.THESPORTSDB_KEY;
 
 // Svikter TheSportsDB — nettverk eller uventet form — far leseren det
@@ -394,6 +402,6 @@ ok("feil hos MET gir 502 uten cache",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 73;
+const antall = 77;
 console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);

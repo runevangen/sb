@@ -168,15 +168,49 @@ function maal(verdi) {
 // (THESPORTSDB_KEY) kommer alt: full tabell, hele runder, og dermed
 // deling og vaer.
 export const TSDB_MINST = { tabell: 10, resultater: 2, neste: 2 };
+// To utgaver av API-et. Uten nokkel: v1 med testnokkelen «3» i adressen,
+// som kapper svarene. Med nokkel (Patreon): v2, der nokkelen gar i en
+// header og aldri i adressen — den skal ikke ende i en logg eller en
+// cache-nokkel. v2-formen er fra dokumentasjonen, ikke fra et svar vi
+// har sett; parserne under er tolerante, og funksjonen faller tilbake.
 export function tsdbSti(del, liga, nokkel, naa) {
   if (!liga || !liga.tsdb) return null;
-  const rot = "/api/v1/json/" + encodeURIComponent(nokkel || "3") + "/";
+  if (nokkel) {
+    const rot = "/api/v2/json/";
+    if (del === "tabell") {
+      return rot + "lookup/table/" + liga.tsdb + "/" + encodeURIComponent(tsdbSesong(liga, naa));
+    }
+    if (del === "resultater") return rot + "schedule/previous/league/" + liga.tsdb;
+    if (del === "neste") return rot + "schedule/next/league/" + liga.tsdb;
+    return null;
+  }
+  const rot = "/api/v1/json/3/";
   if (del === "tabell") {
     return rot + "lookuptable.php?l=" + liga.tsdb + "&s=" + encodeURIComponent(tsdbSesong(liga, naa));
   }
   if (del === "resultater") return rot + "eventspastleague.php?id=" + liga.tsdb;
   if (del === "neste") return rot + "eventsnextleague.php?id=" + liga.tsdb;
   return null;
+}
+
+export function tsdbHeadere(nokkel) {
+  const h = { "Accept": "application/json" };
+  if (nokkel) h["X-API-KEY"] = nokkel;
+  return h;
+}
+
+// v1 legger lista i «events» og «table»; v2 bruker andre navn
+// («schedule», «lookup»). Vi tar den forste lista vi finner, med de kjente
+// navnene forst. null er «ingenting», ikke feil.
+function forsteListe(json, navn) {
+  for (const n of navn) {
+    if (Array.isArray(json[n])) return json[n];
+    if (json[n] === null) return [];
+  }
+  for (const n of Object.keys(json)) {
+    if (Array.isArray(json[n])) return json[n];
+  }
+  return undefined;
 }
 
 // TheSportsDB skriver sesongen som «2026» for kalenderligaer og
@@ -191,9 +225,12 @@ export function tsdbSesong(liga, naa) {
 // sa funksjonen kan ga videre til API-Football.
 export function tolkTabellTsdb(json) {
   if (!json || typeof json !== "object") throw new Error("Tomt svar fra TheSportsDB");
-  if (json.table === null || json.table === undefined) return [];
-  if (!Array.isArray(json.table)) throw new Error("Uventet svar fra TheSportsDB");
-  return json.table.map(tsdbRad).filter((r) => r.lag);
+  const liste = forsteListe(json, ["table", "lookup"]);
+  if (liste === undefined) {
+    if (Object.keys(json).length === 0) return [];
+    throw new Error("Uventet svar fra TheSportsDB");
+  }
+  return liste.map(tsdbRad).filter((r) => r.lag);
 }
 
 function tsdbRad(rad) {
@@ -217,9 +254,12 @@ function tsdbRad(rad) {
 // fra. events er null — ikke en tom liste — nar ligaen ikke har flere.
 export function tolkKamperTsdb(json, naa) {
   if (!json || typeof json !== "object") throw new Error("Tomt svar fra TheSportsDB");
-  if (json.events === null || json.events === undefined) return [];
-  if (!Array.isArray(json.events)) throw new Error("Uventet svar fra TheSportsDB");
-  return json.events.map((e) => tsdbKamp(e, naa)).filter((k) => k.hjemme && k.borte && k.dato);
+  const liste = forsteListe(json, ["events", "schedule"]);
+  if (liste === undefined) {
+    if (Object.keys(json).length === 0) return [];
+    throw new Error("Uventet svar fra TheSportsDB");
+  }
+  return liste.map((e) => tsdbKamp(e, naa)).filter((k) => k.hjemme && k.borte && k.dato);
 }
 
 function tsdbKamp(e, naa) {

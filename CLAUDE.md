@@ -138,10 +138,15 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   kapper svarene (fem tabellrader, én kamp i listene). Et avkortet svar
   vises aldri som årets: `TSDB_MINST` i `fotball-data.js` er det minste
   som regnes som helt, og under det brukes API-Football som før. Med en
-  betalt nøkkel i `THESPORTSDB_KEY` kommer full tabell, hele runder, og
-  dermed deling og vær — det er den ene bryteren. TheSportsDB skriver
-  sesongen «2026» for kalenderligaer og «2026-2027» for dem som krysser
-  nyttår (`tsdbSesong`).
+  Patreon-nøkkel i `THESPORTSDB_KEY` brukes v2 (`/api/v2/json/`), der
+  nøkkelen går i `X-API-KEY`-headeren og aldri i adressen — den skal ikke
+  ende i en logg eller en cache-nøkkel. Da kommer full tabell, hele
+  runder, og dermed deling og vær: det er den ene bryteren, uten deploy.
+  v2-formen er fra dokumentasjonen; parserne tar den første lista de
+  finner i svaret, så et annet feltnavn ikke velter noe. `uverifisert`
+  til nøkkelen er satt og sett virke. TheSportsDB skriver sesongen «2026»
+  for kalenderligaer og «2026-2027» for dem som krysser nyttår
+  (`tsdbSesong`).
 - «Hvor ser du kampen?» Årets kommende kamper har en delingsknapp som
   åpner ett spørsmål under raden: hjemme, på pub (med navn) eller på
   stadion (med arena). Svaret deles som tekst inn i gruppechatten leseren
@@ -175,8 +180,8 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      196 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  73 tester, ~120 ms, ingen nettleser
+    node test/unit.mjs      205 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  77 tester, ~120 ms, ingen nettleser
     node test/run.mjs       135 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
