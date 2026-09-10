@@ -57,6 +57,15 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   det ett skript i `index.html` og ingen endringer i resten.
   Netlify Analytics ville målt på serveren uten noe skript, men er et
   betalt tillegg per prosjekt — valgt bort inntil videre.
+- Et søk sorteres etter relevans hos WordPress (`orderby=relevance`),
+  ikke dato: ellers fyller de tolv nyeste sakene som nevner laget i
+  forbifarten første side. Innenfor det som er hentet legger
+  `rangerTreff()` i `lib.js` tittel-treff øverst, så brødtekst-treff, så
+  resten — nyeste først innenfor hver gruppe. Rangeringen skjer i
+  `renderFeed`, ikke der dataene hentes, så «Vis flere» rangerer hele
+  lista på nytt. Sammenlikningen folder norske tegn og HTML-entiteter,
+  så «Bodø/Glimt» treffer tittelen «Bod&#248;/Glimt». Samme mekanisme er
+  tenkt brukt til å løfte favorittlag i feeden (#24).
 - Filtrerer noe feeden — et søk eller en kategori — står det i toppfeltet
   som en knapp med kryss, ikke som ren tekst. Et filter uten vei ut blir
   stående til man åpner menyen og finner «Alle saker», og krysset i
@@ -115,9 +124,9 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      99 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      119 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  34 tester, ~120 ms, ingen nettleser
-    node test/run.mjs       93 tester, ~110 s, headless Chromium
+    node test/run.mjs       97 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
 De raske først, så en åpenbar feil stopper kjøringen før nettleseren
@@ -128,7 +137,7 @@ statuskoder, cache-headere og at API-nøkkelen går til API-et og ikke til
 leseren. Ingen nøkkel og ingen nettverk kreves.
 
 `unit.mjs` dekker `lib.js` og `fotball-data.js`: URL-validering, videovertslisten, tidsstempler,
-endringssignaturen, gjenkjenning av interne lenker, sesongvinduet per
+endringssignaturen, gjenkjenning av interne lenker, rangering av søketreff, sesongvinduet per
 liga, tolkning av API-Football-svaret, hvilken runde som er «neste», og at
 døgnkvoten holder. `run.mjs` dekker alt som trenger DOM: XSS i titler
 og artikkel-HTML, annonseplassering, rulleoppførsel, artikkelvisningen,
