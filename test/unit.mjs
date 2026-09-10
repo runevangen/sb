@@ -8,7 +8,7 @@
 // Alt som trenger DOM ligger i test/run.mjs.
 
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
-         foldTekst, treffScore, rangerTreff } from "../lib.js";
+         foldTekst, treffScore, rangerTreff, listeTekst } from "../lib.js";
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          apiSti, tolkKamper, nesteRunde, tolkFotballHash, fotballHash,
          tilgjengeligSesong, SESONGVINDU, redaksjonsnavn, normaliserLagnavn }
@@ -231,6 +231,38 @@ ok("lik score og ingen dato beholder rekkefolgen",
    rangerTreff(UDATERT, "x").map((p) => p.id).join(",") === "8,9,10",
    rangerTreff(UDATERT, "x").map((p) => p.id).join(","));
 
+/* ---------------- favorittlag: flere ord og terskel ---------------- */
+
+// Flere favorittlag: det beste treffet teller.
+ok("liste med ord gir beste treff",
+   treffScore(TITTEL, ["Viking", "Fulham"]) === 3, treffScore(TITTEL, ["Viking", "Fulham"]));
+ok("tom liste gir 0", treffScore(TITTEL, []) === 0);
+
+// En sak kategorisert med laget handler om laget, selv om tittelen ikke
+// nevner det.
+const KATEGORISERT = sak(11, "Seier i Bergen", "2026-09-07T10:00:00");
+KATEGORISERT._embedded = { "wp:term": [[{ name: "Fotball" }, { name: "Brann" }], [{ name: "Eliteserien" }]] };
+ok("kategori med lagnavnet gir 3", treffScore(KATEGORISERT, "Brann") === 3,
+   treffScore(KATEGORISERT, "Brann"));
+ok("annen kategori gir ikke treff", treffScore(KATEGORISERT, "Viking") === 0);
+
+// Terskel 2: en sak som bare nevner laget i brodteksten skal ikke skyve
+// dagens toppsak nedover. Uten terskel (soket) skal den det.
+const FAV = [INGEN, KROPPEN, TITTEL];
+ok("terskel 2 lar brodtekst-treff ligge etter dato",
+   rangerTreff(FAV, ["Fulham"], 2).map((p) => p.id).join(",") === "1,5,4",
+   rangerTreff(FAV, ["Fulham"], 2).map((p) => p.id).join(","));
+ok("uten terskel loftes brodtekst-treffet",
+   rangerTreff(FAV, ["Fulham"]).map((p) => p.id).join(",") === "1,4,5",
+   rangerTreff(FAV, ["Fulham"]).map((p) => p.id).join(","));
+ok("liste med bare tomme ord gir lista urort", rangerTreff(FAV, ["", "  "]) === FAV);
+
+ok("ett lag star alene", listeTekst(["Brann"]) === "Brann", listeTekst(["Brann"]));
+ok("to lag bindes med og", listeTekst(["Brann", "Viking"]) === "Brann og Viking");
+ok("tre lag: komma, sa og",
+   listeTekst(["Brann", "Viking", "Molde"]) === "Brann, Viking og Molde");
+ok("ingen lag gir tom tekst", listeTekst([]) === "" && listeTekst(null) === "");
+
 /* ---------------- fotball: lagnavn ---------------- */
 
 ok("norske tegn foldes til ascii i nokkelen",
@@ -396,6 +428,6 @@ ok("hash bygges tilbake til samme rute",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 119;
+const antall = 131;
 console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);

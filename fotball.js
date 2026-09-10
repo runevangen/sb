@@ -12,6 +12,9 @@ import { timeAgo } from "./lib.js";
 
 let naviger = () => {};
 let sokEtterLag = () => {};
+// Favorittlag eies av app.js (det er lagring). Modulen far bare to
+// sporsmal: er dette laget valgt, og bytt.
+let favoritter = { er: () => false, veksle: () => false };
 let aktivLiga = "eliteserien";
 let aktivDel = "tabell";
 
@@ -29,9 +32,10 @@ function el(tag, klasse, tekst) {
 
 /* ---------- oppsett ---------- */
 
-export function initFotball(paNavigering, paLagsok) {
+export function initFotball(paNavigering, paLagsok, paFavoritt) {
   naviger = paNavigering;
   if (paLagsok) sokEtterLag = paLagsok;
+  if (paFavoritt) favoritter = paFavoritt;
 
   const ligaer = document.getElementById("ligaVelger");
   Object.keys(LIGAER).forEach((nokkel) => {
@@ -193,7 +197,10 @@ function tabell(rader) {
         knapp.type = "button";
         knapp.title = "Søk i nyhetene etter " + rad.lag;
         knapp.addEventListener("click", () => sokEtterLag(rad.lag));
-        td.appendChild(knapp);
+        const celle = el("div", "lag-celle");
+        celle.appendChild(knapp);
+        celle.appendChild(stjerne(rad.lag));
+        td.appendChild(celle);
         tr.appendChild(td);
         return;
       }
@@ -206,6 +213,26 @@ function tabell(rader) {
   tab.appendChild(kropp);
   skall.appendChild(tab);
   return skall;
+}
+
+// Stjernen velger laget som favoritt. En egen knapp ved siden av navnet,
+// ikke en del av det: navnet soker, stjernen folger. aria-pressed, ikke
+// aria-current — dette er en av/pa-bryter per lag, ikke et valg mellom
+// lagene. Ingen tekst i knappen, sa lagnavnet i cellen star rent.
+function stjerne(lag) {
+  const knapp = el("button", "lag-stjerne");
+  knapp.type = "button";
+  knapp.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">'
+    + '<path d="M10 1.8l2.5 5.4 5.9.7-4.4 4 1.2 5.8L10 14.8l-5.2 2.9 1.2-5.8-4.4-4 5.9-.7z"/></svg>';
+  merkStjerne(knapp, lag, favoritter.er(lag));
+  knapp.addEventListener("click", () => merkStjerne(knapp, lag, favoritter.veksle(lag)));
+  return knapp;
+}
+
+function merkStjerne(knapp, lag, valgt) {
+  knapp.setAttribute("aria-pressed", valgt ? "true" : "false");
+  knapp.setAttribute("aria-label", (valgt ? "Slutt å følge " : "Følg ") + lag);
+  knapp.title = valgt ? "Favorittlag — trykk for å fjerne" : "Sett som favorittlag";
 }
 
 /* ---------- kamper ---------- */

@@ -66,6 +66,16 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   lista på nytt. Sammenlikningen folder norske tegn og HTML-entiteter,
   så «Bodø/Glimt» treffer tittelen «Bod&#248;/Glimt». Samme mekanisme er
   tenkt brukt til å løfte favorittlag i feeden (#24).
+- Favorittlag velges med stjernen ved lagnavnet i tabellen og lagres i
+  `localStorage` sammen med tema og skrift (`sb-visning`, feltet `lag`).
+  Ingen konto, ingen data hos oss. Feeden løfter sakene om lagene med
+  samme `rangerTreff()` som søket, men med terskel 2: bare saker som har
+  laget i tittelen eller som kategori. En sak som nevner laget i
+  forbifarten skal ikke skyve dagens toppsak nedover uten at leseren ser
+  hvorfor. At rekkefølgen er endret står som en linje øverst i feeden,
+  og linja er en knapp til tabellen, der valget gjøres om. Et søk
+  overstyrer favorittene: da rangeres det etter søkeordet.
+  Innlogging (#24) er dermed en synkroniseringssak, ikke en forutsetning.
 - Filtrerer noe feeden — et søk eller en kategori — står det i toppfeltet
   som en knapp med kryss, ikke som ren tekst. Et filter uten vei ut blir
   stående til man åpner menyen og finner «Alle saker», og krysset i
@@ -100,10 +110,13 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   `startSok` som søkefeltet, så et lagsøk oppfører seg nøyaktig som et
   søk man skriver selv — samme nullstilling, samme toppfelt, samme vei
   tilbake.
-- Tabellen viser alle kolonnene og ruller vannrett i sitt eget felt.
-  `.phone` klipper alt som stikker utenfor, så et felt uten `overflow-x`
-  ville skjult de siste kolonnene uten vei tilbake — testen ruller derfor
-  faktisk feltet framfor bare å måle bredden.
+- Tabellen viser alle kolonnene. Et langt lagnavn brytes over to linjer
+  framfor å gjøre tabellen bredere enn telefonen, så alt får plass også
+  med stor skrift. Blir feltet likevel for smalt, ruller tabellen
+  vannrett i sitt eget felt: `.phone` klipper alt som stikker utenfor, så
+  et felt uten `overflow-x` ville skjult de siste kolonnene uten vei
+  tilbake. Testen smalner feltet med vilje og ruller det faktisk, framfor
+  bare å måle bredden.
 - Adressen settes av `export const config` i funksjonen. Da slipper
   `netlify.toml` en ny regel, og redirect-reglene der holder seg smale.
 - Gratisnivået dekker bare sesongene i `SESONGVINDU` (nå 2022–2024) og
@@ -124,9 +137,9 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      119 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      131 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  34 tester, ~120 ms, ingen nettleser
-    node test/run.mjs       97 tester, ~110 s, headless Chromium
+    node test/run.mjs       115 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
 De raske først, så en åpenbar feil stopper kjøringen før nettleseren
@@ -137,13 +150,14 @@ statuskoder, cache-headere og at API-nøkkelen går til API-et og ikke til
 leseren. Ingen nøkkel og ingen nettverk kreves.
 
 `unit.mjs` dekker `lib.js` og `fotball-data.js`: URL-validering, videovertslisten, tidsstempler,
-endringssignaturen, gjenkjenning av interne lenker, rangering av søketreff, sesongvinduet per
+endringssignaturen, gjenkjenning av interne lenker, rangering av søketreff og favorittlag, sesongvinduet per
 liga, tolkning av API-Football-svaret, hvilken runde som er «neste», og at
 døgnkvoten holder. `run.mjs` dekker alt som trenger DOM: XSS i titler
 og artikkel-HTML, annonseplassering, rulleoppførsel, artikkelvisningen,
 fokusfella, korthøyden, at toppfeltet krymper, paginering, ruting,
-visningsvalgene i menyen og hele fotballmodulen — fanebytte, tabell,
-resultater, neste runde, dyplenker og feilmelding fra tjenesten.
+visningsvalgene i menyen, favorittlag fra stjerne til feed, og hele
+fotballmodulen — fanebytte, tabell, resultater, neste runde, dyplenker og
+feilmelding fra tjenesten.
 
 Testsidene serveres over HTTP, ikke fra `file://` — modul-script blokkeres
 av CORS på file-opphav, og appen ville aldri lastet.

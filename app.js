@@ -3,7 +3,8 @@
 // De rene hjelpefunksjonene ligger i lib.js for a kunne enhetstestes uten
 // nettleser. Alt her nede rorer DOM, nettverk eller lagring.
 
-import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug, rangerTreff } from "./lib.js";
+import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug, rangerTreff, listeTekst }
+  from "./lib.js";
 import { LIGAER, tolkFotballHash, fotballHash } from "./fotball-data.js";
 import { initFotball, visFotball } from "./fotball.js";
 
@@ -582,8 +583,11 @@ function renderFeed(saker, opts) {
 
   // Under et sok star saken med treff i tittelen overst — ogsa som
   // toppsak. Rangeres her og ikke der dataene hentes, sa «Vis flere»
-  // rangerer hele lista pa nytt og ikke bare den nye siden.
-  const posts = rangerTreff(saker, sokeord);
+  // rangerer hele lista pa nytt og ikke bare den nye siden. Uten sok
+  // loftes favorittlagene, men bare saker som handler om dem (terskel 2).
+  const posts = sokeord
+    ? rangerTreff(saker, sokeord)
+    : rangerTreff(saker, favorittlag(), 2);
 
   if (!posts.length) {
     const state = el("div", "state");
@@ -596,6 +600,10 @@ function renderFeed(saker, opts) {
   // fra den forrige, som sjelden peker pa det samme innholdet. Ved
   // paginering er det motsatt: da er listen den samme, bare lengre.
   feed.scrollTop = 0;
+
+  // Rekkefolgen er endret, og det skal sta hvorfor. Linja er en vei til
+  // tabellen, der valget gjores om.
+  if (!sokeord && favorittlag().length) feed.appendChild(favorittLinje());
 
   feed.appendChild(buildHero(posts[0]));
 
@@ -653,6 +661,16 @@ async function hentFlere() {
     }
   }
   return false;
+}
+
+function favorittLinje() {
+  const knapp = el("button", "favoritt-linje");
+  knapp.type = "button";
+  knapp.appendChild(el("span", "favoritt-stjerne", "★"));
+  knapp.appendChild(el("span", null, listeTekst(favorittlag()) + " øverst"));
+  knapp.title = "Velg lag i tabellen";
+  knapp.addEventListener("click", () => settFane("fotball", fotballLiga, "tabell"));
+  return knapp;
 }
 
 function buildHero(post) {
@@ -758,6 +776,33 @@ function merkSegment(id, aktiv) {
 
 const prefs = readPrefs();
 applyPrefs(prefs);
+
+/* ---------- favorittlag ---------- */
+
+// Lagres i samme objekt som tema og skrift: ett valg, en nokkel, ingen
+// konto. Navnet er redaksjonens skrivemate (se fotball-data.js), sa det
+// samme ordet gir treff i feeden.
+
+function favorittlag() {
+  return Array.isArray(prefs.lag) ? prefs.lag : [];
+}
+
+function erFavoritt(lag) {
+  return favorittlag().indexOf(lag) > -1;
+}
+
+function vekslFavoritt(lag) {
+  const valgt = !erFavoritt(lag);
+  prefs.lag = valgt
+    ? favorittlag().concat([lag])
+    : favorittlag().filter((n) => n !== lag);
+  savePrefs(prefs);
+  track(valgt ? "Favorittlag valgt" : "Favorittlag fjernet", { lag });
+  // Feeden star bak fanen. Bygg den om na, sa den er riktig nar leseren
+  // kommer tilbake — men ikke over en feilmelding.
+  if (hasContent) renderFeed(alleSaker, { behold: true });
+  return valgt;
+}
 
 // Et segment velger en verdi, det veksler ikke. Da kan den som allerede
 // star der trykkes uten at noe skrives eller spores.
@@ -1297,7 +1342,8 @@ initFotball(
   // Et lag i tabellen er en inngang til nyhetene om det laget. Sokefeltet
   // finnes allerede, sa dette koster ingen nye kall mot WordPress utover
   // det soket ville kostet uansett.
-  (lag) => startSok(lag, "Lagsok"));
+  (lag) => startSok(lag, "Lagsok"),
+  { er: erFavoritt, veksle: vekslFavoritt });
 
 document.getElementById("fanenNyheter").addEventListener("click", () => {
   if (aktivVisning !== "nyheter") settFane("nyheter");

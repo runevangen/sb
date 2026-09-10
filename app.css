@@ -503,6 +503,35 @@ body {
 
 .state p { margin: 0 0 14px; }
 
+/* Star overst i feeden nar favorittlag er loftet. En knapp, sa veien til
+   a endre valget er der man ser virkningen av det. */
+.favoritt-linje {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 8px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--border-faint);
+  background: var(--bg-ad);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: var(--t-meta);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+}
+
+.favoritt-linje .favoritt-stjerne { color: var(--accent); }
+
+.favoritt-linje:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 /* Felles nullstilling for de klikkbare kortene, som nå er ekte
    <button>-elementer slik at de kan nås med tastatur. */
 .card-btn {
@@ -1175,6 +1204,9 @@ body {
   width: 100%;
   color: var(--text-strong);
   font-weight: 600;
+  /* Et langt lagnavn brytes over to linjer framfor a gjore tabellen
+     bredere enn telefonen: stjernen skal ha plass ved siden av. */
+  white-space: normal;
 }
 
 .tabell .kol-poeng { color: var(--text-strong); font-weight: 700; }
@@ -1198,6 +1230,50 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 3px;
+}
+
+/* Navn til venstre, stjerne til hoyre. Cellen har width: 100 %, sa
+   stjernen far plass uten a presse tallkolonnene. */
+.lag-celle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.lag-stjerne {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  margin: -6px -4px -6px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lag-stjerne svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.lag-stjerne[aria-pressed="true"] { color: var(--accent); }
+.lag-stjerne[aria-pressed="true"] svg { fill: currentColor; }
+
+.lag-stjerne:hover { background: var(--bg-raised); }
+
+.lag-stjerne:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .tabell tbody tr:last-child td { border-bottom: 0; }

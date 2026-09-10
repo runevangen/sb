@@ -121,13 +121,29 @@ export function foldTekst(verdi) {
     .trim();
 }
 
-// 3: tittelen har hele uttrykket. 2: tittelen har alle ordene, men ikke
-// samlet. 1: bare utdraget eller brodteksten har det. 0: ingen treff.
+// Kategorier og stikkord slik WordPress legger dem ved (_embed). Et lag
+// som star som kategori pa saken er et sikrere tegn enn at navnet star i
+// teksten, og koster ingenting a sjekke.
+function termer(post) {
+  const grupper = post && post._embedded && post._embedded["wp:term"];
+  if (!Array.isArray(grupper)) return [];
+  return grupper.flat().map((t) => foldTekst(t && t.name)).filter(Boolean);
+}
+
+// 3: tittelen har hele uttrykket, eller saken er kategorisert med det.
+// 2: tittelen har alle ordene, men ikke samlet. 1: bare utdraget eller
+// brodteksten har det. 0: ingen treff.
+//
+// Flere ord — en liste med favorittlag — gir det beste treffet av dem.
 export function treffScore(post, ord) {
+  if (Array.isArray(ord)) {
+    return ord.reduce((best, o) => Math.max(best, treffScore(post, o)), 0);
+  }
   const uttrykk = foldTekst(ord);
   if (!uttrykk) return 0;
   const tittel = foldTekst(post && post.title && post.title.rendered);
   if (tittel.indexOf(uttrykk) > -1) return 3;
+  if (termer(post).indexOf(uttrykk) > -1) return 3;
   const ordene = uttrykk.split(" ");
   if (ordene.length > 1 && ordene.every((o) => tittel.indexOf(o) > -1)) return 2;
   const kropp = foldTekst(post && post.excerpt && post.excerpt.rendered) + " " +
@@ -138,11 +154,28 @@ export function treffScore(post, ord) {
 // Hoyest score forst; like score beholder nyeste forst. Sorteringen er
 // stabil, sa to saker med samme score og samme tidspunkt star som for.
 // Tomt sokeord gir lista urort — da er det ingenting a rangere etter.
-export function rangerTreff(posts, ord) {
-  if (!ord || !foldTekst(ord)) return posts;
+//
+// terskel er den laveste scoren som teller. Et sok vil ha alt (1): leseren
+// ba om det ordet. Favorittlag vil bare ha saker som handler om laget (2):
+// ellers ville en sak som nevner laget i forbifarten skjovet dagens
+// toppsak nedover, uten at leseren ser hvorfor.
+export function rangerTreff(posts, ord, terskel) {
+  const ordene = (Array.isArray(ord) ? ord : [ord]).filter((o) => foldTekst(o));
+  if (!ordene.length) return posts;
+  const minst = terskel || 1;
   return posts
-    .map((post, i) => ({ post, i, score: treffScore(post, ord),
-                         tid: (postDate(post) || new Date(0)).getTime() }))
+    .map((post, i) => {
+      const score = treffScore(post, ordene);
+      return { post, i, score: score >= minst ? score : 0,
+               tid: (postDate(post) || new Date(0)).getTime() };
+    })
     .sort((a, b) => b.score - a.score || b.tid - a.tid || a.i - b.i)
     .map((r) => r.post);
+}
+
+// «Brann», «Brann og Viking», «Brann, Viking og Molde».
+export function listeTekst(navn) {
+  const l = (navn || []).filter(Boolean);
+  if (l.length < 2) return l.join("");
+  return l.slice(0, -1).join(", ") + " og " + l[l.length - 1];
 }
