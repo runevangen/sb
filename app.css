@@ -1339,6 +1339,16 @@ body {
   outline-offset: 1px;
 }
 
+/* Vaeret star under lagene, over hele bredden av raden. */
+.kamp-vaer {
+  grid-column: 1 / -1;
+  font-size: calc(12px * var(--fs));
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.kamp-vaer[hidden] { display: none; }
+
 /* Panelet ligger som en egen rad rett under kampen, ikke som en dialog:
    det er ett sporsmal, og svaret skal ut av appen, ikke inn i den. */
 .kamp-panel {

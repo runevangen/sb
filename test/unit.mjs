@@ -15,6 +15,9 @@ import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          tsdbSti, tolkKamperTsdb, tolkTabellTsdb, tsdbSesong, delingstekst, tidstekst, HVOR }
   from "../fotball-data.js";
 
+import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
+  from "../vaer-data.js";
+
 let feilet = 0;
 
 function ok(navn, betingelse, detalj) {
@@ -353,6 +356,76 @@ ok("uten lenke ender teksten med sporsmalet",
    /Hvor ser du\?$/.test(delingstekst(KAMPEN, "hjemme", "", "")));
 ok("HVOR har de tre stedene", Object.keys(HVOR).join(",") === "hjemme,pub,stadion");
 
+/* ---------------- vaer: arena, varsel og klerad ---------------- */
+
+ok("arenaen finnes pa navnet API-ene skriver",
+   arenaFor("Lerkendal Stadion").navn === "Lerkendal" && arenaFor("Alfheim Stadion").navn === "Romssa Arena");
+ok("norske tegn i arenanavnet er ikke et problem", arenaFor("Åråsen stadion").navn === "Åråsen");
+ok("ukjent arena gir null, ikke feil sted", arenaFor("Ukjent Park") === null && arenaFor("") === null);
+ok("alle arenaer har koordinater i Norge",
+   ARENAER.every((a) => a.lat > 57 && a.lat < 72 && a.lon > 4 && a.lon < 32));
+ok("adressen har tre desimaler, som MET ber om",
+   vaerSti({ lat: 63.41264, lon: 10.4 }) === "/weatherapi/locationforecast/2.0/compact?lat=63.413&lon=10.400",
+   vaerSti({ lat: 63.41264, lon: 10.4 }));
+
+// JAG/TI: 8 grader og 9 m/s foles som 4. Over 10 grader eller i stille
+// vaer er folt lik malt.
+ok("vind gjor det kaldere", foltTemp(8, 9) === 4, foltTemp(8, 9));
+ok("over ti grader er folt lik malt", foltTemp(15, 9) === 15);
+ok("stille vaer er folt lik malt", foltTemp(3, 0.5) === 3);
+ok("ugyldig temperatur gir null", foltTemp("nei", 3) === null);
+
+function time(t, temp, vind, symbol, nedbor) {
+  return { time: t, data: { instant: { details: { air_temperature: temp, wind_speed: vind } },
+    next_1_hours: { summary: { symbol_code: symbol }, details: { precipitation_amount: nedbor } } } };
+}
+const MET = { properties: { timeseries: [
+  time("2026-09-13T14:00:00Z", 9.2, 8.7, "rain", 1.2),
+  time("2026-09-13T15:00:00Z", 8.4, 9.1, "lightrain", 0.4),
+  time("2026-09-13T16:00:00Z", 7.9, 9.4, "cloudy", 0),
+] } };
+const V = tolkVarsel(MET, "2026-09-13T15:10:00Z");
+ok("timen naermest avspark velges", V.tid === "2026-09-13T15:00:00Z", V.tid);
+ok("verdiene rundes og folt regnes",
+   V.temp === 8 && V.vind === 9 && V.nedbor === 0.4 && V.symbol === "lightrain" && V.folt === 4,
+   JSON.stringify(V));
+ok("mer enn tre timer unna er ikke et varsel for kampen",
+   tolkVarsel(MET, "2026-09-20T15:00:00Z") === null);
+ok("ugyldig tidspunkt gir null", tolkVarsel(MET, "i morgen") === null);
+ok("tomt svar kaster", kaster(() => tolkVarsel({ properties: { timeseries: [] } }, "2026-09-13T15:00:00Z")) &&
+   kaster(() => tolkVarsel(null, "2026-09-13T15:00:00Z")));
+// Langt fram i tid gir MET bare seks-timers bolker.
+const SEKS = { properties: { timeseries: [{ time: "2026-09-13T12:00:00Z", data: {
+  instant: { details: { air_temperature: 12, wind_speed: 2 } },
+  next_6_hours: { summary: { symbol_code: "fair_day" }, details: { precipitation_amount: 0 } } } }] } };
+ok("seks-timers bolken brukes nar timen mangler",
+   tolkVarsel(SEKS, "2026-09-13T13:00:00Z").symbol === "fair_day");
+
+ok("kaldt: vinterjakke", klerad({ temp: -2, folt: -8, vind: 5, nedbor: 0, symbol: "cloudy" }).indexOf("Vinterjakke") === 0);
+ok("kjolig: jakke og lue", klerad({ temp: 8, folt: 4, vind: 9, nedbor: 0, symbol: "cloudy" }).indexOf("Jakke, og gjerne lue.") === 0);
+ok("mildt: genser", klerad({ temp: 17, folt: 17, vind: 2, nedbor: 0, symbol: "cloudy" }) === "Genser holder.");
+ok("varmt: t-skjorte", klerad({ temp: 24, folt: 24, vind: 2, nedbor: 0, symbol: "clearsky_day" }) === "T-skjortevær.");
+ok("regn gir regnjakke", klerad({ temp: 12, folt: 12, vind: 3, nedbor: 1.0, symbol: "rain" }).indexOf("Ta regnjakke.") > -1);
+ok("litt nedbor uten regnsymbol gir ogsa regnjakke",
+   klerad({ temp: 12, folt: 12, vind: 3, nedbor: 0.5, symbol: "cloudy" }).indexOf("Ta regnjakke.") > -1);
+ok("sno nevnes, ikke regnjakke",
+   klerad({ temp: 0, folt: -4, vind: 4, nedbor: 1, symbol: "snow" }).indexOf("snø") > -1 &&
+   klerad({ temp: 0, folt: -4, vind: 4, nedbor: 1, symbol: "snow" }).indexOf("regnjakke") === -1);
+ok("sterk vind nevnes", klerad({ temp: 10, folt: 6, vind: 12, nedbor: 0, symbol: "cloudy" }).indexOf("blåser") > -1);
+ok("uten varsel: tom tekst", klerad(null) === "" && klerad({ temp: null }) === "");
+
+ok("vaerteksten er kort og hel",
+   vaertekst(V) === "8°, føles som 4°. Regn. Jakke, og gjerne lue. Ta regnjakke.", vaertekst(V));
+ok("lik folt og malt nevner ikke folt",
+   vaertekst({ temp: 17, folt: 17, vind: 2, nedbor: 0, symbol: "fair_day" }) === "17°. Sol. Genser holder.",
+   vaertekst({ temp: 17, folt: 17, vind: 2, nedbor: 0, symbol: "fair_day" }));
+
+// Vaeret gar inn i delingsteksten nar det finnes, og utelates nar ikke.
+ok("delingsteksten far vaeret for sporsmalet",
+   delingstekst(KAMPEN, "hjemme", "", "", "8°. Regn.").indexOf("Været ved avspark: 8°. Regn. Hvor ser du?") > -1);
+ok("uten vaer er teksten som for",
+   delingstekst(KAMPEN, "hjemme", "", "", "").indexOf("Været") === -1);
+
 /* ---------------- fotball: lagnavn ---------------- */
 
 ok("norske tegn foldes til ascii i nokkelen",
@@ -518,6 +591,6 @@ ok("hash bygges tilbake til samme rute",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 165;
+const antall = 193;
 console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);

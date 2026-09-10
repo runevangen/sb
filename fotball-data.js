@@ -251,7 +251,7 @@ export const HVOR = {
   stadion: "på stadion",
 };
 
-export function delingstekst(kamp, hvor, sted, url) {
+export function delingstekst(kamp, hvor, sted, url, vaer) {
   const naar = tidstekst(kamp && kamp.dato);
   let hvorTekst = HVOR[hvor] || "";
   if (hvor === "pub" && sted) hvorTekst = "på " + sted;
@@ -260,6 +260,7 @@ export function delingstekst(kamp, hvor, sted, url) {
   }
   return "⚽ " + kamp.hjemme + " – " + kamp.borte + (naar ? ", " + naar : "") + "." +
     (hvorTekst ? " Jeg ser den " + hvorTekst + "." : "") +
+    (vaer ? " Været ved avspark: " + vaer : "") +
     " Hvor ser du?" + (url ? " " + url : "");
 }
 
