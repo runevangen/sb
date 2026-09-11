@@ -1,0 +1,11 @@
+# Hemmeligheter. Appen leser dem fra Netlify-miljoet, aldri fra en fil i
+# repoet — men kjorer du funksjonene lokalt (netlify dev), havner de i en
+# .env, og da skal den aldri kunne bli med i en commit.
+# docs/nokler-og-tokens.md forklarer hvilke som finnes.
+.env
+.env.*
+
+# Verktoy
+node_modules/
+.netlify/
+.DS_Store
