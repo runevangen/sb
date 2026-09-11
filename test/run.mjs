@@ -25,9 +25,14 @@ const tmp = mkdtempSync(join(tmpdir(), "sb-test-"));
 // av CORS pa file://-opphav, sa appen ville aldri lastet. HTTP gjor i
 // tillegg testmiljoet likere produksjon: absolutte stier som /app.css
 // loser seg som de skal.
+// Tegnsettet star i headeren, ikke bare i <meta charset>: det injiserte
+// testskriptet skyver meta-taggen forbi de forste 1024 bytene, og da
+// gjetter nettleseren. Lokalt gjettet den riktig, pa CI ble «føles» til
+// «fÃ¸les». HTTP-headeren vinner over gjetting.
 const MIME = {
-  ".html": "text/html", ".js": "text/javascript", ".css": "text/css",
-  ".png": "image/png", ".json": "application/json", ".webmanifest": "application/manifest+json",
+  ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8", ".png": "image/png",
+  ".json": "application/json; charset=utf-8", ".webmanifest": "application/manifest+json",
 };
 
 function startTjener() {
@@ -95,7 +100,11 @@ function avkod(s) {
 // taket pa kortet i det hele tatt skal binde.
 async function kjor(navn, skript, storrelse) {
   const fil = join(tmp, navn + ".html");
-  writeFileSync(fil, app.replace("<head>", "<head>\n<script>" + HARNESS + skript + "<\/script>"));
+  // Skriptet legges etter <meta charset>, sa tegnsettet star forst i fila
+  // ogsa for den som leser den uten headeren.
+  const meta = app.match(/<meta charset="utf-8">/i);
+  const merke = meta ? meta[0] : "<head>";
+  writeFileSync(fil, app.replace(merke, merke + "\n<script>" + HARNESS + skript + "<\/script>"));
 
   const argv = [
     // --dump-dom virker bare i hodelos modus. Lokalt er binaerfila ofte

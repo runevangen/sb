@@ -50,12 +50,16 @@ export default async (req) => {
   // En sesong abonnementet ikke dekker: prov TheSportsDB forst, som gir
   // arets tabell, resultater og kamper gratis. Svikter den — nettverk,
   // uventet form, ingenting — far leseren det API-Football har, som for.
+  // forsok: hva som ble provd og hvordan det gikk, uten nokkel og uten
+  // adresser. Star i svaret sa det kan leses rett fra nettleseren nar
+  // noe ikke stemmer, framfor a grave i funksjonsloggen.
+  const forsok = [];
   if (sesong !== naSesong && liga.tsdb) {
-    const arets = await hentTsdb(del, liga);
+    const arets = await hentTsdb(del, liga, forsok);
     if (arets) {
       return svar(Object.assign({
         liga: liga.navn, ligaNokkel, land: liga.land,
-        sesong: naSesong, sisteSesong: true, del, kilde: "TheSportsDB",
+        sesong: naSesong, sisteSesong: true, del, kilde: "TheSportsDB", forsok,
         oppdatert: new Date().toISOString(),
       }, arets), 200, LEVETID[del]);
     }
@@ -91,6 +95,7 @@ export default async (req) => {
     sisteSesong: sesong === naSesong,
     del,
     kilde: "API-Football",
+    forsok,
     oppdatert: new Date().toISOString(),
   }, innhold), 200, LEVETID[del]);
 };
@@ -99,40 +104,61 @@ export default async (req) => {
 // lite til a vaere helt: gratisnokkelen kapper svarene, og et avkortet
 // svar skal ikke vises som om det var helt. Den som kaller har en vei
 // videre uansett.
-async function hentTsdb(del, liga) {
+// Med nokkel proves v2 (nokkel i header) og sa v1 (nokkel i adressen):
+// Patreon-nokler finnes i begge varianter. Uten nokkel bare v1 med
+// testnokkelen. Hvert forsok logges i forsok-lista.
+async function hentTsdb(del, liga, forsok) {
+  const nokkel = process.env.THESPORTSDB_KEY || "";
+  const versjoner = nokkel ? ["v2", "v1"] : ["v1"];
+  for (const versjon of versjoner) {
+    const utfall = await hentTsdbVersjon(del, liga, nokkel, versjon);
+    forsok.push(utfall.notat);
+    if (utfall.innhold) return utfall.innhold;
+  }
+  return null;
+}
+
+async function hentTsdbVersjon(del, liga, nokkel, versjon) {
+  const notat = { kilde: "TheSportsDB " + versjon + (nokkel ? " med nokkel" : " uten nokkel") };
   try {
-    const nokkel = process.env.THESPORTSDB_KEY || "";
-    const respons = await fetch(TSDB + tsdbSti(del, liga, nokkel), {
-      headers: tsdbHeadere(nokkel),
+    const respons = await fetch(TSDB + tsdbSti(del, liga, nokkel, undefined, versjon), {
+      headers: tsdbHeadere(nokkel, versjon),
     });
+    notat.status = respons.status;
     if (!respons.ok) throw new Error("HTTP " + respons.status);
     const json = await respons.json();
     if (del === "tabell") {
       const tabell = tolkTabellTsdb(json);
-      if (tabell.length < TSDB_MINST.tabell) return avkortet(del, tabell.length);
-      return { tabell };
+      notat.antall = tabell.length;
+      if (tabell.length < TSDB_MINST.tabell) return { notat: avkortet(notat, del) };
+      return { notat, innhold: { tabell } };
     }
     const alle = tolkKamperTsdb(json);
+    notat.antall = alle.length;
     // Grensen gjelder det som kom, ikke det som ble igjen etter filtrering:
     // en runde med en kamp igjen er ekte nar svaret ellers er fullt.
-    if (alle.length < TSDB_MINST[del]) return avkortet(del, alle.length);
+    if (alle.length < TSDB_MINST[del]) return { notat: avkortet(notat, del) };
     if (del === "resultater") {
       const kamper = alle.filter((k) => k.spilt).sort(
         (a, b) => String(b.dato).localeCompare(String(a.dato)));
-      return kamper.length ? { kamper } : null;
+      return kamper.length ? { notat, innhold: { kamper } } : { notat: Object.assign(notat, { utfall: "ingen spilte" }) };
     }
     const kommende = nesteRunde(alle.filter((k) => !k.spilt));
-    return kommende.length ? { kamper: kommende, runde: kommende[0].runde } : null;
+    return kommende.length
+      ? { notat, innhold: { kamper: kommende, runde: kommende[0].runde } }
+      : { notat: Object.assign(notat, { utfall: "ingen kommende" }) };
   } catch (err) {
-    console.error("[fotball] TheSportsDB feilet, bruker API-Football:", err);
-    return null;
+    console.error("[fotball] TheSportsDB " + versjon + " feilet:", err);
+    notat.utfall = String(err && err.message || err).slice(0, 80);
+    return { notat };
   }
 }
 
-function avkortet(del, antall) {
-  console.warn("[fotball] TheSportsDB ga bare " + antall + " for " + del +
-    " — trolig gratisnokkelen. Sett THESPORTSDB_KEY. Bruker API-Football.");
-  return null;
+function avkortet(notat, del) {
+  console.warn("[fotball] TheSportsDB ga bare " + notat.antall + " for " + del +
+    " — trolig gratisnivaet. Bruker neste kilde.");
+  notat.utfall = "avkortet";
+  return notat;
 }
 
 function tolk(del, json) {

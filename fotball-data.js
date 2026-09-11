@@ -173,9 +173,12 @@ export const TSDB_MINST = { tabell: 10, resultater: 2, neste: 2 };
 // header og aldri i adressen — den skal ikke ende i en logg eller en
 // cache-nokkel. v2-formen er fra dokumentasjonen, ikke fra et svar vi
 // har sett; parserne under er tolerante, og funksjonen faller tilbake.
-export function tsdbSti(del, liga, nokkel, naa) {
+// versjon: "v2" bruker nokkelen i header, "v1" legger den i adressen
+// (uten nokkel: testnokkelen «3»). Patreon-nokler finnes i begge
+// varianter, sa funksjonen prover v2 forst og v1 etterpa.
+export function tsdbSti(del, liga, nokkel, naa, versjon) {
   if (!liga || !liga.tsdb) return null;
-  if (nokkel) {
+  if (versjon === "v2") {
     const rot = "/api/v2/json/";
     if (del === "tabell") {
       return rot + "lookup/table/" + liga.tsdb + "/" + encodeURIComponent(tsdbSesong(liga, naa));
@@ -184,7 +187,7 @@ export function tsdbSti(del, liga, nokkel, naa) {
     if (del === "neste") return rot + "schedule/next/league/" + liga.tsdb;
     return null;
   }
-  const rot = "/api/v1/json/3/";
+  const rot = "/api/v1/json/" + encodeURIComponent(nokkel || "3") + "/";
   if (del === "tabell") {
     return rot + "lookuptable.php?l=" + liga.tsdb + "&s=" + encodeURIComponent(tsdbSesong(liga, naa));
   }
@@ -193,9 +196,9 @@ export function tsdbSti(del, liga, nokkel, naa) {
   return null;
 }
 
-export function tsdbHeadere(nokkel) {
+export function tsdbHeadere(nokkel, versjon) {
   const h = { "Accept": "application/json" };
-  if (nokkel) h["X-API-KEY"] = nokkel;
+  if (nokkel && versjon === "v2") h["X-API-KEY"] = nokkel;
   return h;
 }
 

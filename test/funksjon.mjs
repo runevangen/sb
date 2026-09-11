@@ -199,6 +199,9 @@ ok("TheSportsDB ble provd forst for en sesong utenfor vinduet",
    tsdbKall(kall).length === 1 && kall[0].url.indexOf("thesportsdb.com") > -1, kall[0].url);
 ok("uten kamper fra TheSportsDB er kilden API-Football",
    nes.kilde === "API-Football" && nes.sisteSesong === false, nes.kilde);
+ok("tilbakefallet forklarer forsoket",
+   Array.isArray(nes.forsok) && nes.forsok.length === 1 && nes.forsok[0].utfall === "avkortet",
+   JSON.stringify(nes.forsok));
 ok("bare den forste runden er med", nes.kamper.length === 2, nes.kamper.length);
 ok("lagnavn i kampene oversettes ogsa", nes.kamper[0].borte === "Bodø/Glimt", nes.kamper[0].borte);
 ok("runden navngis i svaret", nes.runde === "Runde 21", nes.runde);
@@ -246,20 +249,43 @@ ok("arets kamper caches som neste runde ellers",
    (r.headers.get("Netlify-CDN-Cache-Control") || "").indexOf("s-maxage=21600") > -1,
    r.headers.get("Netlify-CDN-Cache-Control"));
 
-// Egen nokkel i miljoet: v2, med nokkelen i en header og aldri i
+// Egen nokkel i miljoet: v2 forst, med nokkelen i en header og aldri i
 // adressen. Svaret fra v2 har lista under «schedule».
 process.env.THESPORTSDB_KEY = "min-nokkel";
 kall = stub(SVAR, 200, { svar: { schedule: ARETS.events } });
 r = await fotball(be("/api/fotball/neste?liga=eliteserien"));
 const v2 = await r.json();
-ok("med nokkel brukes v2",
+ok("med nokkel proves v2 forst",
    tsdbKall(kall)[0].url.indexOf("/api/v2/json/schedule/next/league/4358") > -1, tsdbKall(kall)[0].url);
 ok("nokkelen sendes som X-API-KEY",
    tsdbKall(kall)[0].opsjoner.headers["X-API-KEY"] === "min-nokkel");
-ok("nokkelen star ikke i adressen", tsdbKall(kall)[0].url.indexOf("min-nokkel") === -1);
+ok("nokkelen star ikke i v2-adressen", tsdbKall(kall)[0].url.indexOf("min-nokkel") === -1);
 ok("nokkelen lekker ikke ut til leseren", JSON.stringify(v2).indexOf("min-nokkel") === -1);
 ok("v2-svaret leses", r.status === 200 && v2.kilde === "TheSportsDB" && v2.kamper.length === 2,
    JSON.stringify([r.status, v2.kilde, v2.kamper && v2.kamper.length]));
+ok("forsokene star i svaret, uten adresser",
+   Array.isArray(v2.forsok) && v2.forsok.length === 1 && v2.forsok[0].status === 200 &&
+   JSON.stringify(v2.forsok).indexOf("http") === -1, JSON.stringify(v2.forsok));
+
+// Nokkelen er en v1-nokkel: v2 avviser den. Da proves v1 med nokkelen i
+// adressen, og svaret forteller begge forsokene.
+global.fetch = async (url, opsjoner) => {
+  kall.push({ url: String(url), opsjoner: opsjoner || {} });
+  const u = String(url);
+  if (u.indexOf("/api/v2/") > -1) return new Response("{}", { status: 401 });
+  if (u.indexOf("/api/v1/json/min-nokkel/") > -1) return new Response(JSON.stringify(ARETS), { status: 200 });
+  return new Response(JSON.stringify(SVAR), { status: 200 });
+};
+kall.length = 0;
+r = await fotball(be("/api/fotball/neste?liga=eliteserien"));
+const v1 = await r.json();
+ok("avvist v2 gir v1 med nokkelen i adressen",
+   tsdbKall(kall).length === 2 && tsdbKall(kall)[1].url.indexOf("/api/v1/json/min-nokkel/eventsnextleague.php") > -1,
+   tsdbKall(kall).map((k) => k.url).join(" | "));
+ok("v1-svaret brukes", v1.kilde === "TheSportsDB" && v1.sisteSesong === true, v1.kilde);
+ok("begge forsok er forklart, og nokkelen star ikke der",
+   v1.forsok.length === 2 && v1.forsok[0].status === 401 && v1.forsok[1].status === 200 &&
+   JSON.stringify(v1.forsok).indexOf("min-nokkel") === -1, JSON.stringify(v1.forsok));
 delete process.env.THESPORTSDB_KEY;
 
 // Svikter TheSportsDB — nettverk eller uventet form — far leseren det
@@ -402,6 +428,6 @@ ok("feil hos MET gir 502 uten cache",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 77;
+const antall = 82;
 console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);

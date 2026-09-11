@@ -138,9 +138,12 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   kapper svarene (fem tabellrader, én kamp i listene). Et avkortet svar
   vises aldri som årets: `TSDB_MINST` i `fotball-data.js` er det minste
   som regnes som helt, og under det brukes API-Football som før. Med en
-  Patreon-nøkkel i `THESPORTSDB_KEY` brukes v2 (`/api/v2/json/`), der
-  nøkkelen går i `X-API-KEY`-headeren og aldri i adressen — den skal ikke
-  ende i en logg eller en cache-nøkkel. Da kommer full tabell, hele
+  Patreon-nøkkel i `THESPORTSDB_KEY` prøves v2 (`/api/v2/json/`, nøkkelen
+  i `X-API-KEY`-headeren) og deretter v1 med nøkkelen i adressen — Patreon
+  gir begge varianter, og vi vet ikke hvilken nøkkelen er. Svaret bærer
+  `forsok`: hva som ble prøvd, statuskode, antall og utfall, uten nøkkel
+  og uten adresser, så det kan leses rett fra nettleseren
+  (`/api/fotball/tabell?liga=eliteserien`) når noe ikke stemmer. Da kommer full tabell, hele
   runder, og dermed deling og vær: det er den ene bryteren. Men
   funksjonene leser miljøet ved deploy, og kant-cachen holder forrige
   svar i inntil tre timer — så etter at nøkkelen er satt, må det
@@ -184,8 +187,8 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      205 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  77 tester, ~120 ms, ingen nettleser
+    node test/unit.mjs      206 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  82 tester, ~120 ms, ingen nettleser
     node test/run.mjs       135 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
