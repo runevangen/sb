@@ -177,8 +177,9 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   med tester. Varselet rekker rundt ni dager; en kamp lenger fram får et
   gyldig, tomt svar. Cache-nøkkelen er adressen med arena og tidspunkt,
   så hver kamp er én nøkkel, og MET spørres høyst en gang i timen per
-  kamp. `uverifisert` til det er sett i prod: sandkassen når ikke
-  api.met.no.
+  kamp. Sett virke i prod 11. september 2026. Feiler kallet, bærer
+  feilsvaret `forsok` med status og METs egen melding, som
+  fotballfunksjonen.
 - Gratisnivået gir 100 kall i døgnet. Caching skjer på Netlifys kant med
   `Netlify-CDN-Cache-Control` og `durable`, som gir én delt cache i stedet
   for én per region. Levetidene står i `LEVETID` i `fotball-data.js`, og
@@ -191,7 +192,7 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 ## Testing
 
     node test/unit.mjs      206 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  83 tester, ~120 ms, ingen nettleser
+    node test/funksjon.mjs  84 tester, ~120 ms, ingen nettleser
     node test/run.mjs       135 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.

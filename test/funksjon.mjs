@@ -427,9 +427,13 @@ kall = stub({ message: "nede" }, 503);
 r = await vaer(be("/api/vaer?arena=Lerkendal&naar=2026-09-13T15:00:00Z"));
 ok("feil hos MET gir 502 uten cache",
    r.status === 502 && r.headers.get("Cache-Control") === "no-store", r.status);
+const metFeil = await r.json();
+ok("feilsvaret forklarer forsoket med status og METs melding",
+   metFeil.forsok && metFeil.forsok.status === 503 && metFeil.forsok.melding === '{"message":"nede"}' &&
+   metFeil.forsok.utfall === "HTTP 503", JSON.stringify(metFeil.forsok));
 
 /* ---------------- rapport ---------------- */
 
-const antall = 83;
+const antall = 84;
 console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);
