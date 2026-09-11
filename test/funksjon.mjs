@@ -525,8 +525,40 @@ ok("begge tjenerne star i forsok, med navn",
    speil.forsok.some((f) => f.kilde.indexOf("kumi.systems") > -1 && f.antall === 2),
    JSON.stringify(speil.forsok));
 
+// En tjener som aldri svarer skal forlates, ikke ta med seg hele kallet.
+// Uten frist ville Netlify avbrutt funksjonen, og da forsvinner ogsa
+// forsok-lista som forklarer hva som gikk galt.
+kall = [];
+global.fetch = async (url, opsjoner) => {
+  kall.push({ url: String(url), opsjoner: opsjoner || {} });
+  const u = String(url);
+  if (u.indexOf("entur.io") > -1) return new Response(JSON.stringify(ENTUR_SVAR), { status: 200 });
+  if (u.indexOf("overpass-api.de") > -1) {
+    // Svarer aldri av seg selv. Bare fristen kan avslutte den.
+    return new Promise((_, avvis) => {
+      const signal = (opsjoner || {}).signal;
+      if (!signal) return;
+      signal.addEventListener("abort", () => avvis(new Error("This operation was aborted")));
+    });
+  }
+  return new Response(JSON.stringify(OSM_SVAR), { status: 200 });
+};
+const forTreg = Date.now();
+r = await puber(be("/api/puber?arena=Lerkendal"));
+const treg = await r.json();
+const brukt = Date.now() - forTreg;
+ok("en tjener som ikke svarer blir forlatt", r.status === 200 && treg.grupper.length === 2,
+   r.status + " " + JSON.stringify(treg.forsok));
+ok("og det star i forsok at den ble avbrutt",
+   treg.forsok.some((f) => f.kilde.indexOf("overpass-api.de") > -1 && /abort/i.test(String(f.utfall))),
+   JSON.stringify(treg.forsok));
+ok("hele kallet holder seg innenfor Netlifys ti sekunder", brukt < 9000, brukt + " ms");
+// Entur og Overpass vet ingenting om hverandre og sporres samtidig.
+ok("Entur star forst i forsok uansett hvem som ble ferdig forst",
+   treg.forsok[0].kilde === "Entur nearest", JSON.stringify(treg.forsok));
+
 /* ---------------- rapport ---------------- */
 
-const antall = 98;
+const antall = 102;
 console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);

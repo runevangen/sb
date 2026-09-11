@@ -20,7 +20,7 @@ import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
 
 import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, enturNaermest,
          tolkHoldeplasser, grupperPuber, ofteBrukt, noterPub,
-         OVERPASS_SPEIL, overpassHeadere } from "../pub-data.js";
+         OVERPASS_SPEIL, overpassHeadere, restTid } from "../pub-data.js";
 
 let feilet = 0;
 
@@ -479,6 +479,13 @@ ok("serverside identifiserer vi oss",
 // json() feiler pa en gzippet kropp.
 ok("Accept-Encoding settes ikke av oss",
    !("Accept-Encoding" in overpassHeadere(true)) && !("Accept-Encoding" in overpassHeadere(false)));
+// Netlify gir funksjonen ti sekunder. Uten frist per tjener sprenger tre
+// trege tjenere den, og leseren far Netlifys feilside i stedet for vart
+// svar — uten et ord om hvem som sviktet.
+ok("frist per tjener, men aldri over det som er igjen",
+   restTid(1000, 0, 3000) === 1000 && restTid(9000, 0, 3000) === 3000, restTid(1000, 0, 3000));
+ok("tiden ute gir null", restTid(500, 900, 3000) === 0 && restTid(500, 500, 3000) === 0);
+
 ok("flere tjenere a prove, alle over https",
    OVERPASS_SPEIL.length >= 2 && OVERPASS_SPEIL.every((u) => u.indexOf("https://") === 0 && u.indexOf("/interpreter") > -1),
    OVERPASS_SPEIL.join(" "));
@@ -712,6 +719,6 @@ ok("hash bygges tilbake til samme rute",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 228;
+const antall = 230;
 console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);
