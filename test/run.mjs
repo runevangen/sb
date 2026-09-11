@@ -88,6 +88,16 @@ const HARNESS = `
     }).join(" ");
   }
   window.plausible = function () {};
+
+  // Ingen test skal sporre telefonen om ekte posisjon. Uten dette henger
+  // headless Chromium pa CI: posisjonsoppslaget venter pa et nettkall som
+  // aldri kommer, og virtuell tid star stille sa lenge det star pa.
+  // Tester som trenger en posisjon overstyrer denne selv.
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition = function (ok, feil) {
+      if (feil) feil({ code: 1, message: "Stubbet: ingen posisjon i test" });
+    };
+  }
 `;
 
 function avkod(s) {
@@ -1085,6 +1095,8 @@ const SAK_14 = await kjor("pub-feil", FELLES + FOTBALL + `
       ok("og hvem som sviktet",
          forslag.textContent.indexOf("overpass-api.de svarte 406") > -1, forslag.textContent);
       ok("naer deg-knappen star der uansett", !!forslag.querySelector(".pub-naer"));
+      ok("uten posisjon star det hvorfor",
+         forslag.textContent.indexOf("Fikk ikke posisjonen") > -1, forslag.textContent);
       ok("pubfeltet kan fortsatt brukes", !panel.querySelector(".kamp-pub").hidden);
       ferdig();
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);

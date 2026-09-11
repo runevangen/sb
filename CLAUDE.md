@@ -219,7 +219,7 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
     node test/unit.mjs      228 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  98 tester, ~120 ms, ingen nettleser
-    node test/run.mjs       151 tester, ~110 s, headless Chromium
+    node test/run.mjs       152 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
 De raske først, så en åpenbar feil stopper kjøringen før nettleseren
@@ -253,6 +253,10 @@ valgfri vindusstørrelse.
 
 Merk at `--virtual-time-budget` ikke driver CSS-transisjoner fram; bruk
 `--force-prefers-reduced-motion` for skjermbilder av animerte paneler.
+Merk også at virtuell tid står stille så lenge et nettkall venter: et
+ekte posisjonsoppslag hang hele kjøringen på CI. Testrammen stubber
+derfor `getCurrentPosition` til å avslå, og tester som trenger en
+posisjon overstyrer den selv.
 
 ## Arbeidsflyt
 
