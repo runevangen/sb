@@ -11,6 +11,7 @@
 import fotball from "../netlify/functions/fotball.mjs";
 import vaer from "../netlify/functions/vaer.mjs";
 import puber from "../netlify/functions/puber.mjs";
+import { OVERPASS_SPEIL } from "../pub-data.js";
 
 let feilet = 0;
 
@@ -476,12 +477,19 @@ ok("Overpass far Accept og identifiserer oss",
    overpass.opsjoner.headers["Accept"] === "application/json" &&
    String(overpass.opsjoner.headers["User-Agent"]).indexOf("sportsbibelen") === 0,
    JSON.stringify(overpass.opsjoner.headers));
-ok("bare en tjener sporres nar den forste svarer", osmKall(kall).length === 1, osmKall(kall).length);
+// Alle sporres samtidig; den forste som svarer vinner.
+ok("alle tjenerne sporres samtidig",
+   osmKall(kall).length === OVERPASS_SPEIL.length, osmKall(kall).length);
+ok("hver tjener star i forsok, i fast rekkefolge",
+   pub.forsok.slice(1).map((f) => f.kilde).join(",") ===
+   OVERPASS_SPEIL.map((u) => "Overpass " + new URL(u).host).join(","),
+   JSON.stringify(pub.forsok.map((f) => f.kilde)));
 ok("svaret er gruppert ved stadion og ved holdeplass",
    pub.grupper.length === 2 && pub.grupper[0].tittel === "Ved Lerkendal" && pub.grupper[1].tittel === "Ved Nardo" &&
    pub.grupper[1].puber[0].navn === "Nardo Bar", JSON.stringify(pub.grupper));
-ok("kilden er OpenStreetMap og forsokene star der",
-   pub.kilde === "OpenStreetMap" && pub.forsok.length === 2, JSON.stringify(pub.forsok));
+ok("kilden er OpenStreetMap og hvert forsok star der",
+   pub.kilde === "OpenStreetMap" && pub.forsok.length === 1 + OVERPASS_SPEIL.length,
+   JSON.stringify(pub.forsok));
 ok("puber caches et dogn pa kanten",
    (r.headers.get("Netlify-CDN-Cache-Control") || "").indexOf("s-maxage=86400") > -1 &&
    (r.headers.get("Netlify-CDN-Cache-Control") || "").indexOf("durable") > -1);
@@ -502,7 +510,7 @@ ok("feil hos alle tjenerne gir 502 uten cache og med melding",
    r.status === 502 && r.headers.get("Cache-Control") === "no-store" &&
    utenOsm.forsok.some((f) => f.kilde.indexOf("Overpass") === 0 && f.status === 504 && f.melding.indexOf("Too busy") > -1),
    JSON.stringify(utenOsm.forsok));
-ok("alle tjenerne ble provd", osmKall(kall).length >= 2, osmKall(kall).length);
+ok("alle tjenerne ble provd", osmKall(kall).length === OVERPASS_SPEIL.length, osmKall(kall).length);
 
 // Hovedtjeneren svarer 406, speilet svarer. Det var dette som skjedde i prod.
 kall = [];
@@ -519,8 +527,8 @@ r = await puber(be("/api/puber?arena=Lerkendal"));
 const speil = await r.json();
 ok("406 fra hovedtjeneren gar videre til speilet",
    r.status === 200 && speil.grupper.length === 2, r.status + " " + JSON.stringify(speil.forsok));
-ok("begge tjenerne star i forsok, med navn",
-   speil.forsok.filter((f) => f.kilde.indexOf("Overpass") === 0).length === 2 &&
+ok("alle tjenerne star i forsok, med navn og utfall",
+   speil.forsok.filter((f) => f.kilde.indexOf("Overpass") === 0).length === OVERPASS_SPEIL.length &&
    speil.forsok.some((f) => f.kilde.indexOf("overpass-api.de") > -1 && f.status === 406) &&
    speil.forsok.some((f) => f.kilde.indexOf("kumi.systems") > -1 && f.antall === 2),
    JSON.stringify(speil.forsok));
@@ -552,13 +560,15 @@ ok("en tjener som ikke svarer blir forlatt", r.status === 200 && treg.grupper.le
 ok("og det star i forsok at den ble avbrutt",
    treg.forsok.some((f) => f.kilde.indexOf("overpass-api.de") > -1 && /abort/i.test(String(f.utfall))),
    JSON.stringify(treg.forsok));
-ok("hele kallet holder seg innenfor Netlifys ti sekunder", brukt < 9000, brukt + " ms");
+// Med kapplop venter vi ikke pa den trege i det hele tatt: en rask
+// tjener svarer med en gang, og den trege avbrytes.
+ok("en treg tjener forsinker ikke svaret", brukt < 1000, brukt + " ms");
 // Entur og Overpass vet ingenting om hverandre og sporres samtidig.
 ok("Entur star forst i forsok uansett hvem som ble ferdig forst",
    treg.forsok[0].kilde === "Entur nearest", JSON.stringify(treg.forsok));
 
 /* ---------------- rapport ---------------- */
 
-const antall = 102;
+const antall = 103;
 console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);

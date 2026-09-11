@@ -21,13 +21,18 @@ const IDENTITET = "sportsbibelen-app/1.0 https://mvp-sb.netlify.app";
 
 // Netlify avbryter funksjonen etter ti sekunder. Vi holder oss godt
 // innenfor, sa svaret vart — og forsok-lista i det — rekker ut.
-const SAMLET_FRIST = 8000;
+const SAMLET_FRIST = 7500;
 const PER_TJENER = 3000;
 
 function medFrist(ms) {
   const styring = new AbortController();
   const vakt = setTimeout(() => styring.abort(), ms);
-  return { signal: styring.signal, ferdig: () => clearTimeout(vakt) };
+  return {
+    signal: styring.signal,
+    ferdig: () => clearTimeout(vakt),
+    // Stopper de som fortsatt holder pa, nar vi allerede har et svar.
+    stopp: () => styring.abort(),
+  };
 }
 
 export default async (req) => {
@@ -87,45 +92,56 @@ async function hentHoldeplasser(arena, forsok, frist) {
   }
 }
 
-// Prover tjenerne i tur, hver med sin frist. Forste som svarer med puber
-// vinner; hvert forsok forklares i forsok-lista. null nar ingen svarte.
+// Sporr alle tjenerne samtidig. Den forste som svarer med puber vinner,
+// og resten avbrytes — da settler de med en gang, sa forsok-lista blir
+// komplett uten a vente pa de trege. null nar ingen svarte.
 async function hentPuber(arena, forsok, frist) {
   const sporring = "data=" + encodeURIComponent(overpassSporring(arena.lat, arena.lon, 1200));
-  for (const adresse of OVERPASS_SPEIL) {
-    const vert = new URL(adresse).host;
-    const notat = { kilde: "Overpass " + vert };
-    const ms = restTid(frist, Date.now(), PER_TJENER);
-    if (!ms) {
-      forsok.push(Object.assign(notat, { utfall: "tiden var ute" }));
-      break;
-    }
-    const vakt = medFrist(ms);
-    const startet = Date.now();
-    try {
-      const respons = await fetch(adresse, {
-        method: "POST", headers: overpassHeadere(true), body: sporring, signal: vakt.signal,
-      });
-      notat.status = respons.status;
-      if (!respons.ok) {
-        const kropp = (await respons.text().catch(() => "")).replace(/\s+/g, " ").trim();
-        if (kropp) notat.melding = kropp.slice(0, 80);
-        throw new Error("HTTP " + respons.status);
-      }
-      const liste = tolkPuber(await respons.json(), arena);
-      notat.antall = liste.length;
-      notat.ms = Date.now() - startet;
-      forsok.push(notat);
-      return liste;
-    } catch (err) {
-      console.error("[puber] Overpass " + vert + " feilet:", err);
-      notat.utfall = String(err && err.message || err).slice(0, 80);
-      notat.ms = Date.now() - startet;
-      forsok.push(notat);
-    } finally {
-      vakt.ferdig();
-    }
+  const vakt = medFrist(restTid(frist, Date.now(), SAMLET_FRIST));
+  const alle = OVERPASS_SPEIL.map((adresse) =>
+    enTjener(adresse, sporring, arena, vakt.signal));
+
+  let vinner = null;
+  try {
+    vinner = await Promise.any(alle);
+  } catch (err) {
+    // Alle feilet. Hver enkelt forklares i forsok-lista under.
   }
-  return null;
+  vakt.ferdig();
+  vakt.stopp();
+
+  // Rekkefolgen folger OVERPASS_SPEIL, ikke hvem som ble ferdig forst.
+  (await Promise.allSettled(alle)).forEach((r) => {
+    forsok.push(r.status === "fulfilled" ? r.value.notat
+      : (r.reason && r.reason.notat) || { kilde: "Overpass", utfall: "ukjent" });
+  });
+  return vinner ? vinner.liste : null;
+}
+
+function enTjener(adresse, sporring, arena, signal) {
+  const vert = new URL(adresse).host;
+  const notat = { kilde: "Overpass " + vert };
+  const startet = Date.now();
+  return (async () => {
+    const respons = await fetch(adresse, {
+      method: "POST", headers: overpassHeadere(true), body: sporring, signal,
+    });
+    notat.status = respons.status;
+    if (!respons.ok) {
+      const kropp = (await respons.text().catch(() => "")).replace(/\s+/g, " ").trim();
+      if (kropp) notat.melding = kropp.slice(0, 80);
+      throw new Error("HTTP " + respons.status);
+    }
+    const liste = tolkPuber(await respons.json(), arena);
+    notat.antall = liste.length;
+    notat.ms = Date.now() - startet;
+    return { notat, liste };
+  })().catch((err) => {
+    console.error("[puber] Overpass " + vert + " feilet:", err);
+    notat.utfall = String(err && err.message || err).slice(0, 80);
+    notat.ms = Date.now() - startet;
+    throw Object.assign(err instanceof Error ? err : new Error(String(err)), { notat });
+  });
 }
 
 function svar(kropp, status, levetid) {
