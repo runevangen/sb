@@ -5,7 +5,7 @@
 
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug, rangerTreff, listeTekst }
   from "./lib.js";
-import { LIGAER, tolkFotballHash, fotballHash } from "./fotball-data.js";
+import { LIGAER, tolkFotballHash, fotballHash, tolkKamplenke } from "./fotball-data.js";
 import { ofteBrukt, noterPub } from "./pub-data.js";
 import { initFotball, visFotball } from "./fotball.js";
 
@@ -1078,7 +1078,9 @@ function visFane(visning, liga, del) {
   merkFane("fanenFotball", visning === "fotball");
 
   visToppTekst();
-  if (visning === "fotball") visFotball(fotballLiga, fotballDel);
+  // Adressen tolkes her, ikke i modulen: ruting er app.js sin jobb. Kom
+  // leseren fra en delt lenke, folger kampen med inn.
+  if (visning === "fotball") visFotball(fotballLiga, fotballDel, tolkKamplenke(location.hash));
 
   // Menyen beskriver den visningen du star i. Star den apen nar du bytter,
   // skal innholdet folge med.

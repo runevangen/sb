@@ -1033,8 +1033,12 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
          String(d.text).indexOf("Hvor ser du?") > -1, d.text);
       ok("vaeret er med i teksten som deles",
          String(d.text).indexOf("Været ved avspark: 8°, føles som 4°.") > -1, d.text);
-      ok("lenken apner neste runde i appen",
-         String(d.url).indexOf("#/fotball/eliteserien/neste") > -1, d.url);
+      // Lenka skal apne kampen som ble delt, ikke bare runden: en runde er
+      // ti kamper, og mottakeren skal slippe a lete etter den det gjaldt.
+      ok("lenken apner kampen som ble delt, med sted og svar",
+         String(d.url).indexOf("#/fotball/eliteserien/neste?") > -1 &&
+         String(d.url).indexOf("kamp=3") > -1 && String(d.url).indexOf("hvor=pub") > -1 &&
+         String(d.url).indexOf("sted=Pub") > -1, d.url);
       ok("panelet lukkes etter deling", !document.querySelector(".kamp-panel"));
       ferdig();
     }
@@ -1423,9 +1427,74 @@ const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
 
 rmSync(join(tmp, "visninger.js"));
 
+/* ---------------- 17. lenka apner kampen som ble delt ---------------- */
+
+const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
+  window.fetch = function (u) {
+    u = String(u);
+    // Vaer og puber er ikke det som testes her, og et svar som lar vente
+    // pa seg stopper den virtuelle tiden.
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 || u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  // Adressen slik den kommer ut av en deling: kampen, svaret og stedet.
+  location.hash = "#/fotball/eliteserien/neste?kamp=4&hvor=pub&sted=Pub%20X";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    ok("en delt lenke apner fotballfanen", !document.getElementById("fotball").hidden);
+    var merket = document.querySelectorAll(".kamp-delt");
+    ok("bare den delte kampen loftes fram", merket.length === 1, merket.length);
+    ok("og det er den lenka pekte pa",
+       merket[0].dataset.kamp === "4" && merket[0].textContent.indexOf("Molde") > -1,
+       merket[0].dataset.kamp + " " + merket[0].textContent);
+    var linje = merket[0].querySelector(".kamp-invitasjon");
+    ok("det star hvor avsenderen ser den",
+       linje && linje.textContent.indexOf("noen ser kampen på Pub X") > -1,
+       linje ? linje.textContent : "ingen linje");
+
+    // Svaret skal koste ett trykk: panelet apnes med avsenderens sted
+    // valgt, sa «jeg blir med» ikke krever at pubnavnet skrives pa nytt.
+    linje.querySelector(".kamp-invitasjon-svar").click();
+    var panel = document.querySelector(".kamp-panel");
+    ok("svar apner panelet pa den kampen",
+       panel && panel.previousElementSibling === merket[0]);
+    ok("med avsenderens sted ferdig valgt",
+       panel.querySelector(".kamp-pub").value === "Pub X" &&
+       panel.querySelectorAll(".hvor-valg")[1].getAttribute("aria-pressed") === "true",
+       panel.querySelector(".kamp-pub").value);
+
+    // En lenke til en kamp som ikke star i runden lenger: runden skal sta
+    // som for, uten en feilmelding om noe leseren ikke kan gjore noe med.
+    location.hash = "#/fotball/eliteserien/neste?kamp=999&hvor=hjemme";
+    setTimeout(function () { try {
+      ok("en kamp som ikke finnes merker ingenting",
+         document.querySelectorAll(".kamp-delt").length === 0 &&
+         document.querySelectorAll(".kamp.delbar").length === 2,
+         document.querySelectorAll(".kamp-delt").length + "/" +
+         document.querySelectorAll(".kamp.delbar").length);
+      ferdig();
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
+`);
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16];
+const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17];
 let feilet = 0;
 
 for (const t of alle) {

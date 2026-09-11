@@ -1384,6 +1384,39 @@ body {
 
 .kamp-viser-pub:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* Kampen som ble delt med deg, loftet ut av runden: en runde er ti like
+   rader, og lenka pekte pa en av dem. */
+.kamp-delt {
+  background: var(--bg-raised);
+  box-shadow: inset 3px 0 0 var(--accent);
+  border-radius: 6px;
+  padding-left: 10px;
+  padding-right: 8px;
+}
+
+.kamp-invitasjon {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: calc(12px * var(--fs));
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.kamp-invitasjon-svar {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.kamp-invitasjon-svar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 /* Panelet ligger som en egen rad rett under kampen, ikke som en dialog:
    det er ett sporsmal, og svaret skal ut av appen, ikke inn i den. */
 .kamp-panel {

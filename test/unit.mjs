@@ -12,7 +12,8 @@ import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          apiSti, tolkKamper, nesteRunde, tolkFotballHash, fotballHash,
          tilgjengeligSesong, SESONGVINDU, redaksjonsnavn, normaliserLagnavn,
-         tsdbSti, tsdbHeadere, tolkKamperTsdb, tolkTabellTsdb, tsdbSesong, delingstekst, tidstekst, HVOR }
+         tsdbSti, tsdbHeadere, tolkKamperTsdb, tolkTabellTsdb, tsdbSesong, delingstekst, tidstekst, HVOR,
+         kamplenke, tolkKamplenke, invitasjonstekst, stedtekst, STED_MAKS }
   from "../fotball-data.js";
 
 import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
@@ -400,6 +401,50 @@ ok("ukjent sted utelates", delingstekst(KAMPEN, "rart", "", "").indexOf("Jeg ser
 ok("uten lenke ender teksten med sporsmalet",
    /Hvor ser du\?$/.test(delingstekst(KAMPEN, "hjemme", "", "")));
 ok("HVOR har de tre stedene", Object.keys(HVOR).join(",") === "hjemme,pub,stadion");
+
+/* ---------------- deling: lenka til kampen ---------------- */
+
+// Lenka pekte forst pa hele runden, og mottakeren matte finne kampen
+// selv. Na barer den kampen, svaret og stedet — og en eldre app ser
+// fortsatt bare #/fotball/<liga>/neste.
+const LENKE = kamplenke("eliteserien", { id: 7 }, "pub", "Andy's Pub");
+ok("lenka starter som en vanlig runde-lenke",
+   LENKE.indexOf("#/fotball/eliteserien/neste?") === 0, LENKE);
+ok("gamle apper ser fortsatt riktig liga og del",
+   tolkFotballHash(LENKE).liga === "eliteserien" && tolkFotballHash(LENKE).del === "neste",
+   JSON.stringify(tolkFotballHash(LENKE)));
+
+const TOLKET = tolkKamplenke(LENKE);
+ok("kampen, svaret og stedet kommer tilbake ut",
+   TOLKET.kampId === "7" && TOLKET.hvor === "pub" && TOLKET.sted === "Andy's Pub",
+   JSON.stringify(TOLKET));
+ok("en lenke uten kamp er ingen invitasjon",
+   tolkKamplenke("#/fotball/eliteserien/neste") === null);
+ok("en artikkellenke er ingen invitasjon",
+   tolkKamplenke("#/sak/en-sak?kamp=7") === null);
+// «hvor» kommer fra en adresse hvem som helst kan skrive: bare de tre
+// svarene vi kjenner slipper inn, og stedet kappes som i feltet.
+ok("ukjent svar forkastes",
+   tolkKamplenke("#/fotball/eliteserien/neste?kamp=7&hvor=rart").hvor === null);
+ok("et altfor langt stedsnavn kappes",
+   tolkKamplenke("#/fotball/eliteserien/neste?kamp=7&hvor=pub&sted=" +
+     encodeURIComponent("A".repeat(200))).sted.length === STED_MAKS);
+ok("stedet folger bare med nar man ser den pa pub",
+   kamplenke("eliteserien", { id: 7 }, "hjemme", "Andy's Pub").indexOf("sted=") === -1,
+   kamplenke("eliteserien", { id: 7 }, "hjemme", "Andy's Pub"));
+
+// Samme sted, samme ord: teksten som sendes og linja mottakeren leser
+// beskriver stedet likt, fordi begge gar gjennom stedtekst().
+ok("stedet skrives likt i begge ender",
+   delingstekst(KAMPEN, "pub", "Pub X", "").indexOf(stedtekst(KAMPEN, "pub", "Pub X")) > -1 &&
+   invitasjonstekst(KAMPEN, "pub", "Pub X") === "Delt med deg: noen ser kampen på Pub X.",
+   invitasjonstekst(KAMPEN, "pub", "Pub X"));
+ok("invitasjonen navngir arenaen nar avsenderen er pa stadion",
+   invitasjonstekst(KAMPEN, "stadion", "") === "Delt med deg: noen ser kampen på Brann Stadion.",
+   invitasjonstekst(KAMPEN, "stadion", ""));
+ok("uten svar star invitasjonen likevel",
+   invitasjonstekst(KAMPEN, null, "") === "Delt med deg.",
+   invitasjonstekst(KAMPEN, null, ""));
 
 /* ---------------- vaer: arena, varsel og klerad ---------------- */
 

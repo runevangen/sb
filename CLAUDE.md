@@ -183,6 +183,21 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   er testet: det er det leseren faktisk sender. Fjorårets runde kan ikke
   deles; det står hvorfor. Delingen går gjennom samme `delTekst()` i
   `app.js` som «Del appen», med utklippstavle som reserve.
+- Lenka i delingsteksten peker på kampen, ikke på runden: `kamplenke()`
+  legger kampen, svaret og stedet i en spørring etter hashen
+  (`#/fotball/<liga>/neste?kamp=<id>&hvor=pub&sted=…`), ikke som nye ledd
+  i stien — `tolkFotballHash` kjenner ledd igjen på innhold, og en
+  kamp-id ligner verken på en liga eller en del. En eldre utgave av appen
+  ser bare `#/fotball/<liga>/neste`, så en lenke som alt er sendt virker
+  fortsatt. Mottakeren får kampen løftet fram i runden med en linje som
+  sier hvor avsenderen ser den, og en «Svar»-knapp som åpner panelet med
+  det samme stedet valgt: å bli med skal koste ett trykk, ikke at
+  pubnavnet skrives på nytt. Adressen tolkes i `app.js` med
+  `tolkKamplenke()` og sendes inn til `visFotball` — modulen eier ikke
+  ruting. Finner vi ikke kampen igjen, står runden som før; en
+  feilmelding om en kamp som er ferdigspilt hjelper ingen. Stedet i
+  lenka er skrevet av hvem som helst: `hvor` valideres mot de tre
+  svarene, og navnet kappes ved `STED_MAKS` som i feltet.
 - Været ved avspark står under hver kamp i årets neste runde, og går
   inn i delingsteksten. Kilden er MET Norway (Locationforecast 2.0) via
   `netlify/functions/vaer.mjs`: MET krever en User-Agent som sier hvem
@@ -334,9 +349,9 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      300 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      311 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  128 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       203 tester, ~130 s, headless Chromium
+    node test/run.mjs       210 tester, ~130 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
@@ -362,7 +377,8 @@ appen før noen har datert det. `run.mjs` dekker alt som trenger DOM: XSS i titl
 og artikkel-HTML, annonseplassering, rulleoppførsel, artikkelvisningen,
 fokusfella, korthøyden, at toppfeltet krymper, paginering, ruting,
 visningsvalgene i menyen, favorittlag fra stjerne til feed, deling av en
-kamp med sted og pubforslag, adminportalen fra innlogging til lagring, og hele
+kamp med sted og pubforslag, den delte lenka som åpner kampen den peker
+på hos mottakeren, adminportalen fra innlogging til lagring, og hele
 fotballmodulen — fanebytte, tabell, resultater, neste runde, dyplenker og
 feilmelding fra tjenesten.
 

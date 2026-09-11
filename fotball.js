@@ -7,7 +7,8 @@
 // app.js gjennom naviger(), som setter adressen — da virker tilbakeknappen
 // likt her som i resten av appen.
 
-import { LIGAER, DELER, DEL_NAVN, HVOR, delingstekst, fotballHash } from "./fotball-data.js";
+import { LIGAER, DELER, DEL_NAVN, HVOR, STED_MAKS, delingstekst,
+         kamplenke, invitasjonstekst } from "./fotball-data.js";
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte } from "./pub-data.js";
 import { PUBER_OSLO } from "./puber-oslo.js";
@@ -85,7 +86,9 @@ function merk(rot, verdi) {
 
 /* ---------- visning ---------- */
 
-export async function visFotball(liga, del) {
+// invitasjon: kampen, svaret og stedet fra en delt lenke, tolket av
+// app.js. Modulen eier ikke ruting og leser derfor ikke adressen selv.
+export async function visFotball(liga, del, invitasjon) {
   aktivLiga = liga;
   aktivDel = del;
   merk(document.getElementById("ligaVelger"), liga);
@@ -97,6 +100,7 @@ export async function visFotball(liga, del) {
 
   if (lagret && Date.now() - lagret.hentet < HUSKE_MS) {
     tegn(rot, del, lagret.data);
+    visInvitasjon(rot, del, lagret.data, invitasjon);
     return;
   }
 
@@ -109,6 +113,7 @@ export async function visFotball(liga, del) {
     husket.set(nokkel, { data, hentet: Date.now() });
     if (aktivLiga !== liga || aktivDel !== del) return;
     tegn(rot, del, data);
+    visInvitasjon(rot, del, data, invitasjon);
   } catch (err) {
     if (aktivLiga !== liga || aktivDel !== del) return;
     console.error("[Sportsbibelen] fotball · " + nokkel + " feilet:", err);
@@ -320,6 +325,28 @@ function lukkPanel() {
   apentPanel = null;
 }
 
+// Apner delingspanelet pa en rad med svaret ferdig valgt. To veier inn
+// hit: linja som sier hvem som viser kampen, og invitasjonen fra en delt
+// lenke. Begge har allerede svart «hvor» for leseren, og begge skal lande
+// i det samme panelet — ellers finnes det to mater a dele pa.
+function apnePanelMed(rad, hvor, sted) {
+  const knapp = rad && rad.querySelector(".kamp-del");
+  if (!knapp) return null;
+  if (knapp.getAttribute("aria-expanded") !== "true") knapp.click();
+
+  const panel = apentPanel && apentPanel.panel;
+  if (!panel) return null;
+
+  const valg = panel.querySelector(".hvor-valg[data-hvor=\"" + hvor + "\"]");
+  if (valg) valg.click();
+  if (hvor === "pub" && sted) {
+    const felt = panel.querySelector(".kamp-pub");
+    felt.value = sted;
+    felt.dispatchEvent(new Event("input"));
+  }
+  return panel;
+}
+
 function delPanel(kamp) {
   const panel = el("li", "kamp-panel");
   panel.appendChild(el("p", "kamp-panel-tittel", "Hvor ser du kampen?"));
@@ -330,7 +357,7 @@ function delPanel(kamp) {
   pubFelt.type = "text";
   pubFelt.placeholder = "Hvilken pub?";
   pubFelt.setAttribute("aria-label", "Hvilken pub?");
-  pubFelt.maxLength = 60;
+  pubFelt.maxLength = STED_MAKS;
   pubFelt.hidden = true;
   const forslag = pubForslag(kamp, pubFelt);
   forslag.hidden = true;
@@ -364,7 +391,10 @@ function delPanel(kamp) {
 
   send.addEventListener("click", async () => {
     if (!hvor) return;
-    const url = location.origin + location.pathname + fotballHash(aktivLiga, "neste");
+    // Lenka barer kampen, svaret og stedet: mottakeren skal lande pa
+    // kampen det gjelder, ikke i en runde hen ma lete i.
+    const url = location.origin + location.pathname +
+      kamplenke(aktivLiga, kamp, hvor, pubFelt.value.trim());
     // Vaeret er allerede hentet for linja under kampen; er det ikke der,
     // deles teksten uten. Ingen skal vente pa MET for a sende en melding.
     const vaer = kamp.arena ? await hentVaer(kamp) : null;
@@ -647,6 +677,8 @@ function tomtekst(del, data) {
 
 function kamprad(kamp, del, delbar) {
   const rad = el("li", delbar ? "kamp delbar" : "kamp");
+  // Id-en pa raden, sa en delt lenke finner igjen kampen sin i runden.
+  if (kamp.id != null) rad.dataset.kamp = String(kamp.id);
   rad.appendChild(el("span", "kamp-lag", kamp.hjemme));
 
   if (del === "resultater" && kamp.malHjemme !== null) {
@@ -684,20 +716,52 @@ function viserlinje(kamp) {
     knapp.title = "Meldt inn til oss. Trykk for å dele at du ser kampen her.";
     knapp.addEventListener("click", (e) => {
       e.stopPropagation();
-      const rad = knapp.closest(".kamp");
-      const del = rad && rad.querySelector(".kamp-del");
-      if (!del) return;
-      if (del.getAttribute("aria-expanded") !== "true") del.click();
-      const panel = apentPanel && apentPanel.panel;
-      if (!panel) return;
-      panel.querySelectorAll(".hvor-valg")[1].click();
-      const felt = panel.querySelector(".kamp-pub");
-      felt.value = p.navn;
-      felt.dispatchEvent(new Event("input"));
+      apnePanelMed(knapp.closest(".kamp"), "pub", p.navn);
     });
     linje.appendChild(knapp);
   });
   return linje;
+}
+
+/* ---------- invitasjonen fra en delt lenke ---------- */
+
+// Kom leseren hit fra en delt lenke, skal kampen det gjelder sta fram, og
+// svaret vaere ett trykk unna. Uten dette lander mottakeren i runden og
+// ma finne kampen selv — og da er delingen bare en lenke til appen.
+//
+// Finner vi ikke kampen, sier vi ingenting: runden star der som for. En
+// feilmelding om en kamp som er spilt ferdig hjelper ingen.
+function visInvitasjon(rot, del, data, invitasjon) {
+  if (!invitasjon || del !== "neste") return;
+
+  const kamp = ((data && data.kamper) || [])
+    .find((k) => String(k.id) === String(invitasjon.kampId));
+  if (!kamp) return;
+
+  const rad = Array.from(rot.querySelectorAll(".kamp"))
+    .find((r) => r.dataset.kamp === String(kamp.id));
+  if (!rad) return;
+
+  rad.classList.add("kamp-delt");
+
+  const linje = el("div", "kamp-invitasjon");
+  linje.appendChild(el("span", "kamp-invitasjon-tekst",
+    invitasjonstekst(kamp, invitasjon.hvor, invitasjon.sted)));
+
+  // Svaret starter der avsenderen er: a bli med er det vanligste svaret,
+  // og det skal koste ett trykk. Et annet sted velges i panelet som for.
+  if (rad.querySelector(".kamp-del")) {
+    const svar = el("button", "kamp-invitasjon-svar", "Svar");
+    svar.type = "button";
+    svar.title = "Si hvor du ser kampen";
+    svar.addEventListener("click",
+      () => apnePanelMed(rad, invitasjon.hvor || "pub", invitasjon.sted));
+    linje.appendChild(svar);
+  }
+  rad.appendChild(linje);
+
+  // En runde er ti kamper lang. Den delte skal vaere den man ser.
+  if (rad.scrollIntoView) rad.scrollIntoView({ block: "center" });
 }
 
 /* ---------- vaeret ved avspark ---------- */
