@@ -12,9 +12,9 @@
 import { arenaFor } from "../../vaer-data.js";
 import {
   overpassSporring, tolkPuber, enturNaermest, tolkHoldeplasser, grupperPuber,
+  OVERPASS_SPEIL, overpassHeadere,
 } from "../../pub-data.js";
 
-const OVERPASS = "https://overpass-api.de/api/interpreter";
 const ENTUR = "https://api.entur.io/journey-planner/v3/graphql";
 export const LEVETID_PUBER = 86400;
 const IDENTITET = "sportsbibelen-app/1.0 https://mvp-sb.netlify.app";
@@ -46,29 +46,9 @@ export default async (req) => {
       { utfall: String(err && err.message || err).slice(0, 80) }));
   }
 
-  let puber;
-  try {
-    const respons = await fetch(OVERPASS, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": IDENTITET },
-      // 1200 m dekker bade stadion (800) og holdeplassene rundt (700 + 300).
-      body: "data=" + encodeURIComponent(overpassSporring(arena.lat, arena.lon, 1200)),
-    });
-    const notat = { kilde: "Overpass", status: respons.status };
-    if (!respons.ok) {
-      const kropp = (await respons.text().catch(() => "")).replace(/\s+/g, " ").trim();
-      if (kropp) notat.melding = kropp.slice(0, 80);
-      forsok.push(Object.assign(notat, { utfall: "HTTP " + respons.status }));
-      return svar({ feil: "Fikk ikke svar fra OpenStreetMap", forsok }, 502, 0);
-    }
-    puber = tolkPuber(await respons.json(), arena);
-    notat.antall = puber.length;
-    forsok.push(notat);
-  } catch (err) {
-    console.error("[puber] Overpass feilet:", err);
-    forsok.push({ kilde: "Overpass", utfall: String(err && err.message || err).slice(0, 80) });
-    return svar({ feil: "Fikk ikke svar fra OpenStreetMap", forsok }, 502, 0);
-  }
+  // 1200 m dekker bade stadion (800) og holdeplassene rundt (700 + 300).
+  const puber = await hentPuber(arena, forsok);
+  if (!puber) return svar({ feil: "Fikk ikke svar fra OpenStreetMap", forsok }, 502, 0);
 
   return svar({
     arena: arena.navn,
@@ -79,6 +59,36 @@ export default async (req) => {
     oppdatert: new Date().toISOString(),
   }, 200, LEVETID_PUBER);
 };
+
+// Prover tjenerne i tur. Forste som svarer med puber vinner; hvert
+// forsok forklares i forsok-lista. null nar ingen av dem svarte.
+async function hentPuber(arena, forsok) {
+  const sporring = "data=" + encodeURIComponent(overpassSporring(arena.lat, arena.lon, 1200));
+  for (const adresse of OVERPASS_SPEIL) {
+    const vert = new URL(adresse).host;
+    const notat = { kilde: "Overpass " + vert };
+    try {
+      const respons = await fetch(adresse, {
+        method: "POST", headers: overpassHeadere(true), body: sporring,
+      });
+      notat.status = respons.status;
+      if (!respons.ok) {
+        const kropp = (await respons.text().catch(() => "")).replace(/\s+/g, " ").trim();
+        if (kropp) notat.melding = kropp.slice(0, 80);
+        throw new Error("HTTP " + respons.status);
+      }
+      const liste = tolkPuber(await respons.json(), arena);
+      notat.antall = liste.length;
+      forsok.push(notat);
+      return liste;
+    } catch (err) {
+      console.error("[puber] Overpass " + vert + " feilet:", err);
+      notat.utfall = String(err && err.message || err).slice(0, 80);
+      forsok.push(notat);
+    }
+  }
+  return null;
+}
 
 function svar(kropp, status, levetid) {
   const headere = { "Content-Type": "application/json; charset=utf-8" };

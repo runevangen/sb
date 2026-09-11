@@ -3,6 +3,31 @@
 // Kilden er OpenStreetMap via Overpass. Lisensen (ODbL) krever synlig
 // kreditering: «© OpenStreetMap-bidragsytere» star der pubene vises.
 
+// Overpass-tjenerne vi prover, i rekkefolge. Hovedtjeneren er raskest og
+// naermest kilden, men avviser mye; speilene er mildere. Alle tre snakker
+// samme sprak, sa et svar fra et speil er like godt.
+export const OVERPASS_SPEIL = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+];
+
+// Hovedtjeneren svarer 406 «Not Acceptable» nar den ikke liker headerne:
+// den vil ha et Accept som sier hva vi tar imot. Nettleseren setter
+// Accept-Encoding selv og forbyr oss a rore den, sa den settes bare
+// serverside.
+export function overpassHeadere(serverside) {
+  const h = {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "Accept": "application/json",
+  };
+  if (serverside) {
+    h["Accept-Encoding"] = "gzip, deflate";
+    h["User-Agent"] = "sportsbibelen-app/1.0 https://mvp-sb.netlify.app";
+  }
+  return h;
+}
+
 // Overpass-sporring: puber og barer innen radius meter fra et punkt.
 // «out center» gir tagger og koordinater, og ett punkt ogsa for bygninger
 // tegnet som flater. «out center tags» — som sto her forst — avviser

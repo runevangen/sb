@@ -453,6 +453,10 @@ function stubPuber(osm, osmStatus, entur, enturStatus) {
   return kall;
 }
 
+function osmKall(kall) {
+  return kall.filter((k) => k.url.indexOf("entur.io") === -1);
+}
+
 kall = stubPuber(OSM_SVAR, 200, ENTUR_SVAR, 200);
 r = await puber(be("/api/puber?arena=Ukjent"));
 ok("ukjent arena gir 400 uten kall", r.status === 400 && kall.length === 0, r.status + " " + kall.length);
@@ -467,6 +471,12 @@ ok("Entur far ET-Client-Name", entur && entur.opsjoner.headers["ET-Client-Name"]
 ok("Overpass sporres rundt arenaen med 1200 m",
    overpass && decodeURIComponent(overpass.opsjoner.body).indexOf("around:1200,63.413,10.406") > -1,
    overpass && decodeURIComponent(overpass.opsjoner.body));
+// Uten Accept svarer hovedtjeneren 406 og vi far ingen puber.
+ok("Overpass far Accept og identifiserer oss",
+   overpass.opsjoner.headers["Accept"] === "application/json" &&
+   String(overpass.opsjoner.headers["User-Agent"]).indexOf("sportsbibelen") === 0,
+   JSON.stringify(overpass.opsjoner.headers));
+ok("bare en tjener sporres nar den forste svarer", osmKall(kall).length === 1, osmKall(kall).length);
 ok("svaret er gruppert ved stadion og ved holdeplass",
    pub.grupper.length === 2 && pub.grupper[0].tittel === "Ved Lerkendal" && pub.grupper[1].tittel === "Ved Nardo" &&
    pub.grupper[1].puber[0].navn === "Nardo Bar", JSON.stringify(pub.grupper));
@@ -484,17 +494,39 @@ ok("uten Entur er det fortsatt puber ved stadion",
    r.status === 200 && utenEntur.grupper.length === 1 && utenEntur.grupper[0].tittel === "Ved Lerkendal" &&
    utenEntur.forsok[0].status === 503, JSON.stringify(utenEntur.forsok));
 
-// Overpass nede: feil uten cache, med forklaring.
+// Alle tjenerne nede: feil uten cache, med forklaring per tjener.
 kall = stubPuber("<html>Too busy</html>", 504, ENTUR_SVAR, 200);
 r = await puber(be("/api/puber?arena=Lerkendal"));
 const utenOsm = await r.json();
-ok("feil hos Overpass gir 502 uten cache og med melding",
+ok("feil hos alle tjenerne gir 502 uten cache og med melding",
    r.status === 502 && r.headers.get("Cache-Control") === "no-store" &&
-   utenOsm.forsok.some((f) => f.kilde === "Overpass" && f.status === 504 && f.melding.indexOf("Too busy") > -1),
+   utenOsm.forsok.some((f) => f.kilde.indexOf("Overpass") === 0 && f.status === 504 && f.melding.indexOf("Too busy") > -1),
    JSON.stringify(utenOsm.forsok));
+ok("alle tjenerne ble provd", osmKall(kall).length >= 2, osmKall(kall).length);
+
+// Hovedtjeneren svarer 406, speilet svarer. Det var dette som skjedde i prod.
+kall = [];
+global.fetch = async (url, opsjoner) => {
+  kall.push({ url: String(url), opsjoner: opsjoner || {} });
+  const u = String(url);
+  if (u.indexOf("entur.io") > -1) return new Response(JSON.stringify(ENTUR_SVAR), { status: 200 });
+  if (u.indexOf("overpass-api.de") > -1) {
+    return new Response("<!DOCTYPE HTML><html>Not Acceptable</html>", { status: 406 });
+  }
+  return new Response(JSON.stringify(OSM_SVAR), { status: 200 });
+};
+r = await puber(be("/api/puber?arena=Lerkendal"));
+const speil = await r.json();
+ok("406 fra hovedtjeneren gar videre til speilet",
+   r.status === 200 && speil.grupper.length === 2, r.status + " " + JSON.stringify(speil.forsok));
+ok("begge tjenerne star i forsok, med navn",
+   speil.forsok.filter((f) => f.kilde.indexOf("Overpass") === 0).length === 2 &&
+   speil.forsok.some((f) => f.kilde.indexOf("overpass-api.de") > -1 && f.status === 406) &&
+   speil.forsok.some((f) => f.kilde.indexOf("kumi.systems") > -1 && f.antall === 2),
+   JSON.stringify(speil.forsok));
 
 /* ---------------- rapport ---------------- */
 
-const antall = 93;
+const antall = 98;
 console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);
