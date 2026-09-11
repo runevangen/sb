@@ -1536,6 +1536,70 @@ body {
 
 .kamp-invitasjon-svar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* «Tre blir med: Ola, Kari og Per» under kampen, som «vises pa»-linja:
+   den som blar gjennom runden skal se det uten a apne noe. */
+.kamp-blirmed {
+  margin-top: 4px;
+  font-size: calc(12px * var(--fs));
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.kamp-blirmed-merke { color: var(--bekreftet); font-weight: 700; margin-right: 4px; }
+
+/* Svaret for deg selv, inne i panelet. */
+.kamp-blirmed-valg {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.kamp-navn {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border-btn);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: calc(13px * var(--fs));
+}
+
+.kamp-navn[hidden] { display: none; }
+
+.kamp-blimed {
+  padding: 9px 12px;
+  border: 1px solid var(--bekreftet);
+  border-radius: 8px;
+  background: none;
+  color: var(--bekreftet);
+  font-family: inherit;
+  font-size: calc(13px * var(--fs));
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kamp-blimed:disabled { opacity: 0.45; cursor: default; }
+
+.kamp-navn:focus-visible, .kamp-blimed:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Noten tar hele bredden i valgboksen, sa feltet og knappen star sammen
+   pa linja over. */
+.kamp-blirmed-valg .kamp-note { flex: 1 0 100%; }
+
+/* Star det ingenting a trykke pa, skal det sta hvorfor. */
+.kamp-note {
+  margin: 0;
+  font-size: calc(12px * var(--fs));
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
 /* Panelet ligger inne i den valgte kampen, innenfor rammen. Det trenger
    derfor ingen egen strek under — rammen er skillet. */
 .kamp-panel {

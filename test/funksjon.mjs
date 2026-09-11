@@ -14,6 +14,7 @@ import puber from "../netlify/functions/puber.mjs";
 import { OVERPASS_SPEIL } from "../pub-data.js";
 import visninger from "../netlify/functions/visninger.mjs";
 import konto from "../netlify/functions/konto.mjs";
+import svarfunksjon from "../netlify/functions/svar.mjs";
 import { lesVisninger } from "../visning-data.js";
 
 let feilet = 0;
@@ -829,6 +830,103 @@ ok("en okt som ikke gjelder lenger gir 401", r.status === 401, r.status);
 
 r = await konto(kontoBe({ handling: "noe-annet", epost: "leser@example.com" }));
 ok("en ukjent handling avvises", r.status === 400, r.status);
+
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_ANON_KEY;
+
+/* ---------------- hvem blir med ---------------- */
+
+function svarBe(kropp, metode, adresse) {
+  return new Request("https://mvp-sb.netlify.app" + (adresse || "/api/svar"), {
+    method: metode || "POST",
+    headers: { "Content-Type": "application/json" },
+    body: metode === "GET" ? undefined : JSON.stringify(kropp),
+  });
+}
+
+const SVAR_RADER = [
+  { kamp_id: 7, navn: "Ola", hvor: "pub", sted: "Andy's Pub", bruker: "u-1" },
+];
+
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_ANON_KEY;
+kall = stubSupabase(SVAR_RADER);
+r = await svarfunksjon(svarBe(null, "GET", "/api/svar?kamper=7"));
+ok("uten oppsett svarer lista 503", r.status === 503 && kall.length === 0,
+   r.status + " " + kall.length);
+
+process.env.SUPABASE_URL = "https://prosjekt.supabase.co";
+process.env.SUPABASE_ANON_KEY = SUPA_NOKKEL;
+
+kall = stubSupabase(SVAR_RADER);
+r = await svarfunksjon(svarBe(null, "GET", "/api/svar?kamper=7,8"));
+const lista = await r.json();
+ok("hele runden hentes i ett kall", kall.length === 1, kall.length);
+ok("og med kampene i ett filter",
+   kall[0].url.indexOf("kamp_id=in.(7,8)") > -1, kall[0].url);
+// A se hvem som blir med krever ingen konto: appen skal kunne leses uten.
+ok("lesing sender ingen okt", !kall[0].opsjoner.headers.Authorization,
+   JSON.stringify(kall[0].opsjoner.headers));
+ok("radene formes for de sendes ut",
+   lista.svar.length === 1 && lista.svar[0].navn === "Ola", JSON.stringify(lista));
+// Hvem som blir med endrer seg mens man ser pa det.
+ok("lista caches aldri", r.headers.get("Cache-Control") === "no-store");
+
+kall = stubSupabase(SVAR_RADER);
+r = await svarfunksjon(svarBe(null, "GET", "/api/svar?kamper=drop%20table"));
+ok("tull i kamplista gir tom liste, ikke et kall",
+   r.status === 200 && (await r.json()).svar.length === 0 && kall.length === 0,
+   kall.length);
+
+// Skriving krever okta, og den gar med som leserens egen: databasen
+// setter «bruker» fra den, sa ingen kan skrive i en annens navn.
+kall = stubSupabase(SVAR_RADER);
+r = await svarfunksjon(svarBe({ kampId: 7, navn: "Ola" }));
+ok("uten okt far man ikke skrive", r.status === 401 && kall.length === 0, r.status);
+
+kall = stubSupabase(SVAR_RADER);
+r = await svarfunksjon(svarBe({ token: "okt-1", kampId: 7, navn: "  ", hvor: "pub" }));
+ok("uten navn far man ikke skrive", r.status === 400 && kall.length === 0, r.status);
+
+kall = stubSupabase(SVAR_RADER);
+r = await svarfunksjon(svarBe({ token: "okt-1", kampId: "7; drop", navn: "Ola" }));
+ok("en kamp-id som ikke er et tall stoppes her",
+   r.status === 400 && kall.length === 0, r.status);
+
+kall = stubSupabase(SVAR_RADER);
+r = await svarfunksjon(svarBe({ token: "okt-1", kampId: 7, navn: " Ola ", hvor: "pub",
+  sted: "Andy's Pub" }));
+ok("svaret skrives", r.status === 200 && kall.length === 1, r.status + " " + kall.length);
+ok("med leserens egen okt",
+   kall[0].opsjoner.headers.Authorization === "Bearer okt-1",
+   JSON.stringify(kall[0].opsjoner.headers));
+ok("og uten a si hvem brukeren er — det gjor databasen",
+   JSON.parse(kall[0].opsjoner.body).bruker === undefined, kall[0].opsjoner.body);
+// To «jeg blir med» pa samme kamp er en person, ikke to.
+ok("skrivingen er en upsert",
+   kall[0].url.indexOf("on_conflict=kamp_id,bruker") > -1 &&
+   String(kall[0].opsjoner.headers.Prefer).indexOf("merge-duplicates") > -1,
+   kall[0].url + " " + kall[0].opsjoner.headers.Prefer);
+
+kall = stubSupabase({});
+r = await svarfunksjon(svarBe({ handling: "fjern", token: "okt-1", kampId: 7 }));
+ok("man kan angre", r.status === 200 && kall[0].opsjoner.method === "DELETE",
+   r.status + " " + kall[0].opsjoner.method);
+ok("og slettingen gar ogsa med leserens egen okt",
+   kall[0].opsjoner.headers.Authorization === "Bearer okt-1");
+
+// Den som setter opp prosjektet trenger a hore nyaktig dette.
+kall = stubSupabase({ code: "42P01", message: 'relation "public.kampsvar" does not exist' }, 404);
+r = await svarfunksjon(svarBe(null, "GET", "/api/svar?kamper=7"));
+const utenTabell = await r.json();
+ok("mangler tabellen, star det hva som mangler",
+   r.status === 503 && utenTabell.feil.indexOf("kampsvar") > -1 &&
+   utenTabell.feil.indexOf("docs/nokler-og-tokens.md") > -1, utenTabell.feil);
+
+kall = stubSupabase({ message: "JWT expired" }, 401);
+r = await svarfunksjon(svarBe({ token: "gammel", kampId: 7, navn: "Ola" }));
+ok("en utlopt okt sier at man ma logge inn pa nytt",
+   r.status === 401 && (await r.json()).feil.indexOf("Logg inn") > -1, r.status);
 
 delete process.env.SUPABASE_URL;
 delete process.env.SUPABASE_ANON_KEY;

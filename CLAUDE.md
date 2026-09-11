@@ -27,6 +27,8 @@ prosjektet `mvp-sb`.
 
     konto-data.js                   innlogging: rene funksjoner
     netlify/functions/konto.mjs     samme: engangskode og økt via Supabase Auth
+    svar-data.js                    «jeg blir med»: rene funksjoner
+    netlify/functions/svar.mjs      samme: lesing for alle, skriving med din egen økt
 
     admin.html / admin.js            adminportalen: hvilke kamper viser hvilken pub
     visning-data.js                  samme: rene funksjoner, ogsa for lesersiden
@@ -417,11 +419,42 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   personvernerklæring og en måte å be om sletting på hører til her, og
   er ikke skrevet ennå.
 
+### Hvem blir med
+
+- Svaret delingslenka ba om. Teksten i chatten spurte «Hvor ser du?», og
+  til nå hadde det spørsmålet ingen vei tilbake til appen.
+- **Lesing krever ingen konto.** «3 blir med: Ola, Kari og Per» står
+  under kampen for alle, som «denne kampen vises på»-linja: den som
+  blar gjennom runden ser det uten å åpne noe. Skriving krever at du er
+  logget inn — og bare i ditt eget navn.
+- Skrivingen går med leserens egen økt (`Authorization: Bearer`), ikke
+  med en nøkkel som kan skrive hva som helst. Databasen setter `bruker`
+  fra økten, og reglene der slipper bare gjennom din egen rad.
+  Funksjonen har ingen `service_role`-nøkkel, med vilje: da kan heller
+  ikke en feil i den fila skrive i en annens navn.
+- Hele runden hentes i ett kall (`/api/svar?kamper=3,4,5`). Ti kamper
+  skal ikke bli ti kall.
+- Feiler lista, sier den ingenting. Den er et tillegg til kampen, ikke
+  kampen, og en feilmelding under hver eneste rad ville dekket over
+  runden. Den som trykker «Jeg blir med», får derimot beskjed — det er
+  der man venter et svar.
+- Svarer du to ganger, endrer du svaret ditt: skrivingen er en upsert
+  mot `unique (kamp_id, bruker)`. Har du alt svart, er knappen en
+  angreknapp — to knapper ville betydd at man kan bli med to ganger.
+- Navnet er «navnet vennene ser», ikke e-postadressen: den er vår, ikke
+  deres. Det lagres med visningsvalgene (`sb-visning`, feltet
+  `svarnavn`), så det ikke skrives på nytt for hver kamp. Navnet er
+  synlig for alle som åpner kampen — det er prisen for at lista kan
+  leses uten konto, og det står i panelet.
+- Tabellen og reglene står som SQL i `docs/nokler-og-tokens.md`. Finnes
+  den ikke, svarer funksjonen 503 og sier nøyaktig det, framfor å sende
+  en PostgREST-feil videre til leseren.
+
 ## Testing
 
-    node test/unit.mjs      332 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  151 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       243 tester, ~150 s, headless Chromium
+    node test/unit.mjs      350 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  169 tester, ~250 ms, ingen nettleser
+    node test/run.mjs       262 tester, ~170 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
@@ -441,19 +474,20 @@ at kappløpet ikke venter på den; uten den ville akkurat den feilen bare
 vist seg i prod.
 
 `unit.mjs` dekker `lib.js`, `fotball-data.js`, `vaer-data.js`,
-`pub-data.js` og `konto-data.js`: URL-validering, videovertslisten, tidsstempler,
+`pub-data.js`, `konto-data.js` og `svar-data.js`: URL-validering, videovertslisten, tidsstempler,
 endringssignaturen, gjenkjenning av interne lenker, rangering av søketreff og favorittlag, sesongvinduet per
 liga, tolkning av API-Football-svaret, hvilken runde som er «neste», at
 døgnkvoten holder, og at ingenting i `puber-kontakt.js` slipper ut i
 appen før noen har datert det, og at en økt vi ikke kjenner levetiden på
-regnes som utløpt. `run.mjs` dekker alt som trenger DOM: XSS i titler
+regnes som utløpt, og at ditt eget svar på en kamp finnes på id og ikke
+på navn. `run.mjs` dekker alt som trenger DOM: XSS i titler
 og artikkel-HTML, annonseplassering, rulleoppførsel, artikkelvisningen,
 fokusfella, korthøyden, at toppfeltet krymper, paginering, ruting,
 visningsvalgene i menyen, favorittlag fra stjerne til feed, deling av en
 kamp med sted og pubforslag, den delte lenka som åpner kampen den peker
 på hos mottakeren, adminportalen fra innlogging til lagring, innlogging i
 appen fra e-post til utlogging — med feeden ferdig lastet før noen har
-logget inn — og hele
+logget inn — «jeg blir med» fra navn til angring, og hele
 fotballmodulen — fanebytte, tabell, resultater, neste runde, dyplenker og
 feilmelding fra tjenesten.
 

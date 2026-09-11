@@ -1483,6 +1483,10 @@ const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
     u = String(u);
     // Vaer og puber er ikke det som testes her, og et svar som lar vente
     // pa seg stopper den virtuelle tiden.
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ svar: [] })); } });
+    }
     if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 || u.indexOf("overpass") > -1) {
       return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
         text: function () { return Promise.resolve("{}"); } });
@@ -1525,6 +1529,13 @@ const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
        panel.querySelector(".kamp-pub").value === "Pub X" &&
        panel.querySelectorAll(".hvor-valg")[1].getAttribute("aria-pressed") === "true",
        panel.querySelector(".kamp-pub").value);
+    // Den som kommer fra en delt lenke er utlogget. Da skal det sta hva
+    // som mangler — og at delingen virker uansett.
+    ok("utlogget star det hva som skal til for a bli med",
+       panel.querySelector(".kamp-blirmed-valg .kamp-note").textContent
+         .indexOf("Logg inn i menyen") > -1 &&
+       !panel.querySelector(".kamp-blimed"),
+       panel.querySelector(".kamp-blirmed-valg").textContent);
 
     // En lenke til en kamp som ikke star i runden lenger: runden skal sta
     // som for, uten en feilmelding om noe leseren ikke kan gjore noe med.
@@ -1654,9 +1665,129 @@ const SAK_18 = await kjor("innlogging", FELLES + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
 `);
 
+/* ---------------- 19. jeg blir med ---------------- */
+
+const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
+  // Innlogget for appen starter: okta ligger der en tidligere innlogging
+  // la den.
+  localStorage.setItem("sb-konto", JSON.stringify({ token: "okt-1",
+    epost: "leser@example.no", bruker: "u-1",
+    utloper: new Date(Date.now() + 3600000).toISOString() }));
+
+  window.__svar = [];
+  window.__lagret = [];
+  function svarMed(kropp, status) {
+    return Promise.resolve({ ok: !status || status < 400, status: status || 200,
+      statusText: "OK", text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, o) {
+    u = String(u);
+    if (u.indexOf("/api/svar") === 0) {
+      var inn = o && o.body ? JSON.parse(o.body) : null;
+      window.__svar.push({ url: u, inn: inn, headere: (o && o.headers) || null });
+      if (!inn) return svarMed({ svar: window.__lagret });
+      if (inn.handling === "fjern") {
+        window.__lagret = [];
+        return svarMed({ fjernet: true });
+      }
+      window.__lagret = [{ kamp_id: String(inn.kampId), navn: inn.navn, hvor: inn.hvor,
+        sted: inn.sted, bruker: "u-1" }];
+      return svarMed({ svar: window.__lagret });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 || u.indexOf("overpass") > -1) {
+      return svarMed({}, 502);
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return svarMed(kropp);
+    }
+    return svarMed(u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker);
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    // Ti kamper skal ikke bli ti kall.
+    var lesekall = window.__svar.filter(function (k) { return !k.inn; });
+    ok("hele runden hentes i ett kall", lesekall.length === 1, lesekall.length);
+    ok("og med begge kampene", lesekall[0].url.indexOf("kamper=3%2C4") > -1 ||
+       lesekall[0].url.indexOf("kamper=3,4") > -1, lesekall[0].url);
+    ok("ingen er med enda", !document.querySelector(".kamp-blirmed"));
+
+    var rad = document.querySelectorAll(".kamp.delbar")[0];
+    rad.querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    var knapp = panel.querySelector(".kamp-blimed");
+    ok("innlogget star knappen der", !!knapp && knapp.textContent === "Jeg blir med",
+       knapp ? knapp.textContent : "ingen knapp");
+    // Lista leses uten konto, sa navnet leses ogsa av andre enn
+    // vennegruppa. Det skal sta der navnet skrives.
+    ok("det star at navnet er synlig for andre",
+       panel.querySelector(".kamp-blirmed-valg .kamp-note").textContent
+         .indexOf("synlig for alle som åpner kampen") > -1,
+       panel.querySelector(".kamp-blirmed-valg .kamp-note").textContent);
+
+    // Uten navn blir lista uleselig for de andre.
+    knapp.click();
+    ok("uten navn sier den ifra",
+       panel.querySelector(".kamp-blirmed-valg .kamp-svar").textContent.indexOf("navnet") > -1,
+       panel.querySelector(".kamp-blirmed-valg .kamp-svar").textContent);
+    ok("og ingenting er sendt", window.__svar.filter(function (k) { return !!k.inn; }).length === 0);
+
+    panel.querySelectorAll(".hvor-valg")[1].click();   // pa pub
+    panel.querySelector(".kamp-pub").value = "Pub X";
+    panel.querySelector(".kamp-navn").value = " Ola ";
+    knapp.click();
+    setTimeout(function () { try {
+      var skriv = window.__svar.filter(function (k) { return !!k.inn; });
+      ok("svaret sendes med okta", skriv.length === 1 && skriv[0].inn.token === "okt-1",
+         JSON.stringify(skriv.map(function (k) { return k.inn; })));
+      ok("med kamp, navn og sted",
+         skriv[0].inn.kampId === 3 && skriv[0].inn.navn === "Ola" &&
+         skriv[0].inn.hvor === "pub" && skriv[0].inn.sted === "Pub X",
+         JSON.stringify(skriv[0].inn));
+      // Navnet skal ikke skrives pa nytt for hver kamp.
+      ok("navnet huskes til neste gang",
+         (JSON.parse(localStorage.getItem("sb-visning")) || {}).svarnavn === "Ola",
+         localStorage.getItem("sb-visning"));
+
+      var linje = rad.querySelector(".kamp-blirmed");
+      ok("lista star under kampen", !!linje && linje.textContent.indexOf("Ola blir med") > -1,
+         linje ? linje.textContent : "ingen linje");
+      // Linja horer til kampen, ikke til panelet: den skal sta over det.
+      ok("og over panelet, ikke under",
+         linje.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING);
+      ok("bare pa den kampen man svarte pa",
+         document.querySelectorAll(".kamp-blirmed").length === 1,
+         document.querySelectorAll(".kamp-blirmed").length);
+      // To «jeg blir med» er en person, ikke to: knappen blir en angreknapp.
+      ok("knappen blir en angreknapp",
+         knapp.textContent === "Jeg blir ikke med likevel", knapp.textContent);
+      ok("og navnefeltet er ute av veien", panel.querySelector(".kamp-navn").hidden);
+
+      knapp.click();
+      setTimeout(function () { try {
+        var fjern = window.__svar.filter(function (k) { return k.inn && k.inn.handling === "fjern"; });
+        ok("angre sender en fjerning med okta",
+           fjern.length === 1 && fjern[0].inn.token === "okt-1" && fjern[0].inn.kampId === 3,
+           JSON.stringify(fjern.map(function (k) { return k.inn; })));
+        ok("og lista under kampen er borte", !rad.querySelector(".kamp-blirmed"));
+        ok("knappen er tilbake til a bli med",
+           knapp.textContent === "Jeg blir med", knapp.textContent);
+        ferdig();
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
+`);
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18];
+const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_19];
 let feilet = 0;
 
 for (const t of alle) {

@@ -9,6 +9,7 @@ import { LIGAER, tolkFotballHash, fotballHash, tolkKamplenke } from "./fotball-d
 import { ofteBrukt, noterPub } from "./pub-data.js";
 import { gyldigEpost, normaliserEpost, normaliserKode, gyldigKode, maskerEpost, oktGyldig }
   from "./konto-data.js";
+import { normaliserNavn } from "./svar-data.js";
 import { initFotball, visFotball } from "./fotball.js";
 
 // Bytt WP_HOST til din egen WordPress-side når som helst.
@@ -822,6 +823,18 @@ function noterDinPub(navn) {
   track("Pub delt", { pub: String(navn).slice(0, 40) });
 }
 
+// Navnet vennene ser nar du blir med pa en kamp. Ikke e-postadressen:
+// den er var, ikke deres. Det ligger med visningsvalgene, ikke i okta —
+// da star det der ogsa neste gang, uten et kall.
+function svarNavn() {
+  return normaliserNavn(prefs.svarnavn || "");
+}
+
+function settSvarNavn(navn) {
+  prefs.svarnavn = normaliserNavn(navn);
+  savePrefs(prefs);
+}
+
 // Et segment velger en verdi, det veksler ikke. Da kan den som allerede
 // star der trykkes uten at noe skrives eller spores.
 function settVisning(felt, verdi, hendelse, navn) {
@@ -1586,7 +1599,10 @@ initFotball(
   // «Hvor ser du kampen?» gar inn i gruppechatten leseren allerede har.
   // Ingen konto, ingen lagring: chatten er vennegruppa.
   (tekst, url) => delTekst({ title: "Sportsbibelen", text: tekst, url }, "Kamp delt"),
-  { liste: dinePuber, noter: noterDinPub });
+  { liste: dinePuber, noter: noterDinPub },
+  // Innlogging og navn eies av app.js (det er lagring). Modulen far tre
+  // sporsmal: har du en okt, hva heter du for vennene, og husk navnet.
+  { okt: () => kontoOkt, navn: svarNavn, settNavn: settSvarNavn });
 
 document.getElementById("fanenNyheter").addEventListener("click", () => {
   if (aktivVisning !== "nyheter") settFane("nyheter");

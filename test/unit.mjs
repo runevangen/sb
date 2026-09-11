@@ -19,6 +19,9 @@ import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
 import { normaliserEpost, gyldigEpost, normaliserKode, gyldigKode, maskerEpost,
          oktUtloper, oktGyldig, tolkOkt } from "../konto-data.js";
 
+import { normaliserNavn, gyldigNavn, svarRad, tolkSvar, perKamp, blirMedTekst,
+         svartekst, egetSvar, NAVN_MAKS } from "../svar-data.js";
+
 import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
   from "../vaer-data.js";
 
@@ -975,9 +978,13 @@ ok("tull i lageret gjelder ikke",
 
 ok("svaret fra tjenesten formes til en okt",
    JSON.stringify(tolkOkt({ access_token: "t", expires_in: 3600,
-     user: { email: "Leser@Example.no" } }, KONTO_NAA)) ===
-   JSON.stringify({ token: "t", epost: "leser@example.no",
+     user: { email: "Leser@Example.no", id: "u-1" } }, KONTO_NAA)) ===
+   JSON.stringify({ token: "t", epost: "leser@example.no", bruker: "u-1",
      utloper: "2026-09-11T13:00:00.000Z" }));
+// Id-en, ikke adressen, er den du er: adressen skal ikke ligge i en
+// liste andre leser.
+ok("okta barer bruker-id-en", tolkOkt({ access_token: "t",
+   user: { email: "a@b.no", id: "u-2" } }, KONTO_NAA).bruker === "u-2");
 // En halv okt ville sett ut som innlogget helt til forste kall feilet.
 ok("en okt uten token kastes framfor a gis ut",
    kaster(() => tolkOkt({ user: { email: "leser@example.no" } }, KONTO_NAA)));
@@ -986,6 +993,70 @@ ok("en okt uten adresse kastes ogsa",
 ok("uten levetid far okta en kort en",
    tolkOkt({ access_token: "t", user: { email: "a@b.no" } }, KONTO_NAA).utloper ===
    "2026-09-11T13:00:00.000Z");
+
+/* ---------------- hvem blir med ---------------- */
+
+ok("navnet renses", normaliserNavn("  Ola   Nordmann \n") === "Ola Nordmann",
+   normaliserNavn("  Ola   Nordmann \n"));
+ok("et altfor langt navn kappes", normaliserNavn("A".repeat(80)).length === NAVN_MAKS);
+// Et navn ma ha en bokstav eller et tall: ellers er «•••» et navn, og
+// lista blir uleselig for alle andre.
+ok("et navn ma ha noe i seg", gyldigNavn("Ola") && gyldigNavn("K9") &&
+   !gyldigNavn("•••") && !gyldigNavn("   ") && !gyldigNavn(""));
+
+// Brukeren settes av databasen fra okta, aldri herfra: ellers kunne hvem
+// som helst skrevet i en annens navn.
+const SVAR_RAD = svarRad(7, "  Ola  ", "pub", "Andy's Pub");
+ok("raden barer kamp, navn og sted",
+   SVAR_RAD.kamp_id === "7" && SVAR_RAD.navn === "Ola" && SVAR_RAD.hvor === "pub" && SVAR_RAD.sted === "Andy's Pub",
+   JSON.stringify(SVAR_RAD));
+ok("raden sier aldri hvem du er", SVAR_RAD.bruker === undefined, JSON.stringify(SVAR_RAD));
+ok("stedet folger bare med pa pub",
+   svarRad(7, "Ola", "hjemme", "Andy's Pub").sted === undefined);
+ok("et ukjent svar utelates", svarRad(7, "Ola", "rart", "").hvor === undefined);
+
+const SVAR_RADER = [
+  { kamp_id: 7, navn: "Ola", hvor: "pub", sted: "Andy's Pub", bruker: "u-1" },
+  { kamp_id: 7, navn: " Kari ", hvor: "hjemme", bruker: "u-2" },
+  { kamp_id: 8, navn: "Per", hvor: null, bruker: "u-3" },
+  { kamp_id: 8, navn: "  ", bruker: "u-4" },
+  null,
+];
+const BLIRMED = tolkSvar(SVAR_RADER);
+ok("rader uten navn faller bort framfor a tegne et tomt navn",
+   BLIRMED.length === 3 && BLIRMED.every((s) => s.navn), JSON.stringify(BLIRMED));
+ok("navnet renses ogsa pa vei inn", BLIRMED[1].navn === "Kari", BLIRMED[1].navn);
+ok("soppel tolkes til ingenting", tolkSvar(null).length === 0 && tolkSvar("nei").length === 0);
+
+const SVAR_KART = perKamp(BLIRMED);
+ok("svarene grupperes per kamp",
+   SVAR_KART.get("7").length === 2 && SVAR_KART.get("8").length === 1,
+   JSON.stringify(Array.from(SVAR_KART.keys())));
+
+// Tallet forst, fordi det er det man leser nar man blar; navnene fordi
+// det er dem man ser etter.
+ok("en som blir med far navnet sitt",
+   blirMedTekst([BLIRMED[0]]) === "Ola blir med", blirMedTekst([BLIRMED[0]]));
+ok("flere far tallet forst",
+   blirMedTekst(BLIRMED.slice(0, 2)) === "2 blir med: Ola og Kari",
+   blirMedTekst(BLIRMED.slice(0, 2)));
+ok("ingen gir ingen linje", blirMedTekst([]) === "" && blirMedTekst(null) === "");
+
+const SVARKAMP = { hjemme: "Brann", borte: "Bodø/Glimt", arena: "Brann Stadion" };
+ok("det ene svaret skrives ut med stedet",
+   svartekst(BLIRMED[0], SVARKAMP) === "Ola ser den på Andy's Pub",
+   svartekst(BLIRMED[0], SVARKAMP));
+ok("uten sted star navnet alene",
+   svartekst(BLIRMED[2], SVARKAMP) === "Per blir med", svartekst(BLIRMED[2], SVARKAMP));
+
+// To kan hete det samme. Id-en fra okta er den du er, ikke navnet.
+const MITT_SVAR = egetSvar(BLIRMED, "u-2");
+ok("ditt eget svar finnes pa id, ikke pa navn",
+   !!MITT_SVAR && MITT_SVAR.navn === "Kari" &&
+   // Navnet er ikke identitet: to kan hete det samme.
+   egetSvar(BLIRMED, "Kari") === null &&
+   egetSvar(BLIRMED, "u-9") === null && egetSvar(BLIRMED, "") === null,
+   JSON.stringify(MITT_SVAR));
 
 /* ---------------- kontaktopplysninger ---------------- */
 

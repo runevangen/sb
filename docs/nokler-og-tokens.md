@@ -139,6 +139,54 @@ ligger hos oss. Velg region i Supabase bevisst (EU), og husk at en
 personvernerklæring og en måte å be om sletting på hører til her — det er
 ikke kode, men det hører til denne nøkkelen.
 
+#### Tabellen «kampsvar» — hvem blir med
+
+Innloggingen alene trenger ingen tabell. «Jeg blir med» gjør det, og den
+lages én gang med SQL-en under (Supabase → *SQL Editor*). Til den finnes,
+svarer `/api/svar` 503 og sier nøyaktig det.
+
+```sql
+create table kampsvar (
+  id        uuid primary key default gen_random_uuid(),
+  kamp_id   text not null,
+  bruker    uuid not null default auth.uid()
+            references auth.users (id) on delete cascade,
+  navn      text not null check (char_length(navn) between 1 and 24),
+  hvor      text check (hvor in ('hjemme', 'pub', 'stadion')),
+  sted      text check (char_length(sted) <= 60),
+  opprettet timestamptz not null default now(),
+  unique (kamp_id, bruker)
+);
+
+alter table kampsvar enable row level security;
+
+-- Alle kan se hvem som blir med: appen skal kunne leses uten konto.
+create policy "les for alle" on kampsvar
+  for select using (true);
+
+-- Skrive kan du bare i ditt eget navn. `bruker` settes av databasen fra
+-- økten, og funksjonen sender den aldri selv.
+create policy "skriv eget svar" on kampsvar
+  for insert to authenticated with check (bruker = auth.uid());
+create policy "endre eget svar" on kampsvar
+  for update to authenticated using (bruker = auth.uid())
+  with check (bruker = auth.uid());
+create policy "slett eget svar" on kampsvar
+  for delete to authenticated using (bruker = auth.uid());
+```
+
+`unique (kamp_id, bruker)` er det som gjør at to «jeg blir med» på samme
+kamp er én person og ikke to: funksjonen skriver som en upsert.
+
+**Navnet i `navn` er synlig for alle** som åpner den kampen i appen —
+det er prisen for at lista kan leses uten konto. E-postadressen er det
+ikke; den ligger bare i `auth.users`. Derfor er feltet «navnet vennene
+ser», ikke adressen, og fornavn holder.
+
+Tabellen kan ikke leses eller skrives med `service_role`-nøkkelen fra
+denne koden, for den nøkkelen finnes ikke her. Det er med vilje: da kan
+heller ikke en feil i funksjonen skrive i en annens navn.
+
 ### `GITHUB_TOKEN` — adminportalens lagring
 
 Lagring i portalen er en commit. Tokenet er det som får lov til å skrive.
@@ -245,6 +293,9 @@ Det du ser først, og hva det som regel betyr.
 | Innlogging: «Koden stemmer ikke, eller den er for gammel» | feil eller utløpt kode — samme svar med vilje | be om ny kode |
 | Innlogging: «For mange forsøk» (429) | Supabase sperrer e-postsending en stund | vent et minutt |
 | Innlogging: «Fikk ikke sendt koden» | se `forsok` i svaret fra `/api/konto` | som regel feil `SUPABASE_URL` |
+| «Tabellen «kampsvar» finnes ikke i Supabase ennå» | SQL-en over er ikke kjørt | kjør den i Supabase → SQL Editor |
+| «Jeg blir med»: «Økten gjelder ikke lenger» | utløpt økt, eller reglene slipper ikke skrivingen gjennom | logg inn på nytt; sjekk policyene |
+| Ingen «blir med»-linje, men ingen feil heller | lista er et tillegg og feiler stille | se `/api/svar?kamper=<id>` i nettleseren |
 | Pubene: «overpass-api.de svarte 406» | ikke en nøkkel — Overpass-tjeneren | som regel forbigående |
 | Alt ser gammelt ut etter en endring | kant-cachen | trigger deploy tømmer den |
 

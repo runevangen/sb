@@ -76,5 +76,12 @@ export function tolkOkt(json, naa = Date.now()) {
 
   // Uten expires_in: en time. Kort nok til at en okt vi ikke kjenner
   // levetiden pa ikke blir stande.
-  return { token, epost, utloper: oktUtloper(json.expires_in, naa) || oktUtloper(3600, naa) };
+  return {
+    token,
+    epost,
+    // Id-en, ikke adressen, er den du er: to kan hete det samme, og
+    // adressen skal ikke ligge i en liste andre leser.
+    bruker: String((json.user && json.user.id) || ""),
+    utloper: oktUtloper(json.expires_in, naa) || oktUtloper(3600, naa),
+  };
 }

@@ -9,6 +9,8 @@
 
 import { LIGAER, DELER, DEL_NAVN, HVOR, STED_MAKS, delingstekst,
          kamplenke, invitasjonstekst } from "./fotball-data.js";
+import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn, NAVN_MAKS }
+  from "./svar-data.js";
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte } from "./pub-data.js";
 import { PUBER_OSLO } from "./puber-oslo.js";
@@ -32,6 +34,9 @@ let favoritter = { er: () => false, veksle: () => false };
 let deling = async () => "feil";
 // Dine puber eies av app.js (det er lagring): lista, og noter en brukt.
 let puber = { liste: () => [], noter: () => {} };
+// Innlogging og navn eies ogsa av app.js: modulen sporr bare om okta og
+// om navnet vennene ser.
+let konto = { okt: () => null, navn: () => "", settNavn: () => {} };
 let aktivLiga = "eliteserien";
 let aktivDel = "tabell";
 
@@ -49,12 +54,13 @@ function el(tag, klasse, tekst) {
 
 /* ---------- oppsett ---------- */
 
-export function initFotball(paNavigering, paLagsok, paFavoritt, paDeling, paPuber) {
+export function initFotball(paNavigering, paLagsok, paFavoritt, paDeling, paPuber, paKonto) {
   naviger = paNavigering;
   if (paLagsok) sokEtterLag = paLagsok;
   if (paFavoritt) favoritter = paFavoritt;
   if (paDeling) deling = paDeling;
   if (paPuber) puber = paPuber;
+  if (paKonto) konto = paKonto;
 
   const ligaer = document.getElementById("ligaVelger");
   Object.keys(LIGAER).forEach((nokkel) => {
@@ -101,6 +107,7 @@ export async function visFotball(liga, del, invitasjon) {
   if (lagret && Date.now() - lagret.hentet < HUSKE_MS) {
     tegn(rot, del, lagret.data);
     visInvitasjon(rot, del, lagret.data, invitasjon);
+    hentSvar(rot, del, lagret.data);
     return;
   }
 
@@ -114,6 +121,7 @@ export async function visFotball(liga, del, invitasjon) {
     if (aktivLiga !== liga || aktivDel !== del) return;
     tegn(rot, del, data);
     visInvitasjon(rot, del, data, invitasjon);
+    hentSvar(rot, del, data);
   } catch (err) {
     if (aktivLiga !== liga || aktivDel !== del) return;
     console.error("[Sportsbibelen] fotball · " + nokkel + " feilet:", err);
@@ -430,6 +438,9 @@ function delPanel(kamp) {
   panel.appendChild(valg);
   panel.appendChild(forslag);
   panel.appendChild(pubFelt);
+  // To veier ut av det samme sporsmalet: si det til lista, eller si det
+  // i chatten. Lista star forst fordi den er den som svarer tilbake.
+  panel.appendChild(blirMedDel(kamp, () => hvor, () => pubFelt.value.trim()));
   panel.appendChild(send);
   panel.appendChild(svar);
   return panel;
@@ -749,6 +760,164 @@ function viserlinje(kamp) {
     linje.appendChild(knapp);
   });
   return linje;
+}
+
+/* ---------- hvem blir med ---------- */
+
+// Svaret delingslenka ba om. Teksten i chatten spurte «Hvor ser du?», og
+// til na hadde det sporsmalet ingen vei tilbake til appen.
+//
+// Hele runden hentes i ett kall: ti kamper skal ikke bli ti kall. Lista
+// star under kampen, sa den som blar ser den uten a apne noe — samme
+// grunn som for «denne kampen vises pa».
+let sisteSvar = [];
+
+async function hentSvar(rot, del, data) {
+  if (del !== "neste" || !data || !Array.isArray(data.kamper)) return;
+
+  const ider = data.kamper.map((k) => k.id).filter((id) => id != null);
+  if (!ider.length) return;
+
+  try {
+    const respons = await fetch("/api/svar?kamper=" + encodeURIComponent(ider.join(",")),
+      { headers: { "Accept": "application/json" } });
+    const json = JSON.parse(await respons.text());
+    // Stille her, med vilje: lista er et tillegg til kampen, ikke kampen.
+    // En feilmelding under hver eneste rad ville dekket over runden. Den
+    // som faktisk trykker «Jeg blir med», far beskjed — det er der man
+    // venter et svar.
+    if (!respons.ok || json.feil) return;
+    sisteSvar = tolkSvar(json.svar);
+  } catch (err) {
+    return;
+  }
+  tegnSvar(rot);
+}
+
+function tegnSvar(rot) {
+  const kart = perKamp(sisteSvar);
+  Array.from(rot.querySelectorAll(".kamp")).forEach((rad) => {
+    const gammel = rad.querySelector(".kamp-blirmed");
+    if (gammel) gammel.remove();
+
+    const svar = kart.get(String(rad.dataset.kamp || "")) || [];
+    const tekst = blirMedTekst(svar);
+    if (!tekst) return;
+
+    const linje = el("div", "kamp-blirmed");
+    const merke = el("span", "kamp-blirmed-merke", "✓");
+    merke.setAttribute("aria-hidden", "true");
+    linje.appendChild(merke);
+    linje.appendChild(el("span", null, tekst));
+
+    // Linja horer til kampen, ikke til panelet: den skal sta over
+    // panelet nar det er apent, sa rekkefolgen blir lik med og uten.
+    const panel = rad.querySelector(".kamp-panel");
+    if (panel) rad.insertBefore(linje, panel);
+    else rad.appendChild(linje);
+  });
+}
+
+async function svarTjeneste(kropp) {
+  const respons = await fetch("/api/svar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    body: JSON.stringify(kropp),
+  });
+  let json = null;
+  try {
+    json = JSON.parse(await respons.text());
+  } catch (err) {
+    throw new Error("Uventet svar fra tjenesten.");
+  }
+  if (!respons.ok || !json || json.feil) {
+    throw new Error((json && json.feil) || "Tjenesten svarte " + respons.status + ".");
+  }
+  return json;
+}
+
+// Delen av panelet som svarer for deg selv. Utlogget star det hva som
+// mangler og at resten virker uansett — innlogging er ikke en port inn i
+// appen, bare veien til a stille seg pa lista.
+function blirMedDel(kamp, lesHvor, lesSted) {
+  const boks = el("div", "kamp-blirmed-valg");
+  const okt = konto.okt();
+
+  if (!okt) {
+    boks.appendChild(el("p", "kamp-note",
+      "Logg inn i menyen for å si at du blir med. Å dele kampen virker uansett."));
+    return boks;
+  }
+
+  const navnFelt = el("input", "kamp-navn");
+  navnFelt.type = "text";
+  navnFelt.placeholder = "Navnet vennene ser";
+  navnFelt.setAttribute("aria-label", "Navnet vennene ser");
+  navnFelt.maxLength = NAVN_MAKS;
+  navnFelt.value = konto.navn();
+
+  const knapp = el("button", "kamp-blimed");
+  knapp.type = "button";
+  const svar = el("p", "kamp-svar");
+  svar.setAttribute("aria-live", "polite");
+
+  // Har du alt svart, er knappen en angreknapp. To knapper ville betydd
+  // at man kan bli med to ganger.
+  const tegnKnapp = () => {
+    const mitt = egetSvar(sisteSvar.filter((s) => s.kampId === String(kamp.id)),
+      okt.bruker);
+    knapp.textContent = mitt ? "Jeg blir ikke med likevel" : "Jeg blir med";
+    knapp.dataset.med = mitt ? "ja" : "nei";
+    navnFelt.hidden = !!mitt;
+    return mitt;
+  };
+  tegnKnapp();
+
+  knapp.addEventListener("click", async () => {
+    const mitt = knapp.dataset.med === "ja";
+    const navn = normaliserNavn(navnFelt.value);
+    if (!mitt && !gyldigNavn(navn)) {
+      svar.textContent = "Skriv navnet vennene ser deg som.";
+      navnFelt.focus();
+      return;
+    }
+
+    knapp.disabled = true;
+    try {
+      if (mitt) {
+        await svarTjeneste({ handling: "fjern", token: okt.token, kampId: kamp.id });
+        sisteSvar = sisteSvar.filter(
+          (s) => !(s.kampId === String(kamp.id) && s.bruker === okt.bruker));
+        svar.textContent = "Du står ikke på lista lenger.";
+      } else {
+        konto.settNavn(navn);
+        const json = await svarTjeneste({
+          token: okt.token, kampId: kamp.id, navn,
+          hvor: lesHvor(), sted: lesSted(),
+        });
+        const mine = tolkSvar(json.svar);
+        sisteSvar = sisteSvar.filter(
+          (s) => !(s.kampId === String(kamp.id) && s.bruker === okt.bruker)).concat(mine);
+        svar.textContent = "Du står på lista.";
+      }
+      tegnKnapp();
+      tegnSvar(document.getElementById("fotballInnhold"));
+    } catch (err) {
+      svar.textContent = err.message;
+    } finally {
+      knapp.disabled = false;
+    }
+  });
+
+  boks.appendChild(navnFelt);
+  boks.appendChild(knapp);
+  // Lista kan leses uten konto, og da leses navnet ogsa av andre enn
+  // vennegruppa. Det skal sta her, der navnet skrives — ikke i en
+  // erklaering ingen apner.
+  boks.appendChild(el("p", "kamp-note",
+    "Navnet er synlig for alle som åpner kampen. Fornavn holder."));
+  boks.appendChild(svar);
+  return boks;
 }
 
 /* ---------- invitasjonen fra en delt lenke ---------- */
