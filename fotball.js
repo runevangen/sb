@@ -530,30 +530,34 @@ function hentNaerDeg(gruppe, knapp, pubFelt) {
   }, { maximumAge: 300000, timeout: 10000 });
 }
 
-// Samme tjenerrekke som funksjonen bruker. Posisjonen gar rett herfra,
-// aldri innom oss. Etter 20 sekunder per tjener far leseren beskjed
-// framfor en knapp som star og «finner» for alltid.
+// Samme tjenere som funksjonen bruker, og de sporres samtidig: den
+// forste som svarer vinner, resten avbrytes. Etter tur ble summen av
+// trege tjenere lengre enn noen gidder a vente. Posisjonen gar rett
+// herfra, aldri innom oss.
 async function naerePuber(p) {
-  let sisteFeil = new Error("Ingen tjener svarte");
-  for (const adresse of OVERPASS_SPEIL) {
-    const styring = typeof AbortController === "function" ? new AbortController() : null;
-    const vakt = setTimeout(() => styring && styring.abort(), 8000);
-    try {
-      const respons = await fetch(adresse, {
-        method: "POST",
-        headers: overpassHeadere(false),
-        body: "data=" + encodeURIComponent(overpassSporring(p.lat, p.lon, 800)),
-        signal: styring ? styring.signal : undefined,
-      });
-      if (!respons.ok) throw new Error("HTTP " + respons.status);
-      return tolkPuber(await respons.json(), p);
-    } catch (err) {
-      sisteFeil = err;
-    } finally {
-      clearTimeout(vakt);
-    }
+  const styring = typeof AbortController === "function" ? new AbortController() : null;
+  const vakt = setTimeout(() => styring && styring.abort(), 8000);
+  const kropp = "data=" + encodeURIComponent(overpassSporring(p.lat, p.lon, 800));
+  const alle = OVERPASS_SPEIL.map((adresse) => (async () => {
+    const respons = await fetch(adresse, {
+      method: "POST",
+      headers: overpassHeadere(false),
+      body: kropp,
+      signal: styring ? styring.signal : undefined,
+    });
+    if (!respons.ok) throw new Error(new URL(adresse).host + " svarte " + respons.status);
+    return tolkPuber(await respons.json(), p);
+  })());
+  try {
+    return await Promise.any(alle);
+  } catch (err) {
+    // AggregateError: ta den forste grunnen, den sier nok.
+    const grunn = err && err.errors && err.errors[0];
+    throw grunn || err;
+  } finally {
+    clearTimeout(vakt);
+    if (styring) styring.abort();
   }
-  throw sisteFeil;
 }
 
 function visPubFeil(gruppe, tekst) {

@@ -6,10 +6,16 @@
 // Overpass-tjenerne vi prover, i rekkefolge. Hovedtjeneren er raskest og
 // naermest kilden, men avviser mye; speilene er mildere. Alle tre snakker
 // samme sprak, sa et svar fra et speil er like godt.
+// Tjenerne sporres samtidig, ikke etter tur: den forste som svarer
+// vinner, og resten avbrytes. Etter tur ble summen av tre trege tjenere
+// storre enn fristen, og da kom ingenting. Kappløp koster noen ekstra
+// kall, men svaret caches et dogn per arena, sa det blir noen hundre
+// kall i dognet totalt — godt innenfor det Overpass ber om.
 export const OVERPASS_SPEIL = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
+  "https://overpass.osm.ch/api/interpreter",
 ];
 
 // Hovedtjeneren svarer 406 «Not Acceptable» nar den ikke liker headerne:
