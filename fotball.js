@@ -9,7 +9,14 @@
 
 import { LIGAER, DELER, DEL_NAVN, HVOR, delingstekst, fotballHash } from "./fotball-data.js";
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
-         OVERPASS_SPEIL, overpassHeadere } from "./pub-data.js";
+         OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte } from "./pub-data.js";
+import { PUBER_OSLO } from "./puber-oslo.js";
+import { arenaFor } from "./vaer-data.js";
+
+// Kuraterte steder vi stoler pa. «usikker» vises ikke: et sted vi ikke
+// tor sta inne for, er verre enn ett forslag faerre.
+const KJENTE = PUBER_OSLO.filter((p) => p.sikkerhet !== "usikker");
+const KJENT_RADIUS = 1500;
 import { timeAgo } from "./lib.js";
 
 let naviger = () => {};
@@ -404,17 +411,32 @@ function fyllForslag(boks, kamp) {
   // aldri innom oss, og den rundes til rundt hundre meter forst.
   // Trykket som valgte «pa pub» er handlingen telefonen krever for a
   // sporre om posisjon, sa den kan hentes na framfor etter et trykk til.
+  // Kjente fotballpuber star over de andre og trenger ingenting fra
+  // nettet: lista ligger i koden. Nar Overpass er nede, er dette det
+  // eneste som fortsatt virker.
+  const kjent = el("div", "pub-gruppe");
+  boks.appendChild(kjent);
+
   const naer = el("div", "pub-gruppe");
   const knapp = el("button", "pub-naer", "Puber nær deg");
   knapp.type = "button";
-  knapp.addEventListener("click", () => hentNaerDeg(naer, knapp, boks.pubFelt));
+  knapp.addEventListener("click", () => hentNaerDeg(naer, knapp, boks.pubFelt, kjent));
   naer.appendChild(knapp);
   naer.appendChild(el("p", "pub-note", "Posisjonen sendes til OpenStreetMap, ikke til oss."));
   boks.appendChild(naer);
-  hentNaerDeg(naer, knapp, boks.pubFelt);
+  hentNaerDeg(naer, knapp, boks.pubFelt, kjent);
 
   const dine = puber.liste();
   if (dine.length) boks.appendChild(pubGruppe("Dine puber", dine.map((p) => ({ navn: p.navn })), boks.pubFelt));
+
+  // Ved arenaen: ogsa uten nettverk, for de arenaene lista dekker.
+  const arena = arenaFor(kamp.arena);
+  if (arena) {
+    const vedArena = kuraterteNaer(KJENTE, arena, KJENT_RADIUS);
+    if (vedArena.length) {
+      boks.appendChild(pubGruppe("Fotballpuber ved " + arena.navn, vedArena.slice(0, 5), boks.pubFelt));
+    }
+  }
 
   const rundt = el("div", "pub-rundt");
   boks.appendChild(rundt);
@@ -429,7 +451,8 @@ function fyllForslag(boks, kamp) {
           "Fikk ikke hentet puber ved " + kamp.arena + hvemSviktet(data) + ". Skriv puben selv."));
         return;
       }
-      (data.grupper || []).forEach((g) => rundt.appendChild(pubGruppe(g.tittel, g.puber, boks.pubFelt)));
+      (data.grupper || []).forEach((g) =>
+        rundt.appendChild(pubGruppe(g.tittel, merkKuraterte(g.puber, KJENTE), boks.pubFelt)));
       if (data.grupper && data.grupper.length) {
         rundt.appendChild(el("p", "pub-note", "© OpenStreetMap-bidragsytere"));
       } else {
@@ -457,6 +480,14 @@ function pubGruppe(tittel, liste, pubFelt) {
     const b = el("button", "pub-chip");
     b.type = "button";
     b.appendChild(el("span", null, p.navn));
+    // Et sted vi vet viser fotball, blant treff vi bare vet er puber.
+    if (p.viserFotball || p.sikkerhet) {
+      const merke = el("span", "pub-merke", "⚽");
+      merke.setAttribute("aria-label", "kjent for å vise fotball");
+      b.appendChild(merke);
+      const lag = (p.lag || []).join(", ");
+      b.title = lag ? "Kjent for å vise fotball. Stampub for " + lag + "." : "Kjent for å vise fotball.";
+    }
     if (Number.isFinite(p.avstand)) b.appendChild(el("span", "pub-avstand", avstandtekst(p.avstand)));
     b.addEventListener("click", () => {
       pubFelt.value = p.navn;
@@ -501,12 +532,21 @@ async function hentPuberRundt(arena) {
 // posisjon sa et nytt trykk ikke koster et nytt kall.
 const naerHusket = new Map();
 
-function hentNaerDeg(gruppe, knapp, pubFelt) {
+function hentNaerDeg(gruppe, knapp, pubFelt, kjentBoks) {
   if (!navigator.geolocation) { visPubFeil(gruppe, "Ingen posisjon tilgjengelig."); return; }
   knapp.disabled = true;
   knapp.textContent = "Finner puber …";
   navigator.geolocation.getCurrentPosition(async (pos) => {
     const p = rundPosisjon(pos.coords.latitude, pos.coords.longitude);
+    // Kjente fotballpuber forst, og med en gang: lista ligger i koden,
+    // sa denne star der ogsa nar Overpass ikke svarer.
+    if (kjentBoks) {
+      const naere = kuraterteNaer(KJENTE, p, KJENT_RADIUS);
+      if (naere.length) {
+        kjentBoks.replaceChildren();
+        kjentBoks.appendChild(pubGruppe("Kjent for å vise fotball", naere.slice(0, 6), pubFelt));
+      }
+    }
     const nokkel = p.lat + "," + p.lon;
     try {
       if (!naerHusket.has(nokkel)) naerHusket.set(nokkel, naerePuber(p));

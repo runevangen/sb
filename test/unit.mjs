@@ -20,7 +20,9 @@ import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
 
 import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, enturNaermest,
          tolkHoldeplasser, grupperPuber, ofteBrukt, noterPub,
-         OVERPASS_SPEIL, overpassHeadere, restTid } from "../pub-data.js";
+         OVERPASS_SPEIL, overpassHeadere, restTid,
+         sjekkPubliste, kuraterteNaer, merkKuraterte } from "../pub-data.js";
+import { PUBER_OSLO } from "../puber-oslo.js";
 
 let feilet = 0;
 
@@ -554,6 +556,61 @@ ok("tomt navn endrer ingenting", noterPub(dine, "  ").length === 2);
 ok("hoyst fem forslag", ofteBrukt(Array.from({ length: 9 }, (_, i) => ({ navn: "P" + i, antall: i }))).length === 5);
 ok("odelagt lagring gir tom liste", ofteBrukt("rart").length === 0 && ofteBrukt([null, { antall: 3 }]).length === 0);
 
+/* ---------------- kuratert publiste ---------------- */
+
+// Vokteren skal holde lista redigerbar for hvem som helst. Den ekte
+// lista ma passere; da slar en feilskrevet rad ut i testene framfor i
+// appen.
+ok("den kuraterte lista holder formen", sjekkPubliste(PUBER_OSLO).length === 0,
+   sjekkPubliste(PUBER_OSLO).join(" | "));
+ok("lista har innhold og er datert",
+   PUBER_OSLO.length >= 20 && PUBER_OSLO.every((p) => p.sjekket >= "2026-01-01"),
+   PUBER_OSLO.length);
+ok("hver rad har en kilde som faktisk er en lenke",
+   PUBER_OSLO.every((p) => /^https?:\/\//.test(p.kilde)));
+
+function rad(endring) {
+  return Object.assign({ navn: "Testpuben", bydel: "Sentrum", adresse: "Gata 1",
+    lat: 59.913, lon: 10.74, type: "pub", kilde: "https://eksempel.no",
+    sikkerhet: "bekreftet", sjekket: "2026-09-11" }, endring);
+}
+ok("en riktig rad gir ingen feil", sjekkPubliste([rad()]).length === 0, sjekkPubliste([rad()]));
+ok("manglende felt fanges", sjekkPubliste([rad({ kilde: "" })])[0].indexOf("mangler kilde") > -1,
+   sjekkPubliste([rad({ kilde: "" })]));
+ok("koordinat utenfor omradet fanges",
+   sjekkPubliste([rad({ lat: 63.43 })])[0].indexOf("utenfor omradet") > -1);
+ok("ukjent type og sikkerhet fanges",
+   sjekkPubliste([rad({ type: "kafe" })]).length === 1 &&
+   sjekkPubliste([rad({ sikkerhet: "kanskje" })]).length === 1);
+// En udatert rad er verre enn ingen rad: Oslos uteliv flytter seg fort.
+ok("dato som ikke er en dato fanges",
+   sjekkPubliste([rad({ sjekket: "i fjor" })])[0].indexOf("ikke en dato") > -1);
+ok("kilde uten lenke fanges",
+   sjekkPubliste([rad({ kilde: "sa en venn" })])[0].indexOf("ikke en lenke") > -1);
+ok("samme sted to ganger fanges",
+   sjekkPubliste([rad(), rad({ navn: "testpuben" })]).some((f) => f.indexOf("to ganger") > -1));
+ok("noe annet enn en liste fanges", sjekkPubliste("nei").length === 1);
+
+// Uten nettverk i det hele tatt: lista alene svarer «hva er i naerheten».
+const OSLO_S = { lat: 59.911, lon: 10.750 };
+const NAER = kuraterteNaer(PUBER_OSLO, OSLO_S, 1500);
+ok("kuraterte steder i naerheten, naermest forst",
+   NAER.length > 3 && NAER.every((p, i) => i === 0 || p.avstand >= NAER[i - 1].avstand),
+   NAER.slice(0, 3).map((p) => p.navn + " " + p.avstand).join(", "));
+ok("alle innenfor radien", NAER.every((p) => p.avstand <= 1500));
+ok("et sted langt unna er ikke med",
+   kuraterteNaer(PUBER_OSLO, { lat: 63.413, lon: 10.406 }, 1500).length === 0);
+ok("tom liste eller ingen posisjon gir ingenting",
+   kuraterteNaer([], OSLO_S, 1500).length === 0 && kuraterteNaer(PUBER_OSLO, null, 1500).length === 0);
+
+// OpenStreetMap vet at det er en pub; lista vet at de viser fotball.
+const FRA_OSM = [{ navn: "Carls", lat: 59.927, lon: 10.778 }, { navn: "Ukjent Bar", lat: 59.9, lon: 10.7 }];
+const MERKET = merkKuraterte(FRA_OSM, PUBER_OSLO);
+ok("kjente steder merkes, resten star urort",
+   MERKET[0].viserFotball === true && MERKET[0].lag.indexOf("Brann") > -1 &&
+   MERKET[1].viserFotball === undefined, JSON.stringify(MERKET));
+ok("tom kuratert liste endrer ingenting", merkKuraterte(FRA_OSM, []) === FRA_OSM);
+
 /* ---------------- fotball: lagnavn ---------------- */
 
 ok("norske tegn foldes til ascii i nokkelen",
@@ -719,6 +776,6 @@ ok("hash bygges tilbake til samme rute",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 230;
+const antall = 246;
 console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);
