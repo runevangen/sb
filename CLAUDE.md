@@ -149,9 +149,12 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   svar i inntil tre timer — så etter at nøkkelen er satt, må det
   deployes på nytt (Netlify → Deploys → Trigger deploy) før noe endrer
   seg. En deploy tømmer også cachen.
-  v2-formen er fra dokumentasjonen; parserne tar den første lista de
-  finner i svaret, så et annet feltnavn ikke velter noe. `uverifisert`
-  til nøkkelen er satt og sett virke. TheSportsDB skriver sesongen «2026»
+  Parserne tar den første lista de finner i svaret, så et annet
+  feltnavn ikke velter noe. Sett virke i prod 11. september 2026 med
+  Patreon-nøkkel: full tabell for 2026. Første forsøk feilet fordi
+  nøkkelen var limt inn med ett siffer for lite — `forsok` viste 400 fra
+  begge utgavene, og det var det som pekte på nøkkelen framfor koden.
+  TheSportsDB skriver sesongen «2026»
   for kalenderligaer og «2026-2027» for dem som krysser nyttår
   (`tsdbSesong`).
 - «Hvor ser du kampen?» Årets kommende kamper har en delingsknapp som
