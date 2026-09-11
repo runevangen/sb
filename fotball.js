@@ -414,11 +414,19 @@ function fyllForslag(boks, kamp) {
   const rundt = el("div", "pub-rundt");
   boks.appendChild(rundt);
   if (kamp.arena) {
+    // Aldri stille: star det ingenting her, skal det sta hvorfor.
+    rundt.appendChild(el("p", "pub-note pub-venter", "Finner puber ved " + kamp.arena + " …"));
     hentPuberRundt(kamp.arena).then((data) => {
-      if (!data) return;
+      rundt.replaceChildren();
+      if (!data) {
+        rundt.appendChild(el("p", "pub-note pub-feil", "Fikk ikke hentet puber ved " + kamp.arena + ". Skriv puben selv."));
+        return;
+      }
       (data.grupper || []).forEach((g) => rundt.appendChild(pubGruppe(g.tittel, g.puber, boks.pubFelt)));
       if (data.grupper && data.grupper.length) {
         rundt.appendChild(el("p", "pub-note", "© OpenStreetMap-bidragsytere"));
+      } else {
+        rundt.appendChild(el("p", "pub-note", "Fant ingen puber i nærheten av " + kamp.arena + "."));
       }
     });
   }
@@ -477,12 +485,18 @@ function hentNaerDeg(gruppe, knapp, pubFelt) {
     const nokkel = p.lat + "," + p.lon;
     try {
       if (!naerHusket.has(nokkel)) {
+        // Overpass kan bruke tid. Etter 20 sekunder far leseren beskjed
+        // framfor en knapp som star og «finner» for alltid.
+        const styring = typeof AbortController === "function" ? new AbortController() : null;
+        const vakt = setTimeout(() => styring && styring.abort(), 20000);
         naerHusket.set(nokkel, fetch("https://overpass-api.de/api/interpreter", {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: "data=" + encodeURIComponent(overpassSporring(p.lat, p.lon, 800)),
+          signal: styring ? styring.signal : undefined,
         }).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-          .then((json) => tolkPuber(json, p)));
+          .then((json) => tolkPuber(json, p))
+          .finally(() => clearTimeout(vakt)));
       }
       const liste = (await naerHusket.get(nokkel)).slice(0, 6);
       knapp.remove();

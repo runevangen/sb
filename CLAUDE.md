@@ -209,7 +209,7 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
     node test/unit.mjs      224 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  93 tester, ~120 ms, ingen nettleser
-    node test/run.mjs       147 tester, ~110 s, headless Chromium
+    node test/run.mjs       150 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
 De raske først, så en åpenbar feil stopper kjøringen før nettleseren
