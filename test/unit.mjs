@@ -273,18 +273,24 @@ ok("adressen bruker testnokkelen 3 som standard",
    tsdbSti("neste", LIGAER.eliteserien) === "/api/v1/json/3/eventsnextleague.php?id=4358",
    tsdbSti("neste", LIGAER.eliteserien));
 // Med nokkel: v2, og nokkelen star ikke i adressen — den gar i en header.
-ok("med nokkel brukes v2 for neste",
-   tsdbSti("neste", LIGAER.premier, "hemmelig") === "/api/v2/json/schedule/next/league/4328",
-   tsdbSti("neste", LIGAER.premier, "hemmelig"));
-ok("med nokkel brukes v2 for resultater",
-   tsdbSti("resultater", LIGAER.eliteserien, "hemmelig") === "/api/v2/json/schedule/previous/league/4358");
-ok("med nokkel brukes v2 for tabellen, med sesongen i stien",
-   tsdbSti("tabell", LIGAER.eliteserien, "hemmelig", new Date(Date.UTC(2026, 8, 10))) === "/api/v2/json/lookup/table/4358/2026",
-   tsdbSti("tabell", LIGAER.eliteserien, "hemmelig", new Date(Date.UTC(2026, 8, 10))));
-ok("nokkelen star aldri i adressen",
-   ["tabell", "resultater", "neste"].every((d) => tsdbSti(d, LIGAER.eliteserien, "hemmelig").indexOf("hemmelig") === -1));
-ok("nokkelen gar i X-API-KEY", tsdbHeadere("hemmelig")["X-API-KEY"] === "hemmelig");
-ok("uten nokkel sendes ingen X-API-KEY", !("X-API-KEY" in tsdbHeadere("")) && !("X-API-KEY" in tsdbHeadere()));
+ok("v2 for neste",
+   tsdbSti("neste", LIGAER.premier, "hemmelig", undefined, "v2") === "/api/v2/json/schedule/next/league/4328",
+   tsdbSti("neste", LIGAER.premier, "hemmelig", undefined, "v2"));
+ok("v2 for resultater",
+   tsdbSti("resultater", LIGAER.eliteserien, "hemmelig", undefined, "v2") === "/api/v2/json/schedule/previous/league/4358");
+ok("v2 for tabellen, med sesongen i stien",
+   tsdbSti("tabell", LIGAER.eliteserien, "hemmelig", new Date(Date.UTC(2026, 8, 10)), "v2") === "/api/v2/json/lookup/table/4358/2026",
+   tsdbSti("tabell", LIGAER.eliteserien, "hemmelig", new Date(Date.UTC(2026, 8, 10)), "v2"));
+ok("v2 har aldri nokkelen i adressen",
+   ["tabell", "resultater", "neste"].every((d) => tsdbSti(d, LIGAER.eliteserien, "hemmelig", undefined, "v2").indexOf("hemmelig") === -1));
+// v1 med nokkel: Patreon gir ogsa en «production key» for de gamle
+// adressene, med nokkelen i stien.
+ok("v1 med nokkel legger den i adressen, url-kodet",
+   tsdbSti("neste", LIGAER.premier, "a b", undefined, "v1") === "/api/v1/json/a%20b/eventsnextleague.php?id=4328",
+   tsdbSti("neste", LIGAER.premier, "a b", undefined, "v1"));
+ok("nokkelen gar i X-API-KEY bare for v2",
+   tsdbHeadere("hemmelig", "v2")["X-API-KEY"] === "hemmelig" && !("X-API-KEY" in tsdbHeadere("hemmelig", "v1")));
+ok("uten nokkel sendes ingen X-API-KEY", !("X-API-KEY" in tsdbHeadere("", "v2")) && !("X-API-KEY" in tsdbHeadere()));
 ok("liga uten TheSportsDB-id gir null", tsdbSti("neste", { id: 1 }) === null);
 ok("ukjent datasett gir null", tsdbSti("toppscorere", LIGAER.eliteserien) === null);
 ok("resultater har egen adresse",
@@ -617,6 +623,6 @@ ok("hash bygges tilbake til samme rute",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 205;
+const antall = 206;
 console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);
