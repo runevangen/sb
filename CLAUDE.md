@@ -23,7 +23,7 @@ prosjektet `mvp-sb`.
     netlify/functions/puber.mjs   samme: puber ved stadion og holdeplass, døgncache
 
     admin.html / admin.js            adminportalen: hvilke kamper viser hvilken pub
-    visning-data.js                  samme: rene funksjoner
+    visning-data.js                  samme: rene funksjoner, ogsa for lesersiden
     netlify/functions/visninger.mjs  samme: passord og skriving til repoet
     visninger.js                     dataene portalen skriver, lest av appen
 
@@ -273,12 +273,34 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 - Pubene kommer fra `puber-oslo.js`; en pub som ikke står der, avvises av
   funksjonen. `usikker` vises ikke i appen og kan derfor ikke velges her
   heller.
+- Leseren ser det to steder. På kampen selv står «Denne kampen vises på:
+  Lincoln Pub» rett under raden, så den som blar gjennom runden ser det
+  uten å åpne noe; pubnavnet er en knapp som åpner delingspanelet med
+  «på pub» og puben ferdig valgt. I panelet står de samme pubene som
+  egen gruppe aller øverst — den eneste gruppa som svarer på *denne*
+  kampen, mens resten er steder som pleier å vise fotball. Dukker samme
+  pub opp igjen under «Nær deg» eller ved arenaen, bærer den samme hake
+  der (`merkBekreftet`), så den ser lik ut overalt.
+- Det står «Meldt inn til oss» under gruppa, ikke «Puben bekrefter»:
+  inntil pubene skriver selv (#65) er det vi som har ført det inn, og
+  leseren skal vite forskjellen.
+- Fargen er `--bekreftet`, en egen variabel i begge temaer: `#1F7A4D` er
+  for mørk på svart. Haken sier noe annet enn ballen — ballen betyr at
+  stedet pleier å vise fotball, haken at nettopp denne kampen vises.
+- Nettlesertesten legger sin egen `visninger.js` i temp-katalogen, og
+  testtjeneren serverer den framfor den i repoet. Da kan lesersiden
+  testes med ekte data uten at `visninger.js` fylles med oppdiktede
+  puber.
 
 ## Testing
 
-    node test/unit.mjs      271 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  122 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       175 tester, ~110 s, headless Chromium
+    node test/unit.mjs      279 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  119 tester, ~250 ms, ingen nettleser
+    node test/run.mjs       194 tester, ~130 s, headless Chromium
+
+Tallene telles av testene selv. De sto en stund som konstanter, og da
+gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
+funksjonstestene 122 mens 119 kjørte.
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
 De raske først, så en åpenbar feil stopper kjøringen før nettleseren

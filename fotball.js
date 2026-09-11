@@ -11,6 +11,8 @@ import { LIGAER, DELER, DEL_NAVN, HVOR, delingstekst, fotballHash } from "./fotb
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte } from "./pub-data.js";
 import { PUBER_OSLO } from "./puber-oslo.js";
+import { VISNINGER } from "./visninger.js";
+import { bekreftetFor, merkBekreftet } from "./visning-data.js";
 import { arenaFor } from "./vaer-data.js";
 
 // Kuraterte steder vi stoler pa. «usikker» vises ikke: et sted vi ikke
@@ -414,27 +416,43 @@ function fyllForslag(boks, kamp) {
   // Kjente fotballpuber star over de andre og trenger ingenting fra
   // nettet: lista ligger i koden. Nar Overpass er nede, er dette det
   // eneste som fortsatt virker.
+  // Aller forst: pubene som har sagt at de viser nettopp denne kampen.
+  // Det er den eneste gruppa som svarer pa sporsmalet direkte — resten
+  // er steder som pleier a vise fotball. Lista ligger i koden, sa den
+  // star der uten et eneste nettkall.
+  const bekreftede = bekreftetFor(kamp, VISNINGER, KJENTE);
+  if (bekreftede.length) {
+    const bek = pubGruppe("Viser denne kampen", bekreftede, boks.pubFelt);
+    bek.classList.add("pub-gruppe-bekreftet");
+    bek.appendChild(el("p", "pub-note", "Meldt inn til oss. Ring gjerne og hør før du drar."));
+    boks.appendChild(bek);
+  }
+
   const kjent = el("div", "pub-gruppe");
   boks.appendChild(kjent);
 
   const naer = el("div", "pub-gruppe");
   const knapp = el("button", "pub-naer", "Puber nær deg");
   knapp.type = "button";
-  knapp.addEventListener("click", () => hentNaerDeg(naer, knapp, boks.pubFelt, kjent));
+  knapp.addEventListener("click", () => hentNaerDeg(naer, knapp, boks.pubFelt, kjent, bekreftede));
   naer.appendChild(knapp);
   naer.appendChild(el("p", "pub-note", "Posisjonen sendes til OpenStreetMap, ikke til oss."));
   boks.appendChild(naer);
-  hentNaerDeg(naer, knapp, boks.pubFelt, kjent);
+  hentNaerDeg(naer, knapp, boks.pubFelt, kjent, bekreftede);
 
   const dine = puber.liste();
-  if (dine.length) boks.appendChild(pubGruppe("Dine puber", dine.map((p) => ({ navn: p.navn })), boks.pubFelt));
+  if (dine.length) {
+    boks.appendChild(pubGruppe("Dine puber",
+      merkBekreftet(dine.map((p) => ({ navn: p.navn })), bekreftede), boks.pubFelt));
+  }
 
   // Ved arenaen: ogsa uten nettverk, for de arenaene lista dekker.
   const arena = arenaFor(kamp.arena);
   if (arena) {
     const vedArena = kuraterteNaer(KJENTE, arena, KJENT_RADIUS);
     if (vedArena.length) {
-      boks.appendChild(pubGruppe("Fotballpuber ved " + arena.navn, vedArena.slice(0, 5), boks.pubFelt));
+      boks.appendChild(pubGruppe("Fotballpuber ved " + arena.navn,
+        merkBekreftet(vedArena.slice(0, 5), bekreftede), boks.pubFelt));
     }
   }
 
@@ -452,7 +470,8 @@ function fyllForslag(boks, kamp) {
         return;
       }
       (data.grupper || []).forEach((g) =>
-        rundt.appendChild(pubGruppe(g.tittel, merkKuraterte(g.puber, KJENTE), boks.pubFelt)));
+        rundt.appendChild(pubGruppe(g.tittel,
+          merkBekreftet(merkKuraterte(g.puber, KJENTE), bekreftede), boks.pubFelt)));
       if (data.grupper && data.grupper.length) {
         rundt.appendChild(el("p", "pub-note", "© OpenStreetMap-bidragsytere"));
       } else {
@@ -480,6 +499,14 @@ function pubGruppe(tittel, liste, pubFelt) {
     const b = el("button", "pub-chip");
     b.type = "button";
     b.appendChild(el("span", null, p.navn));
+    // Bekreftet star forst av merkene: det svarer pa kampen, ikke bare
+    // pa stedet.
+    if (p.bekreftet) {
+      b.classList.add("bekreftet");
+      const hake = el("span", "pub-bekreftet", "✓");
+      hake.setAttribute("aria-label", "viser denne kampen");
+      b.appendChild(hake);
+    }
     // Et sted vi vet viser fotball, blant treff vi bare vet er puber.
     if (p.viserFotball || p.sikkerhet) {
       const merke = el("span", "pub-merke", "⚽");
@@ -532,7 +559,7 @@ async function hentPuberRundt(arena) {
 // posisjon sa et nytt trykk ikke koster et nytt kall.
 const naerHusket = new Map();
 
-function hentNaerDeg(gruppe, knapp, pubFelt, kjentBoks) {
+function hentNaerDeg(gruppe, knapp, pubFelt, kjentBoks, bekreftede) {
   if (!navigator.geolocation) { visPubFeil(gruppe, "Ingen posisjon tilgjengelig."); return; }
   knapp.disabled = true;
   knapp.textContent = "Finner puber …";
@@ -544,7 +571,8 @@ function hentNaerDeg(gruppe, knapp, pubFelt, kjentBoks) {
       const naere = kuraterteNaer(KJENTE, p, KJENT_RADIUS);
       if (naere.length) {
         kjentBoks.replaceChildren();
-        kjentBoks.appendChild(pubGruppe("Kjent for å vise fotball", naere.slice(0, 6), pubFelt));
+        kjentBoks.appendChild(pubGruppe("Kjent for å vise fotball",
+          merkBekreftet(naere.slice(0, 6), bekreftede), pubFelt));
       }
     }
     const nokkel = p.lat + "," + p.lon;
@@ -554,7 +582,7 @@ function hentNaerDeg(gruppe, knapp, pubFelt, kjentBoks) {
       knapp.remove();
       if (!liste.length) { visPubFeil(gruppe, "Fant ingen puber innen 800 m."); return; }
       gruppe.replaceChildren();
-      gruppe.appendChild(pubGruppe("Nær deg", liste, pubFelt));
+      gruppe.appendChild(pubGruppe("Nær deg", merkBekreftet(liste, bekreftede), pubFelt));
       gruppe.appendChild(el("p", "pub-note", "© OpenStreetMap-bidragsytere"));
     } catch (err) {
       naerHusket.delete(nokkel);
@@ -630,8 +658,43 @@ function kamprad(kamp, del, delbar) {
   if (delbar) {
     rad.appendChild(delKnapp(kamp, rad));
     if (kamp.arena) rad.appendChild(vaerlinje(kamp));
+    const viser = viserlinje(kamp);
+    if (viser) rad.appendChild(viser);
   }
   return rad;
+}
+
+// «Denne kampen vises på: Lincoln Pub» rett under kampen, ikke bare inne
+// i delingspanelet: den som blar gjennom runden skal se det uten a apne
+// noe. Navnet er en knapp som apner panelet med puben ferdig valgt —
+// linja svarer pa sporsmalet og tar deg videre til a dele det.
+function viserlinje(kamp) {
+  const bekreftede = bekreftetFor(kamp, VISNINGER, KJENTE);
+  if (!bekreftede.length) return null;
+  const linje = el("div", "kamp-viser");
+  linje.appendChild(el("span", "kamp-viser-merke", "✓"));
+  linje.appendChild(el("span", "kamp-viser-tekst", "Denne kampen vises på: "));
+  bekreftede.forEach((p, i) => {
+    if (i) linje.appendChild(el("span", "kamp-viser-tekst", ", "));
+    const knapp = el("button", "kamp-viser-pub", p.navn);
+    knapp.type = "button";
+    knapp.title = "Meldt inn til oss. Trykk for å dele at du ser kampen her.";
+    knapp.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const rad = knapp.closest(".kamp");
+      const del = rad && rad.querySelector(".kamp-del");
+      if (!del) return;
+      if (del.getAttribute("aria-expanded") !== "true") del.click();
+      const panel = apentPanel && apentPanel.panel;
+      if (!panel) return;
+      panel.querySelectorAll(".hvor-valg")[1].click();
+      const felt = panel.querySelector(".kamp-pub");
+      felt.value = p.navn;
+      felt.dispatchEvent(new Event("input"));
+    });
+    linje.appendChild(knapp);
+  });
+  return linje;
 }
 
 /* ---------- vaeret ved avspark ---------- */

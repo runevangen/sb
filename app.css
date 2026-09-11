@@ -31,6 +31,9 @@
   --accent-soft:   #1B2A87;
   --accent-bright: #FFFFFF;
 
+  /* Bekreftet: en pub har sagt at den viser nettopp denne kampen. */
+  --bekreftet: #1F7A4D;
+
   --ad-g1: #1B2A87;
   --ad-g2: #2A50D8;
   --ad-g3: #223AA8;
@@ -81,7 +84,10 @@
   --text-dimmer: #A0A0A0;
   --text-faint:  #8A8A8A;
 
-  /* Aksenten lysnes for a holde kontrasten mot svart. */
+  /* Aksenten lysnes for a holde kontrasten mot svart. Det samme gjor
+     bekreftet-gronn: #1F7A4D er for morkt pa svart. */
+  --bekreftet: #4ECB8B;
+
   --accent:        #5C82FF;
   --accent-ink:    #00081F;
   --accent-soft:   #9DB4FF;
@@ -1352,6 +1358,32 @@ body {
 
 .kamp-vaer[hidden] { display: none; }
 
+/* «Denne kampen vises pa: …» star rett under kampen, sa den som blar
+   gjennom runden ser det uten a apne noe. Pubnavnet er en knapp: den
+   apner delingspanelet med puben valgt. */
+.kamp-viser {
+  grid-column: 1 / -1;
+  font-size: calc(12px * var(--fs));
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.kamp-viser-merke { color: var(--bekreftet); font-weight: 700; margin-right: 4px; }
+.kamp-viser-tekst { color: var(--text-dim); }
+
+.kamp-viser-pub {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--bekreftet);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.kamp-viser-pub:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 /* Panelet ligger som en egen rad rett under kampen, ikke som en dialog:
    det er ett sporsmal, og svaret skal ut av appen, ikke inn i den. */
 .kamp-panel {
@@ -1446,6 +1478,14 @@ body {
 
 .pub-avstand { font-size: 11px; color: var(--text-faint); }
 .pub-merke { font-size: 11px; line-height: 1; }
+
+/* En pub som har meldt at den viser nettopp denne kampen. Haken er
+   gronn og ikke bare enda et symbol: den svarer pa kampen, mens ballen
+   bare sier at stedet pleier a vise fotball. */
+.pub-bekreftet { font-size: 11px; line-height: 1; color: var(--bekreftet); font-weight: 700; }
+.pub-chip.bekreftet { border-color: var(--bekreftet); }
+.pub-chip.bekreftet[aria-pressed="true"] .pub-bekreftet { color: var(--accent-ink); }
+.pub-gruppe-bekreftet .pub-gruppe-tittel { color: var(--bekreftet); }
 
 .pub-note {
   margin: 0;

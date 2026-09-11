@@ -38,6 +38,30 @@ export function visningerFor(kamp, alle) {
   return alle.filter((v) => String(v.kampId) === String(kamp.id));
 }
 
+// Pubene som har bekreftet denne kampen, med det vi ellers vet om dem
+// fra den kuraterte lista — bydel, stamlag, koordinater. Sta navnet i
+// visningen ikke igjen i lista, brukes navnet slik det ble skrevet: en
+// pub som er fjernet fra publista skal ikke forsvinne stumt.
+export function bekreftetFor(kamp, alle, kjente) {
+  const kjent = new Map((kjente || []).map((p) => [normaliserLagnavn(p.navn), p]));
+  return visningerFor(kamp, alle).map((v) => {
+    const pub = kjent.get(normaliserLagnavn(v.pub));
+    return Object.assign({}, pub || {}, {
+      navn: (pub && pub.navn) || v.pub,
+      bekreftet: true,
+    });
+  });
+}
+
+// Merker de av trefftene som har bekreftet kampen, sa en pub naer deg
+// ser lik ut uansett hvilken gruppe den dukker opp i. Samme mekanikk som
+// merkKuraterte i pub-data.js.
+export function merkBekreftet(puber, bekreftede) {
+  const sett = new Set((bekreftede || []).map((p) => normaliserLagnavn(p.navn)));
+  return (puber || []).map((p) =>
+    sett.has(normaliserLagnavn(p.navn)) ? Object.assign({}, p, { bekreftet: true }) : p);
+}
+
 // Setter visningene for en pub innenfor et kjent sett kamper, og lar
 // alle andre rader sta. Da kan admin rette opp en runde uten a rore
 // resten, og uten at en kamp som ikke var pa skjermen forsvinner.

@@ -16,8 +16,10 @@ import visninger from "../netlify/functions/visninger.mjs";
 import { lesVisninger } from "../visning-data.js";
 
 let feilet = 0;
+let kjort = 0;
 
 function ok(navn, betingelse, detalj) {
+  kjort++;
   if (betingelse) {
     console.log("  ok   " + navn);
   } else {
@@ -672,6 +674,7 @@ delete process.env.GITHUB_TOKEN;
 
 /* ---------------- rapport ---------------- */
 
-const antall = 122;
-console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
+// Tallet telles, ikke skrives: en hardkodet sum kan sta stille mens
+// tester legges til.
+console.log("\n" + (kjort - feilet) + " av " + kjort + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);
