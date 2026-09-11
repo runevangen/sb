@@ -21,7 +21,9 @@ import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
 import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, enturNaermest,
          tolkHoldeplasser, grupperPuber, ofteBrukt, noterPub,
          OVERPASS_SPEIL, overpassHeadere, restTid,
-         sjekkPubliste, kuraterteNaer, merkKuraterte } from "../pub-data.js";
+         sjekkPubliste, kuraterteNaer, merkKuraterte,
+         sjekkKontaktliste, kontaktFor, finnKontakt, KONTAKT_FELT } from "../pub-data.js";
+import { PUBER_KONTAKT } from "../puber-kontakt.js";
 import { PUBER_OSLO } from "../puber-oslo.js";
 import { VISNINGER as VISNINGER_EKTE } from "../visninger.js";
 import { sjekkVisninger, visningerFor, slaSammen, utenGamle, visningerFil, lesVisninger,
@@ -882,6 +884,82 @@ ok("artikkelruter er ikke fotballruter", tolkFotballHash("#/sak/en-sak") === nul
 ok("tom hash er ikke en fotballrute", tolkFotballHash("") === null);
 ok("hash bygges tilbake til samme rute",
    tolkFotballHash(fotballHash("premier", "neste")).del === "neste");
+
+/* ---------------- kontaktopplysninger ---------------- */
+
+// Samme vokter-tanke som for publista: den ekte fila ma passere, sa en
+// feilskrevet rad slar ut her framfor i appen.
+ok("kontaktfila holder formen",
+   sjekkKontaktliste(PUBER_KONTAKT, PUBER_OSLO.map((p) => p.navn)).length === 0,
+   sjekkKontaktliste(PUBER_KONTAKT, PUBER_OSLO.map((p) => p.navn)).slice(0, 3).join(" | "));
+ok("hver pub i kontaktfila finnes i publista",
+   Object.keys(PUBER_KONTAKT).length >= 20 &&
+   sjekkKontaktliste(PUBER_KONTAKT, PUBER_OSLO.map((p) => p.navn))
+     .every((f) => f.indexOf("ukjent pub") === -1),
+   Object.keys(PUBER_KONTAKT).length);
+// Hvert eneste felt skal baere hvor det kom fra. Uten det er det en
+// pastand, ikke en opplysning.
+ok("alt som star der har kilde og sitat",
+   Object.values(PUBER_KONTAKT).every((rad) =>
+     Object.values(rad).every((f) => /^https?:\/\//.test(f.kilde) && String(f.sitat).trim())));
+
+function kontakt(endring) {
+  return { "Testpuben": Object.assign({
+    telefon: { verdi: "+47 22 41 62 66", tillit: 2, kilde: "https://eksempel.no", sitat: "Tlf: 22 41 62 66" },
+  }, endring) };
+}
+const TESTNAVN = ["Testpuben"];
+ok("en riktig rad gir ingen feil", sjekkKontaktliste(kontakt(), TESTNAVN).length === 0,
+   sjekkKontaktliste(kontakt(), TESTNAVN));
+// Mobil skrives tre-to-tre, fasttelefon i par. Begge er riktige.
+ok("mobilnummer godtas",
+   sjekkKontaktliste(kontakt({ telefon: { verdi: "+47 484 06 215", tillit: 1, kilde: "https://a.no", sitat: "x" } }), TESTNAVN).length === 0);
+ok("nummer pa fremmed form fanges",
+   sjekkKontaktliste(kontakt({ telefon: { verdi: "22416266", tillit: 1, kilde: "https://a.no", sitat: "x" } }), TESTNAVN)[0]
+     .indexOf("ikke et norsk nummer") > -1);
+ok("epost uten krull fanges",
+   sjekkKontaktliste(kontakt({ epost: { verdi: "post.eksempel.no", tillit: 1, kilde: "https://a.no", sitat: "x" } }), TESTNAVN)
+     .some((f) => f.indexOf("e-postadresse") > -1));
+ok("ukjent matvalg fanges",
+   sjekkKontaktliste(kontakt({ mat: { verdi: "pizza", tillit: 1, kilde: "https://a.no", sitat: "x" } }), TESTNAVN)
+     .some((f) => f.indexOf("ukjent matvalg") > -1));
+ok("kilde uten lenke fanges",
+   sjekkKontaktliste(kontakt({ telefon: { verdi: "+47 22 41 62 66", tillit: 2, kilde: "sa en venn", sitat: "x" } }), TESTNAVN)
+     .some((f) => f.indexOf("ikke en lenke") > -1));
+ok("felt uten sitat fanges",
+   sjekkKontaktliste(kontakt({ telefon: { verdi: "+47 22 41 62 66", tillit: 2, kilde: "https://a.no", sitat: "" } }), TESTNAVN)
+     .some((f) => f.indexOf("mangler sitat") > -1));
+ok("ukjent felt fanges",
+   sjekkKontaktliste({ "Testpuben": { parkering: { verdi: "ja" } } }, TESTNAVN)[0].indexOf("ukjent felt") > -1);
+ok("pub som ikke finnes i publista fanges",
+   sjekkKontaktliste(kontakt(), ["En annen pub"]).some((f) => f.indexOf("ukjent pub") > -1));
+ok("noe annet enn et oppslag fanges", sjekkKontaktliste("nei").length === 1);
+
+// Det appen far vise: bare det en person har sett og datert.
+ok("uverifisert star ikke til visning", Object.keys(kontaktFor("Testpuben", kontakt())).length === 0);
+ok("verifisert slipper gjennom",
+   kontaktFor("Testpuben", kontakt({
+     telefon: { verdi: "+47 22 41 62 66", tillit: 2, kilde: "https://a.no", sitat: "x", verifisert: "2026-09-11" },
+   })).telefon === "+47 22 41 62 66");
+ok("bare det verifiserte feltet, ikke naboene",
+   Object.keys(kontaktFor("Testpuben", kontakt({
+     telefon: { verdi: "+47 22 41 62 66", tillit: 2, kilde: "https://a.no", sitat: "x", verifisert: "2026-09-11" },
+     epost: { verdi: "post@eksempel.no", tillit: 1, kilde: "https://a.no", sitat: "x" },
+   }))).join(",") === "telefon");
+ok("verifisert som ikke er en dato fanges",
+   sjekkKontaktliste(kontakt({ telefon: { verdi: "+47 22 41 62 66", tillit: 2, kilde: "https://a.no", sitat: "x", verifisert: "i gar" } }), TESTNAVN)
+     .some((f) => f.indexOf("ikke en dato") > -1));
+// Navnet slas opp foldet, som ellers i prosjektet.
+ok("oppslaget taler skrivemate", !!finnKontakt("testpuben", kontakt()));
+ok("ukjent pub gir ingenting",
+   finnKontakt("Finnes Ikke", kontakt()) === null &&
+   Object.keys(kontaktFor("Finnes Ikke", kontakt())).length === 0);
+// Ingenting er verifisert enna: appen skal derfor ikke vise noe.
+ok("ingenting i den ekte fila vises for noen har sett etter",
+   Object.keys(PUBER_KONTAKT).every((n) => Object.keys(kontaktFor(n, PUBER_KONTAKT)).length === 0));
+ok("feltlista er den fila bruker",
+   Object.values(PUBER_KONTAKT).every((rad) =>
+     Object.keys(rad).every((f) => KONTAKT_FELT.indexOf(f) > -1)));
 
 /* ---------------- rapport ---------------- */
 

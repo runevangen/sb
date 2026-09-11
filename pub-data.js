@@ -230,3 +230,94 @@ export function noterPub(liste, navn, naa) {
   else ut.push({ navn: n, antall: 1, sist: tid });
   return ut.slice(-20);
 }
+
+/* ---------- kontaktopplysninger ---------- */
+
+// Feltene i puber-kontakt.js. Rekkefolgen er den de vises i.
+export const KONTAKT_FELT = [
+  "telefon", "epost", "nettside", "adresse",
+  "mat", "apningstider", "bordbestilling", "aldersgrense", "skjermer",
+];
+
+export const MATVALG = ["full meny", "enkel mat", "ingen mat"];
+
+// Norske nummer skrives i to grupperinger: fasttelefon i par (22 41 62
+// 66) og mobil i tre-to-tre (484 06 215). Begge er riktige, sa begge
+// godtas — men bare de to, sa en avvikende form blir sett.
+const TELEFONFORM = /^\+47 (\d{2} \d{2} \d{2} \d{2}|\d{3} \d{2} \d{3})$/;
+
+// Vokter formen, som sjekkPubliste gjor for publista. Tom liste betyr at
+// alt er bra. pubnavn er navnene fra puber-oslo.js: kontaktopplysninger
+// til en pub vi ikke har, er en skrivefeil — eller en pub som er fjernet
+// uten at dette folget med.
+export function sjekkKontaktliste(kontakter, pubnavn) {
+  if (!kontakter || typeof kontakter !== "object") return ["Kontaktene er ikke et oppslag"];
+  const kjent = new Set((pubnavn || []).map(normaliserLagnavn));
+  const feil = [];
+  Object.keys(kontakter).forEach((navn) => {
+    const hvor = navn;
+    if (kjent.size && !kjent.has(normaliserLagnavn(navn))) {
+      feil.push(hvor + ": ukjent pub");
+    }
+    const rad = kontakter[navn];
+    if (!rad || typeof rad !== "object") { feil.push(hvor + ": ikke et objekt"); return; }
+    Object.keys(rad).forEach((felt) => {
+      const f = rad[felt];
+      const her = hvor + " / " + felt;
+      if (KONTAKT_FELT.indexOf(felt) === -1) { feil.push(her + ": ukjent felt"); return; }
+      if (!f || typeof f !== "object") { feil.push(her + ": ikke et objekt"); return; }
+      if (f.verdi === undefined || f.verdi === null || f.verdi === "") {
+        // Et felt uten verdi skal ikke sta i fila i det hele tatt.
+        feil.push(her + ": star oppfort uten verdi");
+      }
+      if ([1, 2].indexOf(f.tillit) === -1) feil.push(her + ": tillit ma vaere 1 eller 2");
+      if (String(f.kilde || "").indexOf("http") !== 0) feil.push(her + ": kilde er ikke en lenke");
+      if (!String(f.sitat || "").trim()) feil.push(her + ": mangler sitat");
+      if (f.verifisert !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(String(f.verifisert))) {
+        feil.push(her + ": verifisert er ikke en dato");
+      }
+      if (felt === "telefon" && !TELEFONFORM.test(String(f.verdi))) {
+        feil.push(her + ": " + f.verdi + " er ikke et norsk nummer pa kjent form");
+      }
+      if (felt === "epost" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(f.verdi))) {
+        feil.push(her + ": " + f.verdi + " ser ikke ut som en e-postadresse");
+      }
+      if (felt === "nettside" && String(f.verdi).indexOf("http") !== 0) {
+        feil.push(her + ": nettside er ikke en lenke");
+      }
+      if (felt === "mat" && MATVALG.indexOf(f.verdi) === -1) feil.push(her + ": ukjent matvalg " + f.verdi);
+      if (felt === "bordbestilling" && typeof f.verdi !== "boolean") {
+        feil.push(her + ": bordbestilling ma vaere true eller false");
+      }
+      if (felt === "aldersgrense" && !(Number.isInteger(f.verdi) && f.verdi >= 18 && f.verdi <= 25)) {
+        feil.push(her + ": aldersgrense " + f.verdi + " ser feil ut");
+      }
+    });
+  });
+  return feil;
+}
+
+// Det appen far lov til a vise: bare felt en person har sett med egne
+// oyne og datert. Resten er innsamlede forslag, og et feil
+// telefonnummer til en ekte bedrift er verre enn ingen. Gir et enkelt
+// oppslag — { telefon: "+47 …" } — sa visningen slipper a kjenne til
+// kilder og tillit.
+export function kontaktFor(navn, kontakter) {
+  const rad = finnKontakt(navn, kontakter);
+  const ut = {};
+  if (!rad) return ut;
+  KONTAKT_FELT.forEach((felt) => {
+    const f = rad[felt];
+    if (f && f.verifisert && f.verdi !== undefined && f.verdi !== null) ut[felt] = f.verdi;
+  });
+  return ut;
+}
+
+// Alt vi har om en pub, verifisert eller ikke, med kilder. For
+// gjennomgang og feilsoking — aldri for visningen.
+export function finnKontakt(navn, kontakter) {
+  if (!navn || !kontakter) return null;
+  const leit = normaliserLagnavn(navn);
+  const treff = Object.keys(kontakter).find((n) => normaliserLagnavn(n) === leit);
+  return treff ? kontakter[treff] : null;
+}

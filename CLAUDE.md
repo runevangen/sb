@@ -22,6 +22,7 @@ prosjektet `mvp-sb`.
     netlify/functions/vaer.mjs    samme: henting fra MET og caching
     pub-data.js                   pubene rundt kampen: Overpass, Entur, dine puber
     puber-oslo.js                 kuratert liste: Oslo-puber som viser fotball
+    puber-kontakt.js              samme puber: telefon, mat, apningstider — uverifisert
     netlify/functions/puber.mjs   samme: puber ved stadion og holdeplass, døgncache
 
     admin.html / admin.js            adminportalen: hvilke kamper viser hvilken pub
@@ -244,6 +245,19 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   verre enn ingen rad; Oslos uteliv flytter seg fort. Koordinatene er
   anslag fra gateadressen, gode nok til å sortere etter avstand, ikke til
   å navigere etter.
+- Kontaktopplysningene ligger i `puber-kontakt.js`, ikke i `puber-oslo.js`.
+  De to råtner i ulikt tempo: at et sted viser fotball er en redaksjonell
+  vurdering som står seg, mens et telefonnummer ikke gjør det. Hvert felt
+  bærer kilden og et ordrett sitat, og `tillit` — hvor mange uavhengige
+  kilder som sa det samme.
+- **Ingenting derfra vises i appen før det er verifisert.** `kontaktFor()`
+  i `pub-data.js` gir bare ut felt som har en `verifisert`-dato, satt av
+  en person som har sett opplysningen selv. Uten den er raden et forslag,
+  og et feil telefonnummer til en ekte bedrift er verre enn ingen.
+  `sjekkKontaktliste()` vokter formen — nummerform, e-postform, at
+  matvalget er ett av tre, at hvert felt har kilde og sitat — og `unit.mjs`
+  kjører den mot den ekte fila. Innsamlingen 11. september 2026 nådde
+  ingen av pubenes egne sider; sitatene er slik de sto i søketreffet.
 - Gratisnivået gir 100 kall i døgnet. Caching skjer på Netlifys kant med
   `Netlify-CDN-Cache-Control` og `durable`, som gir én delt cache i stedet
   for én per region. Levetidene står i `LEVETID` i `fotball-data.js`, og
@@ -320,7 +334,7 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      279 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      300 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  128 tester, ~250 ms, ingen nettleser
     node test/run.mjs       203 tester, ~130 s, headless Chromium
 
@@ -342,8 +356,9 @@ vist seg i prod.
 
 `unit.mjs` dekker `lib.js`, `fotball-data.js`, `vaer-data.js` og `pub-data.js`: URL-validering, videovertslisten, tidsstempler,
 endringssignaturen, gjenkjenning av interne lenker, rangering av søketreff og favorittlag, sesongvinduet per
-liga, tolkning av API-Football-svaret, hvilken runde som er «neste», og at
-døgnkvoten holder. `run.mjs` dekker alt som trenger DOM: XSS i titler
+liga, tolkning av API-Football-svaret, hvilken runde som er «neste», at
+døgnkvoten holder, og at ingenting i `puber-kontakt.js` slipper ut i
+appen før noen har datert det. `run.mjs` dekker alt som trenger DOM: XSS i titler
 og artikkel-HTML, annonseplassering, rulleoppførsel, artikkelvisningen,
 fokusfella, korthøyden, at toppfeltet krymper, paginering, ruting,
 visningsvalgene i menyen, favorittlag fra stjerne til feed, deling av en
