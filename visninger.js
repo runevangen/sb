@@ -16,4 +16,6 @@
 // terminlisten. kamp og dato star her for at fila skal vaere lesbar
 // alene; det er kampId som gjelder.
 
-export const VISNINGER = [];
+export const VISNINGER = [
+  {"pub":"Andy's Pub","kampId":2399155,"kamp":"Lillestrøm – Vålerenga","dato":"2026-09-12T14:00:00Z","satt":"2026-09-11T13:13:33.992Z"}
+];
