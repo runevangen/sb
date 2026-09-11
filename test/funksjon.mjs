@@ -272,7 +272,7 @@ ok("forsokene star i svaret, uten adresser",
 global.fetch = async (url, opsjoner) => {
   kall.push({ url: String(url), opsjoner: opsjoner || {} });
   const u = String(url);
-  if (u.indexOf("/api/v2/") > -1) return new Response("{}", { status: 401 });
+  if (u.indexOf("/api/v2/") > -1) return new Response('{"error":"Invalid API key"}', { status: 401 });
   if (u.indexOf("/api/v1/json/min-nokkel/") > -1) return new Response(JSON.stringify(ARETS), { status: 200 });
   return new Response(JSON.stringify(SVAR), { status: 200 });
 };
@@ -286,6 +286,8 @@ ok("v1-svaret brukes", v1.kilde === "TheSportsDB" && v1.sisteSesong === true, v1
 ok("begge forsok er forklart, og nokkelen star ikke der",
    v1.forsok.length === 2 && v1.forsok[0].status === 401 && v1.forsok[1].status === 200 &&
    JSON.stringify(v1.forsok).indexOf("min-nokkel") === -1, JSON.stringify(v1.forsok));
+ok("tjenestens egen feilmelding folger med",
+   v1.forsok[0].melding === '{"error":"Invalid API key"}', v1.forsok[0].melding);
 delete process.env.THESPORTSDB_KEY;
 
 // Svikter TheSportsDB — nettverk eller uventet form — far leseren det
@@ -428,6 +430,6 @@ ok("feil hos MET gir 502 uten cache",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 82;
+const antall = 83;
 console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);
