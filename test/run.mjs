@@ -7,7 +7,7 @@
 // mocket window.fetch, kjores i headless Chromium og rapporterer via
 // exit-kode. Sett CHROME hvis nettleseren ligger et annet sted.
 
-import { readFileSync, writeFileSync, mkdtempSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdtempSync, existsSync, rmSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
 import { promisify } from "node:util";
@@ -39,9 +39,13 @@ const MIME = {
 function startTjener() {
   const tjener = createServer((req, res) => {
     const sti = decodeURIComponent(req.url.split("?")[0]);
-    // Testsidene ligger i temp; alt annet hentes fra repoet.
-    const rot = sti.endsWith(".html") ? tmp : root;
-    const fil = join(rot, sti.replace(/^\/+/, ""));
+    // Testsidene ligger i temp; alt annet hentes fra repoet. En test kan
+    // ogsa legge sin egen utgave av en modul i temp — da vinner den. Det
+    // er slik en datafil som visninger.js kan fylles i en test uten at
+    // det som star i repoet endres.
+    const rel = sti.replace(/^\/+/, "");
+    const iTmp = join(tmp, rel);
+    const fil = existsSync(iTmp) ? iTmp : join(root, rel);
     try {
       const innhold = readFileSync(fil);
       const type = MIME[fil.slice(fil.lastIndexOf("."))] || "application/octet-stream";
@@ -1238,9 +1242,137 @@ const SAK_15 = await kjor("admin", `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 600); });
 `, null, adminSide);
 
+/* ---------------- 16. puben bekrefter kampen ---------------- */
+
+// Visningene admin setter skal treffe leseren: pubene som viser nettopp
+// denne kampen star over alle andre forslag, og er merket ogsa der de
+// dukker opp i en annen gruppe.
+//
+// visninger.js er tom i repoet. Testen legger sin egen utgave i temp,
+// som tjeneren serverer framfor den i repoet.
+writeFileSync(join(tmp, "visninger.js"),
+  'export const VISNINGER = [\n' +
+  '  {"pub":"Lincoln Pub","kampId":3,"kamp":"Brann – Bodo/Glimt",' +
+  '"dato":"2026-09-20T17:00:00+00:00","satt":"2026-09-11T10:00:00.000Z"},\n' +
+  '  {"pub":"Carls","kampId":4,"kamp":"Molde – Rosenborg",' +
+  '"dato":"2026-09-21T17:00:00+00:00","satt":"2026-09-11T10:00:00.000Z"}\n' +
+  '];\n');
+
+const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
+  // Leseren star ved Lincoln Pub. Overpass svarer med den samme puben,
+  // sa den dukker opp bade som bekreftet og som treff naer deg.
+  navigator.geolocation.getCurrentPosition = function (ok) {
+    ok({ coords: { latitude: 59.9165, longitude: 10.7530 } });
+  };
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve({ elements: [
+        { type: "node", id: 9, lat: 59.9165, lon: 10.7531, tags: { amenity: "pub", name: "Lincoln Pub" } },
+        { type: "node", id: 10, lat: 59.9168, lon: 10.7540, tags: { amenity: "pub", name: "Tilfeldig Bar" } } ] }); } });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del, kilde: "TheSportsDB",
+                    oppdatert: new Date().toISOString(), kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    // Linja star pa kampen selv, sa den som blar ser det uten a apne noe.
+    var rader = document.querySelectorAll(".kamp.delbar");
+    var viser = rader[0].querySelector(".kamp-viser");
+    ok("kampen sier selv at den vises et sted", !!viser);
+    ok("og hvor", viser.textContent.indexOf("Denne kampen vises på: Lincoln Pub") > -1,
+       viser.textContent);
+    ok("neste kamp har sin egen pub pa raden",
+       rader[1].querySelector(".kamp-viser").textContent.indexOf("Carls") > -1,
+       rader[1].querySelector(".kamp-viser").textContent);
+    // Pubnavnet tar deg videre: panelet apnes med puben valgt.
+    rader[0].querySelector(".kamp-viser-pub").click();
+    var apnet = document.querySelector(".kamp-panel");
+    ok("et trykk pa pubnavnet apner delingspanelet", !!apnet);
+    ok("med puben ferdig valgt", apnet.querySelector(".kamp-pub").value === "Lincoln Pub",
+       apnet.querySelector(".kamp-pub").value);
+    ok("og «pa pub» valgt",
+       apnet.querySelectorAll(".hvor-valg")[1].getAttribute("aria-pressed") === "true");
+    document.querySelectorAll(".kamp-del")[0].click();
+
+    // Forste kamp: Brann – Bodo/Glimt, som Lincoln Pub viser.
+    document.querySelectorAll(".kamp-del")[0].click();
+    var panel = document.querySelectorAll(".kamp-panel")[0];
+    panel.querySelectorAll(".hvor-valg")[1].click();
+    var forslag = panel.querySelector(".pub-forslag");
+    setTimeout(function () { try {
+      var titler = Array.prototype.map.call(forslag.querySelectorAll(".pub-gruppe-tittel"),
+        function (t) { return t.textContent; });
+      ok("bekreftede puber star aller forst", titler[0] === "Viser denne kampen", titler.join("|"));
+      var bekGruppe = forslag.querySelector(".pub-gruppe-bekreftet");
+      var bekChips = bekGruppe.querySelectorAll(".pub-chip");
+      ok("bare puben som viser denne kampen star der",
+         bekChips.length === 1 && bekChips[0].textContent.indexOf("Lincoln Pub") === 0,
+         bekChips.length + " " + bekChips[0].textContent);
+      ok("den er merket med hake", !!bekChips[0].querySelector(".pub-bekreftet"));
+      ok("og haken sier hva den betyr",
+         bekChips[0].querySelector(".pub-bekreftet").getAttribute("aria-label") === "viser denne kampen");
+      ok("det star hvor opplysningen kommer fra",
+         bekGruppe.textContent.indexOf("Meldt inn til oss") > -1, bekGruppe.textContent);
+      // En annen pubs kamp skal ikke lekke inn her.
+      ok("en annen kamps pub star ikke her",
+         bekGruppe.textContent.indexOf("Carls") === -1, bekGruppe.textContent);
+
+      // Samme pub dukker opp naer deg, og skal se lik ut der.
+      var naerChips = Array.prototype.filter.call(forslag.querySelectorAll(".pub-chip"),
+        function (c) { return c.textContent.indexOf("Lincoln Pub") === 0; });
+      ok("puben dukker opp i flere grupper", naerChips.length > 1, naerChips.length);
+      ok("og er merket bekreftet i alle",
+         naerChips.every(function (c) { return !!c.querySelector(".pub-bekreftet"); }));
+      var andre = Array.prototype.filter.call(forslag.querySelectorAll(".pub-chip"),
+        function (c) { return c.textContent.indexOf("Tilfeldig Bar") === 0; });
+      ok("en pub uten visning er ikke merket",
+         andre.length > 0 && !andre[0].querySelector(".pub-bekreftet"), andre.length);
+
+      // Et trykk velger puben som ellers.
+      bekChips[0].click();
+      ok("et trykk fyller pubfeltet", panel.querySelector(".kamp-pub").value === "Lincoln Pub",
+         panel.querySelector(".kamp-pub").value);
+
+      // Andre kamp: en annen pub, og Lincoln skal ikke folge med. Ett
+      // panel om gangen, sa det forrige er borte.
+      document.querySelectorAll(".kamp-del")[1].click();
+      var panel2 = document.querySelector(".kamp-panel");
+      ok("bare ett panel er apent", document.querySelectorAll(".kamp-panel").length === 1,
+         document.querySelectorAll(".kamp-panel").length);
+      panel2.querySelectorAll(".hvor-valg")[1].click();
+      setTimeout(function () { try {
+        var bek2 = panel2.querySelector(".pub-gruppe-bekreftet");
+        ok("neste kamp har sin egen pub",
+           bek2 && bek2.textContent.indexOf("Carls") > -1, bek2 ? bek2.textContent : "ingen gruppe");
+        ok("og ikke den forriges",
+           bek2.querySelectorAll(".pub-chip").length === 1, bek2.textContent);
+        ferdig();
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
+`);
+
+rmSync(join(tmp, "visninger.js"));
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15];
+const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16];
 let feilet = 0;
 
 for (const t of alle) {

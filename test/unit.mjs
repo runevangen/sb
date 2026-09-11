@@ -24,12 +24,14 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
          sjekkPubliste, kuraterteNaer, merkKuraterte } from "../pub-data.js";
 import { PUBER_OSLO } from "../puber-oslo.js";
 import { VISNINGER as VISNINGER_EKTE } from "../visninger.js";
-import { sjekkVisninger, visningerFor, slaSammen, utenGamle, visningerFil, lesVisninger }
-  from "../visning-data.js";
+import { sjekkVisninger, visningerFor, slaSammen, utenGamle, visningerFil, lesVisninger,
+         bekreftetFor, merkBekreftet } from "../visning-data.js";
 
 let feilet = 0;
+let kjort = 0;
 
 function ok(navn, betingelse, detalj) {
+  kjort++;
   if (betingelse) {
     console.log("  ok   " + navn);
   } else {
@@ -653,6 +655,30 @@ ok("visninger for en kamp finnes",
 ok("ingen visninger gir tom liste",
    visningerFor({ id: 77 }, BLANDET).length === 0 && visningerFor(null, BLANDET).length === 0);
 
+// Lesersiden: hvem viser denne kampen, med det vi ellers vet om stedet.
+const BEK = bekreftetFor({ id: 11 }, BLANDET, PUBER_OSLO);
+ok("bekreftede puber hentes for kampen", BEK.length === 1 && BEK[0].navn === "Lincoln Pub",
+   JSON.stringify(BEK.map((p) => p.navn)));
+ok("og de er merket som bekreftet", BEK[0].bekreftet === true);
+ok("de barer med seg det vi vet om stedet fra publista",
+   typeof BEK[0].lat === "number" && !!BEK[0].bydel, JSON.stringify(BEK[0]));
+// En pub som er tatt ut av publista skal ikke forsvinne stumt.
+const UKJENT = bekreftetFor({ id: 11 },
+   [{ pub: "Nedlagt Pub", kampId: 11, kamp: "x", dato: "2026-09-20T15:00:00Z", satt: "x" }], PUBER_OSLO);
+ok("en pub utenfor publista star med navnet sitt",
+   UKJENT.length === 1 && UKJENT[0].navn === "Nedlagt Pub" && UKJENT[0].bekreftet === true);
+
+// Samme pub kan dukke opp i flere grupper, og skal se lik ut overalt.
+const BEK_MERKET = merkBekreftet(
+   [{ navn: "Lincoln Pub" }, { navn: "Carls" }], BEK);
+ok("bekreftet settes pa treff som star i lista", BEK_MERKET[0].bekreftet === true);
+ok("og ikke pa de andre", BEK_MERKET[1].bekreftet === undefined);
+ok("merkingen folder skrivematen",
+   merkBekreftet([{ navn: "lincoln pub" }], BEK)[0].bekreftet === true);
+ok("uten bekreftede skjer ingenting",
+   merkBekreftet([{ navn: "Carls" }], []).length === 1 &&
+   merkBekreftet([{ navn: "Carls" }], [])[0].bekreftet === undefined);
+
 // Spilte kamper har ingen verdi her, og lista ville vokst uten ende.
 const GAMMEL = [{ pub: "Carls", kampId: 1, kamp: "x", dato: "2026-09-01T15:00:00Z", satt: "x" },
                 { pub: "Carls", kampId: 2, kamp: "y", dato: "2026-09-13T15:00:00Z", satt: "x" }];
@@ -859,6 +885,7 @@ ok("hash bygges tilbake til samme rute",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 271;
-console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
+// Tallet telles, ikke skrives: en hardkodet sum sa 271 mens 279 testet
+// kjorte, og da sier tallet ingenting om at en test er lagt til.
+console.log("\n" + (kjort - feilet) + " av " + kjort + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);
