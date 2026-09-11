@@ -88,6 +88,16 @@ const HARNESS = `
     }).join(" ");
   }
   window.plausible = function () {};
+
+  // Ingen test skal sporre telefonen om ekte posisjon. Uten dette henger
+  // headless Chromium pa CI: posisjonsoppslaget venter pa et nettkall som
+  // aldri kommer, og virtuell tid star stille sa lenge det star pa.
+  // Tester som trenger en posisjon overstyrer denne selv.
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition = function (ok, feil) {
+      if (feil) feil({ code: 1, message: "Stubbet: ingen posisjon i test" });
+    };
+  }
 `;
 
 function avkod(s) {
@@ -965,10 +975,12 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
     var forslag = panel.querySelector(".pub-forslag");
     ok("pubforslagene vises nar pub er valgt", forslag && !forslag.hidden);
     var titler = function () { return Array.prototype.map.call(forslag.querySelectorAll(".pub-gruppe-tittel"), function (t) { return t.textContent; }); };
-    var forsteChip = forslag.querySelector(".pub-chip");
-    ok("dine puber star forst", titler()[0] === "Dine puber" && forsteChip && forsteChip.textContent === "Pub X", titler().join("|"));
-    ok("naer deg er en knapp, ikke et automatisk kall",
-       forslag.querySelector(".pub-naer") && window.__overpassKall === 0);
+    // Kampen spilles ofte et annet sted enn der man ser den, sa naer deg
+    // hentes med en gang — trykket som valgte «pa pub» er handlingen
+    // telefonen krever for a sporre om posisjon.
+    ok("naer deg hentes med en gang, uten et trykk til",
+       window.__overpassKall === 1, window.__overpassKall);
+    ok("dine puber er med", titler().indexOf("Dine puber") > -1, titler().join("|"));
     panel.querySelector(".kamp-pub").value = "Pub X";
 
     // Et annet panel apnes: det forste skal lukkes.
@@ -983,6 +995,10 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
     // Nested tilbakekall ligger utenfor try-en over; hvert far sin egen.
     setTimeout(function () { try {
       var titlerNa = Array.prototype.map.call(forslag.querySelectorAll(".pub-gruppe-tittel"), function (t) { return t.textContent; });
+      ok("naer deg star forst", titlerNa[0] === "Nær deg", titlerNa.join("|"));
+      ok("naer deg sporr Overpass fra nettleseren med rundet posisjon",
+         window.__overpassKall === 1 && window.__overpassBody.indexOf("around:800,63.431,10.395") > -1, window.__overpassBody);
+      ok("puber naer deg vises", forslag.textContent.indexOf("Torgpuben") > -1);
       ok("puber ved stadion og ved holdeplassen kommer fra funksjonen",
          titlerNa.indexOf("Ved Brann Stadion") > -1 && titlerNa.indexOf("Ved Brann stadion holdeplass") > -1, titlerNa.join("|"));
       ok("funksjonen spores en gang per arena", window.__puberKall === 1, window.__puberKall);
@@ -993,26 +1009,15 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
       ok("trykk pa en pub fyller feltet", chip && panel.querySelector(".kamp-pub").value === "Stadionpuben" &&
          chip.getAttribute("aria-pressed") === "true");
 
-      // Naer deg: posisjonen rundes og gar rett til Overpass.
-      var naerKnapp = forslag.querySelector(".pub-naer");
-      ok("naer deg-knappen finnes", !!naerKnapp);
-      if (naerKnapp) naerKnapp.click();
+      panel.querySelector(".kamp-pub").value = "Pub X";
+      panel.querySelector(".kamp-send").click();
       setTimeout(function () { try {
-        ok("naer deg sporr Overpass fra nettleseren med rundet posisjon",
-           window.__overpassKall === 1 && window.__overpassBody.indexOf("around:800,63.431,10.395") > -1, window.__overpassBody);
-        var naer = Array.prototype.map.call(forslag.querySelectorAll(".pub-gruppe-tittel"), function (t) { return t.textContent; });
-        ok("puber naer deg vises", naer.indexOf("Nær deg") > -1 && forslag.textContent.indexOf("Torgpuben") > -1, naer.join("|"));
-
-        panel.querySelector(".kamp-pub").value = "Pub X";
-        panel.querySelector(".kamp-send").click();
-        setTimeout(function () { try {
-          var lagret = (JSON.parse(localStorage.getItem("sb-visning")) || {}).puber || [];
-          ok("delt pub telles i dine puber", lagret.length === 1 && lagret[0].navn === "Pub X" && lagret[0].antall === 3,
-             JSON.stringify(lagret));
-          etterDeling();
-        } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+        var lagret = (JSON.parse(localStorage.getItem("sb-visning")) || {}).puber || [];
+        ok("delt pub telles i dine puber", lagret.length === 1 && lagret[0].navn === "Pub X" && lagret[0].antall === 3,
+           JSON.stringify(lagret));
+        etterDeling();
       } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
-    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
     function etterDeling() {
       var d = window.__delt || {};
       ok("teksten som deles har kampen, puben og sporsmalet",
@@ -1058,7 +1063,8 @@ const SAK_14 = await kjor("pub-feil", FELLES + FOTBALL + `
     u = String(u);
     if (u.indexOf("/api/puber?") === 0) {
       return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
-        text: function () { return Promise.resolve(JSON.stringify({ feil: "Fikk ikke svar fra OpenStreetMap" })); } });
+        text: function () { return Promise.resolve(JSON.stringify({ feil: "Fikk ikke svar fra OpenStreetMap",
+          forsok: [{ kilde: "Overpass overpass-api.de", status: 406, utfall: "HTTP 406" }] })); } });
     }
     if (u.indexOf("/api/vaer?") === 0) {
       return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
@@ -1085,7 +1091,12 @@ const SAK_14 = await kjor("pub-feil", FELLES + FOTBALL + `
     setTimeout(function () { try {
       ok("svikter funksjonen, star det hvorfor",
          forslag.textContent.indexOf("Fikk ikke hentet puber ved Brann Stadion") > -1, forslag.textContent);
+      // Hvem som sviktet, sa det kan meldes videre uten a grave i logger.
+      ok("og hvem som sviktet",
+         forslag.textContent.indexOf("overpass-api.de svarte 406") > -1, forslag.textContent);
       ok("naer deg-knappen star der uansett", !!forslag.querySelector(".pub-naer"));
+      ok("uten posisjon star det hvorfor",
+         forslag.textContent.indexOf("Fikk ikke posisjonen") > -1, forslag.textContent);
       ok("pubfeltet kan fortsatt brukes", !panel.querySelector(".kamp-pub").hidden);
       ferdig();
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);

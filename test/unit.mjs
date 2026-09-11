@@ -470,13 +470,15 @@ ok("Overpass-sporringen har radius og tre desimaler",
 // Hovedtjeneren svarer 406 uten Accept. Uten den headeren far ingen puber.
 ok("Accept sier hva vi tar imot", overpassHeadere(false)["Accept"] === "application/json" &&
    overpassHeadere(true)["Accept"] === "application/json");
-// Nettleseren forbyr oss a sette Accept-Encoding og User-Agent.
+// Nettleseren forbyr oss a sette User-Agent.
 ok("nettleseren far bare det den har lov til a sette",
-   !("Accept-Encoding" in overpassHeadere(false)) && !("User-Agent" in overpassHeadere(false)),
-   JSON.stringify(overpassHeadere(false)));
-ok("serverside settes ogsa Accept-Encoding og User-Agent",
-   overpassHeadere(true)["Accept-Encoding"].indexOf("gzip") > -1 &&
+   !("User-Agent" in overpassHeadere(false)), JSON.stringify(overpassHeadere(false)));
+ok("serverside identifiserer vi oss",
    overpassHeadere(true)["User-Agent"].indexOf("sportsbibelen") === 0);
+// Setter vi Accept-Encoding selv, slutter Node a pakke ut svaret, og
+// json() feiler pa en gzippet kropp.
+ok("Accept-Encoding settes ikke av oss",
+   !("Accept-Encoding" in overpassHeadere(true)) && !("Accept-Encoding" in overpassHeadere(false)));
 ok("flere tjenere a prove, alle over https",
    OVERPASS_SPEIL.length >= 2 && OVERPASS_SPEIL.every((u) => u.indexOf("https://") === 0 && u.indexOf("/interpreter") > -1),
    OVERPASS_SPEIL.join(" "));

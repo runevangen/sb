@@ -399,11 +399,11 @@ function fyllForslag(boks, kamp) {
   boks.dataset.fylt = "1";
   boks.replaceChildren();
 
-  const dine = puber.liste();
-  if (dine.length) boks.appendChild(pubGruppe("Dine puber", dine.map((p) => ({ navn: p.navn })), boks.pubFelt));
-
-  // Naer deg: bare pa trykk. Posisjonen gar rett til OpenStreetMap og
+  // Naer deg forst, og hentet med en gang: kampen spilles ofte et annet
+  // sted enn der man ser den. Posisjonen gar rett til OpenStreetMap og
   // aldri innom oss, og den rundes til rundt hundre meter forst.
+  // Trykket som valgte «pa pub» er handlingen telefonen krever for a
+  // sporre om posisjon, sa den kan hentes na framfor etter et trykk til.
   const naer = el("div", "pub-gruppe");
   const knapp = el("button", "pub-naer", "Puber nær deg");
   knapp.type = "button";
@@ -411,16 +411,22 @@ function fyllForslag(boks, kamp) {
   naer.appendChild(knapp);
   naer.appendChild(el("p", "pub-note", "Posisjonen sendes til OpenStreetMap, ikke til oss."));
   boks.appendChild(naer);
+  hentNaerDeg(naer, knapp, boks.pubFelt);
+
+  const dine = puber.liste();
+  if (dine.length) boks.appendChild(pubGruppe("Dine puber", dine.map((p) => ({ navn: p.navn })), boks.pubFelt));
 
   const rundt = el("div", "pub-rundt");
   boks.appendChild(rundt);
   if (kamp.arena) {
-    // Aldri stille: star det ingenting her, skal det sta hvorfor.
+    // Aldri stille: star det ingenting her, skal det sta hvorfor — og
+    // hvem som sviktet, sa det kan meldes videre uten a grave i logger.
     rundt.appendChild(el("p", "pub-note pub-venter", "Finner puber ved " + kamp.arena + " …"));
     hentPuberRundt(kamp.arena).then((data) => {
       rundt.replaceChildren();
-      if (!data) {
-        rundt.appendChild(el("p", "pub-note pub-feil", "Fikk ikke hentet puber ved " + kamp.arena + ". Skriv puben selv."));
+      if (!data || data.feil) {
+        rundt.appendChild(el("p", "pub-note pub-feil",
+          "Fikk ikke hentet puber ved " + kamp.arena + hvemSviktet(data) + ". Skriv puben selv."));
         return;
       }
       (data.grupper || []).forEach((g) => rundt.appendChild(pubGruppe(g.tittel, g.puber, boks.pubFelt)));
@@ -431,6 +437,16 @@ function fyllForslag(boks, kamp) {
       }
     });
   }
+}
+
+// «(overpass-api.de svarte 406)» — nok til a se hva som feiler, uten a
+// apne funksjonsloggen.
+function hvemSviktet(data) {
+  const liste = (data && data.forsok) || [];
+  const sist = liste.filter((f) => f && f.utfall).pop();
+  if (!sist) return "";
+  const navn = String(sist.kilde || "").replace(/^Overpass /, "");
+  return " (" + navn + (sist.status ? " svarte " + sist.status : ": " + sist.utfall) + ")";
 }
 
 function pubGruppe(tittel, liste, pubFelt) {
@@ -456,17 +472,17 @@ function pubGruppe(tittel, liste, pubFelt) {
   return gruppe;
 }
 
+// Svarer alltid med det funksjonen sa, ogsa nar det er en feil: da star
+// forsok-lista der, og visningen kan si hvem som sviktet.
 async function hentPuberRundt(arena) {
   if (puberHusket.has(arena)) return puberHusket.get(arena);
   const lofte = (async () => {
     try {
       const respons = await fetch("/api/puber?arena=" + encodeURIComponent(arena),
         { headers: { "Accept": "application/json" } });
-      if (!respons.ok) return null;
-      const data = JSON.parse(await respons.text());
-      return data && !data.feil ? data : null;
+      return JSON.parse(await respons.text());
     } catch (err) {
-      return null;
+      return { feil: String(err && err.message || err) };
     }
   })();
   puberHusket.set(arena, lofte);
@@ -496,7 +512,8 @@ function hentNaerDeg(gruppe, knapp, pubFelt) {
       naerHusket.delete(nokkel);
       knapp.disabled = false;
       knapp.textContent = "Puber nær deg";
-      visPubFeil(gruppe, "Fikk ikke svar fra OpenStreetMap. Prøv igjen.");
+      visPubFeil(gruppe, "Fikk ikke svar fra OpenStreetMap (" +
+        String(err && err.message || err).slice(0, 40) + "). Prøv igjen.");
     }
   }, () => {
     knapp.disabled = false;
