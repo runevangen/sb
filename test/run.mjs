@@ -1053,14 +1053,25 @@ const SAK_13 = await kjor("kamp-deling-gammel", FELLES + FOTBALL + `
   }, 1200); });
 `);
 
-/* ---------------- 14. pubforslag nar funksjonen svikter ---------------- */
+/* ---------------- 14. pubforslag nar alt nettverk svikter ---------------- */
 
 // Ingenting skal feile stille: svarer funksjonen feil, star det hvorfor.
+// Og det viktigste: den kuraterte lista ligger i koden, sa kjente
+// fotballpuber i naerheten star der ogsa nar bade Overpass og var egen
+// funksjon er nede. Det var nettopp Overpass som sviktet i prod.
 const SAK_14 = await kjor("pub-feil", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
+  // Leseren star ved Oslo S. Overpass svarer ikke.
+  navigator.geolocation.getCurrentPosition = function (ok) {
+    ok({ coords: { latitude: 59.9110, longitude: 10.7500 } });
+  };
   window.fetch = function (u) {
     u = String(u);
+    if (u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: false, status: 504, statusText: "Gateway Timeout",
+        json: function () { return Promise.reject(new Error("nede")); } });
+    }
     if (u.indexOf("/api/puber?") === 0) {
       return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
         text: function () { return Promise.resolve(JSON.stringify({ feil: "Fikk ikke svar fra OpenStreetMap",
@@ -1089,14 +1100,27 @@ const SAK_14 = await kjor("pub-feil", FELLES + FOTBALL + `
     panel.querySelectorAll(".hvor-valg")[1].click();
     var forslag = panel.querySelector(".pub-forslag");
     setTimeout(function () { try {
+      // Uten nettverk i det hele tatt star lista i koden igjen.
+      var titler = Array.prototype.map.call(forslag.querySelectorAll(".pub-gruppe-tittel"), function (t) { return t.textContent; });
+      ok("kjente fotballpuber vises uten nettverk",
+         titler[0] === "Kjent for å vise fotball", titler.join("|"));
+      var chips = forslag.querySelectorAll(".pub-chip");
+      ok("og de er ekte steder fra lista",
+         chips.length > 2 && forslag.textContent.indexOf("O'Learys Oslo Sentralstasjon") > -1,
+         chips.length + " " + forslag.textContent.slice(0, 120));
+      ok("de er merket som kjent for fotball", !!forslag.querySelector(".pub-merke"));
+      ok("naermest star forst",
+         chips[0].textContent.indexOf("O'Learys Oslo Sentralstasjon") === 0, chips[0].textContent);
+
       ok("svikter funksjonen, star det hvorfor",
          forslag.textContent.indexOf("Fikk ikke hentet puber ved Brann Stadion") > -1, forslag.textContent);
       // Hvem som sviktet, sa det kan meldes videre uten a grave i logger.
       ok("og hvem som sviktet",
          forslag.textContent.indexOf("overpass-api.de svarte 406") > -1, forslag.textContent);
       ok("naer deg-knappen star der uansett", !!forslag.querySelector(".pub-naer"));
-      ok("uten posisjon star det hvorfor",
-         forslag.textContent.indexOf("Fikk ikke posisjonen") > -1, forslag.textContent);
+      // Naer deg feiler, men sier hvem som sviktet.
+      ok("naer deg forklarer hvem som sviktet",
+         forslag.textContent.indexOf("overpass-api.de svarte 504") > -1, forslag.textContent);
       ok("pubfeltet kan fortsatt brukes", !panel.querySelector(".kamp-pub").hidden);
       ferdig();
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);

@@ -1442,6 +1442,7 @@ body {
 }
 
 .pub-avstand { font-size: 11px; color: var(--text-faint); }
+.pub-merke { font-size: 11px; line-height: 1; }
 
 .pub-note {
   margin: 0;

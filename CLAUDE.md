@@ -19,6 +19,7 @@ prosjektet `mvp-sb`.
     vaer-data.js                  været ved avspark: arenaer, varsel, kleråd
     netlify/functions/vaer.mjs    samme: henting fra MET og caching
     pub-data.js                   pubene rundt kampen: Overpass, Entur, dine puber
+    puber-oslo.js                 kuratert liste: Oslo-puber som viser fotball
     netlify/functions/puber.mjs   samme: puber ved stadion og holdeplass, døgncache
 
 `lib.js` finnes for å kunne enhetstestes uten nettleser. Hører en funksjon
@@ -215,6 +216,20 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   i funksjonsloggen. Lisensen (ODbL) krever
   «© OpenStreetMap-bidragsytere» der pubene vises. `uverifisert` til det
   er sett i prod: sandkassen når verken Overpass eller Entur.
+- OpenStreetMap vet at et sted er en pub, men ikke om de viser fotball.
+  Det er den vurderingen `puber-oslo.js` bærer, og den ligger i koden —
+  så «Kjent for å vise fotball» står der også når både Overpass og vår
+  egen funksjon er nede. Det er verdt mye her, der Overpass har vært det
+  skjøreste leddet. Lista brukes tre steder: en gruppe nær leseren, en
+  gruppe ved arenaen der lista dekker den, og et merke på treff fra
+  OpenStreetMap som vi vet viser fotball. Rader merket `usikker` vises
+  ikke — ett forslag færre er bedre enn ett vi ikke tør stå inne for.
+  `sjekkPubliste()` vokter formen, og `unit.mjs` kjører den mot den ekte
+  lista: en feilskrevet rad slår ut i testene framfor i appen. Hver rad
+  må ha en kilde som er en lenke, og en `sjekket`-dato. En udatert rad er
+  verre enn ingen rad; Oslos uteliv flytter seg fort. Koordinatene er
+  anslag fra gateadressen, gode nok til å sortere etter avstand, ikke til
+  å navigere etter.
 - Gratisnivået gir 100 kall i døgnet. Caching skjer på Netlifys kant med
   `Netlify-CDN-Cache-Control` og `durable`, som gir én delt cache i stedet
   for én per region. Levetidene står i `LEVETID` i `fotball-data.js`, og
@@ -226,9 +241,9 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      230 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      246 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  103 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       152 tester, ~110 s, headless Chromium
+    node test/run.mjs       156 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
 De raske først, så en åpenbar feil stopper kjøringen før nettleseren

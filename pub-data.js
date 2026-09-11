@@ -3,6 +3,10 @@
 // Kilden er OpenStreetMap via Overpass. Lisensen (ODbL) krever synlig
 // kreditering: «© OpenStreetMap-bidragsytere» star der pubene vises.
 
+// Samme normalisering som lagnavn: sma bokstaver, norske tegn foldet,
+// tegnsetting fjernet. Da er «O'Reilly's» og «OReillys» samme sted.
+import { normaliserLagnavn } from "./fotball-data.js";
+
 // Overpass-tjenerne vi prover, i rekkefolge. Hovedtjeneren er raskest og
 // naermest kilden, men avviser mye; speilene er mildere. Alle tre snakker
 // samme sprak, sa et svar fra et speil er like godt.
@@ -141,6 +145,67 @@ export function grupperPuber(puber, arena, holdeplasser) {
     if (ved.length) grupper.push({ tittel: "Ved " + h.navn, puber: ved.slice(0, 4) });
   }
   return grupper;
+}
+
+/* ---------- kuraterte puber ---------- */
+
+// OpenStreetMap vet at et sted er en pub, men ikke om de viser fotball.
+// Den kuraterte lista i puber-oslo.js er nettopp det OSM ikke kan si.
+// Den ligger i koden, sa den virker uten nettverk — og det er verdt mye
+// her, der Overpass har vist seg a vaere det skjoreste leddet.
+//
+// sjekket-datoen er det viktigste feltet: en liste uten dato ratner uten
+// at noen merker det.
+export const PUBLISTE_FELT = ["navn", "bydel", "lat", "lon", "type", "kilde", "sikkerhet", "sjekket"];
+export const PUBTYPER = ["sportsbar", "supporterpub", "pub"];
+export const PUBSIKKERHET = ["bekreftet", "sannsynlig", "usikker"];
+
+// Vokter formen sa hvem som helst kan redigere lista uten a odelegge
+// appen. Gir en liste med det som er galt; tom liste betyr at alt er bra.
+export function sjekkPubliste(liste, ramme) {
+  const r = ramme || { lat: [59.80, 60.05], lon: [10.45, 10.95] };
+  const feil = [];
+  if (!Array.isArray(liste)) return ["Lista er ikke en liste"];
+  const sett = new Set();
+  liste.forEach((p, i) => {
+    const hvor = "rad " + (i + 1) + " (" + ((p && p.navn) || "uten navn") + ")";
+    if (!p || typeof p !== "object") { feil.push(hvor + ": ikke et objekt"); return; }
+    PUBLISTE_FELT.forEach((felt) => {
+      if (p[felt] === undefined || p[felt] === "") feil.push(hvor + ": mangler " + felt);
+    });
+    const nokkel = normaliserLagnavn(p.navn);
+    if (nokkel && sett.has(nokkel)) feil.push(hvor + ": samme navn to ganger");
+    sett.add(nokkel);
+    if (!(p.lat >= r.lat[0] && p.lat <= r.lat[1]) || !(p.lon >= r.lon[0] && p.lon <= r.lon[1])) {
+      feil.push(hvor + ": koordinatene ligger utenfor omradet");
+    }
+    if (PUBTYPER.indexOf(p.type) === -1) feil.push(hvor + ": ukjent type " + p.type);
+    if (PUBSIKKERHET.indexOf(p.sikkerhet) === -1) feil.push(hvor + ": ukjent sikkerhet " + p.sikkerhet);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(p.sjekket))) feil.push(hvor + ": sjekket er ikke en dato");
+    if (String(p.kilde).indexOf("http") !== 0) feil.push(hvor + ": kilde er ikke en lenke");
+  });
+  return feil;
+}
+
+// De kuraterte stedene innen radius, naermest forst. Ingen nettverk.
+export function kuraterteNaer(liste, senter, radius) {
+  if (!Array.isArray(liste) || !senter) return [];
+  return liste
+    .map((p) => Object.assign({}, p, { avstand: avstandM(senter, p) }))
+    .filter((p) => p.avstand <= radius)
+    .sort((a, b) => a.avstand - b.avstand);
+}
+
+// Merker treff fra OpenStreetMap som vi vet viser fotball. Da star
+// «viser fotball» pa de vi er sikre pa, uten a skjule resten.
+export function merkKuraterte(puber, liste) {
+  if (!Array.isArray(liste) || !liste.length) return puber;
+  const kjent = new Map();
+  liste.forEach((p) => kjent.set(normaliserLagnavn(p.navn), p));
+  return puber.map((p) => {
+    const traff = kjent.get(normaliserLagnavn(p.navn));
+    return traff ? Object.assign({}, p, { viserFotball: true, lag: traff.lag || [] }) : p;
+  });
 }
 
 /* ---------- dine puber ---------- */
