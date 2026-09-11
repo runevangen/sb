@@ -13,18 +13,19 @@ export const OVERPASS_SPEIL = [
 ];
 
 // Hovedtjeneren svarer 406 «Not Acceptable» nar den ikke liker headerne:
-// den vil ha et Accept som sier hva vi tar imot. Nettleseren setter
-// Accept-Encoding selv og forbyr oss a rore den, sa den settes bare
-// serverside.
+// den vil ha et Accept som sier hva vi tar imot, og en User-Agent som
+// sier hvem vi er. Nettleseren forbyr oss a sette User-Agent, sa den
+// settes bare serverside.
+//
+// Accept-Encoding settes ikke: setter vi den selv, slutter Node a pakke
+// ut svaret for oss, og da feiler json(). Bade Node og nettleseren
+// setter en fornuftig verdi uten var hjelp.
 export function overpassHeadere(serverside) {
   const h = {
     "Content-Type": "application/x-www-form-urlencoded",
     "Accept": "application/json",
   };
-  if (serverside) {
-    h["Accept-Encoding"] = "gzip, deflate";
-    h["User-Agent"] = "sportsbibelen-app/1.0 https://mvp-sb.netlify.app";
-  }
+  if (serverside) h["User-Agent"] = "sportsbibelen-app/1.0 https://mvp-sb.netlify.app";
   return h;
 }
 

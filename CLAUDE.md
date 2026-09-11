@@ -7,7 +7,7 @@ prosjektet `mvp-sb`.
     app.css       all stil
     app.js        appen, lastet som modul
     lib.js        rene funksjoner uten DOM, importeres av app.js og av testene
-    sw.js         service worker
+    sw.js         service worker: cacher bare skallet, aldri /api/
     netlify.toml  proxy mot WordPress
 
     BACKLOGG.md   peker til issues, som er den ekte backloggen
@@ -183,11 +183,14 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   feilsvaret `forsok` med status og METs egen melding, som
   fotballfunksjonen.
 - «Hvilken pub?» får fire svar som chips over feltet, og feltet er
-  fortsatt sannheten. *Dine puber*: de du har delt før, lagret lokalt
-  som favorittlagene (`sb-visning`, feltet `puber`), oftest brukt først.
-  *Nær deg*: bare på trykk; posisjonen rundes til tre desimaler (≈100 m)
-  og går rett fra nettleseren til Overpass, aldri innom oss, og det står
-  under knappen. *Ved stadion* og *ved holdeplassen*: fra
+  fortsatt sannheten. *Nær deg* står først og hentes med en gang:
+  kampen spilles ofte et annet sted enn der man ser den. Trykket som
+  valgte «på pub» er handlingen telefonen krever for å spørre om
+  posisjon, så den kan hentes da framfor etter et trykk til. Posisjonen
+  rundes til tre desimaler (≈100 m) og går rett fra nettleseren til
+  Overpass, aldri innom oss, og det står under knappen. *Dine puber*:
+  de du har delt før, lagret lokalt som favorittlagene (`sb-visning`,
+  feltet `puber`), oftest brukt først. *Ved stadion* og *ved holdeplassen*: fra
   `netlify/functions/puber.mjs`, som spør Entur om holdeplassene innen
   700 m og Overpass om puber innen 1200 m, og grupperer (800 m fra
   stadion, 300 m fra holdeplass). Arenaene står fast, så hver er én
@@ -197,7 +200,10 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   `pub-data.js` er tjenerne som prøves i tur, både fra funksjonen og fra
   nettleseren, så én streng tjener ikke tar ned funksjonen. Svikter
   Entur, står pubene ved stadion igjen; svikter alle Overpass-tjenerne,
-  502 uten cache og `forsok` som forklarer per tjener. Lisensen (ODbL) krever
+  502 uten cache og `forsok` som forklarer per tjener — og visningen
+  setter den siste linja i `forsok` inn i feilmeldingen
+  («overpass-api.de svarte 406»), så det kan meldes videre uten å grave
+  i funksjonsloggen. Lisensen (ODbL) krever
   «© OpenStreetMap-bidragsytere» der pubene vises. `uverifisert` til det
   er sett i prod: sandkassen når verken Overpass eller Entur.
 - Gratisnivået gir 100 kall i døgnet. Caching skjer på Netlifys kant med
@@ -213,7 +219,7 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
     node test/unit.mjs      228 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  98 tester, ~120 ms, ingen nettleser
-    node test/run.mjs       150 tester, ~110 s, headless Chromium
+    node test/run.mjs       151 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
 De raske først, så en åpenbar feil stopper kjøringen før nettleseren
