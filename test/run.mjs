@@ -975,6 +975,34 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
        Math.round(linjeMal.width) + "x" + Math.round(linjeMal.height));
     ok("pilen er dekor, ikke et mal",
        getComputedStyle(linje0.querySelector(".kamp-pil")).pointerEvents === "none");
+    // Flata ligger over lagnavnene — den ma, for a fange trykk hvor som
+    // helst pa linja. Da kan den aldri male noe selv: pa telefon henger
+    // :hover igjen etter et trykk, og en bunnfarge her gjorde lagnavnene
+    // borte for godt.
+    var arkRegler = [];
+    Array.prototype.forEach.call(document.styleSheets, function (ark) {
+      try { Array.prototype.push.apply(arkRegler, ark.cssRules); } catch (e) {}
+    });
+    var flateRegler = arkRegler.filter(function (r) {
+      return r.selectorText && r.selectorText.indexOf(".kamp-del") > -1;
+    });
+    ok("det finnes regler for flata a sjekke", flateRegler.length > 0, flateRegler.length);
+    ok("trykkflata maler aldri over lagnavnene",
+       flateRegler.every(function (r) {
+         var bunn = (r.style.background || "") + " " + (r.style.backgroundColor || "");
+         // Ingen regex her: i en template-literal spises bakstreken, og
+         // et monster med \\( blir ugyldig og stopper hele testsiden.
+         return bunn.indexOf("var(") === -1 && bunn.indexOf("#") === -1 &&
+                bunn.indexOf("rgb") === -1 && bunn.indexOf("hsl") === -1;
+       }),
+       flateRegler.map(function (r) { return r.selectorText + "{" + r.style.background + "}"; }).join(" | "));
+    // Og trykket skal lande pa flata uansett hvor pa linja det traff —
+    // ogsa midt pa lagnavnet.
+    var navnMal = linje0.querySelector(".kamp-lag").getBoundingClientRect();
+    var truffet = document.elementFromPoint(navnMal.left + navnMal.width / 2,
+                                            navnMal.top + navnMal.height / 2);
+    ok("et trykk midt pa lagnavnet treffer flata",
+       truffet === knapper[0], truffet && (truffet.className || truffet.tagName));
     var lagNavn = Array.prototype.map.call(linje0.querySelectorAll(".kamp-lag"), function (l) { return l.textContent; });
     ok("ett tastaturmal per kamp, og det sier hvilken kamp",
        knapper[0].getAttribute("aria-label") === lagNavn.join(" – ") + ". Hvor ser du kampen?",

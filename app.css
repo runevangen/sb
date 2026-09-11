@@ -1357,7 +1357,20 @@ body {
   cursor: pointer;
 }
 
-.kamp-del:hover { background: var(--bg-raised); }
+/* Flata skal ALDRI male noe selv. Den ligger over lagnavnene — den ma,
+   for a fange trykk hvor som helst pa linja — sa en bunnfarge her legger
+   seg rett over teksten. Pa telefon henger :hover igjen etter et trykk,
+   og da ble lagnavnene borte for godt. Markeringen hoerer hjemme pa raden
+   under, ikke pa flata over.
+   :has() gjor at raden kjenner sin egen knapp. Uten stotte uteblir bare
+   hover-fargen; rammen og fokusrammen star uansett. Og bare der pekeren
+   faktisk kan sveve: pa berøring finnes ikke hover, bare et ekko av det. */
+@media (hover: hover) {
+  .kamp:has(.kamp-del:hover) > .kamp-linje { background: var(--bg-raised); }
+  .kamp.valgt:has(.kamp-del:hover) > .kamp-linje { background: none; }
+}
+
+.kamp-linje { border-radius: 8px; }
 
 .kamp-del:focus-visible {
   outline: 2px solid var(--accent);
