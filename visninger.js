@@ -17,5 +17,7 @@
 // alene; det er kampId som gjelder.
 
 export const VISNINGER = [
-  {"pub":"Andy's Pub","kampId":2399155,"kamp":"Lillestrøm – Vålerenga","dato":"2026-09-12T14:00:00Z","satt":"2026-09-11T13:13:33.992Z"}
+  {"pub":"Andy's Pub","kampId":2399155,"kamp":"Lillestrøm – Vålerenga","dato":"2026-09-12T14:00:00Z","satt":"2026-09-11T13:13:49.919Z"},
+  {"pub":"Andy's Pub","kampId":2399156,"kamp":"Rosenborg – Tromsø","dato":"2026-09-12T16:00:00Z","satt":"2026-09-11T13:13:49.919Z"},
+  {"pub":"Andy's Pub","kampId":2399151,"kamp":"Bodø/Glimt – Sandefjord","dato":"2026-09-14T17:00:00Z","satt":"2026-09-11T13:13:49.919Z"}
 ];
