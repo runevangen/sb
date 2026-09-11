@@ -1048,9 +1048,53 @@ const SAK_13 = await kjor("kamp-deling-gammel", FELLES + FOTBALL + `
   }, 1200); });
 `);
 
+/* ---------------- 14. pubforslag nar funksjonen svikter ---------------- */
+
+// Ingenting skal feile stille: svarer funksjonen feil, star det hvorfor.
+const SAK_14 = await kjor("pub-feil", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("/api/puber?") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve(JSON.stringify({ feil: "Fikk ikke svar fra OpenStreetMap" })); } });
+    }
+    if (u.indexOf("/api/vaer?") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del, kilde: "TheSportsDB",
+                    oppdatert: new Date().toISOString(), kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    panel.querySelectorAll(".hvor-valg")[1].click();
+    var forslag = panel.querySelector(".pub-forslag");
+    setTimeout(function () { try {
+      ok("svikter funksjonen, star det hvorfor",
+         forslag.textContent.indexOf("Fikk ikke hentet puber ved Brann Stadion") > -1, forslag.textContent);
+      ok("naer deg-knappen star der uansett", !!forslag.querySelector(".pub-naer"));
+      ok("pubfeltet kan fortsatt brukes", !panel.querySelector(".kamp-pub").hidden);
+      ferdig();
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
+`);
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13];
+const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14];
 let feilet = 0;
 
 for (const t of alle) {

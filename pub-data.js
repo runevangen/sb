@@ -4,11 +4,13 @@
 // kreditering: «© OpenStreetMap-bidragsytere» star der pubene vises.
 
 // Overpass-sporring: puber og barer innen radius meter fra et punkt.
-// «out center» gir ett punkt ogsa for bygninger tegnet som flater.
+// «out center» gir tagger og koordinater, og ett punkt ogsa for bygninger
+// tegnet som flater. «out center tags» — som sto her forst — avviser
+// Overpass med 406, og «tags» ville uansett droppet koordinatene.
 export function overpassSporring(lat, lon, radius) {
   return '[out:json][timeout:12];nwr["amenity"~"^(pub|bar)$"](around:' +
     Math.round(radius) + "," + Number(lat).toFixed(3) + "," + Number(lon).toFixed(3) +
-    ");out center tags;";
+    ");out center;";
 }
 
 // Tre desimaler er rundt 100 meter. Nok til a finne en pub, og ikke nok

@@ -464,7 +464,7 @@ ok("uten vaer er teksten som for",
 /* ---------------- puber ---------------- */
 
 ok("Overpass-sporringen har radius og tre desimaler",
-   overpassSporring(63.41264, 10.4, 800) === '[out:json][timeout:12];nwr["amenity"~"^(pub|bar)$"](around:800,63.413,10.400);out center tags;',
+   overpassSporring(63.41264, 10.4, 800) === '[out:json][timeout:12];nwr["amenity"~"^(pub|bar)$"](around:800,63.413,10.400);out center;',
    overpassSporring(63.41264, 10.4, 800));
 ok("posisjonen rundes til tre desimaler",
    rundPosisjon(59.9138688, 10.7522454).lat === 59.914 && rundPosisjon(59.9138688, 10.7522454).lon === 10.752);
