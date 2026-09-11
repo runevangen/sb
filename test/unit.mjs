@@ -19,7 +19,8 @@ import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
   from "../vaer-data.js";
 
 import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, enturNaermest,
-         tolkHoldeplasser, grupperPuber, ofteBrukt, noterPub } from "../pub-data.js";
+         tolkHoldeplasser, grupperPuber, ofteBrukt, noterPub,
+         OVERPASS_SPEIL, overpassHeadere } from "../pub-data.js";
 
 let feilet = 0;
 
@@ -466,6 +467,20 @@ ok("uten vaer er teksten som for",
 ok("Overpass-sporringen har radius og tre desimaler",
    overpassSporring(63.41264, 10.4, 800) === '[out:json][timeout:12];nwr["amenity"~"^(pub|bar)$"](around:800,63.413,10.400);out center;',
    overpassSporring(63.41264, 10.4, 800));
+// Hovedtjeneren svarer 406 uten Accept. Uten den headeren far ingen puber.
+ok("Accept sier hva vi tar imot", overpassHeadere(false)["Accept"] === "application/json" &&
+   overpassHeadere(true)["Accept"] === "application/json");
+// Nettleseren forbyr oss a sette Accept-Encoding og User-Agent.
+ok("nettleseren far bare det den har lov til a sette",
+   !("Accept-Encoding" in overpassHeadere(false)) && !("User-Agent" in overpassHeadere(false)),
+   JSON.stringify(overpassHeadere(false)));
+ok("serverside settes ogsa Accept-Encoding og User-Agent",
+   overpassHeadere(true)["Accept-Encoding"].indexOf("gzip") > -1 &&
+   overpassHeadere(true)["User-Agent"].indexOf("sportsbibelen") === 0);
+ok("flere tjenere a prove, alle over https",
+   OVERPASS_SPEIL.length >= 2 && OVERPASS_SPEIL.every((u) => u.indexOf("https://") === 0 && u.indexOf("/interpreter") > -1),
+   OVERPASS_SPEIL.join(" "));
+
 ok("posisjonen rundes til tre desimaler",
    rundPosisjon(59.9138688, 10.7522454).lat === 59.914 && rundPosisjon(59.9138688, 10.7522454).lon === 10.752);
 // Lerkendal til Trondheim torg er rundt 2,3 km.
@@ -695,6 +710,6 @@ ok("hash bygges tilbake til samme rute",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 224;
+const antall = 228;
 console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);

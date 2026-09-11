@@ -8,7 +8,8 @@
 // likt her som i resten av appen.
 
 import { LIGAER, DELER, DEL_NAVN, HVOR, delingstekst, fotballHash } from "./fotball-data.js";
-import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst } from "./pub-data.js";
+import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
+         OVERPASS_SPEIL, overpassHeadere } from "./pub-data.js";
 import { timeAgo } from "./lib.js";
 
 let naviger = () => {};
@@ -484,20 +485,7 @@ function hentNaerDeg(gruppe, knapp, pubFelt) {
     const p = rundPosisjon(pos.coords.latitude, pos.coords.longitude);
     const nokkel = p.lat + "," + p.lon;
     try {
-      if (!naerHusket.has(nokkel)) {
-        // Overpass kan bruke tid. Etter 20 sekunder far leseren beskjed
-        // framfor en knapp som star og «finner» for alltid.
-        const styring = typeof AbortController === "function" ? new AbortController() : null;
-        const vakt = setTimeout(() => styring && styring.abort(), 20000);
-        naerHusket.set(nokkel, fetch("https://overpass-api.de/api/interpreter", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: "data=" + encodeURIComponent(overpassSporring(p.lat, p.lon, 800)),
-          signal: styring ? styring.signal : undefined,
-        }).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-          .then((json) => tolkPuber(json, p))
-          .finally(() => clearTimeout(vakt)));
-      }
+      if (!naerHusket.has(nokkel)) naerHusket.set(nokkel, naerePuber(p));
       const liste = (await naerHusket.get(nokkel)).slice(0, 6);
       knapp.remove();
       if (!liste.length) { visPubFeil(gruppe, "Fant ingen puber innen 800 m."); return; }
@@ -515,6 +503,32 @@ function hentNaerDeg(gruppe, knapp, pubFelt) {
     knapp.textContent = "Puber nær deg";
     visPubFeil(gruppe, "Fikk ikke posisjonen. Skriv puben selv.");
   }, { maximumAge: 300000, timeout: 10000 });
+}
+
+// Samme tjenerrekke som funksjonen bruker. Posisjonen gar rett herfra,
+// aldri innom oss. Etter 20 sekunder per tjener far leseren beskjed
+// framfor en knapp som star og «finner» for alltid.
+async function naerePuber(p) {
+  let sisteFeil = new Error("Ingen tjener svarte");
+  for (const adresse of OVERPASS_SPEIL) {
+    const styring = typeof AbortController === "function" ? new AbortController() : null;
+    const vakt = setTimeout(() => styring && styring.abort(), 20000);
+    try {
+      const respons = await fetch(adresse, {
+        method: "POST",
+        headers: overpassHeadere(false),
+        body: "data=" + encodeURIComponent(overpassSporring(p.lat, p.lon, 800)),
+        signal: styring ? styring.signal : undefined,
+      });
+      if (!respons.ok) throw new Error("HTTP " + respons.status);
+      return tolkPuber(await respons.json(), p);
+    } catch (err) {
+      sisteFeil = err;
+    } finally {
+      clearTimeout(vakt);
+    }
+  }
+  throw sisteFeil;
 }
 
 function visPubFeil(gruppe, tekst) {
