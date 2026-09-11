@@ -125,7 +125,13 @@ async function hentTsdbVersjon(del, liga, nokkel, versjon) {
       headers: tsdbHeadere(nokkel, versjon),
     });
     notat.status = respons.status;
-    if (!respons.ok) throw new Error("HTTP " + respons.status);
+    if (!respons.ok) {
+      // Tjenesten sier gjerne hvorfor i kroppen («invalid API key»). De
+      // forste tegnene er nok, og de inneholder ikke nokkelen var.
+      const kropp = (await respons.text().catch(() => "")).replace(/\s+/g, " ").trim();
+      if (kropp) notat.melding = kropp.slice(0, 80);
+      throw new Error("HTTP " + respons.status);
+    }
     const json = await respons.json();
     if (del === "tabell") {
       const tabell = tolkTabellTsdb(json);
