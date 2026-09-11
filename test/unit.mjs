@@ -23,6 +23,9 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
          OVERPASS_SPEIL, overpassHeadere, restTid,
          sjekkPubliste, kuraterteNaer, merkKuraterte } from "../pub-data.js";
 import { PUBER_OSLO } from "../puber-oslo.js";
+import { VISNINGER as VISNINGER_EKTE } from "../visninger.js";
+import { sjekkVisninger, visningerFor, slaSammen, utenGamle, visningerFil, lesVisninger }
+  from "../visning-data.js";
 
 let feilet = 0;
 
@@ -611,6 +614,86 @@ ok("kjente steder merkes, resten star urort",
    MERKET[1].viserFotball === undefined, JSON.stringify(MERKET));
 ok("tom kuratert liste endrer ingenting", merkKuraterte(FRA_OSM, []) === FRA_OSM);
 
+/* ---------------- visninger ---------------- */
+
+const VKAMPER = [
+  { id: 11, hjemme: "Brann", borte: "Bodø/Glimt", dato: "2026-09-13T15:00:00Z" },
+  { id: 12, hjemme: "Molde", borte: "Rosenborg", dato: "2026-09-14T17:00:00Z" },
+];
+const VNAA = Date.parse("2026-09-11T10:00:00Z");
+
+const SATT = slaSammen([], "Carls", [11], VKAMPER, VNAA);
+ok("en valgt kamp blir en visning",
+   SATT.length === 1 && SATT[0].pub === "Carls" && SATT[0].kampId === 11 &&
+   SATT[0].kamp === "Brann – Bodø/Glimt" && SATT[0].satt === new Date(VNAA).toISOString(),
+   JSON.stringify(SATT));
+ok("kampId er et tall, ikke en streng", typeof SATT[0].kampId === "number");
+
+// Admin retter opp en runde uten a rore resten.
+const BLANDET = slaSammen(
+  [{ pub: "Carls", kampId: 99, kamp: "Gammel", dato: "2026-10-01T15:00:00Z", satt: "x" },
+   { pub: "Lincoln Pub", kampId: 11, kamp: "Brann – Bodø/Glimt", dato: "2026-09-13T15:00:00Z", satt: "x" }],
+  "Carls", [12], VKAMPER, VNAA);
+ok("andre puber rores ikke",
+   BLANDET.some((v) => v.pub === "Lincoln Pub" && v.kampId === 11), JSON.stringify(BLANDET));
+ok("kamper utenfor runden star igjen",
+   BLANDET.some((v) => v.pub === "Carls" && v.kampId === 99));
+ok("en kamp som ikke lenger er krysset av, forsvinner",
+   !BLANDET.some((v) => v.pub === "Carls" && v.kampId === 11));
+ok("den nye er med", BLANDET.some((v) => v.pub === "Carls" && v.kampId === 12));
+ok("lista er sortert pa dato", BLANDET.every((v, i) =>
+   i === 0 || String(v.dato) >= String(BLANDET[i - 1].dato)), BLANDET.map((v) => v.dato).join(","));
+// Store og sma bokstaver skal ikke gi to rader for samme pub.
+ok("puben kjennes igjen uansett skrivemate",
+   slaSammen(SATT, "carls", [], VKAMPER, VNAA).length === 0);
+
+ok("visninger for en kamp finnes",
+   visningerFor({ id: 11 }, BLANDET).length === 1 &&
+   visningerFor({ id: 11 }, BLANDET)[0].pub === "Lincoln Pub");
+ok("ingen visninger gir tom liste",
+   visningerFor({ id: 77 }, BLANDET).length === 0 && visningerFor(null, BLANDET).length === 0);
+
+// Spilte kamper har ingen verdi her, og lista ville vokst uten ende.
+const GAMMEL = [{ pub: "Carls", kampId: 1, kamp: "x", dato: "2026-09-01T15:00:00Z", satt: "x" },
+                { pub: "Carls", kampId: 2, kamp: "y", dato: "2026-09-13T15:00:00Z", satt: "x" }];
+ok("gamle kamper ryddes bort", utenGamle(GAMMEL, VNAA, 2).length === 1 &&
+   utenGamle(GAMMEL, VNAA, 2)[0].kampId === 2, JSON.stringify(utenGamle(GAMMEL, VNAA, 2)));
+ok("en kamp i gar beholdes", utenGamle(
+   [{ pub: "Carls", kampId: 3, kamp: "z", dato: "2026-09-10T15:00:00Z", satt: "x" }], VNAA, 2).length === 1);
+
+const PUBNAVN = PUBER_OSLO.map((p) => p.navn);
+ok("gyldige visninger gir ingen feil", sjekkVisninger(SATT, PUBNAVN).length === 0,
+   sjekkVisninger(SATT, PUBNAVN).join(" | "));
+ok("den ekte lista holder formen", sjekkVisninger(VISNINGER_EKTE, PUBNAVN).length === 0,
+   sjekkVisninger(VISNINGER_EKTE, PUBNAVN).join(" | "));
+function vrad(endring) {
+  return Object.assign({ pub: "Carls", kampId: 11, kamp: "A – B",
+    dato: "2026-09-13T15:00:00Z", satt: "2026-09-11T10:00:00Z" }, endring);
+}
+ok("ukjent pub fanges", sjekkVisninger([vrad({ pub: "Utepils AS" })], PUBNAVN)[0].indexOf("ukjent pub") > -1);
+ok("manglende felt fanges", sjekkVisninger([vrad({ kamp: "" })], PUBNAVN)[0].indexOf("mangler kamp") > -1);
+ok("kampId som ikke er tall fanges",
+   sjekkVisninger([vrad({ kampId: "elleve" })], PUBNAVN).some((f) => f.indexOf("ikke et tall") > -1));
+ok("ugyldig dato fanges",
+   sjekkVisninger([vrad({ dato: "snart" })], PUBNAVN)[0].indexOf("ikke en dato") > -1);
+ok("samme pub og kamp to ganger fanges",
+   sjekkVisninger([vrad(), vrad()], PUBNAVN).some((f) => f.indexOf("to ganger") > -1));
+ok("noe annet enn en liste fanges", sjekkVisninger("nei", PUBNAVN).length === 1);
+
+// Fila er bade en modul appen importerer og JSON funksjonen leser.
+const FIL = visningerFil(SATT);
+ok("fila kan leses tilbake uendret", JSON.stringify(lesVisninger(FIL)) === JSON.stringify(SATT), FIL);
+ok("tom liste gir en gyldig, tom fil", lesVisninger(visningerFil([])).length === 0);
+ok("en rad per linje, sa git-diffen viser hva som endret seg",
+   FIL.split("\n").filter((l) => l.trim().indexOf("{") === 0).length === SATT.length);
+// Teksten kommer fra et skjema, og havner i en fil som kjores som kode.
+const OND = visningerFil([vrad({ pub: '"};evil()//' })]);
+ok("anforselstegn i et navn bryter ikke ut av strengen",
+   lesVisninger(OND)[0].pub === '"};evil()//' && OND.indexOf('\\"};evil()//') > -1,
+   OND.split("\n").find((l) => l.trim().indexOf("{") === 0));
+ok("en fil uten VISNINGER kaster", kaster(() => lesVisninger("bare tekst")));
+ok("en avkortet fil kaster", kaster(() => lesVisninger("export const VISNINGER = [")));
+
 /* ---------------- fotball: lagnavn ---------------- */
 
 ok("norske tegn foldes til ascii i nokkelen",
@@ -776,6 +859,6 @@ ok("hash bygges tilbake til samme rute",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 246;
+const antall = 271;
 console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);

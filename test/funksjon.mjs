@@ -12,6 +12,8 @@ import fotball from "../netlify/functions/fotball.mjs";
 import vaer from "../netlify/functions/vaer.mjs";
 import puber from "../netlify/functions/puber.mjs";
 import { OVERPASS_SPEIL } from "../pub-data.js";
+import visninger from "../netlify/functions/visninger.mjs";
+import { lesVisninger } from "../visning-data.js";
 
 let feilet = 0;
 
@@ -567,8 +569,109 @@ ok("en treg tjener forsinker ikke svaret", brukt < 1000, brukt + " ms");
 ok("Entur star forst i forsok uansett hvem som ble ferdig forst",
    treg.forsok[0].kilde === "Entur nearest", JSON.stringify(treg.forsok));
 
+/* ---------------- admin: visninger ---------------- */
+
+const PASSORD = "et-langt-adminpassord";
+const GHTOKEN = "ghp_hemmelig";
+
+function stubGithub(fila, lesStatus, skrivStatus) {
+  const kall = [];
+  global.fetch = async (url, opsjoner) => {
+    const o = opsjoner || {};
+    kall.push({ url: String(url), metode: o.method || "GET", opsjoner: o });
+    if (o.method === "PUT") {
+      return new Response(JSON.stringify({ commit: { sha: "abc" } }), { status: skrivStatus || 200 });
+    }
+    return new Response(JSON.stringify({
+      sha: "gammel-sha",
+      content: Buffer.from(fila, "utf8").toString("base64"),
+    }), { status: lesStatus || 200 });
+  };
+  return kall;
+}
+
+function adminBe(kropp, metode) {
+  return new Request("https://mvp-sb.netlify.app/api/visninger", {
+    method: metode || "POST",
+    headers: { "Content-Type": "application/json" },
+    body: metode === "GET" ? undefined : JSON.stringify(kropp),
+  });
+}
+
+const TOM_FIL = "export const VISNINGER = [];\n";
+const ADMIN_KAMPER = [
+  { id: 11, hjemme: "Brann", borte: "Bodo/Glimt", dato: "2126-09-13T15:00:00Z" },
+  { id: 12, hjemme: "Molde", borte: "Rosenborg", dato: "2126-09-14T17:00:00Z" },
+];
+
+delete process.env.ADMIN_PASSORD;
+delete process.env.GITHUB_TOKEN;
+kall = stubGithub(TOM_FIL);
+r = await visninger(adminBe({ passord: PASSORD, pub: "Carls", kampIder: [11], kamper: ADMIN_KAMPER }));
+ok("uten oppsett svarer portalen 503", r.status === 503, r.status);
+ok("uten oppsett rores ikke GitHub", kall.length === 0, kall.length);
+
+process.env.ADMIN_PASSORD = PASSORD;
+process.env.GITHUB_TOKEN = GHTOKEN;
+
+kall = stubGithub(TOM_FIL);
+r = await visninger(adminBe(null, "GET"));
+ok("GET avvises", r.status === 405, r.status);
+
+kall = stubGithub(TOM_FIL);
+r = await visninger(adminBe({ passord: "feil", pub: "Carls", kampIder: [11], kamper: ADMIN_KAMPER }));
+ok("feil passord gir 401", r.status === 401, r.status);
+// Et feil passord skal ikke koste et kall mot GitHub.
+ok("feil passord rorer ikke GitHub", kall.length === 0, kall.length);
+
+kall = stubGithub(TOM_FIL);
+r = await visninger(adminBe({ passord: PASSORD, pub: "Utepils AS", kampIder: [11], kamper: ADMIN_KAMPER }));
+ok("ukjent pub gir 400", r.status === 400, r.status);
+ok("ukjent pub rorer ikke GitHub", kall.length === 0, kall.length);
+
+kall = stubGithub(TOM_FIL);
+r = await visninger(adminBe({ passord: PASSORD, pub: "Carls", kampIder: [11], kamper: ADMIN_KAMPER }));
+const lagret = await r.json();
+ok("en lagring svarer 200", r.status === 200 && lagret.ok === true, r.status + " " + JSON.stringify(lagret));
+ok("svaret sier hva som ble lagret",
+   lagret.pub === "Carls" && lagret.valgt === 1 && lagret.totalt === 1, JSON.stringify(lagret));
+// Tokenet er det eneste som ikke tåler a lekke.
+ok("tokenet lekker ikke ut til portalen", JSON.stringify(lagret).indexOf(GHTOKEN) === -1);
+ok("tokenet sendes som Bearer til GitHub",
+   kall[0].opsjoner.headers["Authorization"] === "Bearer " + GHTOKEN);
+const put = kall.find((k) => k.metode === "PUT");
+ok("fila skrives med sha fra lesingen", put && JSON.parse(put.opsjoner.body).sha === "gammel-sha");
+ok("commit-meldingen sier hva som skjedde",
+   JSON.parse(put.opsjoner.body).message.indexOf("Carls viser 1 kamper") > -1,
+   JSON.parse(put.opsjoner.body).message);
+const skrevet = Buffer.from(JSON.parse(put.opsjoner.body).content, "base64").toString("utf8");
+ok("det som skrives er en gyldig fil vi kan lese tilbake",
+   lesVisninger(skrevet).length === 1 && lesVisninger(skrevet)[0].kampId === 11, skrevet);
+
+// Lagringen bygger pa det som star i fila na, ikke pa en utrullet kopi.
+kall = stubGithub(TOM_FIL.replace("[]",
+  '[{"pub":"Lincoln Pub","kampId":11,"kamp":"A","dato":"2126-09-13T15:00:00Z","satt":"2026-09-11T10:00:00Z"}]'));
+r = await visninger(adminBe({ passord: PASSORD, pub: "Carls", kampIder: [12], kamper: ADMIN_KAMPER }));
+const sammen = Buffer.from(JSON.parse(kall.find((k) => k.metode === "PUT").opsjoner.body).content, "base64").toString("utf8");
+ok("en annen pubs visning star igjen",
+   lesVisninger(sammen).length === 2 && lesVisninger(sammen).some((v) => v.pub === "Lincoln Pub"),
+   sammen);
+
+kall = stubGithub(TOM_FIL, 404);
+r = await visninger(adminBe({ passord: PASSORD, pub: "Carls", kampIder: [11], kamper: ADMIN_KAMPER }));
+ok("far vi ikke lest fila, gir det 502 med grunn",
+   r.status === 502 && (await r.json()).feil.indexOf("404") > -1, r.status);
+
+kall = stubGithub(TOM_FIL, 200, 409);
+r = await visninger(adminBe({ passord: PASSORD, pub: "Carls", kampIder: [11], kamper: ADMIN_KAMPER }));
+ok("far vi ikke skrevet, gir det 502 med grunn",
+   r.status === 502 && (await r.json()).feil.indexOf("409") > -1, r.status);
+
+delete process.env.ADMIN_PASSORD;
+delete process.env.GITHUB_TOKEN;
+
 /* ---------------- rapport ---------------- */
 
-const antall = 103;
+const antall = 122;
 console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);
