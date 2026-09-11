@@ -294,20 +294,31 @@ function kampliste(kamper, del, data) {
 // ikke fylles med halvferdige valg.
 let apentPanel = null;
 
+// En knapp som ligger utstrakt over hele kamplinja. Raden kan ikke selv
+// bli en <button>: den inneholder pubnavn-knappen, og en knapp i en
+// knapp finnes ikke. Da er dette den ene maten a gjore hele linja
+// trykkbar uten a miste tastaturet — ett mal per kamp, lest opp som
+// lagene og sporsmalet.
 function delKnapp(kamp, rad) {
   const knapp = el("button", "kamp-del");
   knapp.type = "button";
-  knapp.setAttribute("aria-label", "Del kampen " + kamp.hjemme + " – " + kamp.borte);
+  knapp.setAttribute("aria-label", kamp.hjemme + " – " + kamp.borte + ". Hvor ser du kampen?");
   knapp.setAttribute("aria-expanded", "false");
   knapp.title = "Hvor ser du kampen? Del med vennene dine";
-  knapp.appendChild(el("span", null, "↗"));
   knapp.addEventListener("click", () => {
     if (apentPanel && apentPanel.knapp === knapp) { lukkPanel(); return; }
     lukkPanel();
+    rad.classList.add("valgt");
+    // Vaeret hentes forst her. For sto det under hver eneste kamp i
+    // runden, og ti kamper ble ti kall mot MET for leseren hadde trykket
+    // pa noe — og raden vokste og hoppet mens den ble lest. Na gjelder
+    // det den ene kampen man faktisk lurer pa. hentVaer husker per kamp,
+    // sa a apne den samme igjen koster ingenting.
+    if (kamp.arena) rad.appendChild(vaerlinje(kamp));
     const panel = delPanel(kamp);
-    rad.insertAdjacentElement("afterend", panel);
+    rad.appendChild(panel);
     knapp.setAttribute("aria-expanded", "true");
-    apentPanel = { panel, knapp };
+    apentPanel = { panel, knapp, rad };
     panel.querySelector(".hvor-valg").focus();
   });
   return knapp;
@@ -316,12 +327,17 @@ function delKnapp(kamp, rad) {
 function lukkPanel() {
   if (!apentPanel) return;
   apentPanel.panel.remove();
+  if (apentPanel.rad) {
+    apentPanel.rad.classList.remove("valgt");
+    const vaer = apentPanel.rad.querySelector(".kamp-vaer");
+    if (vaer) vaer.remove();
+  }
   apentPanel.knapp.setAttribute("aria-expanded", "false");
   apentPanel = null;
 }
 
 function delPanel(kamp) {
-  const panel = el("li", "kamp-panel");
+  const panel = el("div", "kamp-panel");
   panel.appendChild(el("p", "kamp-panel-tittel", "Hvor ser du kampen?"));
 
   let hvor = null;
@@ -365,7 +381,7 @@ function delPanel(kamp) {
   send.addEventListener("click", async () => {
     if (!hvor) return;
     const url = location.origin + location.pathname + fotballHash(aktivLiga, "neste");
-    // Vaeret er allerede hentet for linja under kampen; er det ikke der,
+    // Vaeret er hentet da raden ble apnet, og husket per kamp; er det ikke der,
     // deles teksten uten. Ingen skal vente pa MET for a sende en melding.
     const vaer = kamp.arena ? await hentVaer(kamp) : null;
     const tekst = delingstekst(kamp, hvor, pubFelt.value.trim(), url, vaer && vaer.tekst);
@@ -645,20 +661,31 @@ function tomtekst(del, data) {
   return "Ingen kamper er satt opp.";
 }
 
+// Raden er en beholder, ikke et rutenett: rammen rundt den valgte kampen
+// skal omslutte alt som horer til den — vaeret, puben og panelet. Selve
+// kamplinja er rutenettet, og bare den dekkes av trykkflata.
 function kamprad(kamp, del, delbar) {
   const rad = el("li", delbar ? "kamp delbar" : "kamp");
-  rad.appendChild(el("span", "kamp-lag", kamp.hjemme));
+  const linje = el("div", "kamp-linje");
+  linje.appendChild(el("span", "kamp-lag", kamp.hjemme));
 
   if (del === "resultater" && kamp.malHjemme !== null) {
-    rad.appendChild(el("span", "kamp-tall", kamp.malHjemme + " – " + kamp.malBorte));
+    linje.appendChild(el("span", "kamp-tall", kamp.malHjemme + " – " + kamp.malBorte));
   } else {
-    rad.appendChild(el("span", "kamp-tall", klokke(kamp.dato)));
+    linje.appendChild(el("span", "kamp-tall", klokke(kamp.dato)));
   }
 
-  rad.appendChild(el("span", "kamp-lag kamp-borte", kamp.borte));
+  linje.appendChild(el("span", "kamp-lag kamp-borte", kamp.borte));
   if (delbar) {
-    rad.appendChild(delKnapp(kamp, rad));
-    if (kamp.arena) rad.appendChild(vaerlinje(kamp));
+    // Pilen er dekor na, ikke malet: den viser at raden kan apnes, og
+    // hvilken vei den star. Trykkflata under er det man faktisk treffer.
+    const pil = el("span", "kamp-pil", "›");
+    pil.setAttribute("aria-hidden", "true");
+    linje.appendChild(pil);
+    linje.appendChild(delKnapp(kamp, rad));
+  }
+  rad.appendChild(linje);
+  if (delbar) {
     const viser = viserlinje(kamp);
     if (viser) rad.appendChild(viser);
   }

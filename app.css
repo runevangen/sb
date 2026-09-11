@@ -30,6 +30,9 @@
   --accent-ink:    #FFFFFF;
   --accent-soft:   #1B2A87;
   --accent-bright: #FFFFFF;
+  /* Bunnen i den valgte kampen: sa svak at rammen gjor jobben, men nok
+     til at raden loftes fra lista. */
+  --accent-wash:   #EDF1FD;
 
   /* Bekreftet: en pub har sagt at den viser nettopp denne kampen. */
   --bekreftet: #1F7A4D;
@@ -92,6 +95,9 @@
   --accent-ink:    #00081F;
   --accent-soft:   #9DB4FF;
   --accent-bright: #FFFFFF;
+  /* Pa svart holder en dyp marine seg nermere aksenten enn en gra ville
+     gjort, og blir ikke lysere enn at teksten star. */
+  --accent-wash:   #0F1730;
 
   --ad-g1: #101010;
   --ad-g2: #2A2A2A;
@@ -1302,15 +1308,25 @@ body {
 
 .kamper > .kamp-dag:first-child { margin-top: 0; }
 
+/* Raden er beholderen: rammen rundt den valgte kampen tegnes her, sa
+   den omslutter vaeret, puben og panelet — alt som horer til kampen.
+   .kamp-linje er selve kamplinja, og det er bare den trykkflata dekker;
+   ellers kunne man ikke trykke pa valgene i panelet under. */
 .kamp {
+  position: relative;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border-faint);
+}
+
+.kamp-linje {
+  position: relative;
   display: grid;
   /* Resultatet i midten holder samme bredde uansett lagnavn, sa kolonnen
      star loddrett ned gjennom listen. */
   grid-template-columns: 1fr 76px 1fr;
   align-items: center;
   gap: 6px;
-  padding: 9px 0;
-  border-bottom: 1px solid var(--border-faint);
+  min-height: 26px;
 }
 
 .kamp-lag {
@@ -1324,33 +1340,69 @@ body {
 
 .kamp-borte { text-align: right; }
 
-/* Delbar kamp: en fjerde, smal kolonne for delingsknappen. */
-.kamp.delbar { grid-template-columns: 1fr 76px 1fr 30px; }
+/* Delbar kamp: en fjerde, smal kolonne for pilen. */
+.kamp.delbar > .kamp-linje { grid-template-columns: 1fr 76px 1fr 30px; }
 
+/* Trykkflata: en ekte knapp utstrakt over kamplinja. Raden kan ikke selv
+   vaere en knapp — den inneholder pubnavn-knappen, og en knapp i en knapp
+   finnes ikke — sa dette er maten hele linja blir trykkbar pa uten at
+   tastaturet mister noe. Ett mal per kamp. */
 .kamp-del {
-  width: 30px;
-  height: 30px;
-  margin: -4px 0;
+  position: absolute;
+  inset: 0;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: 8px;
   background: none;
-  color: var(--accent);
-  font-size: 16px;
-  line-height: 1;
   cursor: pointer;
 }
 
-.kamp-del:hover, .kamp-del[aria-expanded="true"] { background: var(--bg-raised); }
+.kamp-del:hover { background: var(--bg-raised); }
 
 .kamp-del:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
+
+/* Pilen er dekor: den sier at raden kan apnes, og hvilken vei den star.
+   pointer-events: none, sa trykket gar til flata under uansett hvor pa
+   linja det traff. */
+.kamp-pil {
+  justify-self: end;
+  width: 30px;
+  height: 30px;
+  margin: -4px 0;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  font-size: 17px;
+  line-height: 1;
+  pointer-events: none;
+  transition: transform 140ms ease;
+}
+
+.kamp.valgt .kamp-pil { transform: rotate(90deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .kamp-pil { transition: none; }
+}
+
+/* Den valgte kampen. Rammen er det tydeligste vi har: den sier at alt
+   innenfor — tid, vaer, pub og panel — handler om denne ene kampen. */
+.kamp.valgt {
+  border: 1.5px solid var(--accent);
+  border-radius: 10px;
+  padding: 9px 10px 11px;
+  margin: 4px -6px;
+  background: var(--accent-wash);
+}
+
+/* Naboen under mister sin egen strek nar rammen allerede skiller dem. */
+.kamp.valgt + .kamp { border-top: 0; }
 
 /* Vaeret star under lagene, over hele bredden av raden. */
 .kamp-vaer {
-  grid-column: 1 / -1;
+  margin-top: 5px;
   font-size: calc(12px * var(--fs));
   line-height: 1.4;
   color: var(--text-dim);
@@ -1362,7 +1414,7 @@ body {
    gjennom runden ser det uten a apne noe. Pubnavnet er en knapp: den
    apner delingspanelet med puben valgt. */
 .kamp-viser {
-  grid-column: 1 / -1;
+  margin-top: 4px;
   font-size: calc(12px * var(--fs));
   line-height: 1.4;
   color: var(--text-dim);
@@ -1386,9 +1438,10 @@ body {
 
 /* Panelet ligger som en egen rad rett under kampen, ikke som en dialog:
    det er ett sporsmal, og svaret skal ut av appen, ikke inn i den. */
+/* Panelet ligger inne i den valgte kampen, innenfor rammen. Det trenger
+   derfor ingen egen strek under — rammen er skillet. */
 .kamp-panel {
-  padding: 10px 0 12px;
-  border-bottom: 1px solid var(--border-faint);
+  padding: 10px 0 2px;
   display: flex;
   flex-direction: column;
   gap: 8px;
