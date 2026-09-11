@@ -610,15 +610,47 @@ delete process.env.ADMIN_PASSORD;
 delete process.env.GITHUB_TOKEN;
 kall = stubGithub(TOM_FIL);
 r = await visninger(adminBe({ passord: PASSORD, pub: "Carls", kampIder: [11], kamper: ADMIN_KAMPER }));
+const uoppsatt = await r.json();
 ok("uten oppsett svarer portalen 503", r.status === 503, r.status);
 ok("uten oppsett rores ikke GitHub", kall.length === 0, kall.length);
+// «Portalen er ikke satt opp» alene sender admin til a lete i koden
+// etter noe som star i Netlify-panelet.
+ok("503-svaret navngir det som mangler",
+   uoppsatt.feil.indexOf("ADMIN_PASSORD") > -1 && uoppsatt.feil.indexOf("GITHUB_TOKEN") > -1,
+   uoppsatt.feil);
+ok("og det sier at det ma rulles ut pa nytt",
+   uoppsatt.feil.indexOf("Trigger deploy") > -1, uoppsatt.feil);
+
+// Portalen sporr ved apning, sa admin far vite det for kampene er
+// krysset av — ikke etterpa.
+r = await visninger(adminBe(null, "GET"));
+const uklar = await r.json();
+ok("GET sier at portalen ikke er klar",
+   r.status === 200 && uklar.klar === false, r.status + " " + JSON.stringify(uklar));
+ok("og hvilke variabler som mangler",
+   uklar.mangler.join(",") === "ADMIN_PASSORD,GITHUB_TOKEN", JSON.stringify(uklar.mangler));
 
 process.env.ADMIN_PASSORD = PASSORD;
+r = await visninger(adminBe({ passord: PASSORD, pub: "Carls", kampIder: [11], kamper: ADMIN_KAMPER }));
+const halvt = await r.json();
+ok("mangler bare tokenet, er det bare det som star",
+   halvt.feil.indexOf("GITHUB_TOKEN") > -1 && halvt.feil.indexOf("ADMIN_PASSORD") === -1, halvt.feil);
+
 process.env.GITHUB_TOKEN = GHTOKEN;
 
-kall = stubGithub(TOM_FIL);
 r = await visninger(adminBe(null, "GET"));
-ok("GET avvises", r.status === 405, r.status);
+ok("med begge satt sier GET at portalen er klar", (await r.json()).klar === true);
+
+r = await visninger(adminBe(null, "PUT"));
+ok("andre metoder avvises", r.status === 405, r.status);
+
+// Innloggingen: portalen viser ingenting for passordet er godtatt.
+kall = stubGithub(TOM_FIL);
+r = await visninger(adminBe({ handling: "sjekk", passord: "feil" }));
+ok("innlogging med feil passord gir 401", r.status === 401, r.status);
+r = await visninger(adminBe({ handling: "sjekk", passord: PASSORD }));
+ok("innlogging med riktig passord gir 200", r.status === 200 && (await r.json()).ok === true, r.status);
+ok("en innlogging skriver ingenting", kall.length === 0, kall.length);
 
 kall = stubGithub(TOM_FIL);
 r = await visninger(adminBe({ passord: "feil", pub: "Carls", kampIder: [11], kamper: ADMIN_KAMPER }));

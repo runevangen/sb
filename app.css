@@ -1479,7 +1479,7 @@ body {
 .pub-avstand { font-size: 11px; color: var(--text-faint); }
 .pub-merke { font-size: 11px; line-height: 1; }
 
-/* En pub som har meldt at den viser nettopp denne kampen. Haken er
+/* En pub som har meldt at den viser nettopp denne kampen. Stjerna er
    gronn og ikke bare enda et symbol: den svarer pa kampen, mens ballen
    bare sier at stedet pleier a vise fotball. */
 .pub-bekreftet { font-size: 11px; line-height: 1; color: var(--bekreftet); font-weight: 700; }

@@ -9,7 +9,9 @@
 //
 // Passordet ligger i ADMIN_PASSORD, tokenet i GITHUB_TOKEN. Tokenet skal
 // vaere finkornet og bare ha skrivetilgang til innhold i dette ene
-// repoet. Uten begge svarer funksjonen 503.
+// repoet. Uten begge svarer funksjonen 503, og sier hvilken som mangler.
+// Et GET spor bare om oppsettet: portalen bruker det til a si fra for
+// admin har gjort jobben, framfor etterpa.
 
 import { PUBER_OSLO } from "../../puber-oslo.js";
 import {
@@ -23,11 +25,18 @@ const STI = "visninger.js";
 const IDENTITET = "sportsbibelen-app/1.0 https://mvp-sb.netlify.app";
 
 export default async (req) => {
+  const mangler = manglerIOppsettet();
+
+  // Portalen sporr om oppsettet for den viser noe som helst. Far admin
+  // forst vite at portalen ikke er satt opp nar hen trykker Lagre, er
+  // valget allerede gjort en gang til ingen nytte. Svaret rooper
+  // ingenting: navnene pa miljovariablene star i repoet fra for.
+  if (req.method === "GET") return svar({ klar: mangler.length === 0, mangler }, 200);
   if (req.method !== "POST") return svar({ feil: "Bruk POST" }, 405);
 
+  if (mangler.length) return svar({ feil: oppsettTekst(mangler), mangler }, 503);
   const passord = process.env.ADMIN_PASSORD;
   const token = process.env.GITHUB_TOKEN;
-  if (!passord || !token) return svar({ feil: "Portalen er ikke satt opp" }, 503);
 
   let inn;
   try {
@@ -41,6 +50,11 @@ export default async (req) => {
   if (!likeStrenger(String(inn.passord || ""), passord)) {
     return svar({ feil: "Feil passord" }, 401);
   }
+
+  // Innloggingen: portalen viser ingenting for passordet er godtatt.
+  // Den gir ingen annen tilgang enn et POST uten «sjekk» ville gitt —
+  // den flytter bare svaret dit admin er, fra Lagre til innloggingen.
+  if (inn.handling === "sjekk") return svar({ ok: true }, 200);
 
   const pub = String(inn.pub || "");
   const kamper = Array.isArray(inn.kamper) ? inn.kamper : [];
@@ -110,6 +124,24 @@ function githubHodet(token) {
     "X-GitHub-Api-Version": "2022-11-28",
     "User-Agent": IDENTITET,
   };
+}
+
+// Uten begge hemmelighetene kan portalen ingenting, og da skal det sta
+// hvilken som mangler. «Portalen er ikke satt opp» alene sender admin
+// til a lete i koden etter noe som star i Netlify-panelet.
+function manglerIOppsettet() {
+  const mangler = [];
+  if (!process.env.ADMIN_PASSORD) mangler.push("ADMIN_PASSORD");
+  if (!process.env.GITHUB_TOKEN) mangler.push("GITHUB_TOKEN");
+  return mangler;
+}
+
+function oppsettTekst(mangler) {
+  return "Portalen er ikke satt opp: " + mangler.join(" og ")
+    + " mangler i Netlify-miljøet. Sett " + (mangler.length > 1 ? "dem" : "den")
+    + " under Site configuration →"
+    + " Environment variables, og rull ut på nytt (Deploys → Trigger deploy):"
+    + " funksjonene leser miljøet ved utrulling.";
 }
 
 // Konstant tid: en sammenlikning som stopper ved forste avvik, forteller

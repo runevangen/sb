@@ -1147,30 +1147,52 @@ const SAK_15 = await kjor("admin", `
     { id: 901, hjemme: "Arsenal", borte: "Liverpool", dato: "2026-09-19T14:00:00+00:00", arena: "Emirates Stadium" }
   ];
   var sendt = null;
+  var innlogging = null;
   var bedtOm = [];
+  function svar(status, kropp) {
+    return Promise.resolve({ ok: status < 400, status: status, text: function () {
+      return Promise.resolve(JSON.stringify(kropp)); } });
+  }
   window.fetch = function (u, opt) {
     u = String(u);
     bedtOm.push(u);
     if (u.indexOf("/api/fotball/neste") === 0) {
       var pl = u.indexOf("liga=premier") > -1;
-      return Promise.resolve({ ok: true, status: 200, text: function () {
-        return Promise.resolve(JSON.stringify({
-          liga: pl ? "Premier League" : "Eliteserien", sesong: 2026, sisteSesong: true,
-          kilde: "TheSportsDB", runde: pl ? "Runde 5" : "Runde 21",
-          kamper: pl ? KAMPER_PL : KAMPER_ES }));
-      } });
+      return svar(200, {
+        liga: pl ? "Premier League" : "Eliteserien", sesong: 2026, sisteSesong: true,
+        kilde: "TheSportsDB", runde: pl ? "Runde 5" : "Runde 21",
+        kamper: pl ? KAMPER_PL : KAMPER_ES });
     }
     if (u.indexOf("/api/visninger") === 0) {
-      sendt = JSON.parse(opt.body);
-      return Promise.resolve({ ok: true, status: 200, text: function () {
-        return Promise.resolve(JSON.stringify({ ok: true, pub: sendt.pub, valgt: sendt.kampIder.length,
-          merknad: "Lagret " + sendt.kampIder.length + " kamper." }));
-      } });
+      // Uten metode er det oppsett-sporsmalet portalen stiller ved apning.
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [] });
+      var kropp = JSON.parse(opt.body);
+      if (kropp.handling === "sjekk") {
+        innlogging = kropp;
+        return kropp.passord === "hemmelig"
+          ? svar(200, { ok: true })
+          : svar(401, { feil: "Feil passord" });
+      }
+      sendt = kropp;
+      return svar(200, { ok: true, pub: sendt.pub, valgt: sendt.kampIder.length,
+        merknad: "Lagret " + sendt.kampIder.length + " kamper." });
     }
-    return Promise.resolve({ ok: true, status: 200, text: function () { return Promise.resolve("{}"); } });
+    return svar(200, {});
   };
 
+  function telt(sti) {
+    return bedtOm.filter(function (u) { return u.indexOf(sti) === 0; }).length;
+  }
+
   window.addEventListener("load", function () { setTimeout(function () { try {
+    // Passordet forst. Resten av portalen finnes ikke pa skjermen for
+    // tjenesten har godtatt det — og da er heller ingen kamper hentet,
+    // sa en apning ingen kan lagre fra ikke koster av dognkvoten.
+    ok("portalen ligger skjult for innlogging",
+       document.getElementById("portal").hidden === true);
+    ok("ingen kamper hentes for innlogging", telt("/api/fotball/neste") === 0, bedtOm.join(" "));
+    ok("portalen sporr om den er satt opp", telt("/api/visninger") === 1, bedtOm.join(" "));
+
     var puber = document.getElementById("pub");
     ok("pubene fra lista kan velges", puber.options.length > 10, puber.options.length);
     ok("usikre puber star ikke i lista",
@@ -1181,29 +1203,50 @@ const SAK_15 = await kjor("admin", `
        ligaer.options.length === 2 && ligaer.options[0].value === "eliteserien",
        Array.prototype.map.call(ligaer.options, function (o) { return o.value; }).join(","));
 
-    // Kampene er hentet fra samme endepunkt som fotballfanen bruker.
-    ok("kampene hentes fra fotball-funksjonen",
-       bedtOm.filter(function (u) { return u.indexOf("/api/fotball/neste") === 0; }).length === 1,
-       bedtOm.join(" "));
-    var bokser = document.querySelectorAll(".kamp input");
-    ok("de kommende kampene er avkryssbare", bokser.length === 2, bokser.length);
-    ok("kampen star med lag og tid",
-       document.getElementById("kamper").textContent.indexOf("Rosenborg – Brann") > -1,
-       document.getElementById("kamper").textContent.slice(0, 120));
-    ok("runden og kilden star under lista",
-       document.getElementById("kampHint").textContent.indexOf("Runde 21") > -1,
-       document.getElementById("kampHint").textContent);
-
     // Uten passord skjer ingenting: portalen ber ikke tjenesten om noe.
-    document.getElementById("lagre").click();
-    ok("uten passord sendes ingenting", sendt === null);
+    document.getElementById("loggInn").click();
+    ok("uten passord sendes ingen innlogging", innlogging === null);
     ok("og det staar hvorfor",
-       document.getElementById("melding").textContent.indexOf("passordet") > -1,
-       document.getElementById("melding").textContent);
+       document.getElementById("adgangMelding").textContent.indexOf("passordet") > -1,
+       document.getElementById("adgangMelding").textContent);
 
-    document.getElementById("passord").value = "hemmelig";
-    bokser[0].checked = true;
-    document.getElementById("lagre").click();
+    // Feil passord slipper deg ikke inn, og tjenestens svar star der.
+    document.getElementById("passord").value = "apneopp";
+    document.getElementById("loggInn").click();
+
+    setTimeout(function () { try {
+      ok("feil passord holder portalen skjult",
+         document.getElementById("portal").hidden === true);
+      ok("og tjenestens svar vises",
+         document.getElementById("adgangMelding").textContent.indexOf("Feil passord") > -1,
+         document.getElementById("adgangMelding").textContent);
+      ok("feil passord henter ingen kamper", telt("/api/fotball/neste") === 0, bedtOm.join(" "));
+
+      document.getElementById("passord").value = "hemmelig";
+      document.getElementById("loggInn").click();
+
+      setTimeout(function () { try {
+        ok("riktig passord apner portalen",
+           document.getElementById("portal").hidden === false);
+        // Passordet lever i modulen, ikke i DOM-en.
+        ok("passordfeltet tommes etter innlogging",
+           document.getElementById("passord").value === "");
+
+        // Kampene er hentet fra samme endepunkt som fotballfanen bruker,
+        // og forst na.
+        ok("kampene hentes fra fotball-funksjonen, etter innlogging",
+           telt("/api/fotball/neste") === 1, bedtOm.join(" "));
+        var bokser = document.querySelectorAll(".kamp input");
+        ok("de kommende kampene er avkryssbare", bokser.length === 2, bokser.length);
+        ok("kampen star med lag og tid",
+           document.getElementById("kamper").textContent.indexOf("Rosenborg – Brann") > -1,
+           document.getElementById("kamper").textContent.slice(0, 120));
+        ok("runden og kilden star under lista",
+           document.getElementById("kampHint").textContent.indexOf("Runde 21") > -1,
+           document.getElementById("kampHint").textContent);
+
+        bokser[0].checked = true;
+        document.getElementById("lagre").click();
 
     setTimeout(function () { try {
       ok("valget sendes til tjenesten", !!sendt);
@@ -1237,6 +1280,8 @@ const SAK_15 = await kjor("admin", `
              sendt.kampIder.length === 1 && sendt.kampIder[0] === 901, JSON.stringify(sendt.kampIder));
           ferdig();
         } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 200);
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
       } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 600); });
@@ -1297,6 +1342,11 @@ const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
     ok("kampen sier selv at den vises et sted", !!viser);
     ok("og hvor", viser.textContent.indexOf("Denne kampen vises på: Lincoln Pub") > -1,
        viser.textContent);
+    // Stjerna er merket for «denne kampen vises her»; ballen sier bare at
+    // stedet pleier a vise fotball.
+    ok("linja er merket med stjerne",
+       viser.querySelector(".kamp-viser-merke").textContent === "\u2605",
+       viser.querySelector(".kamp-viser-merke").textContent);
     ok("neste kamp har sin egen pub pa raden",
        rader[1].querySelector(".kamp-viser").textContent.indexOf("Carls") > -1,
        rader[1].querySelector(".kamp-viser").textContent);
@@ -1324,8 +1374,11 @@ const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
       ok("bare puben som viser denne kampen star der",
          bekChips.length === 1 && bekChips[0].textContent.indexOf("Lincoln Pub") === 0,
          bekChips.length + " " + bekChips[0].textContent);
-      ok("den er merket med hake", !!bekChips[0].querySelector(".pub-bekreftet"));
-      ok("og haken sier hva den betyr",
+      ok("den er merket med stjerne",
+         !!bekChips[0].querySelector(".pub-bekreftet")
+         && bekChips[0].querySelector(".pub-bekreftet").textContent === "\u2605",
+         bekChips[0].textContent);
+      ok("og stjerna sier hva den betyr",
          bekChips[0].querySelector(".pub-bekreftet").getAttribute("aria-label") === "viser denne kampen");
       ok("det star hvor opplysningen kommer fra",
          bekGruppe.textContent.indexOf("Meldt inn til oss") > -1, bekGruppe.textContent);

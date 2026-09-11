@@ -250,9 +250,24 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   «Del appen» i menyen og er `noindex`. Portalen skriver ingenting selv:
   den sender valget til `/api/visninger`, som er det eneste stedet
   passordet (`ADMIN_PASSORD`) og GitHub-tokenet (`GITHUB_TOKEN`) finnes.
-  Mangler ett av dem, svarer funksjonen 503 med en synlig melding.
   Passordet sammenliknes i konstant tid, og et feil passord når aldri
   GitHub.
+- Passordet først: resten av portalen ligger skjult til tjenesten har
+  godtatt det (`handling: "sjekk"`, som bare svarer ja eller nei).
+  Skjulingen er ikke sikkerheten — den ligger i funksjonen, som krever
+  passordet ved hver skriving — men den som åpner sida skal se ett felt,
+  ikke et skjema hen ikke kan lagre. Innloggingen sparer også et kall
+  mot API-Football per åpning: kampene hentes først etterpå, og
+  døgnkvoten er hundre. Passordet lever i en variabel i modulen, ikke i
+  feltet og ikke i `sessionStorage`; feltet tømmes, og en oppfriskning
+  krever ny innlogging.
+- Mangler en av hemmelighetene, svarer funksjonen 503 og sier hvilken —
+  «Portalen er ikke satt opp» alene sender admin til å lete i koden
+  etter noe som står i Netlify-panelet. Et `GET /api/visninger` spør
+  bare om oppsettet (`klar`, `mangler`), og portalen gjør det ved
+  åpning: da står det der før kampene er krysset av, ikke etter. Husk at
+  funksjonene leser miljøet ved utrulling, så en ny variabel krever en
+  ny deploy.
 - Kampene admin krysser av hentes fra `/api/fotball/neste` — samme
   endepunkt som fotballfanen. Ligaene kommer fra `LIGAER` i
   `fotball-data.js`, ikke fra en egen liste, så de to ikke kan gli fra
@@ -279,14 +294,16 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   «på pub» og puben ferdig valgt. I panelet står de samme pubene som
   egen gruppe aller øverst — den eneste gruppa som svarer på *denne*
   kampen, mens resten er steder som pleier å vise fotball. Dukker samme
-  pub opp igjen under «Nær deg» eller ved arenaen, bærer den samme hake
-  der (`merkBekreftet`), så den ser lik ut overalt.
+  pub opp igjen under «Nær deg» eller ved arenaen, bærer den samme
+  stjerne der (`merkBekreftet`), så den ser lik ut overalt.
 - Det står «Meldt inn til oss» under gruppa, ikke «Puben bekrefter»:
   inntil pubene skriver selv (#65) er det vi som har ført det inn, og
   leseren skal vite forskjellen.
 - Fargen er `--bekreftet`, en egen variabel i begge temaer: `#1F7A4D` er
-  for mørk på svart. Haken sier noe annet enn ballen — ballen betyr at
-  stedet pleier å vise fotball, haken at nettopp denne kampen vises.
+  for mørk på svart. Stjerna sier noe annet enn ballen — ballen betyr at
+  stedet pleier å vise fotball, stjerna at nettopp denne kampen vises.
+  Stjerna i tabellen er en annen sak: den velger favorittlag, og de to
+  møtes aldri på samme skjerm.
 - Nettlesertesten legger sin egen `visninger.js` i temp-katalogen, og
   testtjeneren serverer den framfor den i repoet. Da kan lesersiden
   testes med ekte data uten at `visninger.js` fylles med oppdiktede
@@ -295,8 +312,8 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 ## Testing
 
     node test/unit.mjs      279 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  119 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       194 tester, ~130 s, headless Chromium
+    node test/funksjon.mjs  128 tester, ~250 ms, ingen nettleser
+    node test/run.mjs       203 tester, ~130 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
@@ -321,7 +338,7 @@ døgnkvoten holder. `run.mjs` dekker alt som trenger DOM: XSS i titler
 og artikkel-HTML, annonseplassering, rulleoppførsel, artikkelvisningen,
 fokusfella, korthøyden, at toppfeltet krymper, paginering, ruting,
 visningsvalgene i menyen, favorittlag fra stjerne til feed, deling av en
-kamp med sted og pubforslag, adminportalen fra ligavalg til lagring, og hele
+kamp med sted og pubforslag, adminportalen fra innlogging til lagring, og hele
 fotballmodulen — fanebytte, tabell, resultater, neste runde, dyplenker og
 feilmelding fra tjenesten.
 

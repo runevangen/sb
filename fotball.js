@@ -500,12 +500,13 @@ function pubGruppe(tittel, liste, pubFelt) {
     b.type = "button";
     b.appendChild(el("span", null, p.navn));
     // Bekreftet star forst av merkene: det svarer pa kampen, ikke bare
-    // pa stedet.
+    // pa stedet. Stjerna er merket for «denne kampen vises her», ballen
+    // for «stedet pleier a vise fotball».
     if (p.bekreftet) {
       b.classList.add("bekreftet");
-      const hake = el("span", "pub-bekreftet", "✓");
-      hake.setAttribute("aria-label", "viser denne kampen");
-      b.appendChild(hake);
+      const stjerne = el("span", "pub-bekreftet", "★");
+      stjerne.setAttribute("aria-label", "viser denne kampen");
+      b.appendChild(stjerne);
     }
     // Et sted vi vet viser fotball, blant treff vi bare vet er puber.
     if (p.viserFotball || p.sikkerhet) {
@@ -672,7 +673,9 @@ function viserlinje(kamp) {
   const bekreftede = bekreftetFor(kamp, VISNINGER, KJENTE);
   if (!bekreftede.length) return null;
   const linje = el("div", "kamp-viser");
-  linje.appendChild(el("span", "kamp-viser-merke", "✓"));
+  const merke = el("span", "kamp-viser-merke", "★");
+  merke.setAttribute("aria-hidden", "true");
+  linje.appendChild(merke);
   linje.appendChild(el("span", "kamp-viser-tekst", "Denne kampen vises på: "));
   bekreftede.forEach((p, i) => {
     if (i) linje.appendChild(el("span", "kamp-viser-tekst", ", "));

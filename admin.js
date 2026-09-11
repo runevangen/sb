@@ -1,8 +1,18 @@
-// Admin-portalen. Enkel med vilje: velg pub, kryss av kamper, lagre.
+// Admin-portalen. Enkel med vilje: logg inn, velg pub, kryss av kamper,
+// lagre.
 //
 // Den skriver ikke selv — den sender valget til /api/visninger, som er
 // det eneste stedet passordet og GitHub-tokenet finnes. Portalen kan
 // ligge apent; uten passord skjer ingenting.
+//
+// Passordet forst: resten av portalen ligger skjult til tjenesten har
+// godtatt det. Det er ikke sikkerheten — den ligger i funksjonen, som
+// krever passordet ved hver skriving — men det er ordenen. Den som apner
+// sida skal se ett felt, ikke et skjema hen ikke kan lagre. Og det
+// sparer et kall mot API-Football per apning: kvoten er hundre i dognet.
+//
+// Passordet ligger i en variabel her, ikke i sessionStorage: en
+// oppfriskning er billigere enn et passord som blir liggende.
 
 import { PUBER_OSLO } from "./puber-oslo.js";
 import { VISNINGER } from "./visninger.js";
@@ -10,6 +20,7 @@ import { LIGAER } from "./fotball-data.js";
 
 const felt = (id) => document.getElementById(id);
 let kamper = [];
+let passord = "";
 
 /* ---------- pubvelgeren ---------- */
 
@@ -37,11 +48,78 @@ Object.keys(LIGAER).forEach((nokkel) => {
   valg.textContent = LIGAER[nokkel].navn + " (" + LIGAER[nokkel].land + ")";
   felt("liga").appendChild(valg);
 });
-felt("liga").addEventListener("change", hentKamper);
+felt("liga").addEventListener("change", () => { if (passord) hentKamper(); });
+
+/* ---------- adgang ---------- */
+
+// Sporr tjenesten om den i det hele tatt er satt opp, for admin har
+// gjort noe. Mangler ADMIN_PASSORD eller GITHUB_TOKEN, star det her —
+// med navnet pa den som mangler — framfor a mote admin som «Portalen er
+// ikke satt opp» etter at kampene er krysset av.
+sjekkOppsett();
+
+async function sjekkOppsett() {
+  try {
+    const respons = await fetch("/api/visninger", { headers: { "Accept": "application/json" } });
+    const data = JSON.parse(await respons.text());
+    // Bare et tydelig nei skal stenge knappen. Svarer en eldre utrulling
+    // noe annet pa GET, lar vi innloggingen forsoke.
+    if (data.klar !== false) return;
+    visAdgang(data.feil || "Portalen er ikke satt opp.", "feil");
+    felt("loggInn").disabled = true;
+  } catch (err) {
+    // Nettverksfeil her skal ikke lase portalen.
+  }
+}
+
+felt("loggInn").addEventListener("click", loggInn);
+felt("passord").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); loggInn(); }
+});
+felt("loggUt").addEventListener("click", () => location.reload());
+
+async function loggInn() {
+  const forsok = felt("passord").value;
+  if (!forsok) { visAdgang("Skriv passordet først.", "feil"); felt("passord").focus(); return; }
+  felt("loggInn").disabled = true;
+  visAdgang("Sjekker …", "");
+  try {
+    const respons = await fetch("/api/visninger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ handling: "sjekk", passord: forsok }),
+    });
+    const data = JSON.parse(await respons.text());
+    if (!respons.ok || data.feil) {
+      visAdgang(data.feil || ("Tjenesten svarte " + respons.status), "feil");
+      felt("loggInn").disabled = false;
+      return;
+    }
+  } catch (err) {
+    visAdgang("Fikk ikke sjekket passordet: " + err.message, "feil");
+    felt("loggInn").disabled = false;
+    return;
+  }
+
+  // Feltet tommes: passordet lever i variabelen, ikke i DOM-en.
+  passord = forsok;
+  felt("passord").value = "";
+  felt("passord").disabled = true;
+  felt("loggInn").hidden = true;
+  felt("loggUt").hidden = false;
+  felt("adgangHint").textContent = "Passordet ligger bare i denne fanen, til du logger ut eller lukker den.";
+  visAdgang("Innlogget.", "ok");
+  felt("portal").hidden = false;
+  hentKamper();
+}
+
+function visAdgang(tekst, art) {
+  const m = felt("adgangMelding");
+  m.textContent = tekst;
+  m.className = "melding" + (art ? " " + art : "");
+}
 
 /* ---------- kampene ---------- */
-
-hentKamper();
 
 async function hentKamper() {
   const liga = felt("liga").value || Object.keys(LIGAER)[0];
@@ -133,8 +211,7 @@ felt("merkIngen").addEventListener("click", () => alleBokser().forEach((b) => { 
 /* ---------- lagring ---------- */
 
 felt("lagre").addEventListener("click", async () => {
-  const passord = felt("passord").value;
-  if (!passord) { vis("Skriv passordet først.", "feil"); felt("passord").focus(); return; }
+  if (!passord) { vis("Logg inn først.", "feil"); felt("passord").focus(); return; }
 
   const valgte = alleBokser().filter((b) => b.checked).map((b) => Number(b.value));
   felt("lagre").disabled = true;
@@ -153,7 +230,18 @@ felt("lagre").addEventListener("click", async () => {
       }),
     });
     const data = JSON.parse(await respons.text());
-    if (!respons.ok || data.feil) {
+    if (respons.status === 401) {
+      // Passordet er byttet mens fanen sto apen. Da er innloggingen
+      // ikke lenger sann, og skjemaet skal ikke se ut som om den er det.
+      passord = "";
+      vis("Passordet ble ikke godtatt. Logg inn på nytt.", "feil");
+      visAdgang("Logg inn på nytt.", "feil");
+      felt("passord").disabled = false;
+      felt("loggInn").disabled = false;
+      felt("loggInn").hidden = false;
+      felt("loggUt").hidden = true;
+      felt("portal").hidden = true;
+    } else if (!respons.ok || data.feil) {
       vis(data.feil || ("Tjenesten svarte " + respons.status), "feil");
     } else {
       vis(data.merknad || "Lagret.", "ok");

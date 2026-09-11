@@ -49,6 +49,14 @@
   .melding:empty { display: none; padding: 0; }
   .hint { font-size: 12px; color: var(--tekst-svak); margin: 8px 0 0; }
   .rad { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .rad input[type="password"] { flex: 1 1 180px; width: auto; }
+  /* Portalen ligger skjult til passordet er godtatt. display: none med
+     !important, sa en seksjon med egen display ikke smetter fram. */
+  [hidden] { display: none !important; }
+  .visuelt-skjult {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
   a { color: var(--aksent); }
 </style>
 </head>
@@ -56,18 +64,27 @@
 <main>
   <h1>Hvem viser kampen</h1>
   <p class="undertittel">
-    Velg en pub, velg liga, kryss av kampene de viser, lagre. Kampene er
-    de samme kommende kampene som fotballfanen viser. Endringen er ute i
+    Logg inn, velg en pub, velg liga, kryss av kampene de viser, lagre.
+    Kampene er de samme kommende kampene som fotballfanen viser. Endringen er ute i
     appen når utrullingen er ferdig, om et minutt eller to.
   </p>
 
   <section>
     <h2>Adgang</h2>
     <label for="passord">Adminpassord</label>
-    <input type="password" id="passord" autocomplete="current-password">
-    <p class="hint">Lagres bare i denne fanen, og forsvinner når du lukker den.</p>
+    <div class="rad">
+      <input type="password" id="passord" autocomplete="current-password">
+      <button id="loggInn" type="button">Logg inn</button>
+      <button class="lenke" id="loggUt" type="button" hidden>Logg ut</button>
+    </div>
+    <p class="melding" id="adgangMelding" role="status" aria-live="polite"></p>
+    <p class="hint" id="adgangHint">
+      Passordet ligger bare i denne fanen så lenge den er åpen — verken i
+      nettadressen eller i lagringen. Oppfrisker du siden, logger du inn på nytt.
+    </p>
   </section>
 
+  <div id="portal" hidden>
   <section>
     <h2>Pub</h2>
     <label for="pub" class="visuelt-skjult">Velg pub</label>
@@ -91,6 +108,7 @@
     </div>
     <p class="melding" id="melding" role="status" aria-live="polite"></p>
   </section>
+  </div>
 
   <p class="hint">
     <a href="/">Tilbake til appen</a>. Lista lagres som <code>visninger.js</code> i
