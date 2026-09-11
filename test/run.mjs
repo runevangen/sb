@@ -955,20 +955,52 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
        document.querySelector(".fotball-kilde").textContent);
     ok("ingen notis nar deling er mulig", !document.querySelector(".kamp-notis"));
 
-    // Vaeret star under kampen som har arena, og bare der.
-    var vaer = document.querySelectorAll(".kamp-vaer");
-    ok("vaeret star under kampen med arena",
-       vaer.length === 1 && !vaer[0].hidden && vaer[0].textContent.indexOf("8°, føles som 4°") === 0,
-       vaer.length + " " + (vaer[0] ? vaer[0].textContent : ""));
-    ok("vaeret hentes en gang per kamp", window.__vaerKall === 1, window.__vaerKall);
+    // Vaeret hentes ikke for noen apner kampen. For sto det under hver
+    // eneste kamp i runden, og hver av dem kostet et kall mot MET for
+    // leseren hadde trykket pa noe.
+    ok("ingen vaerlinje for kampen er apnet",
+       document.querySelectorAll(".kamp-vaer").length === 0);
+    ok("og MET er ikke sporten gang", window.__vaerKall === 0, window.__vaerKall);
     ok("MET krediteres",
        document.getElementById("fotballInnhold").textContent.indexOf("Vær: MET Norway") > -1);
 
+    // Hele linja er knappen, ikke en pil i hjornet: flata ligger utstrakt
+    // over kamplinja, og pilen er dekor som ikke tar imot trykk.
+    var linje0 = knapper[0].closest(".kamp").querySelector(".kamp-linje");
+    var flate = knapper[0].getBoundingClientRect();
+    var linjeMal = linje0.getBoundingClientRect();
+    ok("trykkflata dekker hele kamplinja",
+       Math.abs(flate.width - linjeMal.width) < 2 && Math.abs(flate.height - linjeMal.height) < 2,
+       Math.round(flate.width) + "x" + Math.round(flate.height) + " mot " +
+       Math.round(linjeMal.width) + "x" + Math.round(linjeMal.height));
+    ok("pilen er dekor, ikke et mal",
+       getComputedStyle(linje0.querySelector(".kamp-pil")).pointerEvents === "none");
+    var lagNavn = Array.prototype.map.call(linje0.querySelectorAll(".kamp-lag"), function (l) { return l.textContent; });
+    ok("ett tastaturmal per kamp, og det sier hvilken kamp",
+       knapper[0].getAttribute("aria-label") === lagNavn.join(" – ") + ". Hvor ser du kampen?",
+       knapper[0].getAttribute("aria-label"));
+    // Et trykk midt pa lagnavnet skal apne kampen, ikke bare pa pilen.
+    ok("ingen egen knapp i hjornet a treffe",
+       knapper[0].closest(".kamp").querySelectorAll("button.kamp-pil").length === 0);
+
     knapper[0].click();
     var panel = document.querySelector(".kamp-panel");
-    ok("trykk apner panelet rett under kampen",
-       panel && panel.previousElementSibling === knapper[0].closest(".kamp") &&
+    var valgt = knapper[0].closest(".kamp");
+    // Rammen skal omslutte alt som horer til kampen, sa panelet ligger
+    // inni raden — ikke som en losrevet rad under den.
+    ok("trykk apner panelet inne i kampen",
+       panel && panel.parentElement === valgt &&
        knapper[0].getAttribute("aria-expanded") === "true");
+    ok("den valgte kampen far en ramme rundt seg",
+       valgt.classList.contains("valgt") &&
+       getComputedStyle(valgt).borderTopWidth !== "0px",
+       getComputedStyle(valgt).borderTopWidth);
+    ok("og bare den ene", document.querySelectorAll(".kamp.valgt").length === 1);
+    // Vaeret kommer forst na, og bare pa kampen som ble apnet.
+    ok("vaerlinja kommer nar kampen apnes", valgt.querySelectorAll(".kamp-vaer").length === 1);
+    ok("og MET sporres da, en gang", window.__vaerKall === 1, window.__vaerKall);
+    ok("ingen andre kamper har fatt vaer",
+       document.querySelectorAll(".kamp-vaer").length === 1);
     ok("del er sperret til et sted er valgt", panel.querySelector(".kamp-send").disabled);
     ok("stadion har arenaens navn nar vi har det",
        panel.querySelectorAll(".hvor-valg")[2].textContent === "På Brann Stadion",
@@ -994,6 +1026,12 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
     knapper[1].click();
     ok("bare ett panel om gangen", document.querySelectorAll(".kamp-panel").length === 1 &&
        knapper[0].getAttribute("aria-expanded") === "false");
+    ok("rammen folger med over", document.querySelectorAll(".kamp.valgt").length === 1 &&
+       !knapper[0].closest(".kamp").classList.contains("valgt"));
+    // Vaeret rydder etter seg: den lukkede kampen skal ikke bli staende
+    // med en linje som hoerer til en apen rad.
+    ok("vaeret folger den apne kampen",
+       knapper[0].closest(".kamp").querySelectorAll(".kamp-vaer").length === 0);
     knapper[0].click();
     panel = document.querySelector(".kamp-panel");
     panel.querySelectorAll(".hvor-valg")[1].click();
@@ -1001,6 +1039,15 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
 
     // Nested tilbakekall ligger utenfor try-en over; hvert far sin egen.
     setTimeout(function () { try {
+      // Vaeret fylles nar MET svarer, og bare pa den apne kampen.
+      var vaerNa = document.querySelectorAll(".kamp-vaer");
+      ok("vaeret star under den apne kampen nar svaret kom",
+         vaerNa.length === 1 && !vaerNa[0].hidden &&
+         vaerNa[0].textContent.indexOf("8°, føles som 4°") === 0,
+         vaerNa.length + " " + (vaerNa[0] ? vaerNa[0].textContent : ""));
+      ok("og den star inne i rammen",
+         vaerNa[0].closest(".kamp").classList.contains("valgt"));
+
       var titlerNa = Array.prototype.map.call(forslag.querySelectorAll(".pub-gruppe-tittel"), function (t) { return t.textContent; });
       ok("naer deg star forst", titlerNa[0] === "Nær deg", titlerNa.join("|"));
       ok("naer deg sporr Overpass fra nettleseren med rundet posisjon",
@@ -1471,8 +1518,9 @@ const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
     // valgt, sa «jeg blir med» ikke krever at pubnavnet skrives pa nytt.
     linje.querySelector(".kamp-invitasjon-svar").click();
     var panel = document.querySelector(".kamp-panel");
+    // Panelet ligger inne i den valgte kampen, innenfor rammen.
     ok("svar apner panelet pa den kampen",
-       panel && panel.previousElementSibling === merket[0]);
+       panel && merket[0].contains(panel) && merket[0].classList.contains("valgt"));
     ok("med avsenderens sted ferdig valgt",
        panel.querySelector(".kamp-pub").value === "Pub X" &&
        panel.querySelectorAll(".hvor-valg")[1].getAttribute("aria-pressed") === "true",

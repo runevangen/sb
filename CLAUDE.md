@@ -181,6 +181,26 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   TheSportsDB skriver sesongen «2026»
   for kalenderligaer og «2026-2027» for dem som krysser nyttår
   (`tsdbSesong`).
+- Hele kamplinja er trykkflaten, ikke en pil i hjørnet. Raden kan ikke
+  selv være en `<button>` — den inneholder pubnavn-knappen, og en knapp i
+  en knapp finnes ikke — så `.kamp-del` er en ekte knapp lagt utstrakt
+  over `.kamp-linje` (`position: absolute; inset: 0`), mens pubnavnet
+  løftes over med `z-index`. Ett tastaturmål per kamp, lest opp som
+  «Rosenborg – Tromsø. Hvor ser du kampen?». Pilen er dekor
+  (`pointer-events: none`) og roterer når raden er åpen, så den viser
+  tilstand framfor å være det eneste man kan treffe.
+- Den åpne kampen får en ramme i aksentfargen. Raden er derfor en
+  beholder og `.kamp-linje` rutenettet inni: rammen skal omslutte alt som
+  hører til kampen — tiden, været, puben og panelet — så panelet ligger
+  inne i raden, ikke som en løsrevet rad under den. Bunnen er
+  `--accent-wash`, egen variabel i begge temaer: på svart er en dyp
+  marine (`#0F1730`) nærmere aksenten enn en grå ville vært.
+- Været hentes først når kampen åpnes, ikke når runden tegnes. Før kalte
+  `kamprad()` `vaerlinje()` for hver eneste kamp, og ti kamper ble ti
+  kall mot MET før leseren hadde trykket på noe — og raden vokste og
+  hoppet mens den ble lest. `hentVaer` husker per kamp, så å åpne den
+  samme igjen koster ingenting, og delingsteksten henter fra samme minne.
+  Linja fjernes når raden lukkes.
 - «Hvor ser du kampen?» Årets kommende kamper har en delingsknapp som
   åpner ett spørsmål under raden: hjemme, på pub (med navn) eller på
   stadion (med arena). Svaret deles som tekst inn i gruppechatten leseren
@@ -401,7 +421,7 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
     node test/unit.mjs      332 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  151 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       230 tester, ~150 s, headless Chromium
+    node test/run.mjs       243 tester, ~150 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
