@@ -8,6 +8,7 @@
 // likt her som i resten av appen.
 
 import { LIGAER, DELER, DEL_NAVN, HVOR, delingstekst, fotballHash } from "./fotball-data.js";
+import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst } from "./pub-data.js";
 import { timeAgo } from "./lib.js";
 
 let naviger = () => {};
@@ -18,6 +19,8 @@ let favoritter = { er: () => false, veksle: () => false };
 // Deling eies ogsa av app.js: samme delingsmeny og samme utklippstavle-
 // fallback som «Del appen». Svarer med hva som skjedde.
 let deling = async () => "feil";
+// Dine puber eies av app.js (det er lagring): lista, og noter en brukt.
+let puber = { liste: () => [], noter: () => {} };
 let aktivLiga = "eliteserien";
 let aktivDel = "tabell";
 
@@ -35,11 +38,12 @@ function el(tag, klasse, tekst) {
 
 /* ---------- oppsett ---------- */
 
-export function initFotball(paNavigering, paLagsok, paFavoritt, paDeling) {
+export function initFotball(paNavigering, paLagsok, paFavoritt, paDeling, paPuber) {
   naviger = paNavigering;
   if (paLagsok) sokEtterLag = paLagsok;
   if (paFavoritt) favoritter = paFavoritt;
   if (paDeling) deling = paDeling;
+  if (paPuber) puber = paPuber;
 
   const ligaer = document.getElementById("ligaVelger");
   Object.keys(LIGAER).forEach((nokkel) => {
@@ -318,6 +322,8 @@ function delPanel(kamp) {
   pubFelt.setAttribute("aria-label", "Hvilken pub?");
   pubFelt.maxLength = 60;
   pubFelt.hidden = true;
+  const forslag = pubForslag(kamp, pubFelt);
+  forslag.hidden = true;
   const send = el("button", "kamp-send", "Del");
   send.type = "button";
   send.disabled = true;
@@ -338,7 +344,8 @@ function delPanel(kamp) {
       valg.querySelectorAll(".hvor-valg").forEach((k) =>
         k.setAttribute("aria-pressed", k === b ? "true" : "false"));
       pubFelt.hidden = nokkel !== "pub";
-      if (nokkel === "pub") pubFelt.focus();
+      forslag.hidden = nokkel !== "pub";
+      if (nokkel === "pub") { fyllForslag(forslag, kamp); pubFelt.focus(); }
       send.disabled = false;
       svar.textContent = "";
     });
@@ -355,16 +362,151 @@ function delPanel(kamp) {
     send.disabled = true;
     const utfall = await deling(tekst, url);
     send.disabled = false;
+    if (utfall === "delt" || utfall === "kopiert") {
+      // En delt pub er en pub leseren bruker. Neste gang star den forst.
+      if (hvor === "pub" && pubFelt.value.trim()) puber.noter(pubFelt.value.trim());
+    }
     if (utfall === "delt") { lukkPanel(); return; }
     if (utfall === "kopiert") svar.textContent = "Kopiert. Lim inn i chatten.";
     else if (utfall !== "avbrutt") svar.textContent = "Fikk ikke delt. Kopier teksten selv: " + tekst;
   });
 
   panel.appendChild(valg);
+  panel.appendChild(forslag);
   panel.appendChild(pubFelt);
   panel.appendChild(send);
   panel.appendChild(svar);
   return panel;
+}
+
+/* ---------- pubforslag ---------- */
+
+// Fire svar pa «hvilken pub?»: dine, naer deg, ved stadion, ved
+// holdeplassen. Alle er knapper som fyller feltet — feltet er fortsatt
+// sannheten, sa en pub som ikke star i lista kan skrives.
+const puberHusket = new Map();
+
+function pubForslag(kamp, pubFelt) {
+  const boks = el("div", "pub-forslag");
+  boks.dataset.arena = kamp.arena || "";
+  boks.pubFelt = pubFelt;
+  return boks;
+}
+
+function fyllForslag(boks, kamp) {
+  if (boks.dataset.fylt) return;
+  boks.dataset.fylt = "1";
+  boks.replaceChildren();
+
+  const dine = puber.liste();
+  if (dine.length) boks.appendChild(pubGruppe("Dine puber", dine.map((p) => ({ navn: p.navn })), boks.pubFelt));
+
+  // Naer deg: bare pa trykk. Posisjonen gar rett til OpenStreetMap og
+  // aldri innom oss, og den rundes til rundt hundre meter forst.
+  const naer = el("div", "pub-gruppe");
+  const knapp = el("button", "pub-naer", "Puber nær deg");
+  knapp.type = "button";
+  knapp.addEventListener("click", () => hentNaerDeg(naer, knapp, boks.pubFelt));
+  naer.appendChild(knapp);
+  naer.appendChild(el("p", "pub-note", "Posisjonen sendes til OpenStreetMap, ikke til oss."));
+  boks.appendChild(naer);
+
+  const rundt = el("div", "pub-rundt");
+  boks.appendChild(rundt);
+  if (kamp.arena) {
+    hentPuberRundt(kamp.arena).then((data) => {
+      if (!data) return;
+      (data.grupper || []).forEach((g) => rundt.appendChild(pubGruppe(g.tittel, g.puber, boks.pubFelt)));
+      if (data.grupper && data.grupper.length) {
+        rundt.appendChild(el("p", "pub-note", "© OpenStreetMap-bidragsytere"));
+      }
+    });
+  }
+}
+
+function pubGruppe(tittel, liste, pubFelt) {
+  const gruppe = el("div", "pub-gruppe");
+  gruppe.appendChild(el("p", "pub-gruppe-tittel", tittel));
+  const rad = el("div", "pub-liste");
+  liste.forEach((p) => {
+    const b = el("button", "pub-chip");
+    b.type = "button";
+    b.appendChild(el("span", null, p.navn));
+    if (Number.isFinite(p.avstand)) b.appendChild(el("span", "pub-avstand", avstandtekst(p.avstand)));
+    b.addEventListener("click", () => {
+      pubFelt.value = p.navn;
+      pubFelt.dispatchEvent(new Event("input"));
+      // Markerer valget der det ble gjort, og bare der.
+      gruppe.closest(".pub-forslag").querySelectorAll(".pub-chip").forEach((k) =>
+        k.setAttribute("aria-pressed", k === b ? "true" : "false"));
+    });
+    b.setAttribute("aria-pressed", "false");
+    rad.appendChild(b);
+  });
+  gruppe.appendChild(rad);
+  return gruppe;
+}
+
+async function hentPuberRundt(arena) {
+  if (puberHusket.has(arena)) return puberHusket.get(arena);
+  const lofte = (async () => {
+    try {
+      const respons = await fetch("/api/puber?arena=" + encodeURIComponent(arena),
+        { headers: { "Accept": "application/json" } });
+      if (!respons.ok) return null;
+      const data = JSON.parse(await respons.text());
+      return data && !data.feil ? data : null;
+    } catch (err) {
+      return null;
+    }
+  })();
+  puberHusket.set(arena, lofte);
+  return lofte;
+}
+
+// Overpass rett fra nettleseren, med posisjonen rundet. Svaret husket per
+// posisjon sa et nytt trykk ikke koster et nytt kall.
+const naerHusket = new Map();
+
+function hentNaerDeg(gruppe, knapp, pubFelt) {
+  if (!navigator.geolocation) { visPubFeil(gruppe, "Ingen posisjon tilgjengelig."); return; }
+  knapp.disabled = true;
+  knapp.textContent = "Finner puber …";
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    const p = rundPosisjon(pos.coords.latitude, pos.coords.longitude);
+    const nokkel = p.lat + "," + p.lon;
+    try {
+      if (!naerHusket.has(nokkel)) {
+        naerHusket.set(nokkel, fetch("https://overpass-api.de/api/interpreter", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: "data=" + encodeURIComponent(overpassSporring(p.lat, p.lon, 800)),
+        }).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+          .then((json) => tolkPuber(json, p)));
+      }
+      const liste = (await naerHusket.get(nokkel)).slice(0, 6);
+      knapp.remove();
+      if (!liste.length) { visPubFeil(gruppe, "Fant ingen puber innen 800 m."); return; }
+      gruppe.replaceChildren();
+      gruppe.appendChild(pubGruppe("Nær deg", liste, pubFelt));
+      gruppe.appendChild(el("p", "pub-note", "© OpenStreetMap-bidragsytere"));
+    } catch (err) {
+      naerHusket.delete(nokkel);
+      knapp.disabled = false;
+      knapp.textContent = "Puber nær deg";
+      visPubFeil(gruppe, "Fikk ikke svar fra OpenStreetMap. Prøv igjen.");
+    }
+  }, () => {
+    knapp.disabled = false;
+    knapp.textContent = "Puber nær deg";
+    visPubFeil(gruppe, "Fikk ikke posisjonen. Skriv puben selv.");
+  }, { maximumAge: 300000, timeout: 10000 });
+}
+
+function visPubFeil(gruppe, tekst) {
+  let note = gruppe.querySelector(".pub-feil");
+  if (!note) { note = el("p", "pub-note pub-feil"); gruppe.appendChild(note); }
+  note.textContent = tekst;
 }
 
 // En ferdigspilt sesong har ingen neste runde, og det er noe annet enn at

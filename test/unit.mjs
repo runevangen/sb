@@ -18,6 +18,9 @@ import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
 import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
   from "../vaer-data.js";
 
+import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, enturNaermest,
+         tolkHoldeplasser, grupperPuber, ofteBrukt, noterPub } from "../pub-data.js";
+
 let feilet = 0;
 
 function ok(navn, betingelse, detalj) {
@@ -458,6 +461,75 @@ ok("delingsteksten far vaeret for sporsmalet",
 ok("uten vaer er teksten som for",
    delingstekst(KAMPEN, "hjemme", "", "", "").indexOf("Været") === -1);
 
+/* ---------------- puber ---------------- */
+
+ok("Overpass-sporringen har radius og tre desimaler",
+   overpassSporring(63.41264, 10.4, 800) === '[out:json][timeout:12];nwr["amenity"~"^(pub|bar)$"](around:800,63.413,10.400);out center tags;',
+   overpassSporring(63.41264, 10.4, 800));
+ok("posisjonen rundes til tre desimaler",
+   rundPosisjon(59.9138688, 10.7522454).lat === 59.914 && rundPosisjon(59.9138688, 10.7522454).lon === 10.752);
+// Lerkendal til Trondheim torg er rundt 2,3 km.
+const LERK = { lat: 63.413, lon: 10.406 };
+ok("avstanden regnes i meter", Math.abs(avstandM(LERK, { lat: 63.430, lon: 10.395 }) - 1970) < 60,
+   avstandM(LERK, { lat: 63.430, lon: 10.395 }));
+ok("avstand skrives kort", avstandtekst(243) === "240 m" && avstandtekst(1250) === "1,3 km" && avstandtekst(NaN) === "");
+
+const OSM = { elements: [
+  { type: "node", id: 1, lat: 63.4140, lon: 10.4070, tags: { amenity: "pub", name: "Lerkendal Pub", opening_hours: "Mo-Su 12:00-01:00" } },
+  { type: "way", id: 2, center: { lat: 63.4200, lon: 10.3950 }, tags: { amenity: "bar", name: "Bybar" } },
+  { type: "node", id: 3, lat: 63.4141, lon: 10.4071, tags: { amenity: "pub", name: "lerkendal pub" } },
+  { type: "node", id: 4, lat: 63.4150, lon: 10.4080, tags: { amenity: "pub" } },
+  { type: "node", id: 5, tags: { amenity: "pub", name: "Uten sted" } },
+] };
+const PUBER = tolkPuber(OSM, LERK);
+ok("puber leses med navn, punkt og avstand, naermest forst",
+   PUBER.length === 2 && PUBER[0].navn === "Lerkendal Pub" && PUBER[0].avstand < 200 &&
+   PUBER[0].tider === "Mo-Su 12:00-01:00" && PUBER[1].navn === "Bybar", JSON.stringify(PUBER));
+ok("flater far punktet fra center", PUBER[1].lat === 63.42);
+ok("uten navn eller uten punkt faller bort, dobbelt navn en gang", PUBER.length === 2);
+ok("uventet svar kaster", kaster(() => tolkPuber({ nope: 1 })) && kaster(() => tolkPuber(null)));
+
+ok("Entur-sporringen ber om holdeplasser rundt punktet",
+   enturNaermest(63.413, 10.406, 700).indexOf("nearest(latitude: 63.4130, longitude: 10.4060, maximumDistance: 700") > -1 &&
+   enturNaermest(63.413, 10.406, 700).indexOf("filterByPlaceTypes: [stopPlace]") > -1);
+const ENTUR = { data: { nearest: { edges: [
+  { node: { distance: 120, place: { id: "NSR:StopPlace:1", name: "Lerkendal stadion", latitude: 63.4138, longitude: 10.4050 } } },
+  { node: { distance: 120, place: { id: "NSR:StopPlace:1b", name: "Lerkendal stadion", latitude: 63.4138, longitude: 10.4052 } } },
+  { node: { distance: 480, place: { id: "NSR:StopPlace:2", name: "Nardo", latitude: 63.4110, longitude: 10.4130 } } },
+  { node: { distance: 500, place: {} } },
+] } } };
+const HOLD = tolkHoldeplasser(ENTUR);
+ok("holdeplasser leses, samme navn en gang, tomme faller bort",
+   HOLD.length === 2 && HOLD[0].navn === "Lerkendal stadion" && HOLD[0].avstand === 120 && HOLD[1].navn === "Nardo",
+   JSON.stringify(HOLD));
+ok("uten svar fra Entur er lista tom", tolkHoldeplasser(null).length === 0 && tolkHoldeplasser({ errors: [] }).length === 0);
+
+const ALLE = [
+  { navn: "Lerkendal Pub", lat: 63.4140, lon: 10.4070 },
+  { navn: "Nardo Bar", lat: 63.4112, lon: 10.4128 },
+  { navn: "Langt unna", lat: 63.4300, lon: 10.3900 },
+];
+const GRUPPER = grupperPuber(ALLE, Object.assign({ navn: "Lerkendal" }, LERK), HOLD);
+ok("ved stadion: innen 800 m, naermest forst",
+   GRUPPER[0].tittel === "Ved Lerkendal" && GRUPPER[0].puber.map((p) => p.navn).join(",") === "Lerkendal Pub,Nardo Bar",
+   JSON.stringify(GRUPPER[0]));
+ok("ved holdeplass: innen 300 m fra den",
+   GRUPPER.some((g) => g.tittel === "Ved Nardo" && g.puber.length === 1 && g.puber[0].navn === "Nardo Bar"),
+   JSON.stringify(GRUPPER));
+ok("holdeplass uten puber rundt gir ingen gruppe, og langt unna er ikke med",
+   JSON.stringify(GRUPPER).indexOf("Langt unna") === -1);
+
+let dine = noterPub([], "Pub X", 1000);
+dine = noterPub(dine, "Bar Y", 2000);
+dine = noterPub(dine, "pub x", 3000);
+ok("en delt pub telles, uavhengig av store og sma bokstaver",
+   dine.length === 2 && dine[0].navn === "Pub X" && dine[0].antall === 2 && dine[0].sist === 3000, JSON.stringify(dine));
+ok("oftest brukt forst, sa sist brukt", ofteBrukt(dine)[0].navn === "Pub X" &&
+   ofteBrukt([{ navn: "A", antall: 1, sist: 1 }, { navn: "B", antall: 1, sist: 2 }])[0].navn === "B");
+ok("tomt navn endrer ingenting", noterPub(dine, "  ").length === 2);
+ok("hoyst fem forslag", ofteBrukt(Array.from({ length: 9 }, (_, i) => ({ navn: "P" + i, antall: i }))).length === 5);
+ok("odelagt lagring gir tom liste", ofteBrukt("rart").length === 0 && ofteBrukt([null, { antall: 3 }]).length === 0);
+
 /* ---------------- fotball: lagnavn ---------------- */
 
 ok("norske tegn foldes til ascii i nokkelen",
@@ -623,6 +695,6 @@ ok("hash bygges tilbake til samme rute",
 
 /* ---------------- rapport ---------------- */
 
-const antall = 206;
+const antall = 224;
 console.log("\n" + (antall - feilet) + " av " + antall + " enhetstester passerte");
 process.exit(feilet ? 1 : 0);

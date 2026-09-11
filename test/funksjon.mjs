@@ -10,6 +10,7 @@
 
 import fotball from "../netlify/functions/fotball.mjs";
 import vaer from "../netlify/functions/vaer.mjs";
+import puber from "../netlify/functions/puber.mjs";
 
 let feilet = 0;
 
@@ -432,8 +433,68 @@ ok("feilsvaret forklarer forsoket med status og METs melding",
    metFeil.forsok && metFeil.forsok.status === 503 && metFeil.forsok.melding === '{"message":"nede"}' &&
    metFeil.forsok.utfall === "HTTP 503", JSON.stringify(metFeil.forsok));
 
+/* ---------------- puber ---------------- */
+
+const OSM_SVAR = { elements: [
+  { type: "node", id: 1, lat: 63.4140, lon: 10.4070, tags: { amenity: "pub", name: "Lerkendal Pub" } },
+  { type: "node", id: 2, lat: 63.4112, lon: 10.4128, tags: { amenity: "bar", name: "Nardo Bar" } },
+] };
+const ENTUR_SVAR = { data: { nearest: { edges: [
+  { node: { distance: 480, place: { id: "NSR:StopPlace:2", name: "Nardo", latitude: 63.4110, longitude: 10.4130 } } },
+] } } };
+function stubPuber(osm, osmStatus, entur, enturStatus) {
+  const kall = [];
+  global.fetch = async (url, opsjoner) => {
+    kall.push({ url: String(url), opsjoner: opsjoner || {} });
+    const u = String(url);
+    if (u.indexOf("entur.io") > -1) return new Response(JSON.stringify(entur), { status: enturStatus || 200 });
+    return new Response(typeof osm === "string" ? osm : JSON.stringify(osm), { status: osmStatus || 200 });
+  };
+  return kall;
+}
+
+kall = stubPuber(OSM_SVAR, 200, ENTUR_SVAR, 200);
+r = await puber(be("/api/puber?arena=Ukjent"));
+ok("ukjent arena gir 400 uten kall", r.status === 400 && kall.length === 0, r.status + " " + kall.length);
+
+kall = stubPuber(OSM_SVAR, 200, ENTUR_SVAR, 200);
+r = await puber(be("/api/puber?arena=Lerkendal%20Stadion"));
+const pub = await r.json();
+ok("puber svarer 200", r.status === 200, r.status);
+const entur = kall.find((k) => k.url.indexOf("entur.io") > -1);
+const overpass = kall.find((k) => k.url.indexOf("overpass-api.de") > -1);
+ok("Entur far ET-Client-Name", entur && entur.opsjoner.headers["ET-Client-Name"] === "sportsbibelen-app");
+ok("Overpass sporres rundt arenaen med 1200 m",
+   overpass && decodeURIComponent(overpass.opsjoner.body).indexOf("around:1200,63.413,10.406") > -1,
+   overpass && decodeURIComponent(overpass.opsjoner.body));
+ok("svaret er gruppert ved stadion og ved holdeplass",
+   pub.grupper.length === 2 && pub.grupper[0].tittel === "Ved Lerkendal" && pub.grupper[1].tittel === "Ved Nardo" &&
+   pub.grupper[1].puber[0].navn === "Nardo Bar", JSON.stringify(pub.grupper));
+ok("kilden er OpenStreetMap og forsokene star der",
+   pub.kilde === "OpenStreetMap" && pub.forsok.length === 2, JSON.stringify(pub.forsok));
+ok("puber caches et dogn pa kanten",
+   (r.headers.get("Netlify-CDN-Cache-Control") || "").indexOf("s-maxage=86400") > -1 &&
+   (r.headers.get("Netlify-CDN-Cache-Control") || "").indexOf("durable") > -1);
+
+// Entur nede: fortsatt puber ved stadion.
+kall = stubPuber(OSM_SVAR, 200, { message: "nede" }, 503);
+r = await puber(be("/api/puber?arena=Lerkendal"));
+const utenEntur = await r.json();
+ok("uten Entur er det fortsatt puber ved stadion",
+   r.status === 200 && utenEntur.grupper.length === 1 && utenEntur.grupper[0].tittel === "Ved Lerkendal" &&
+   utenEntur.forsok[0].status === 503, JSON.stringify(utenEntur.forsok));
+
+// Overpass nede: feil uten cache, med forklaring.
+kall = stubPuber("<html>Too busy</html>", 504, ENTUR_SVAR, 200);
+r = await puber(be("/api/puber?arena=Lerkendal"));
+const utenOsm = await r.json();
+ok("feil hos Overpass gir 502 uten cache og med melding",
+   r.status === 502 && r.headers.get("Cache-Control") === "no-store" &&
+   utenOsm.forsok.some((f) => f.kilde === "Overpass" && f.status === 504 && f.melding.indexOf("Too busy") > -1),
+   JSON.stringify(utenOsm.forsok));
+
 /* ---------------- rapport ---------------- */
 
-const antall = 84;
+const antall = 93;
 console.log("\n" + (antall - feilet) + " av " + antall + " funksjonstester passerte");
 process.exit(feilet ? 1 : 0);

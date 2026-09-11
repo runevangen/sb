@@ -18,6 +18,8 @@ prosjektet `mvp-sb`.
     netlify/functions/fotball.mjs samme modul: henting og caching
     vaer-data.js                  været ved avspark: arenaer, varsel, kleråd
     netlify/functions/vaer.mjs    samme: henting fra MET og caching
+    pub-data.js                   pubene rundt kampen: Overpass, Entur, dine puber
+    netlify/functions/puber.mjs   samme: puber ved stadion og holdeplass, døgncache
 
 `lib.js` finnes for å kunne enhetstestes uten nettleser. Hører en funksjon
 hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
@@ -180,6 +182,20 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   kamp. Sett virke i prod 11. september 2026. Feiler kallet, bærer
   feilsvaret `forsok` med status og METs egen melding, som
   fotballfunksjonen.
+- «Hvilken pub?» får fire svar som chips over feltet, og feltet er
+  fortsatt sannheten. *Dine puber*: de du har delt før, lagret lokalt
+  som favorittlagene (`sb-visning`, feltet `puber`), oftest brukt først.
+  *Nær deg*: bare på trykk; posisjonen rundes til tre desimaler (≈100 m)
+  og går rett fra nettleseren til Overpass, aldri innom oss, og det står
+  under knappen. *Ved stadion* og *ved holdeplassen*: fra
+  `netlify/functions/puber.mjs`, som spør Entur om holdeplassene innen
+  700 m og Overpass om puber innen 1200 m, og grupperer (800 m fra
+  stadion, 300 m fra holdeplass). Arenaene står fast, så hver er én
+  cache-nøkkel med et døgns levetid — Overpass ber om fair use, og dette
+  er det. Svikter Entur, står pubene ved stadion igjen; svikter Overpass,
+  502 uten cache og `forsok` som forklarer. Lisensen (ODbL) krever
+  «© OpenStreetMap-bidragsytere» der pubene vises. `uverifisert` til det
+  er sett i prod: sandkassen når verken Overpass eller Entur.
 - Gratisnivået gir 100 kall i døgnet. Caching skjer på Netlifys kant med
   `Netlify-CDN-Cache-Control` og `durable`, som gir én delt cache i stedet
   for én per region. Levetidene står i `LEVETID` i `fotball-data.js`, og
@@ -191,9 +207,9 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      206 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  84 tester, ~120 ms, ingen nettleser
-    node test/run.mjs       135 tester, ~110 s, headless Chromium
+    node test/unit.mjs      224 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  93 tester, ~120 ms, ingen nettleser
+    node test/run.mjs       147 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
 De raske først, så en åpenbar feil stopper kjøringen før nettleseren
@@ -205,14 +221,14 @@ leseren, og at TheSportsDB prøves først for årets neste runde og faller
 tilbake når den svikter, og at værfunksjonen identifiserer seg for MET.
 Ingen nøkkel og ingen nettverk kreves.
 
-`unit.mjs` dekker `lib.js`, `fotball-data.js` og `vaer-data.js`: URL-validering, videovertslisten, tidsstempler,
+`unit.mjs` dekker `lib.js`, `fotball-data.js`, `vaer-data.js` og `pub-data.js`: URL-validering, videovertslisten, tidsstempler,
 endringssignaturen, gjenkjenning av interne lenker, rangering av søketreff og favorittlag, sesongvinduet per
 liga, tolkning av API-Football-svaret, hvilken runde som er «neste», og at
 døgnkvoten holder. `run.mjs` dekker alt som trenger DOM: XSS i titler
 og artikkel-HTML, annonseplassering, rulleoppførsel, artikkelvisningen,
 fokusfella, korthøyden, at toppfeltet krymper, paginering, ruting,
 visningsvalgene i menyen, favorittlag fra stjerne til feed, deling av en
-kamp med sted, og hele
+kamp med sted og pubforslag, og hele
 fotballmodulen — fanebytte, tabell, resultater, neste runde, dyplenker og
 feilmelding fra tjenesten.
 
