@@ -16,6 +16,9 @@ import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          kamplenke, tolkKamplenke, invitasjonstekst, stedtekst, STED_MAKS }
   from "../fotball-data.js";
 
+import { normaliserEpost, gyldigEpost, normaliserKode, gyldigKode, maskerEpost,
+         oktUtloper, oktGyldig, tolkOkt } from "../konto-data.js";
+
 import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
   from "../vaer-data.js";
 
@@ -929,6 +932,60 @@ ok("artikkelruter er ikke fotballruter", tolkFotballHash("#/sak/en-sak") === nul
 ok("tom hash er ikke en fotballrute", tolkFotballHash("") === null);
 ok("hash bygges tilbake til samme rute",
    tolkFotballHash(fotballHash("premier", "neste")).del === "neste");
+
+/* ---------------- innlogging ---------------- */
+
+ok("adressen normaliseres", normaliserEpost("  Leser@Example.NO ") === "leser@example.no",
+   normaliserEpost("  Leser@Example.NO "));
+ok("en adresse er en adresse", gyldigEpost("leser@example.no") && gyldigEpost("a.b+c@x.co.uk"));
+ok("det som apenbart ikke er en adresse stoppes",
+   !gyldigEpost("leser") && !gyldigEpost("leser@example") && !gyldigEpost("a b@c.no") &&
+   !gyldigEpost("") && !gyldigEpost(null));
+ok("en absurd lang adresse stoppes", !gyldigEpost("a".repeat(250) + "@example.no"));
+
+// Koden limes inn fra en e-post, med mellomrom og linjeskift.
+ok("koden renses", normaliserKode(" 12 34-56\n") === "123456", normaliserKode(" 12 34-56\n"));
+ok("seks siffer er en kode", gyldigKode("123456") && gyldigKode("12 34 56"));
+ok("faerre eller flere er det ikke",
+   !gyldigKode("12345") && !gyldigKode("") && normaliserKode("1234567") === "123456");
+
+// Hele adressen i menyen er en lekkasje over skulderen.
+ok("adressen maskeres", maskerEpost("runevangen@gmail.com") === "ru••••@gmail.com",
+   maskerEpost("runevangen@gmail.com"));
+ok("en kort adresse maskeres ogsa", maskerEpost("ab@x.no") === "a•@x.no", maskerEpost("ab@x.no"));
+ok("maskeringen viser aldri hele navnet",
+   maskerEpost("ola@x.no").indexOf("ola") === -1, maskerEpost("ola@x.no"));
+
+const KONTO_NAA = Date.parse("2026-09-11T12:00:00Z");
+ok("sekunder blir et tidspunkt",
+   oktUtloper(3600, KONTO_NAA) === "2026-09-11T13:00:00.000Z", oktUtloper(3600, KONTO_NAA));
+ok("tull gir ingen utlopsdato",
+   oktUtloper("snart", KONTO_NAA) === null && oktUtloper(-5, KONTO_NAA) === null);
+
+const GYLDIG = { token: "t", epost: "leser@example.no", utloper: "2026-09-11T13:00:00.000Z" };
+ok("en hel okt gjelder", oktGyldig(GYLDIG, KONTO_NAA));
+ok("en utlopt okt gjelder ikke", !oktGyldig(GYLDIG, KONTO_NAA + 2 * 3600 * 1000));
+// En okt vi ikke kjenner levetiden pa, er ikke en okt vi skal stole pa.
+ok("en okt uten utlopsdato gjelder ikke",
+   !oktGyldig({ token: "t", epost: "leser@example.no" }, KONTO_NAA));
+ok("en okt uten token gjelder ikke",
+   !oktGyldig({ epost: "leser@example.no", utloper: GYLDIG.utloper }, KONTO_NAA));
+ok("tull i lageret gjelder ikke",
+   !oktGyldig(null, KONTO_NAA) && !oktGyldig("noe", KONTO_NAA) && !oktGyldig({}, KONTO_NAA));
+
+ok("svaret fra tjenesten formes til en okt",
+   JSON.stringify(tolkOkt({ access_token: "t", expires_in: 3600,
+     user: { email: "Leser@Example.no" } }, KONTO_NAA)) ===
+   JSON.stringify({ token: "t", epost: "leser@example.no",
+     utloper: "2026-09-11T13:00:00.000Z" }));
+// En halv okt ville sett ut som innlogget helt til forste kall feilet.
+ok("en okt uten token kastes framfor a gis ut",
+   kaster(() => tolkOkt({ user: { email: "leser@example.no" } }, KONTO_NAA)));
+ok("en okt uten adresse kastes ogsa",
+   kaster(() => tolkOkt({ access_token: "t" }, KONTO_NAA)));
+ok("uten levetid far okta en kort en",
+   tolkOkt({ access_token: "t", user: { email: "a@b.no" } }, KONTO_NAA).utloper ===
+   "2026-09-11T13:00:00.000Z");
 
 /* ---------------- kontaktopplysninger ---------------- */
 

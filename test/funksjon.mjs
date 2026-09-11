@@ -13,6 +13,7 @@ import vaer from "../netlify/functions/vaer.mjs";
 import puber from "../netlify/functions/puber.mjs";
 import { OVERPASS_SPEIL } from "../pub-data.js";
 import visninger from "../netlify/functions/visninger.mjs";
+import konto from "../netlify/functions/konto.mjs";
 import { lesVisninger } from "../visning-data.js";
 
 let feilet = 0;
@@ -703,6 +704,134 @@ ok("far vi ikke skrevet, gir det 502 med grunn",
 
 delete process.env.ADMIN_PASSORD;
 delete process.env.GITHUB_TOKEN;
+
+/* ---------------- innlogging ---------------- */
+
+// Kallet mot Supabase gar fra funksjonen, ikke fra nettleseren: nokkelen
+// skal aldri na leseren, og appen skal bare snakke med sitt eget domene.
+function stubSupabase(svar, status) {
+  const kall = [];
+  global.fetch = async (url, opsjoner) => {
+    kall.push({ url: String(url), opsjoner: opsjoner || {} });
+    return new Response(JSON.stringify(svar === undefined ? {} : svar), {
+      status: status || 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  return kall;
+}
+
+function kontoBe(kropp, metode) {
+  return new Request("https://mvp-sb.netlify.app/api/konto", {
+    method: metode || "POST",
+    headers: { "Content-Type": "application/json" },
+    body: metode === "GET" ? undefined : JSON.stringify(kropp),
+  });
+}
+
+const SUPA_NOKKEL = "hemmelig-anon-nokkel";
+const OKT = {
+  access_token: "okt-token-123",
+  expires_in: 3600,
+  user: { email: "Leser@Example.com" },
+};
+
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_ANON_KEY;
+
+kall = stubSupabase(OKT);
+r = await konto(kontoBe({ handling: "kode", epost: "leser@example.com" }));
+const kontoUoppsatt = await r.json();
+ok("uten oppsett svarer innloggingen 503", r.status === 503, r.status);
+ok("uten oppsett rores ikke tjenesten", kall.length === 0, kall.length);
+ok("503-svaret navngir det som mangler",
+   kontoUoppsatt.feil.indexOf("SUPABASE_URL") > -1 &&
+   kontoUoppsatt.feil.indexOf("SUPABASE_ANON_KEY") > -1, kontoUoppsatt.feil);
+ok("og at det ma rulles ut pa nytt",
+   kontoUoppsatt.feil.indexOf("Trigger deploy") > -1, kontoUoppsatt.feil);
+
+// Appen sporr ved apning, sa det star for adressen er skrevet inn.
+r = await konto(kontoBe(null, "GET"));
+const kontoUklar = await r.json();
+ok("GET sier at innloggingen ikke er klar",
+   r.status === 200 && kontoUklar.klar === false, JSON.stringify(kontoUklar));
+ok("og hvilke variabler som mangler",
+   kontoUklar.mangler.join(",") === "SUPABASE_URL,SUPABASE_ANON_KEY",
+   JSON.stringify(kontoUklar.mangler));
+
+process.env.SUPABASE_URL = "https://prosjekt.supabase.co/";
+process.env.SUPABASE_ANON_KEY = SUPA_NOKKEL;
+
+kall = stubSupabase({});
+r = await konto(kontoBe({ handling: "kode", epost: "  Leser@Example.com " }));
+ok("koden bestilles hos tjenesten", r.status === 200 && kall.length === 1,
+   r.status + " " + kall.length);
+ok("adressen normaliseres for den sendes",
+   JSON.parse(kall[0].opsjoner.body).email === "leser@example.com",
+   kall[0].opsjoner.body);
+// Skragestreken pa slutten av SUPABASE_URL skal ikke gi //auth.
+ok("adressen til tjenesten er hel",
+   kall[0].url === "https://prosjekt.supabase.co/auth/v1/otp", kall[0].url);
+ok("nokkelen gar til tjenesten, ikke til leseren",
+   kall[0].opsjoner.headers.apikey === SUPA_NOKKEL &&
+   JSON.stringify(await (await konto(kontoBe({ handling: "kode", epost: "a@b.no" }))).json())
+     .indexOf(SUPA_NOKKEL) === -1);
+ok("svaret caches aldri",
+   r.headers.get("Cache-Control") === "no-store", r.headers.get("Cache-Control"));
+
+kall = stubSupabase({});
+r = await konto(kontoBe({ handling: "kode", epost: "ikke-en-adresse" }));
+ok("en adresse som apenbart ikke er en adresse stoppes her",
+   r.status === 400 && kall.length === 0, r.status + " " + kall.length);
+
+// For mange forsok er den ene feilen leseren kan gjore noe med: vente.
+kall = stubSupabase({ msg: "email rate limit exceeded" }, 429);
+r = await konto(kontoBe({ handling: "kode", epost: "leser@example.com" }));
+ok("for mange forsok sier at man skal vente",
+   r.status === 429 && (await r.json()).feil.indexOf("Vent") > -1, r.status);
+
+kall = stubSupabase(OKT);
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "12 34 56" }));
+const okt = await r.json();
+ok("riktig kode gir en okt", r.status === 200 && okt.token === "okt-token-123",
+   r.status + " " + JSON.stringify(okt));
+ok("koden renses for den sendes",
+   JSON.parse(kall[0].opsjoner.body).token === "123456", kall[0].opsjoner.body);
+ok("adressen kommer tilbake normalisert", okt.epost === "leser@example.com", okt.epost);
+// Et antall sekunder er ubrukelig etter en omstart: appen far et
+// tidspunkt.
+ok("okta har et utlopstidspunkt, ikke et antall sekunder",
+   !Number.isNaN(Date.parse(okt.utloper)) && Date.parse(okt.utloper) > Date.now(), okt.utloper);
+
+kall = stubSupabase({ error: "invalid_grant", error_description: "Token has expired" }, 403);
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
+const feilKode = await r.json();
+// Feil kode og utlopt kode far samme svar: at en kode fantes, er i seg
+// selv noe om adressen.
+ok("feil kode gir 401 uten a rope noe", r.status === 401 &&
+   feilKode.feil === "Koden stemmer ikke, eller den er for gammel.",
+   r.status + " " + feilKode.feil);
+
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123" }));
+ok("en kode som ikke er seks siffer stoppes her", r.status === 400, r.status);
+
+kall = stubSupabase({ email: "leser@example.com" });
+r = await konto(kontoBe({ handling: "hvem", token: "okt-token-123" }));
+ok("okta kan sjekkes mot tjenesten",
+   r.status === 200 && (await r.json()).epost === "leser@example.com", r.status);
+ok("okta sendes som bearer-token",
+   kall[0].opsjoner.headers.Authorization === "Bearer okt-token-123",
+   JSON.stringify(kall[0].opsjoner.headers));
+
+kall = stubSupabase({ msg: "invalid JWT" }, 401);
+r = await konto(kontoBe({ handling: "hvem", token: "gammelt" }));
+ok("en okt som ikke gjelder lenger gir 401", r.status === 401, r.status);
+
+r = await konto(kontoBe({ handling: "noe-annet", epost: "leser@example.com" }));
+ok("en ukjent handling avvises", r.status === 400, r.status);
+
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_ANON_KEY;
 
 /* ---------------- rapport ---------------- */
 

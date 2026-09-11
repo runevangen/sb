@@ -17,6 +17,8 @@ Ingenting her er hemmelig i seg selv. Navnene står i koden fra før; det er
 | `THESPORTSDB_KEY` | årets sesong i fotballfanen | faller tilbake til fjorårets tall | med abonnementet |
 | `ADMIN_PASSORD` | innlogging i adminportalen | portalen svarer 503 | nei |
 | `GITHUB_TOKEN` | lagring fra adminportalen | portalen svarer 503 | **ja — 90 dager** |
+| `SUPABASE_URL` | innlogging i appen | innloggingen svarer 503 | nei |
+| `SUPABASE_ANON_KEY` | innlogging i appen | innloggingen svarer 503 | ved rotering |
 | `MET_KONTAKT` | valgfri kontaktadresse til MET | ingenting; været virker | nei |
 | `GITHUB_REPO` | valgfri: hvilket repo admin skriver til | `runevangen/sb` | — |
 | `GITHUB_BRANCH` | valgfri: hvilken gren | `main` | — |
@@ -108,6 +110,34 @@ Ikke en konto, ikke en bruker.
 
 Passordet når aldri GitHub: er det feil, svarer funksjonen 401 før den har
 rørt tokenet.
+
+### `SUPABASE_URL` og `SUPABASE_ANON_KEY` — innlogging i appen
+
+Innloggingen i menyen: leseren skriver e-postadressen sin, får en
+engangskode, og er logget inn. Supabase Auth gjør jobben — utsteder
+koden, sender e-posten og gir ut økten.
+
+- **Leses av:** `netlify/functions/konto.mjs`
+- **Sendes som:** headeren `apikey` til `<SUPABASE_URL>/auth/v1/…`
+- **Uten dem:** `503`, og appen sier hvilken som mangler allerede når
+  panelet åpnes (`GET /api/konto` spør bare om oppsettet)
+- **Lages på:** https://supabase.com → prosjektet → *Project Settings* →
+  *API*. `SUPABASE_URL` er *Project URL*, `SUPABASE_ANON_KEY` er den
+  offentlige *anon*-nøkkelen — **ikke** `service_role`, som kan lese alt.
+- **Utløper:** ikke av seg selv. Roterer du nøkkelen i Supabase, må
+  verdien byttes her og deployes.
+
+Hvorfor kallet går fra funksjonen og ikke fra nettleseren, når
+anon-nøkkelen tåler å være offentlig: da snakker appen bare med sitt eget
+domene. Ingen tredjepartsskript i `index.html`, ingen informasjonskapsel
+fra noen andre, og ingenting å gjøre om Supabase en dag bytter SDK. Det
+er samme regel som for API-Football, av en annen grunn.
+
+**Dette er første gang appen lagrer noe om en person.** Adressen ligger
+hos Supabase, økten ligger i leserens egen `localStorage`, og ingenting
+ligger hos oss. Velg region i Supabase bevisst (EU), og husk at en
+personvernerklæring og en måte å be om sletting på hører til her — det er
+ikke kode, men det hører til denne nøkkelen.
 
 ### `GITHUB_TOKEN` — adminportalens lagring
 
@@ -211,6 +241,10 @@ Det du ser først, og hva det som regel betyr.
 | Portalen: «… HTTP 403» | tokenet mangler `Contents: read and write` | rett rettighetene |
 | Portalen: «Fikk ikke lagret: HTTP 409» | fila endret mellom lesing og skriving | prøv igjen |
 | Tabellen viser i fjor, uten feilmelding | `THESPORTSDB_KEY` mangler, er utløpt, eller svaret ble avkortet | se `forsok` på `/api/fotball/tabell` |
+| Innlogging: «Innloggingen er ikke satt opp: X mangler» | X ikke satt i Netlify | sett X, trigger deploy |
+| Innlogging: «Koden stemmer ikke, eller den er for gammel» | feil eller utløpt kode — samme svar med vilje | be om ny kode |
+| Innlogging: «For mange forsøk» (429) | Supabase sperrer e-postsending en stund | vent et minutt |
+| Innlogging: «Fikk ikke sendt koden» | se `forsok` i svaret fra `/api/konto` | som regel feil `SUPABASE_URL` |
 | Pubene: «overpass-api.de svarte 406» | ikke en nøkkel — Overpass-tjeneren | som regel forbigående |
 | Alt ser gammelt ut etter en endring | kant-cachen | trigger deploy tømmer den |
 

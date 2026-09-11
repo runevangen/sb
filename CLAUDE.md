@@ -25,6 +25,9 @@ prosjektet `mvp-sb`.
     puber-kontakt.js              samme puber: telefon, mat, apningstider — uverifisert
     netlify/functions/puber.mjs   samme: puber ved stadion og holdeplass, døgncache
 
+    konto-data.js                   innlogging: rene funksjoner
+    netlify/functions/konto.mjs     samme: engangskode og økt via Supabase Auth
+
     admin.html / admin.js            adminportalen: hvilke kamper viser hvilken pub
     visning-data.js                  samme: rene funksjoner, ogsa for lesersiden
     netlify/functions/visninger.mjs  samme: passord og skriving til repoet
@@ -78,6 +81,9 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   det ett skript i `index.html` og ingen endringer i resten.
   Netlify Analytics ville målt på serveren uten noe skript, men er et
   betalt tillegg per prosjekt — valgt bort inntil videre.
+  Innloggingen endrer ikke dette: den lagrer e-postadressen til den som
+  selv velger å logge inn, og fortsatt ingenting om alle andre. Ingen
+  sporing, ingen informasjonskapsler, ingen samtykkebanner.
 - Et søk sorteres etter relevans hos WordPress (`orderby=relevance`),
   ikke dato: ellers fyller de tolv nyeste sakene som nevner laget i
   forbifarten første side. Innenfor det som er hentet legger
@@ -347,11 +353,55 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   testes med ekte data uten at `visninger.js` fylles med oppdiktede
   puber.
 
+### Innlogging
+
+- **Ingenting er låst bak innlogging.** Nyheter, fotball, tabell,
+  favorittlag, deling, puber og vær virker nøyaktig som før uten konto,
+  og skal fortsette å gjøre det. Innlogging er for det som går til noen
+  andre, eller til en annen telefon: å dele hvor du ser kampen, og å ta
+  med favorittlagene dine. En knapp i menyen ser ut som en port, så
+  panelet sier med ord at den ikke er det — teksten står ett sted
+  (`KONTO_TEKST` i `app.js`) for alle tre tilstandene, og en
+  nettlesertest sjekker at feeden står ferdig før noen har logget inn.
+- Innlogging med engangskode på e-post, fra menyen. Den er første steg
+  mot fire ting: å se hvem som blir med på kampen, at valgene dine
+  følger deg mellom enheter (#24), at pubene skriver selv (#65), og
+  faste vennegrupper. Ingen av dem er bygget ennå, og panelet lover
+  ikke noe annet.
+- Supabase Auth utsteder koden, sender e-posten og gir ut økten. Å
+  skrive det selv ville vært kryptografi, e-postsending og sperring av
+  gjentatte forsøk — feil sted å spare.
+- Kallet går fra `netlify/functions/konto.mjs`, ikke fra nettleseren,
+  selv om anon-nøkkelen tåler å være offentlig: da snakker appen bare
+  med sitt eget domene. Ingen tredjepartsskript i `index.html`, ingen
+  informasjonskapsel fra noen andre. Nøklene står i
+  `docs/nokler-og-tokens.md`.
+- Oppsettet sjekkes når panelet åpnes (`GET /api/konto` svarer `klar`
+  og `mangler`), ikke når leseren trykker Send: får du vite at
+  innloggingen ikke er satt opp først etter at adressen er skrevet inn,
+  var skrivingen til ingen nytte. Samme grep som i adminportalen.
+- Feil kode og utløpt kode får samme svar. At en kode fantes, er i seg
+  selv noe om adressen. Av samme grunn svarer bestillingen likt enten
+  adressen finnes fra før eller ikke — ellers er innloggingen et
+  oppslagsverk over hvem som bruker appen.
+- Økten ligger i `localStorage` (`sb-konto`) med et utløpstidspunkt, ikke
+  et antall sekunder: sekunder er ubrukelige etter en omstart. En økt
+  uten gyldig utløpstidspunkt regnes som utløpt og ryddes ved oppstart —
+  en økt vi ikke kjenner levetiden på, er ikke en økt å stole på.
+- Adressen vises maskert (`ru••••@gmail.com`) i menyen og i kvitteringen.
+  Appen leses i en sofa med flere i.
+- `konto-data.js` er de rene funksjonene, delt mellom appen og
+  funksjonen: blir de to uenige om hva en gyldig adresse eller kode er,
+  får leseren «feil kode» på en kode som stemmer.
+- Dette er første gang appen lagrer noe om en person. En
+  personvernerklæring og en måte å be om sletting på hører til her, og
+  er ikke skrevet ennå.
+
 ## Testing
 
-    node test/unit.mjs      311 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  128 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       210 tester, ~130 s, headless Chromium
+    node test/unit.mjs      332 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  151 tester, ~250 ms, ingen nettleser
+    node test/run.mjs       230 tester, ~150 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
@@ -362,23 +412,28 @@ De raske først, så en åpenbar feil stopper kjøringen før nettleseren
 i det hele tatt starter.
 
 `funksjon.mjs` kaller Netlify-funksjonene direkte med et stubbet `fetch`:
-statuskoder, cache-headere, at API-nøkkelen går til API-et og ikke til
-leseren, og at TheSportsDB prøves først for årets neste runde og faller
+statuskoder, cache-headere, at API-nøkkelen og Supabase-nøkkelen går til
+tjenesten og ikke til leseren, at feil og utløpt engangskode får samme
+svar, og at TheSportsDB prøves først for årets neste runde og faller
 tilbake når den svikter, og at værfunksjonen identifiserer seg for MET.
 Ingen nøkkel og ingen nettverk kreves. Én test lar en tjener tie for å se
 at kappløpet ikke venter på den; uten den ville akkurat den feilen bare
 vist seg i prod.
 
-`unit.mjs` dekker `lib.js`, `fotball-data.js`, `vaer-data.js` og `pub-data.js`: URL-validering, videovertslisten, tidsstempler,
+`unit.mjs` dekker `lib.js`, `fotball-data.js`, `vaer-data.js`,
+`pub-data.js` og `konto-data.js`: URL-validering, videovertslisten, tidsstempler,
 endringssignaturen, gjenkjenning av interne lenker, rangering av søketreff og favorittlag, sesongvinduet per
 liga, tolkning av API-Football-svaret, hvilken runde som er «neste», at
 døgnkvoten holder, og at ingenting i `puber-kontakt.js` slipper ut i
-appen før noen har datert det. `run.mjs` dekker alt som trenger DOM: XSS i titler
+appen før noen har datert det, og at en økt vi ikke kjenner levetiden på
+regnes som utløpt. `run.mjs` dekker alt som trenger DOM: XSS i titler
 og artikkel-HTML, annonseplassering, rulleoppførsel, artikkelvisningen,
 fokusfella, korthøyden, at toppfeltet krymper, paginering, ruting,
 visningsvalgene i menyen, favorittlag fra stjerne til feed, deling av en
 kamp med sted og pubforslag, den delte lenka som åpner kampen den peker
-på hos mottakeren, adminportalen fra innlogging til lagring, og hele
+på hos mottakeren, adminportalen fra innlogging til lagring, innlogging i
+appen fra e-post til utlogging — med feeden ferdig lastet før noen har
+logget inn — og hele
 fotballmodulen — fanebytte, tabell, resultater, neste runde, dyplenker og
 feilmelding fra tjenesten.
 

@@ -81,6 +81,31 @@
         <button class="action-btn" id="installBtn" type="button" hidden>
           <span class="action-ico" aria-hidden="true">⤓</span>Installer appen
         </button>
+        <!-- Innlogging. Panelet ligger i menyen, ikke pa en egen side:
+             det er to felt, og menyen er der leseren alt er. -->
+        <button class="action-btn" id="kontoBtn" type="button"
+                aria-expanded="false" aria-controls="kontoPanel">
+          <span class="action-ico" aria-hidden="true">&#128100;</span><span id="kontoBtnTekst">Logg inn</span>
+        </button>
+        <div class="konto-panel" id="kontoPanel" hidden>
+          <!-- Teksten settes av app.js, som eier de tre tilstandene. Den
+               her er den samme, for det korte oyeblikket for skriptet
+               har kjort. -->
+          <p class="konto-note" id="kontoNote">Du trenger ikke konto for å lese
+            eller følge fotballen — alt det virker uten. Innlogging er for å dele
+            hvor du ser kampen, og for å ta med favorittlagene dine mellom
+            telefoner. Vi sender en engangskode på e-post; adressen er det eneste
+            vi lagrer om deg.</p>
+          <input class="konto-felt" id="kontoEpost" type="email" inputmode="email"
+                 autocomplete="email" placeholder="E-postadresse"
+                 aria-label="E-postadresse" maxlength="254">
+          <input class="konto-felt" id="kontoKode" type="text" inputmode="numeric"
+                 autocomplete="one-time-code" placeholder="Koden fra e-posten"
+                 aria-label="Koden fra e-posten" maxlength="6" hidden>
+          <button class="konto-send" id="kontoSend" type="button">Send kode</button>
+          <button class="konto-ut" id="kontoUt" type="button" hidden>Logg ut</button>
+          <p class="konto-svar" id="kontoSvar" aria-live="polite"></p>
+        </div>
         <p class="action-note" id="actionNote" hidden></p>
         <!-- Adminportalen. Apen, men uten passord skjer ingenting. -->
         <p class="action-note"><a class="admin-lenke" href="/admin.html">Hvem viser kampen (admin)</a></p>

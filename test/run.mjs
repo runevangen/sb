@@ -1492,9 +1492,123 @@ const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
 `);
 
+/* ---------------- 18. innlogging ---------------- */
+
+const SAK_18 = await kjor("innlogging", FELLES + `
+  var saker = lagSaker(12);
+  window.__konto = [];
+  function svarMed(kropp, status) {
+    return Promise.resolve({ ok: !status || status < 400, status: status || 200,
+      statusText: "OK", text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, o) {
+    u = String(u);
+    if (u.indexOf("/api/konto") === 0) {
+      var inn = o && o.body ? JSON.parse(o.body) : null;
+      window.__konto.push(inn ? inn.handling : "oppsett");
+      if (!inn) return svarMed({ klar: true, mangler: [] });
+      if (inn.handling === "kode") return svarMed({ sendt: true });
+      if (inn.handling === "logg-inn") {
+        if (inn.kode !== "123456") {
+          return svarMed({ feil: "Koden stemmer ikke, eller den er for gammel." }, 401);
+        }
+        return svarMed({ token: "okt-123", epost: inn.epost,
+          utloper: new Date(Date.now() + 3600000).toISOString() });
+      }
+      return svarMed({ feil: "Ukjent handling" }, 400);
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return svarMed(svar);
+  };
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.getElementById("menuBtn").click();
+    var knapp = document.getElementById("kontoBtn");
+    var panel = document.getElementById("kontoPanel");
+    ok("menyen har en innlogging", knapp.textContent.indexOf("Logg inn") > -1, knapp.textContent);
+    ok("panelet er lukket til man trykker", panel.hidden);
+    // Ingenting er last bak innloggingen: feeden star ferdig for noen har
+    // logget inn, og det er hele poenget med at knappen star i menyen.
+    ok("appen virker utlogget", document.querySelectorAll("#feed .row").length > 0 &&
+       !localStorage.getItem("sb-konto"),
+       document.querySelectorAll("#feed .row").length);
+
+    knapp.click();
+    ok("trykk apner panelet", !panel.hidden && knapp.getAttribute("aria-expanded") === "true");
+    // Leseren skal vite hva som lagres for hen skriver adressen, ikke etterpa.
+    ok("det star hva vi lagrer",
+       document.getElementById("kontoNote").textContent.indexOf("det eneste vi lagrer") > -1,
+       document.getElementById("kontoNote").textContent);
+    // En knapp i menyen ser ut som en port til noe. Teksten ma si at den
+    // ikke er det.
+    ok("og at man ikke trenger konto for a bruke appen",
+       document.getElementById("kontoNote").textContent.indexOf("trenger ikke konto") > -1,
+       document.getElementById("kontoNote").textContent);
+    ok("oppsettet sjekkes ved apning", window.__konto.join(",") === "oppsett",
+       window.__konto.join(","));
+
+    // En adresse som apenbart ikke er en adresse stoppes for kallet: en
+    // e-post som aldri kommer er verre enn en beskjed med en gang.
+    document.getElementById("kontoEpost").value = "ikke-en-adresse";
+    document.getElementById("kontoSend").click();
+    ok("tull i adressefeltet stoppes her",
+       document.getElementById("kontoSvar").textContent.indexOf("e-postadresse") > -1 &&
+       window.__konto.join(",") === "oppsett",
+       document.getElementById("kontoSvar").textContent + " | " + window.__konto.join(","));
+
+    document.getElementById("kontoEpost").value = "Leser@Example.no";
+    document.getElementById("kontoSend").click();
+    setTimeout(function () { try {
+      ok("koden bestilles", window.__konto.join(",") === "oppsett,kode", window.__konto.join(","));
+      ok("kodefeltet kommer fram", !document.getElementById("kontoKode").hidden);
+      ok("knappen bytter til a logge inn",
+         document.getElementById("kontoSend").textContent === "Logg inn",
+         document.getElementById("kontoSend").textContent);
+      // Adressen maskeres ogsa i kvitteringen: den leses i en sofa med flere i.
+      ok("kvitteringen navngir adressen maskert",
+         document.getElementById("kontoSvar").textContent.indexOf("le•••@example.no") > -1,
+         document.getElementById("kontoSvar").textContent);
+
+      document.getElementById("kontoKode").value = "999999";
+      document.getElementById("kontoSend").click();
+      setTimeout(function () { try {
+        ok("feil kode sier ifra",
+           document.getElementById("kontoSvar").textContent.indexOf("stemmer ikke") > -1,
+           document.getElementById("kontoSvar").textContent);
+        ok("og logger ingen inn", !localStorage.getItem("sb-konto"));
+
+        document.getElementById("kontoKode").value = "12 34 56";
+        document.getElementById("kontoSend").click();
+        setTimeout(function () { try {
+          var lagret = JSON.parse(localStorage.getItem("sb-konto") || "null");
+          ok("riktig kode logger inn", lagret && lagret.token === "okt-123",
+             JSON.stringify(lagret));
+          ok("okta har et utlopstidspunkt", lagret && !isNaN(Date.parse(lagret.utloper)),
+             lagret && lagret.utloper);
+          ok("menyen viser hvem du er, maskert",
+             document.getElementById("kontoBtnTekst").textContent === "le•••@example.no",
+             document.getElementById("kontoBtnTekst").textContent);
+          // En knapp som ser ut som den gir noe den ikke gir, er verre
+          // enn en knapp som sier hva den er.
+          ok("og innlogget star det hva innloggingen er til",
+             document.getElementById("kontoNote").textContent.indexOf("med eller uten konto") > -1,
+             document.getElementById("kontoNote").textContent);
+
+          document.getElementById("kontoUt").click();
+          ok("logg ut tommer okta", !localStorage.getItem("sb-konto"));
+          ok("og menyen sier logg inn igjen",
+             document.getElementById("kontoBtnTekst").textContent === "Logg inn",
+             document.getElementById("kontoBtnTekst").textContent);
+          ferdig();
+        } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
+`);
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17];
+const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18];
 let feilet = 0;
 
 for (const t of alle) {
