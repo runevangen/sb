@@ -6,6 +6,7 @@
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug, rangerTreff, listeTekst }
   from "./lib.js";
 import { LIGAER, tolkFotballHash, fotballHash } from "./fotball-data.js";
+import { ofteBrukt, noterPub } from "./pub-data.js";
 import { initFotball, visFotball } from "./fotball.js";
 
 // Bytt WP_HOST til din egen WordPress-side når som helst.
@@ -804,6 +805,21 @@ function vekslFavoritt(lag) {
   return valgt;
 }
 
+/* ---------- dine puber ---------- */
+
+// Pubene leseren har delt fra for, lagret lokalt som favorittlagene: ett
+// objekt, en nokkel, ingen konto. Den som brukes oftest star forst.
+
+function dinePuber() {
+  return ofteBrukt(prefs.puber);
+}
+
+function noterDinPub(navn) {
+  prefs.puber = noterPub(prefs.puber, navn);
+  savePrefs(prefs);
+  track("Pub delt", { pub: String(navn).slice(0, 40) });
+}
+
 // Et segment velger en verdi, det veksler ikke. Da kan den som allerede
 // star der trykkes uten at noe skrives eller spores.
 function settVisning(felt, verdi, hendelse, navn) {
@@ -1355,7 +1371,8 @@ initFotball(
   { er: erFavoritt, veksle: vekslFavoritt },
   // «Hvor ser du kampen?» gar inn i gruppechatten leseren allerede har.
   // Ingen konto, ingen lagring: chatten er vennegruppa.
-  (tekst, url) => delTekst({ title: "Sportsbibelen", text: tekst, url }, "Kamp delt"));
+  (tekst, url) => delTekst({ title: "Sportsbibelen", text: tekst, url }, "Kamp delt"),
+  { liste: dinePuber, noter: noterDinPub });
 
 document.getElementById("fanenNyheter").addEventListener("click", () => {
   if (aktivVisning !== "nyheter") settFane("nyheter");

@@ -884,8 +884,29 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
     return Object.assign({}, k, { arena: i === 0 ? "Brann Stadion" : "" });
   });
   window.__vaerKall = 0;
-  window.fetch = function (u) {
+  window.__puberKall = 0;
+  window.__overpassKall = 0;
+  // Dine puber fra for: Pub X er delt to ganger.
+  localStorage.setItem("sb-visning", JSON.stringify({ puber: [{ navn: "Pub X", antall: 2, sist: 1 }] }));
+  // Posisjon: Trondheim torg. Tilbakekallet skjer straks.
+  navigator.geolocation.getCurrentPosition = function (ok) {
+    ok({ coords: { latitude: 63.4305, longitude: 10.3951 } });
+  };
+  window.fetch = function (u, o) {
     u = String(u);
+    if (u.indexOf("overpass-api.de") > -1) {
+      window.__overpassKall += 1;
+      window.__overpassBody = decodeURIComponent(String((o || {}).body || ""));
+      return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve({ elements: [
+        { type: "node", id: 9, lat: 63.4310, lon: 10.3960, tags: { amenity: "pub", name: "Torgpuben" } } ] }); } });
+    }
+    if (u.indexOf("/api/puber?") === 0) {
+      window.__puberKall += 1;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ arena: "Brann Stadion", kilde: "OpenStreetMap",
+          grupper: [{ tittel: "Ved Brann Stadion", puber: [{ navn: "Stadionpuben", avstand: 240 }] },
+                    { tittel: "Ved Brann stadion holdeplass", puber: [{ navn: "Holdeplasskroa", avstand: 90 }] }] })); } });
+    }
     if (u.indexOf("/api/vaer?") === 0) {
       window.__vaerKall += 1;
       return Promise.resolve({ ok: true, status: 200, statusText: "OK",
@@ -939,6 +960,15 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
     panel.querySelectorAll(".hvor-valg")[1].click();   // pa pub
     ok("pubfeltet kommer fram", !panel.querySelector(".kamp-pub").hidden);
     ok("del er apnet", !panel.querySelector(".kamp-send").disabled);
+    // Forslagene: dine puber forst, knapp for naer deg, og etter hvert
+    // ved stadion og ved holdeplassen fra funksjonen.
+    var forslag = panel.querySelector(".pub-forslag");
+    ok("pubforslagene vises nar pub er valgt", forslag && !forslag.hidden);
+    var titler = function () { return Array.prototype.map.call(forslag.querySelectorAll(".pub-gruppe-tittel"), function (t) { return t.textContent; }); };
+    var forsteChip = forslag.querySelector(".pub-chip");
+    ok("dine puber star forst", titler()[0] === "Dine puber" && forsteChip && forsteChip.textContent === "Pub X", titler().join("|"));
+    ok("naer deg er en knapp, ikke et automatisk kall",
+       forslag.querySelector(".pub-naer") && window.__overpassKall === 0);
     panel.querySelector(".kamp-pub").value = "Pub X";
 
     // Et annet panel apnes: det forste skal lukkes.
@@ -948,10 +978,42 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
     knapper[0].click();
     panel = document.querySelector(".kamp-panel");
     panel.querySelectorAll(".hvor-valg")[1].click();
-    panel.querySelector(".kamp-pub").value = "Pub X";
-    panel.querySelector(".kamp-send").click();
+    forslag = panel.querySelector(".pub-forslag");
 
-    setTimeout(function () {
+    // Nested tilbakekall ligger utenfor try-en over; hvert far sin egen.
+    setTimeout(function () { try {
+      var titlerNa = Array.prototype.map.call(forslag.querySelectorAll(".pub-gruppe-tittel"), function (t) { return t.textContent; });
+      ok("puber ved stadion og ved holdeplassen kommer fra funksjonen",
+         titlerNa.indexOf("Ved Brann Stadion") > -1 && titlerNa.indexOf("Ved Brann stadion holdeplass") > -1, titlerNa.join("|"));
+      ok("funksjonen spores en gang per arena", window.__puberKall === 1, window.__puberKall);
+      ok("OpenStreetMap krediteres", forslag.textContent.indexOf("© OpenStreetMap-bidragsytere") > -1);
+      var chip = Array.prototype.find.call(forslag.querySelectorAll(".pub-chip"), function (c) { return c.textContent.indexOf("Stadionpuben") === 0; });
+      ok("chipen viser avstand", chip && chip.textContent.indexOf("240 m") > -1, chip && chip.textContent);
+      if (chip) chip.click();
+      ok("trykk pa en pub fyller feltet", chip && panel.querySelector(".kamp-pub").value === "Stadionpuben" &&
+         chip.getAttribute("aria-pressed") === "true");
+
+      // Naer deg: posisjonen rundes og gar rett til Overpass.
+      var naerKnapp = forslag.querySelector(".pub-naer");
+      ok("naer deg-knappen finnes", !!naerKnapp);
+      if (naerKnapp) naerKnapp.click();
+      setTimeout(function () { try {
+        ok("naer deg sporr Overpass fra nettleseren med rundet posisjon",
+           window.__overpassKall === 1 && window.__overpassBody.indexOf("around:800,63.431,10.395") > -1, window.__overpassBody);
+        var naer = Array.prototype.map.call(forslag.querySelectorAll(".pub-gruppe-tittel"), function (t) { return t.textContent; });
+        ok("puber naer deg vises", naer.indexOf("Nær deg") > -1 && forslag.textContent.indexOf("Torgpuben") > -1, naer.join("|"));
+
+        panel.querySelector(".kamp-pub").value = "Pub X";
+        panel.querySelector(".kamp-send").click();
+        setTimeout(function () { try {
+          var lagret = (JSON.parse(localStorage.getItem("sb-visning")) || {}).puber || [];
+          ok("delt pub telles i dine puber", lagret.length === 1 && lagret[0].navn === "Pub X" && lagret[0].antall === 3,
+             JSON.stringify(lagret));
+          etterDeling();
+        } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+    function etterDeling() {
       var d = window.__delt || {};
       ok("teksten som deles har kampen, puben og sporsmalet",
          String(d.text).indexOf("Brann – Bodo/Glimt") > -1 &&
@@ -963,7 +1025,7 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
          String(d.url).indexOf("#/fotball/eliteserien/neste") > -1, d.url);
       ok("panelet lukkes etter deling", !document.querySelector(".kamp-panel"));
       ferdig();
-    }, 300);
+    }
   } catch (e) { ok("ingen unntak underveis", false, e.message + " @ " + (e.stack || "").split("\\n")[1]); ferdig(); }
   }, 1200); });
 `);
