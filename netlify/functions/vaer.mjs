@@ -30,15 +30,24 @@ export default async (req) => {
   if (Number.isNaN(Date.parse(naar))) return svar({ feil: "Ugyldig tidspunkt" }, 400, 0);
 
   let json;
+  const forsok = { kilde: "MET Locationforecast", arena: arena.navn };
   try {
     const respons = await fetch(MET + vaerSti(arena), {
       headers: { "User-Agent": userAgent(), "Accept": "application/json" },
     });
-    if (!respons.ok) throw new Error("HTTP " + respons.status);
+    forsok.status = respons.status;
+    if (!respons.ok) {
+      // MET sier hvorfor i kroppen (403 uten User-Agent, 422 ved feil
+      // koordinater). De forste tegnene er nok.
+      const kropp = (await respons.text().catch(() => "")).replace(/\s+/g, " ").trim();
+      if (kropp) forsok.melding = kropp.slice(0, 80);
+      throw new Error("HTTP " + respons.status);
+    }
     json = await respons.json();
   } catch (err) {
     console.error("[vaer] henting feilet:", err);
-    return svar({ feil: "Fikk ikke svar fra MET" }, 502, 0);
+    forsok.utfall = String(err && err.message || err).slice(0, 80);
+    return svar({ feil: "Fikk ikke svar fra MET", forsok }, 502, 0);
   }
 
   let varsel;
