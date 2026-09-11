@@ -22,6 +22,11 @@ prosjektet `mvp-sb`.
     puber-oslo.js                 kuratert liste: Oslo-puber som viser fotball
     netlify/functions/puber.mjs   samme: puber ved stadion og holdeplass, døgncache
 
+    admin.html / admin.js            adminportalen: hvilke kamper viser hvilken pub
+    visning-data.js                  samme: rene funksjoner
+    netlify/functions/visninger.mjs  samme: passord og skriving til repoet
+    visninger.js                     dataene portalen skriver, lest av appen
+
 `lib.js` finnes for å kunne enhetstestes uten nettleser. Hører en funksjon
 hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
@@ -239,11 +244,41 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 - API-et svarer 200 også når noe er galt og legger feilen i `errors`.
   `tolkTabell` kaster på det framfor å vise en tom tabell.
 
+### Hvem viser kampen (admin)
+
+- `admin.html` er en egen side, ikke en visning i appen. Den ligger under
+  «Del appen» i menyen og er `noindex`. Portalen skriver ingenting selv:
+  den sender valget til `/api/visninger`, som er det eneste stedet
+  passordet (`ADMIN_PASSORD`) og GitHub-tokenet (`GITHUB_TOKEN`) finnes.
+  Mangler ett av dem, svarer funksjonen 503 med en synlig melding.
+  Passordet sammenliknes i konstant tid, og et feil passord når aldri
+  GitHub.
+- Kampene admin krysser av hentes fra `/api/fotball/neste` — samme
+  endepunkt som fotballfanen. Ligaene kommer fra `LIGAER` i
+  `fotball-data.js`, ikke fra en egen liste, så de to ikke kan gli fra
+  hverandre. Bytter admin liga, hentes den ligaens kommende kamper.
+  Kampene som sto på skjermen sendes med lagringen, så funksjonen slipper
+  å hente dem på nytt og vi vet at det er de samme.
+- Lagringen er en commit: funksjonen leser `visninger.js` fra GitHub
+  (sha og innhold), fletter inn valget med `slaSammen` i
+  `visning-data.js` og skriver fila tilbake. Fila er derfor gyldig JSON
+  inni en `export`, så funksjonen kan lese den ekte tilstanden fra
+  repoet framfor å stole på en utrullet kopi. `utenGamle` kaster kamper
+  som er spilt for lenge siden, så lista ikke vokser i det uendelige.
+  En commit utløser en deploy, så endringen er ute i appen etter et
+  minutt eller to — og går noe galt, kan fila rettes for hånd.
+- `slaSammen` rører bare den ene puben og de kampene som sto på
+  skjermen. To puber kan settes etter hverandre, og en annen ligas
+  visninger overlever et bytte.
+- Pubene kommer fra `puber-oslo.js`; en pub som ikke står der, avvises av
+  funksjonen. `usikker` vises ikke i appen og kan derfor ikke velges her
+  heller.
+
 ## Testing
 
-    node test/unit.mjs      246 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  103 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       156 tester, ~110 s, headless Chromium
+    node test/unit.mjs      271 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  122 tester, ~250 ms, ingen nettleser
+    node test/run.mjs       175 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
 De raske først, så en åpenbar feil stopper kjøringen før nettleseren
@@ -264,7 +299,7 @@ døgnkvoten holder. `run.mjs` dekker alt som trenger DOM: XSS i titler
 og artikkel-HTML, annonseplassering, rulleoppførsel, artikkelvisningen,
 fokusfella, korthøyden, at toppfeltet krymper, paginering, ruting,
 visningsvalgene i menyen, favorittlag fra stjerne til feed, deling av en
-kamp med sted og pubforslag, og hele
+kamp med sted og pubforslag, adminportalen fra ligavalg til lagring, og hele
 fotballmodulen — fanebytte, tabell, resultater, neste runde, dyplenker og
 feilmelding fra tjenesten.
 

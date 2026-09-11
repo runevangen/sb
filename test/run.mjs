@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const app = readFileSync(join(root, "index.html"), "utf8");
+const adminSide = readFileSync(join(root, "admin.html"), "utf8");
 const tmp = mkdtempSync(join(tmpdir(), "sb-test-"));
 
 // Testsidene serveres over HTTP, ikke fra file://. Modul-script blokkeres
@@ -108,13 +109,15 @@ function avkod(s) {
 // storrelse settes der vindushoyden er en del av det som testes. Standard
 // er nettleserens eget vindu; hoydetesten trenger et telefonformat for at
 // taket pa kortet i det hele tatt skal binde.
-async function kjor(navn, skript, storrelse) {
+async function kjor(navn, skript, storrelse, kilde) {
   const fil = join(tmp, navn + ".html");
+  // Standard er appen selv; admin-portalen er en egen side og sendes inn.
+  const side = kilde || app;
   // Skriptet legges etter <meta charset>, sa tegnsettet star forst i fila
   // ogsa for den som leser den uten headeren.
-  const meta = app.match(/<meta charset="utf-8">/i);
+  const meta = side.match(/<meta charset="utf-8">/i);
   const merke = meta ? meta[0] : "<head>";
-  writeFileSync(fil, app.replace(merke, merke + "\n<script>" + HARNESS + skript + "<\/script>"));
+  writeFileSync(fil, side.replace(merke, merke + "\n<script>" + HARNESS + skript + "<\/script>"));
 
   const argv = [
     // --dump-dom virker bare i hodelos modus. Lokalt er binaerfila ofte
@@ -1127,9 +1130,117 @@ const SAK_14 = await kjor("pub-feil", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
 `);
 
+/* ---------------- 15. admin-portalen ---------------- */
+
+// Portalen er en egen side. Den skriver ingenting selv: testen fanger
+// POST-en og sjekker at det som sendes er det samme som sto pa skjermen.
+const SAK_15 = await kjor("admin", `
+  var KAMPER_ES = [
+    { id: 501, hjemme: "Rosenborg", borte: "Brann", dato: "2026-09-20T17:00:00+00:00", arena: "Lerkendal Stadion" },
+    { id: 502, hjemme: "Vaalerenga", borte: "Bodo/Glimt", dato: "2026-09-21T15:00:00+00:00", arena: "Intility Arena" }
+  ];
+  var KAMPER_PL = [
+    { id: 901, hjemme: "Arsenal", borte: "Liverpool", dato: "2026-09-19T14:00:00+00:00", arena: "Emirates Stadium" }
+  ];
+  var sendt = null;
+  var bedtOm = [];
+  window.fetch = function (u, opt) {
+    u = String(u);
+    bedtOm.push(u);
+    if (u.indexOf("/api/fotball/neste") === 0) {
+      var pl = u.indexOf("liga=premier") > -1;
+      return Promise.resolve({ ok: true, status: 200, text: function () {
+        return Promise.resolve(JSON.stringify({
+          liga: pl ? "Premier League" : "Eliteserien", sesong: 2026, sisteSesong: true,
+          kilde: "TheSportsDB", runde: pl ? "Runde 5" : "Runde 21",
+          kamper: pl ? KAMPER_PL : KAMPER_ES }));
+      } });
+    }
+    if (u.indexOf("/api/visninger") === 0) {
+      sendt = JSON.parse(opt.body);
+      return Promise.resolve({ ok: true, status: 200, text: function () {
+        return Promise.resolve(JSON.stringify({ ok: true, pub: sendt.pub, valgt: sendt.kampIder.length,
+          merknad: "Lagret " + sendt.kampIder.length + " kamper." }));
+      } });
+    }
+    return Promise.resolve({ ok: true, status: 200, text: function () { return Promise.resolve("{}"); } });
+  };
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var puber = document.getElementById("pub");
+    ok("pubene fra lista kan velges", puber.options.length > 10, puber.options.length);
+    ok("usikre puber star ikke i lista",
+       puber.textContent.indexOf("usikker") === -1);
+
+    var ligaer = document.getElementById("liga");
+    ok("ligaene kommer fra fotballmodulen",
+       ligaer.options.length === 2 && ligaer.options[0].value === "eliteserien",
+       Array.prototype.map.call(ligaer.options, function (o) { return o.value; }).join(","));
+
+    // Kampene er hentet fra samme endepunkt som fotballfanen bruker.
+    ok("kampene hentes fra fotball-funksjonen",
+       bedtOm.filter(function (u) { return u.indexOf("/api/fotball/neste") === 0; }).length === 1,
+       bedtOm.join(" "));
+    var bokser = document.querySelectorAll(".kamp input");
+    ok("de kommende kampene er avkryssbare", bokser.length === 2, bokser.length);
+    ok("kampen star med lag og tid",
+       document.getElementById("kamper").textContent.indexOf("Rosenborg – Brann") > -1,
+       document.getElementById("kamper").textContent.slice(0, 120));
+    ok("runden og kilden star under lista",
+       document.getElementById("kampHint").textContent.indexOf("Runde 21") > -1,
+       document.getElementById("kampHint").textContent);
+
+    // Uten passord skjer ingenting: portalen ber ikke tjenesten om noe.
+    document.getElementById("lagre").click();
+    ok("uten passord sendes ingenting", sendt === null);
+    ok("og det staar hvorfor",
+       document.getElementById("melding").textContent.indexOf("passordet") > -1,
+       document.getElementById("melding").textContent);
+
+    document.getElementById("passord").value = "hemmelig";
+    bokser[0].checked = true;
+    document.getElementById("lagre").click();
+
+    setTimeout(function () { try {
+      ok("valget sendes til tjenesten", !!sendt);
+      ok("bare den avkryssede kampen er med",
+         sendt.kampIder.length === 1 && sendt.kampIder[0] === 501, JSON.stringify(sendt.kampIder));
+      ok("puben blir med", sendt.pub === puber.value, sendt.pub);
+      ok("passordet blir med", sendt.passord === "hemmelig");
+      ok("kampene pa skjermen sendes med, sa tjenesten slipper a gjette",
+         sendt.kamper.length === 2 && sendt.kamper[0].hjemme === "Rosenborg",
+         JSON.stringify(sendt.kamper[0]));
+      ok("svaret fra tjenesten vises",
+         document.getElementById("melding").textContent.indexOf("Lagret 1 kamper") > -1,
+         document.getElementById("melding").textContent);
+
+      // Bytter admin liga, hentes den ligaens kommende kamper.
+      ligaer.value = "premier";
+      ligaer.dispatchEvent(new Event("change"));
+      setTimeout(function () { try {
+        ok("liga-bytte henter nye kamper",
+           bedtOm[bedtOm.length - 1].indexOf("liga=premier") > -1, bedtOm[bedtOm.length - 1]);
+        var nye = document.querySelectorAll(".kamp input");
+        ok("og lista er den nye ligaens",
+           nye.length === 1 && document.getElementById("kamper").textContent.indexOf("Arsenal") > -1,
+           nye.length + " " + document.getElementById("kamper").textContent.slice(0, 80));
+        ok("avkryssingen folger ikke med over", nye[0].checked === false);
+
+        document.getElementById("merkAlle").click();
+        document.getElementById("lagre").click();
+        setTimeout(function () { try {
+          ok("«kryss av alle» tar hele den nye ligaen",
+             sendt.kampIder.length === 1 && sendt.kampIder[0] === 901, JSON.stringify(sendt.kampIder));
+          ferdig();
+        } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 200);
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 600); });
+`, null, adminSide);
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14];
+const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15];
 let feilet = 0;
 
 for (const t of alle) {
