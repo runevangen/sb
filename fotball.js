@@ -480,7 +480,15 @@ async function hentPuberRundt(arena) {
     try {
       const respons = await fetch("/api/puber?arena=" + encodeURIComponent(arena),
         { headers: { "Accept": "application/json" } });
-      return JSON.parse(await respons.text());
+      const tekst = await respons.text();
+      try {
+        return JSON.parse(tekst);
+      } catch (err) {
+        // Ikke vart svar: da har Netlify avbrutt funksjonen, og vi far
+        // deres feilside. Si det, framfor a gjette pa en parsefeil.
+        return { feil: "tjenesten svarte " + respons.status,
+                 forsok: [{ kilde: "puber", status: respons.status, utfall: "ikke vart svar" }] };
+      }
     } catch (err) {
       return { feil: String(err && err.message || err) };
     }
@@ -529,7 +537,7 @@ async function naerePuber(p) {
   let sisteFeil = new Error("Ingen tjener svarte");
   for (const adresse of OVERPASS_SPEIL) {
     const styring = typeof AbortController === "function" ? new AbortController() : null;
-    const vakt = setTimeout(() => styring && styring.abort(), 20000);
+    const vakt = setTimeout(() => styring && styring.abort(), 8000);
     try {
       const respons = await fetch(adresse, {
         method: "POST",

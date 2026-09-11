@@ -29,6 +29,14 @@ export function overpassHeadere(serverside) {
   return h;
 }
 
+// Netlify gir en funksjon ti sekunder. Tre tjenere etter hverandre uten
+// frist sprenger det, og da far leseren Netlifys egen feilside i stedet
+// for vart svar — uten et ord om hvem som sviktet. Hver tjener far
+// derfor sin egen frist, under en samlet frist for hele kallet.
+export function restTid(frist, naa, tak) {
+  return Math.max(0, Math.min(tak, frist - naa));
+}
+
 // Overpass-sporring: puber og barer innen radius meter fra et punkt.
 // «out center» gir tagger og koordinater, og ett punkt ogsa for bygninger
 // tegnet som flater. «out center tags» — som sto her forst — avviser

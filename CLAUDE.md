@@ -195,8 +195,13 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   700 m og Overpass om puber innen 1200 m, og grupperer (800 m fra
   stadion, 300 m fra holdeplass). Arenaene står fast, så hver er én
   cache-nøkkel med et døgns levetid — Overpass ber om fair use, og dette
-  er det. Overpass-kall må bære `Accept: application/json`; uten den
-  svarer hovedtjeneren 406 med en HTML-feilside. `OVERPASS_SPEIL` i
+  er det. Netlify avbryter en funksjon etter ti sekunder, så Entur og
+  Overpass spørres samtidig, og hver tjener har sin egen frist under en
+  samlet (`restTid`). Uten det sprenger tre trege tjenere taket, og da
+  får leseren Netlifys feilside i stedet for vårt svar — uten `forsok`,
+  som er det eneste som sier hvem som sviktet. Overpass-kall må bære
+  `Accept: application/json`; uten den svarer hovedtjeneren 406 med en
+  HTML-feilside. `OVERPASS_SPEIL` i
   `pub-data.js` er tjenerne som prøves i tur, både fra funksjonen og fra
   nettleseren, så én streng tjener ikke tar ned funksjonen. Svikter
   Entur, står pubene ved stadion igjen; svikter alle Overpass-tjenerne,
@@ -217,8 +222,8 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      228 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  98 tester, ~120 ms, ingen nettleser
+    node test/unit.mjs      230 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  102 tester, ~3 s, ingen nettleser
     node test/run.mjs       152 tester, ~110 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
@@ -229,7 +234,9 @@ i det hele tatt starter.
 statuskoder, cache-headere, at API-nøkkelen går til API-et og ikke til
 leseren, og at TheSportsDB prøves først for årets neste runde og faller
 tilbake når den svikter, og at værfunksjonen identifiserer seg for MET.
-Ingen nøkkel og ingen nettverk kreves.
+Ingen nøkkel og ingen nettverk kreves. De tre sekundene går med til én
+test som lar en tjener tie for å se at fristen avbryter den; uten den
+ville akkurat den feilen bare vist seg i prod.
 
 `unit.mjs` dekker `lib.js`, `fotball-data.js`, `vaer-data.js` og `pub-data.js`: URL-validering, videovertslisten, tidsstempler,
 endringssignaturen, gjenkjenning av interne lenker, rangering av søketreff og favorittlag, sesongvinduet per
