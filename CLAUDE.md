@@ -12,6 +12,8 @@ prosjektet `mvp-sb`.
 
     BACKLOGG.md   peker til issues, som er den ekte backloggen
     docs/         dypdykk og notater som ikke er kode
+                  nokler-og-tokens.md: alle hemmeligheter, hvor de settes,
+                  hva som svikter uten dem, og hvordan de fornyes
 
     fotball.js                    fotballmodulen (beta): visningen
     fotball-data.js               samme modul: rene funksjoner
@@ -46,6 +48,13 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   `/categories`, aldri wildcard mot `wp/v2` — det ville åpnet en vei inn
   til `/users`, som lister brukernavn.
 - Ingenting skal kreve endringer på sportsbibelen.no.
+- Hemmelighetene appen trenger — API-nøkler, adminpassordet,
+  GitHub-tokenet — står samlet i `docs/nokler-og-tokens.md`: hvor hver
+  settes, hva som svikter uten den, hvordan den fornyes, og hvilket
+  endepunkt som sier fra når noe er galt. Legger du til en ny nøkkel,
+  hører den hjemme der. To ting gjelder alle: funksjonene leser miljøet
+  ved utrulling, så en ny variabel krever en ny deploy, og
+  miljøvariabler er versalfølsomme.
 - Artikkel-HTML renses med en allowlist før den vises. Ukjente tagger
   pakkes ut til tekst. Utvid allowlisten framfor å lage unntak.
 - Fargene ligger som CSS-variabler i `:root`. Et tema overstyrer kun
