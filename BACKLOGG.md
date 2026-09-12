@@ -20,11 +20,17 @@ Denne fila finnes bare for å peke dit, og for å si hvorfor.
 
 - **[#25](https://github.com/runevangen/sb/issues/25)** — de oppdiktede
   annonsørene er det eneste punktet som er synlig for ekte lesere nå.
-- **[#26](https://github.com/runevangen/sb/issues/26)** — Plausible
-  samler null til domenet er lagt til. Ett steg, ingen deploy.
 - **[#29](https://github.com/runevangen/sb/issues/29)** — brukernavnene
   på sportsbibelen.no er offentlig lesbare. Det er derfor
   proxy-reglene i `netlify.toml` er smale, og den regelen må stå.
+- **[#65](https://github.com/runevangen/sb/issues/65)** — adminportalen
+  virker, og pubene er ført inn av oss. Neste steg er at puben fører
+  inn selv. Veien dit er kortere nå enn da issuen ble skrevet.
+
+Denne lista pekte en stund til #26, som ble lukket samme dag den ble
+skrevet — Netlify Analytics ble valgt framfor Plausible. Akkurat den
+glidningen er grunnen til at backloggen ligger i issues og ikke her:
+sjekk mot issues når noe her ser rart ut, ikke motsatt.
 
 Historikken for denne fila, med den fulle teksten slik den var før
 issuene ble laget, ligger i git.
