@@ -19,5 +19,7 @@
 export const VISNINGER = [
   {"pub":"Andy's Pub","kampId":2399155,"kamp":"Lillestrøm – Vålerenga","dato":"2026-09-12T14:00:00Z","satt":"2026-09-11T13:13:49.919Z"},
   {"pub":"Andy's Pub","kampId":2399156,"kamp":"Rosenborg – Tromsø","dato":"2026-09-12T16:00:00Z","satt":"2026-09-11T13:13:49.919Z"},
+  {"pub":"Dr. Jekyll's Pub","kampId":2399153,"kamp":"Hamarkameratene – Molde","dato":"2026-09-13T15:00:00Z","satt":"2026-09-11T17:22:02.272Z"},
+  {"pub":"Dr. Jekyll's Pub","kampId":2399152,"kamp":"Fredrikstad – Sarpsborg 08","dato":"2026-09-13T17:15:00Z","satt":"2026-09-11T17:22:02.272Z"},
   {"pub":"Andy's Pub","kampId":2399151,"kamp":"Bodø/Glimt – Sandefjord","dato":"2026-09-14T17:00:00Z","satt":"2026-09-11T13:13:49.919Z"}
 ];
