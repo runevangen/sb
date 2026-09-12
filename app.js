@@ -1381,9 +1381,23 @@ async function kontoKall(kropp) {
     throw new Error("Uventet svar fra innloggingen.");
   }
   if (!respons.ok || !data || data.feil) {
-    throw new Error((data && data.feil) || "Innloggingen svarte " + respons.status + ".");
+    throw new Error(((data && data.feil) || "Innloggingen svarte " + respons.status + ".")
+      + tjenestenSa(data));
   }
   return data;
+}
+
+// «Fikk ikke sendt koden» alene sender leseren — og den som satte opp
+// tjenesten — ut på leting i et panel som ikke sier noe. Funksjonen
+// bærer tjenestens egen melding i `forsok`, så den settes inn her, som i
+// pubforslagene. Ingen nøkkel og ingen adresser ligger i `forsok`.
+function tjenestenSa(data) {
+  const sist = ((data && data.forsok) || []).filter(Boolean).pop();
+  if (!sist) return "";
+  const detalj = sist.melding || sist.utfall || "";
+  if (!detalj && !sist.status) return "";
+  return " (" + (sist.status ? "svarte " + sist.status : "") +
+    (detalj ? (sist.status ? ": " : "") + detalj : "") + ")";
 }
 
 async function kontoSteget() {

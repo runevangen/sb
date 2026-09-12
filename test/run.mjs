@@ -1594,7 +1594,16 @@ const SAK_18 = await kjor("innlogging", FELLES + `
       var inn = o && o.body ? JSON.parse(o.body) : null;
       window.__konto.push(inn ? inn.handling : "oppsett");
       if (!inn) return svarMed({ klar: true, mangler: [] });
-      if (inn.handling === "kode") return svarMed({ sendt: true });
+      if (inn.handling === "kode") {
+        // Én bestilling feiler med vilje, sa vi ser at tjenestens egen
+        // melding nar fram til leseren.
+        if (inn.epost === "feil@example.no") {
+          return svarMed({ feil: "Fikk ikke sendt koden. Prøv igjen om litt.",
+            forsok: [{ kilde: "Supabase Auth", status: 500,
+              melding: "Error sending confirmation email" }] }, 502);
+        }
+        return svarMed({ sendt: true });
+      }
       if (inn.handling === "logg-inn") {
         if (inn.kode !== "123456") {
           return svarMed({ feil: "Koden stemmer ikke, eller den er for gammel." }, 401);
@@ -1643,10 +1652,24 @@ const SAK_18 = await kjor("innlogging", FELLES + `
        window.__konto.join(",") === "oppsett",
        document.getElementById("kontoSvar").textContent + " | " + window.__konto.join(","));
 
-    document.getElementById("kontoEpost").value = "Leser@Example.no";
+    // «Fikk ikke sendt koden» alene sier ikke hvorfor. Tjenestens egen
+    // melding skal sta i parentes etter, sa den kan meldes videre uten a
+    // grave i funksjonsloggen.
+    document.getElementById("kontoEpost").value = "feil@example.no";
     document.getElementById("kontoSend").click();
     setTimeout(function () { try {
-      ok("koden bestilles", window.__konto.join(",") === "oppsett,kode", window.__konto.join(","));
+      var feiltekst = document.getElementById("kontoSvar").textContent;
+      ok("tjenestens egen melding folger med feilen",
+         feiltekst.indexOf("Fikk ikke sendt koden") > -1 &&
+         feiltekst.indexOf("svarte 500") > -1 &&
+         feiltekst.indexOf("Error sending confirmation email") > -1, feiltekst);
+      ok("og feilen logger ingen inn", !localStorage.getItem("sb-konto"));
+
+      document.getElementById("kontoEpost").value = "Leser@Example.no";
+      document.getElementById("kontoSend").click();
+      setTimeout(function () { try {
+      ok("koden bestilles", window.__konto.join(",") === "oppsett,kode,kode",
+         window.__konto.join(","));
       ok("kodefeltet kommer fram", !document.getElementById("kontoKode").hidden);
       ok("knappen bytter til a logge inn",
          document.getElementById("kontoSend").textContent === "Logg inn",
@@ -1688,6 +1711,7 @@ const SAK_18 = await kjor("innlogging", FELLES + `
              document.getElementById("kontoBtnTekst").textContent);
           ferdig();
         } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
       } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });

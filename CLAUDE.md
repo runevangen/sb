@@ -434,6 +434,13 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   en økt vi ikke kjenner levetiden på, er ikke en økt å stole på.
 - Adressen vises maskert (`ru••••@gmail.com`) i menyen og i kvitteringen.
   Appen leses i en sofa med flere i.
+- Feiler bestillingen, står tjenestens egen melding i parentes etter
+  «Fikk ikke sendt koden» (`tjenestenSa()` i `app.js`, som henter siste
+  ledd i `forsok`). «Prøv igjen om litt» alene sender både leseren og den
+  som satte opp tjenesten ut på leting i et panel som ikke sier noe —
+  mens svaret, «svarte 500: Error sending confirmation email», alt ligger
+  i kroppen. Samme grep som i pubforslagene. Hverken nøkler eller
+  adresser ligger i `forsok`.
 - `konto-data.js` er de rene funksjonene, delt mellom appen og
   funksjonen: blir de to uenige om hva en gyldig adresse eller kode er,
   får leseren «feil kode» på en kode som stemmer.
@@ -476,7 +483,7 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
     node test/unit.mjs      350 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  169 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       265 tester, ~170 s, headless Chromium
+    node test/run.mjs       267 tester, ~170 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
