@@ -25,7 +25,10 @@ prosjektet `mvp-sb`.
     puber-kontakt.js              samme puber: telefon, mat, apningstider — uverifisert
     netlify/functions/puber.mjs   samme: puber ved stadion og holdeplass, døgncache
 
-    pin-data.js                     innlogging med fornavn og PIN: rene funksjoner
+    pin-data.js                     innlogging med fornavn og PIN: rene funksjoner,
+                                    og brukerlista adminportalen viser
+    netlify/functions/brukere.mjs   admin: se, endre PIN og slette brukere.
+                                    Den ene fila med en service_role-nøkkel
     konto-data.js                   innlogging: rene funksjoner (økt, og den
                                     parkerte e-posthalvdelen)
     netlify/functions/konto.mjs     samme: konto og økt via Supabase Auth,
@@ -566,6 +569,48 @@ forsøk til. Og feil kode og utløpt kode får samme svar: at en kode fantes,
 er i seg selv noe om adressen.
 
 
+### Brukerne (admin)
+
+- Adminportalen viser **hvem som har logget inn, første gang og sist
+  inne**, og lar admin **sette en ny PIN** eller **slette** en konto.
+  Tidene kommer fra Supabase selv (`created_at` og `last_sign_in_at`) —
+  vi teller ikke, for en teller vi fører selv ville kunne gli fra
+  virkeligheten uten at noen merket det. Kontoen lages ved første
+  innlogging, så `created_at` *er* første gang.
+- **`netlify/functions/brukere.mjs` er den ene fila i prosjektet med en
+  `service_role`-nøkkel, og det er et bevisst brudd på en regel som
+  ellers gjelder overalt.** Regelen — ingen funksjon har en slik nøkkel,
+  så en feil i `konto.mjs` eller `svar.mjs` ikke kan skrive i en annens
+  navn — står. Men å sette en annens PIN og slette en annens konto *er* å
+  handle på vegne av andre, og Supabase Auth har ingen annen vei dit; en
+  `security definer`-funksjon ville bare flyttet den samme makta inn i
+  databasen, med en hemmelighet i et SQL-argument i stedet. Nøkkelen
+  ligger derfor i den ene fila, importeres ingen steder, og fila gjør
+  ikke annet enn dette.
+- Hver handling krever `ADMIN_PASSORD`, sammenliknet i konstant tid som i
+  `visninger.mjs`, og sjekken skjer **før** noe som helst annet: et feil
+  passord når aldri Supabase. En nettlesertest sjekker at portalen ikke
+  henter en eneste bruker før passordet er godtatt.
+- **Admin ser aldri en PIN.** De ligger hashet hos Supabase, og det er
+  riktig. Admin kan sette en ny — og da står den i klartekst på skjermen
+  én gang, fordi den må sies videre. Det står i meldingen at den ikke kan
+  leses igjen.
+- En ny PIN settes med `PIN_PEPPER` på, som alle andre. Står pepperet
+  feil, kommer ikke personen inn med PIN-en admin nettopp ga dem — derfor
+  er `PIN_PEPPER` med i det funksjonen krever, ikke bare `konto.mjs`.
+- Navnet vises slik personen selv skrev det. Adressen bærer bare slugen
+  («bjoernaage»), så `konto.mjs` sender navnet med som `user_metadata`
+  ved opprettelse. Kontoer laget uten det faller tilbake til slugen — ikke
+  pent, men riktig, og bedre enn en tom rad.
+- Id-en går inn i en adresse, så den sjekkes mot formen en uuid har
+  framfor å stoles på — selv om den kommer fra lista portalen nettopp
+  fikk.
+- Sletting krever to trykk, som i appen: det første sier hva som kommer
+  til å skje — og at fornavnet blir ledig igjen — det andre gjør det.
+- Funksjonen som viser tiden heter `sistInneTekst()`, ikke `tidstekst()`:
+  det navnet er tatt i `fotball-data.js` og står for avsparkstidspunktet.
+  To like navn på to ulike ting kostet en CI-runde sist (`.kamp-delt`).
+
 ### Hvem blir med
 
 - Svaret delingslenka ba om. Teksten i chatten spurte «Hvor ser du?», og
@@ -618,9 +663,9 @@ er i seg selv noe om adressen.
 
 ## Testing
 
-    node test/unit.mjs      379 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  194 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       287 tester, ~180 s, headless Chromium
+    node test/unit.mjs      393 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  216 tester, ~250 ms, ingen nettleser
+    node test/run.mjs       301 tester, ~190 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
@@ -635,7 +680,8 @@ statuskoder, cache-headere, at API-nøkkelen, Supabase-nøkkelen og
 PIN-pepperet går til tjenesten og ikke til leseren, at en ny konto lages i
 samme kall som innloggingen, at et fornavn som er tatt sier det både før
 og etter at PIN-en tastes, at et nytt navn føres opp i kontolista med
-leserens egen økt, og at
+leserens egen økt, at et feil adminpassord aldri når Supabase i det hele
+tatt, at en ny PIN settes med pepperet på, og at
 TheSportsDB prøves først for årets neste runde og faller
 tilbake når den svikter, og at værfunksjonen identifiserer seg for MET.
 Ingen nøkkel og ingen nettverk kreves. Én test lar en tjener tie for å se
@@ -650,12 +696,14 @@ døgnkvoten holder, og at ingenting i `puber-kontakt.js` slipper ut i
 appen før noen har datert det, og at en økt vi ikke kjenner levetiden på
 regnes som utløpt, og at ditt eget svar på en kamp finnes på id og ikke
 på navn, og at «Ola» og «ola» blir samme konto mens «Bjorn» og «Bjørn»
-ikke blir det. `run.mjs` dekker alt som trenger DOM: XSS i titler
+ikke blir det, og at brukerlista formes uten adressen vi lagde av navnet.
+`run.mjs` dekker alt som trenger DOM: XSS i titler
 og artikkel-HTML, annonseplassering, rulleoppførsel, artikkelvisningen,
 fokusfella, korthøyden, at toppfeltet krymper, paginering, ruting,
 visningsvalgene i menyen, favorittlag fra stjerne til feed, deling av en
 kamp med sted og pubforslag, den delte lenka som åpner kampen den peker
-på hos mottakeren, adminportalen fra innlogging til lagring, innlogging i
+på hos mottakeren, adminportalen fra innlogging til lagring — og
+brukerlista der, som ikke hentes før passordet er godtatt, innlogging i
 appen i to steg — et ledig navn som ber om PIN-en to ganger, to ulike
 PIN-er som stoppes før kontoen lages, «bytt navn» som tømmer det du
 tastet, og et kjent navn som bare ber om PIN-en — med feeden ferdig

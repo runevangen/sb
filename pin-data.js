@@ -112,3 +112,62 @@ export function tolkPinOkt(json, navn, naa = Date.now()) {
     utloper: oktUtloper(json.expires_in, naa) || oktUtloper(3600, naa),
   };
 }
+
+/* ---------- brukerlista i adminportalen ---------- */
+
+// Svaret fra Supabases admin-API, formet til det portalen trenger og
+// ikke mer. Adressen vi lagde av navnet folger ikke med ut — den er en
+// nokkel, ikke noe a vise — men navnet gjor det.
+//
+// Navnet star i `user_metadata.navn`, skrevet slik personen selv skrev
+// det. Kontoer laget for vi begynte a sende det med har det ikke, og da
+// er slugen fra adressen det naermeste vi kommer: «bjoernaage» er ikke
+// pent, men det er riktig, og det er bedre enn en tom rad.
+//
+// Forste og siste palogging er `created_at` og `last_sign_in_at`.
+// Kontoen lages ved forste innlogging, sa de to er nyaktig det de ser ut
+// som. En konto som aldri har logget inn finnes ikke.
+export function tolkBrukere(rader, domene = PIN_DOMENE) {
+  const liste = Array.isArray(rader) ? rader : (rader && rader.users) || [];
+  if (!Array.isArray(liste)) return [];
+
+  return liste
+    .filter((r) => r && r.id)
+    .map((r) => {
+      const epost = String(r.email || "");
+      const slug = epost.endsWith("@" + domene) ? epost.slice(0, -(domene.length + 1)) : "";
+      const meta = r.user_metadata || r.raw_user_meta_data || {};
+      return {
+        id: String(r.id),
+        navn: normaliserPinNavn(meta.navn) || slug,
+        slug,
+        forst: r.created_at || "",
+        sist: r.last_sign_in_at || "",
+      };
+    })
+    // Bare vare egne kontoer. Ligger det noe annet i prosjektet, hoerer
+    // det ikke hjemme i denne lista.
+    .filter((b) => b.slug)
+    .sort((a, b) => String(b.sist || "").localeCompare(String(a.sist || "")));
+}
+
+// «I går 21:04». Admin leser dette for a se hvem som faktisk har vaert
+// inne, sa en dato uten klokkeslett sier for lite og en ISO-streng for
+// mye. Ukjent tid gir en strek, ikke «Invalid Date».
+//
+// Heter ikke `tidstekst`: det navnet er tatt i fotball-data.js, og star
+// for noe helt annet — avsparkstidspunktet for en kamp. To like navn pa
+// to ulike ting kostet oss en CI-runde sist (`.kamp-delt`).
+export function sistInneTekst(iso, naa = Date.now()) {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "—";
+
+  const dager = Math.floor((naa - t) / 86400000);
+  const klokke = new Date(t).toLocaleTimeString("nb-NO",
+    { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Oslo" });
+  if (dager <= 0) return "I dag " + klokke;
+  if (dager === 1) return "I går " + klokke;
+  if (dager < 7) return dager + " dager siden";
+  return new Date(t).toLocaleDateString("nb-NO",
+    { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Oslo" });
+}

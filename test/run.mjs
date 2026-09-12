@@ -1228,6 +1228,7 @@ const SAK_15 = await kjor("admin", `
   var sendt = null;
   var innlogging = null;
   var bedtOm = [];
+  var brukerKall = [];
   function svar(status, kropp) {
     return Promise.resolve({ ok: status < 400, status: status, text: function () {
       return Promise.resolve(JSON.stringify(kropp)); } });
@@ -1241,6 +1242,23 @@ const SAK_15 = await kjor("admin", `
         liga: pl ? "Premier League" : "Eliteserien", sesong: 2026, sisteSesong: true,
         kilde: "TheSportsDB", runde: pl ? "Runde 5" : "Runde 21",
         kamper: pl ? KAMPER_PL : KAMPER_ES });
+    }
+    if (u.indexOf("/api/brukere") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [] });
+      var bk = JSON.parse(opt.body);
+      brukerKall.push(bk);
+      if (bk.passord !== "hemmelig") return svar(401, { feil: "Feil passord" });
+      if (bk.handling === "liste") {
+        return svar(200, { brukere: [
+          { id: "11111111-2222-3333-4444-555555555555", navn: "Kari", slug: "kari",
+            forst: "2026-09-01T10:00:00Z", sist: new Date(Date.now() - 3600000).toISOString() },
+          { id: "66666666-7777-8888-9999-000000000000", navn: "Ola", slug: "ola",
+            forst: "2026-08-20T10:00:00Z", sist: "2026-08-20T10:00:00Z" }
+        ] });
+      }
+      if (bk.handling === "pin") return svar(200, { ok: true });
+      if (bk.handling === "slett") return svar(200, { slettet: true });
+      return svar(400, { feil: "Ukjent handling" });
     }
     if (u.indexOf("/api/visninger") === 0) {
       // Uten metode er det oppsett-sporsmalet portalen stiller ved apning.
@@ -1271,6 +1289,10 @@ const SAK_15 = await kjor("admin", `
        document.getElementById("portal").hidden === true);
     ok("ingen kamper hentes for innlogging", telt("/api/fotball/neste") === 0, bedtOm.join(" "));
     ok("portalen sporr om den er satt opp", telt("/api/visninger") === 1, bedtOm.join(" "));
+    // Brukerlista er den mest folsomme delen av portalen. Ingenting derfra
+    // skal hentes for passordet er godtatt.
+    ok("ingen brukere hentes for innlogging", brukerKall.length === 0,
+       JSON.stringify(brukerKall));
 
     var puber = document.getElementById("pub");
     ok("pubene fra lista kan velges", puber.options.length > 10, puber.options.length);
@@ -1357,7 +1379,74 @@ const SAK_15 = await kjor("admin", `
         setTimeout(function () { try {
           ok("«kryss av alle» tar hele den nye ligaen",
              sendt.kampIder.length === 1 && sendt.kampIder[0] === 901, JSON.stringify(sendt.kampIder));
-          ferdig();
+
+          /* ---- brukerne ---- */
+
+          var rader = document.querySelectorAll("#brukerRader tr");
+          ok("brukerne star i portalen etter innlogging", rader.length === 2, rader.length);
+          ok("og passordet ble sendt med",
+             brukerKall.length === 1 && brukerKall[0].passord === "hemmelig" &&
+             brukerKall[0].handling === "liste", JSON.stringify(brukerKall));
+          ok("raden viser navnet",
+             rader[0].querySelector(".navn").textContent === "Kari",
+             rader[0].querySelector(".navn").textContent);
+          // Forst og sist er to ulike kolonner: admin skal kunne se hvem som
+          // aldri kom tilbake etter forste gang.
+          var tider = rader[0].querySelectorAll(".tid");
+          ok("og bade forste gang og sist inne",
+             tider.length === 2 && tider[1].textContent.indexOf("I dag") === 0,
+             tider[1] && tider[1].textContent);
+          ok("en ISO-streng star aldri pa skjermen",
+             document.getElementById("brukere").textContent.indexOf("T10:00:00Z") === -1,
+             document.getElementById("brukere").textContent.slice(0, 120));
+
+          // Ny PIN. En for kort PIN skal stoppes her, ikke hos tjenesten.
+          var pinFelt = rader[0].querySelector("input");
+          var settKnapp = rader[0].querySelectorAll("button")[0];
+          pinFelt.value = "12";
+          settKnapp.click();
+          ok("en for kort PIN stoppes i portalen",
+             brukerKall.length === 1 &&
+             document.getElementById("brukerMelding").textContent.indexOf("minst") > -1,
+             document.getElementById("brukerMelding").textContent);
+
+          pinFelt.value = "45 67";
+          settKnapp.click();
+          setTimeout(function () { try {
+            var satt = brukerKall[brukerKall.length - 1];
+            ok("en gyldig PIN sendes, renset, med id og passord",
+               satt.handling === "pin" && satt.pin === "4567" &&
+               satt.id === "11111111-2222-3333-4444-555555555555" &&
+               satt.passord === "hemmelig", JSON.stringify(satt));
+            // Admin ma kunne si PIN-en videre: den kan ikke leses igjen.
+            ok("og den nye PIN-en star pa skjermen en gang",
+               document.getElementById("brukerMelding").textContent.indexOf("4567") > -1,
+               document.getElementById("brukerMelding").textContent);
+            ok("feltet tommes etterpa", pinFelt.value === "", pinFelt.value);
+
+            // Sletting er endelig, sa den krever to trykk.
+            var forStatus = brukerKall.length;
+            var slettKnapp = rader[0].querySelectorAll("button")[1];
+            slettKnapp.click();
+            ok("forste trykk sletter ingenting", brukerKall.length === forStatus,
+               brukerKall.length + " mot " + forStatus);
+            ok("og sier hva som kommer til a skje",
+               document.getElementById("brukerMelding").textContent.indexOf("ledig igjen") > -1,
+               document.getElementById("brukerMelding").textContent);
+
+            slettKnapp.click();
+            setTimeout(function () { try {
+              var slett = brukerKall.filter(function (k) { return k.handling === "slett"; });
+              ok("andre trykk sletter, pa den ene id-en",
+                 slett.length === 1 &&
+                 slett[0].id === "11111111-2222-3333-4444-555555555555",
+                 JSON.stringify(slett));
+              ok("og lista hentes pa nytt etterpa",
+                 brukerKall.filter(function (k) { return k.handling === "liste"; }).length === 2,
+                 JSON.stringify(brukerKall.map(function (k) { return k.handling; })));
+              ferdig();
+            } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+          } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
         } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 200);
       } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);

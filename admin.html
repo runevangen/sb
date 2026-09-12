@@ -50,6 +50,24 @@
   .hint { font-size: 12px; color: var(--tekst-svak); margin: 8px 0 0; }
   .rad { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .rad input[type="password"] { flex: 1 1 180px; width: auto; }
+  /* Brukerlista. Fire kolonner er nok: hvem, nar de kom, nar de sist var
+     inne, og hva man kan gjore med dem. */
+  .brukere { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .brukere th, .brukere td { text-align: left; padding: 8px 8px 8px 0; border-bottom: 1px solid var(--ramme); vertical-align: middle; }
+  .brukere th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--tekst-svak); font-weight: 600; }
+  .brukere tr:last-child td { border-bottom: 0; }
+  .brukere .navn { font-weight: 600; }
+  .brukere .tid { color: var(--tekst-dim); white-space: nowrap; }
+  .brukere td.valg { text-align: right; white-space: nowrap; }
+  .brukere input[type="text"] {
+    width: 78px; padding: 7px 8px; border: 1px solid var(--ramme-sterk);
+    border-radius: 6px; background: #fff; color: var(--tekst); font: inherit; font-size: 13px;
+  }
+  .brukere button { padding: 7px 10px; font-size: 13px; }
+  /* Sletting star som tekst til den er trykket en gang — da blir den rod
+     og sier hva den kommer til a gjore. Samme grep som i appen. */
+  .brukere button.slett { background: none; color: var(--tekst-dim); text-decoration: underline; font-weight: 500; }
+  .brukere button.slett[data-sikker="ja"] { background: var(--feil); color: #fff; text-decoration: none; font-weight: 600; }
   /* Portalen ligger skjult til passordet er godtatt. display: none med
      !important, sa en seksjon med egen display ikke smetter fram. */
   [hidden] { display: none !important; }
@@ -65,6 +83,7 @@
   <h1>Hvem viser kampen</h1>
   <p class="undertittel">
     Logg inn, velg en pub, velg liga, kryss av kampene de viser, lagre.
+    Her ligger også brukerne: hvem som har logget inn, når, og PIN-en deres.
     Kampene er de samme kommende kampene som fotballfanen viser. Endringen er ute i
     appen når utrullingen er ferdig, om et minutt eller to.
   </p>
@@ -98,6 +117,18 @@
     <select id="liga"></select>
     <ul class="kamper" id="kamper"><li><p class="hint">Henter kamper …</p></li></ul>
     <p class="hint" id="kampHint"></p>
+  </section>
+
+  <section>
+    <h2>Brukere</h2>
+    <p class="hint" id="brukerHint">Henter brukerne …</p>
+    <table class="brukere" id="brukere" hidden>
+      <thead>
+        <tr><th>Navn</th><th>Første gang</th><th>Sist inne</th><th></th></tr>
+      </thead>
+      <tbody id="brukerRader"></tbody>
+    </table>
+    <p class="melding" id="brukerMelding" role="status" aria-live="polite"></p>
   </section>
 
   <section>

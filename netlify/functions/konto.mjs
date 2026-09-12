@@ -118,7 +118,14 @@ async function loggInn(inn) {
   // noe som alt er galt et annet sted.
   if (!(inne.status > 0 && inne.status < 500 && inne.status !== 429)) return pinFeil(inne);
 
-  const ny = await hosSupabase("/auth/v1/signup", { email: epost, password: passord });
+  // Navnet folger med som metadata, skrevet slik personen selv skrev
+  // det. Adressen barer bare slugen («bjoernaage»), og den er riktig men
+  // ikke pen — adminportalen skal vise «Bjørn Åge».
+  const ny = await hosSupabase("/auth/v1/signup", {
+    email: epost,
+    password: passord,
+    data: { navn },
+  });
   ny.forsok = inne.forsok.concat(ny.forsok);
 
   if (ny.ok && ny.json && ny.json.access_token) return pinOkt(ny, navn, true);

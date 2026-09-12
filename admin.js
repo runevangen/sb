@@ -17,6 +17,7 @@
 import { PUBER_OSLO } from "./puber-oslo.js";
 import { VISNINGER } from "./visninger.js";
 import { LIGAER } from "./fotball-data.js";
+import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
 
 const felt = (id) => document.getElementById(id);
 let kamper = [];
@@ -111,10 +112,160 @@ async function loggInn() {
   visAdgang("Innlogget.", "ok");
   felt("portal").hidden = false;
   hentKamper();
+  hentBrukere();
 }
 
 function visAdgang(tekst, art) {
   const m = felt("adgangMelding");
+  m.textContent = tekst;
+  m.className = "melding" + (art ? " " + art : "");
+}
+
+/* ---------- brukerne ---------- */
+
+// Hvem har logget inn, nar kom de forst, og nar var de sist inne.
+// Tallene kommer fra Supabase selv, ikke fra noe vi teller: en teller vi
+// forer selv ville kunne gli fra virkeligheten uten at noen merket det.
+//
+// Nokkelen som trengs for a se og endre andres kontoer ligger bare i
+// /api/brukere. Portalen sender passordet og far en liste; den ser aldri
+// noen PIN, for PIN-er ligger hashet hos Supabase. Admin kan sette en
+// ny, ikke lese den gamle.
+async function brukerKall(kropp) {
+  const respons = await fetch("/api/brukere", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    body: JSON.stringify(Object.assign({ passord }, kropp)),
+  });
+  let data = null;
+  try {
+    data = JSON.parse(await respons.text());
+  } catch (err) {
+    throw new Error("Uventet svar fra brukerlista.");
+  }
+  if (!respons.ok || !data || data.feil) {
+    throw new Error((data && data.feil) || ("Tjenesten svarte " + respons.status + "."));
+  }
+  return data;
+}
+
+async function hentBrukere() {
+  felt("brukerHint").textContent = "Henter brukerne …";
+  felt("brukerHint").hidden = false;
+  try {
+    const data = await brukerKall({ handling: "liste" });
+    tegnBrukere(data.brukere || []);
+  } catch (err) {
+    felt("brukere").hidden = true;
+    felt("brukerHint").textContent = err.message;
+  }
+}
+
+function tegnBrukere(liste) {
+  const kropp = felt("brukerRader");
+  kropp.textContent = "";
+
+  if (!liste.length) {
+    felt("brukere").hidden = true;
+    felt("brukerHint").hidden = false;
+    felt("brukerHint").textContent =
+      "Ingen har logget inn ennå. Kontoen lages første gang noen skriver"
+      + " fornavn og PIN i appen.";
+    return;
+  }
+
+  liste.forEach((b) => kropp.appendChild(brukerRad(b)));
+  felt("brukere").hidden = false;
+  felt("brukerHint").hidden = false;
+  felt("brukerHint").textContent = liste.length === 1
+    ? "Én bruker. Sortert etter hvem som var inne sist."
+    : liste.length + " brukere. Sortert etter hvem som var inne sist.";
+}
+
+function brukerRad(b) {
+  const rad = document.createElement("tr");
+
+  rad.appendChild(celle("td", "navn", b.navn));
+  rad.appendChild(celle("td", "tid", sistInneTekst(b.forst)));
+  rad.appendChild(celle("td", "tid", sistInneTekst(b.sist)));
+
+  const valg = celle("td", "valg", "");
+
+  // Ny PIN: feltet og knappen star sammen, sa det er tydelig at de to
+  // horer til hverandre og til denne raden.
+  const pinFelt = document.createElement("input");
+  pinFelt.type = "text";
+  pinFelt.inputMode = "numeric";
+  pinFelt.maxLength = PIN_MAKS;
+  pinFelt.placeholder = "Ny PIN";
+  pinFelt.setAttribute("aria-label", "Ny PIN for " + b.navn);
+
+  const settKnapp = document.createElement("button");
+  settKnapp.type = "button";
+  settKnapp.textContent = "Sett";
+  settKnapp.addEventListener("click", async () => {
+    const pin = String(pinFelt.value || "").replace(/\D+/g, "");
+    if (pin.length < PIN_MIN) {
+      visBruker("PIN-en er minst " + PIN_MIN + " siffer.", "feil");
+      pinFelt.focus();
+      return;
+    }
+    settKnapp.disabled = true;
+    try {
+      await brukerKall({ handling: "pin", id: b.id, pin });
+      pinFelt.value = "";
+      // PIN-en star i klartekst her, en gang, fordi admin ma kunne si den
+      // videre. Den kan ikke leses igjen etterpa — heller ikke av oss.
+      visBruker(b.navn + " har nå PIN " + pin + ". Si den videre nå; den kan ikke leses igjen.", "ok");
+    } catch (err) {
+      visBruker(err.message, "feil");
+    } finally {
+      settKnapp.disabled = false;
+    }
+  });
+
+  // Sletting er endelig, sa den krever to trykk: det forste sier hva som
+  // kommer til a skje, det andre gjor det. Samme grep som i appen.
+  const slettKnapp = document.createElement("button");
+  slettKnapp.type = "button";
+  slettKnapp.className = "slett";
+  slettKnapp.textContent = "Slett";
+  slettKnapp.dataset.sikker = "nei";
+  slettKnapp.addEventListener("click", async () => {
+    if (slettKnapp.dataset.sikker !== "ja") {
+      slettKnapp.dataset.sikker = "ja";
+      slettKnapp.textContent = "Slett for godt";
+      visBruker("Sletter " + b.navn + ", alle «jeg blir med»-svarene, og gjør"
+        + " fornavnet ledig igjen. Trykk en gang til.", "feil");
+      return;
+    }
+    slettKnapp.disabled = true;
+    try {
+      await brukerKall({ handling: "slett", id: b.id });
+      visBruker(b.navn + " er slettet. Fornavnet er ledig igjen.", "ok");
+      hentBrukere();
+    } catch (err) {
+      visBruker(err.message, "feil");
+      slettKnapp.disabled = false;
+    }
+  });
+
+  valg.appendChild(pinFelt);
+  valg.appendChild(settKnapp);
+  valg.appendChild(slettKnapp);
+  rad.appendChild(valg);
+  return rad;
+}
+
+function celle(tag, klasse, tekst) {
+  const el = document.createElement(tag);
+  if (klasse) el.className = klasse;
+  el.textContent = tekst;
+  return el;
+}
+
+function visBruker(tekst, art) {
+  const m = felt("brukerMelding");
   m.textContent = tekst;
   m.className = "melding" + (art ? " " + art : "");
 }

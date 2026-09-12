@@ -20,6 +20,7 @@ Ingenting her er hemmelig i seg selv. Navnene står i koden fra før; det er
 | `SUPABASE_URL` | innlogging i appen | innloggingen svarer 503 | nei |
 | `SUPABASE_ANON_KEY` | innlogging i appen | innloggingen svarer 503 | ved rotering |
 | `PIN_PEPPER` | innlogging med fornavn og PIN | innloggingen svarer 503 | nei — **men kan ikke endres etterpå** |
+| `SUPABASE_SERVICE_KEY` | brukerlista i adminportalen | portalen viser ingen brukere | ved rotering — **og den kan alt** |
 | *(Resend API-nøkkel)* | **parkert**: e-posten med engangskoden | ingenting i dag; appen sender ingen e-post | nei — settes i Supabase, ikke i Netlify |
 | `MET_KONTAKT` | valgfri kontaktadresse til MET | ingenting; været virker | nei |
 | `GITHUB_REPO` | valgfri: hvilket repo admin skriver til | `runevangen/sb` | — |
@@ -357,6 +358,61 @@ app-passord fra `myaccount.google.com/apppasswords` uten mellomrom. Taket
 er rundt 500 i døgnet, og app-utsending ligger i utkanten av Googles
 vilkår, så det er en nødluke og ikke et oppsett.
 
+### `SUPABASE_SERVICE_KEY` — brukerlista i adminportalen
+
+**Dette er den ene nøkkelen i prosjektet som kan gjøre hva som helst med
+hvem som helst, og at den finnes i det hele tatt er et bevisst brudd på
+en regel som ellers gjelder overalt.**
+
+Regelen er at ingen funksjon har en `service_role`-nøkkel: da kan heller
+ikke en feil i `konto.mjs` eller `svar.mjs` skrive i en annens navn. Den
+regelen står. Men å se andres kontoer, sette en annens PIN og slette en
+annens konto *er* å handle på vegne av andre, og Supabase Auth har ingen
+annen vei dit. En `security definer`-funksjon i databasen ville bare
+flyttet den samme makta, med en hemmelighet i et SQL-argument i stedet.
+
+Så nøkkelen ligger i **én fil**, `netlify/functions/brukere.mjs`. Den
+importeres ikke noe sted, den deles ikke, og fila gjør ikke annet enn
+dette. Hver eneste handling krever `ADMIN_PASSORD`, sammenliknet i
+konstant tid — et feil passord når aldri Supabase.
+
+- **Leses av:** `netlify/functions/brukere.mjs`, og ingen andre
+- **Sendes som:** `apikey` og `Authorization: Bearer` til
+  `<SUPABASE_URL>/auth/v1/admin/…`
+- **Uten den:** `503`, og portalen sier hvilken som mangler
+- **Lages på:** Supabase → *Project Settings* → *API* → `service_role`.
+  Den står bak en «Reveal»-knapp, med en advarsel ved siden av. Advarselen
+  stemmer.
+- **Utløper:** ikke av seg selv, men roteres den i Supabase må verdien
+  byttes her og deployes.
+
+**De to nøklene ser like ut.** `SUPABASE_ANON_KEY` og
+`SUPABASE_SERVICE_KEY` er begge lange JWT-er som begynner likt, og limer
+du inn feil, svarer Supabase 401 på alt i portalen. Funksjonen kjenner
+igjen nettopp den 401-en og sier «Står anon-nøkkelen i
+SUPABASE_SERVICE_KEY? De to ser like ut.» framfor en generisk feil.
+
+**Aldri i nettleseren.** Nøkkelen skal ikke inn i `admin.js`, ikke i en
+`data-`-attributt, ikke i en URL. Portalen sender passordet og får en
+liste; den ser aldri nøkkelen og aldri noen PIN.
+
+#### Hva admin kan gjøre, og hva admin ikke kan
+
+| Kan | Kan ikke |
+| --- | --- |
+| Se hvem som har logget inn, første gang og sist inne | Se noens PIN — de ligger hashet hos Supabase |
+| Sette en ny PIN på en som har glemt sin | Lese den gamle |
+| Slette en konto, med alle «jeg blir med»-svarene | Angre slettingen |
+
+Tidene kommer fra Supabase selv: `created_at` og `last_sign_in_at`. Vi
+teller ikke — en teller vi fører selv ville kunne gli fra virkeligheten
+uten at noen merket det. Kontoen lages ved første innlogging, så
+`created_at` *er* første gang noen logget på.
+
+En ny PIN settes med `PIN_PEPPER` på, som alle andre PIN-er. Står
+pepperet feil her, kommer ikke personen inn med PIN-en admin nettopp ga
+dem — derfor står `PIN_PEPPER` i lista over det som må være satt.
+
 ### Tabellen «pin_kontoer» — hvilke fornavn er tatt
 
 Innloggingen spør om navnet er nytt **før** PIN-en tastes, og det er ikke
@@ -583,6 +639,9 @@ Det du ser først, og hva det som regel betyr.
 | Innlogging: «Navnet eller PIN-en stemmer ikke» | feil PIN, eller `PIN_PEPPER` er endret etter at kontoen ble laget | sett pepperet tilbake; endres det, må kontoene lages på nytt |
 | Innlogging: ««Ola» er tatt» | fornavnet er én konto, og noen andre har det | velg et annet fornavn |
 | «Tabellen «pin_kontoer» finnes ikke i Supabase ennå» | SQL-en over er ikke kjørt | kjør den i Supabase → SQL Editor |
+| Portalen: «Supabase avviste nøkkelen» | anon-nøkkelen står i `SUPABASE_SERVICE_KEY` | hent `service_role` under Project Settings → API |
+| Portalen: «Brukerlista er ikke satt opp: X mangler» | X ikke satt i Netlify | sett X, trigger deploy |
+| Ny PIN virker ikke for personen | `PIN_PEPPER` var ikke satt da PIN-en ble satt | sett pepperet, deploy, sett PIN-en på nytt |
 | Et kjent navn ber om «Gjenta PIN-en» | raden i `pin_kontoer` mangler — kontoen ble laget før tabellen fantes | før opp slugen for hånd, eller la personen slette og lage kontoen på nytt |
 | Innlogging: «krever at e-postbekreftelse er slått av» | *Confirm email* står på i Supabase | slå den av; adressen er en nøkkel, ikke en postkasse |
 | Innlogging: «For mange forsøk» (429) | Supabase sperrer en stund | vent et minutt |
@@ -654,6 +713,7 @@ sendes videre til hvem som helst:
 ```
 /api/visninger                        → {"klar":true,"mangler":[]}
 /api/konto                            → {"klar":true,"mangler":[]}
+/api/brukere                          → {"klar":true,"mangler":[]}
 /api/fotball/tabell?liga=eliteserien  → kilde + forsok
 /api/vaer?arena=<navn>&naar=<iso>     → forsok ved feil
 ```

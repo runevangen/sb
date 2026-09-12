@@ -14,6 +14,7 @@ import puber from "../netlify/functions/puber.mjs";
 import { OVERPASS_SPEIL } from "../pub-data.js";
 import visninger from "../netlify/functions/visninger.mjs";
 import konto from "../netlify/functions/konto.mjs";
+import brukere from "../netlify/functions/brukere.mjs";
 import svarfunksjon from "../netlify/functions/svar.mjs";
 import { lesVisninger } from "../visning-data.js";
 
@@ -848,7 +849,14 @@ ok("et nytt navn far en konto i samme kall",
 ok("og kontoen lages hos tjenesten, ikke her",
    kall[1].url.indexOf("/auth/v1/signup") > -1, kall[1].url);
 ok("med samme adresse og samme passord som innloggingen provde",
-   kall[0].opsjoner.body === kall[1].opsjoner.body, kall[1].opsjoner.body);
+   JSON.parse(kall[1].opsjoner.body).email === JSON.parse(kall[0].opsjoner.body).email &&
+   JSON.parse(kall[1].opsjoner.body).password === JSON.parse(kall[0].opsjoner.body).password,
+   kall[1].opsjoner.body);
+// Adressen barer bare slugen. Navnet slik personen skrev det folger med
+// som metadata, sa adminportalen kan vise «Bjørn Åge» og ikke
+// «bjoernaage».
+ok("og med navnet slik det ble skrevet",
+   JSON.parse(kall[1].opsjoner.body).data.navn === "Ola", kall[1].opsjoner.body);
 // Uten foringen ville neste person som skriver «Ola» fatt «lag en PIN» pa
 // et navn som er tatt — og det er den ene feilen vi ikke kan rette opp.
 ok("og navnet fores opp i kontolista",
@@ -1017,6 +1025,128 @@ delete process.env.SUPABASE_URL;
 delete process.env.SUPABASE_ANON_KEY;
 delete process.env.PIN_PEPPER;
 
+/* ---------------- brukerlista i adminportalen ---------------- */
+
+function brukerBe(kropp, metode) {
+  return new Request("https://mvp-sb.netlify.app/api/brukere", {
+    method: metode || "POST",
+    headers: { "Content-Type": "application/json" },
+    body: metode === "GET" ? undefined : JSON.stringify(kropp),
+  });
+}
+
+const SVC = "hemmelig-service-nokkel";
+const BRUKER_ID = "11111111-2222-3333-4444-555555555555";
+
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_SERVICE_KEY;
+delete process.env.ADMIN_PASSORD;
+delete process.env.PIN_PEPPER;
+
+kall = stubSupabase([]);
+r = await brukere(brukerBe({ passord: "x", handling: "liste" }));
+const brukerUoppsatt = await r.json();
+ok("uten oppsett svarer brukerlista 503", r.status === 503, r.status);
+ok("uten oppsett rores ikke tjenesten", kall.length === 0, kall.length);
+ok("503-svaret navngir det som mangler",
+   brukerUoppsatt.feil.indexOf("SUPABASE_SERVICE_KEY") > -1 &&
+   brukerUoppsatt.feil.indexOf("ADMIN_PASSORD") > -1 &&
+   brukerUoppsatt.feil.indexOf("PIN_PEPPER") > -1, brukerUoppsatt.feil);
+
+r = await brukere(brukerBe(null, "GET"));
+ok("GET sier at brukerlista ikke er klar",
+   r.status === 200 && (await r.json()).klar === false, r.status);
+
+process.env.SUPABASE_URL = "https://prosjekt.supabase.co/";
+process.env.SUPABASE_SERVICE_KEY = SVC;
+process.env.ADMIN_PASSORD = "riktig-passord";
+process.env.PIN_PEPPER = PEPPER;
+
+// Et feil passord skal aldri fore til et kall mot Supabase. Nokkelen her
+// kan gjore hva som helst med hvem som helst; passordet er det eneste som
+// star i veien.
+kall = stubSupabase([]);
+r = await brukere(brukerBe({ passord: "feil", handling: "liste" }));
+ok("feil passord gir 401", r.status === 401, r.status);
+ok("og narmer seg aldri tjenesten", kall.length === 0, kall.length);
+
+kall = stubSupabase([
+  { id: BRUKER_ID, email: "ola@pin.mvp-sb.netlify.app",
+    user_metadata: { navn: "Ola" },
+    created_at: "2026-09-01T10:00:00Z", last_sign_in_at: "2026-09-11T19:00:00Z" },
+]);
+r = await brukere(brukerBe({ passord: "riktig-passord", handling: "liste" }));
+const brukerLista = await r.json();
+ok("riktig passord gir lista", r.status === 200 && brukerLista.brukere.length === 1,
+   r.status + " " + JSON.stringify(brukerLista));
+ok("med navn, forste og siste palogging",
+   brukerLista.brukere[0].navn === "Ola" &&
+   brukerLista.brukere[0].forst === "2026-09-01T10:00:00Z" &&
+   brukerLista.brukere[0].sist === "2026-09-11T19:00:00Z",
+   JSON.stringify(brukerLista.brukere[0]));
+ok("lista hentes fra admin-endepunktet",
+   kall[0].url.indexOf("/auth/v1/admin/users") > -1, kall[0].url);
+// Nokkelen her kan lese og slette hvem som helst. Den skal aldri ut.
+ok("service-nokkelen gar til tjenesten, ikke til admin",
+   kall[0].opsjoner.headers.Authorization === "Bearer " + SVC &&
+   JSON.stringify(brukerLista).indexOf(SVC) === -1,
+   JSON.stringify(brukerLista));
+ok("og adressen vi lagde av navnet vises ikke",
+   JSON.stringify(brukerLista).indexOf("@pin.mvp-sb.netlify.app") === -1,
+   JSON.stringify(brukerLista));
+ok("svaret caches aldri",
+   r.headers.get("Cache-Control") === "no-store", r.headers.get("Cache-Control"));
+
+// Ny PIN til en som har glemt sin. Pepperet ma pa, ellers kommer hen ikke
+// inn med PIN-en admin nettopp ga.
+kall = stubSupabase({});
+r = await brukere(brukerBe({ passord: "riktig-passord", handling: "pin",
+  id: BRUKER_ID, pin: "45 67" }));
+ok("admin kan sette en ny PIN", r.status === 200, r.status);
+ok("og den settes med pepperet pa",
+   JSON.parse(kall[0].opsjoner.body).password === "4567:" + PEPPER,
+   kall[0].opsjoner.body);
+ok("pa den ene brukeren, ikke pa alle",
+   kall[0].url.indexOf("/auth/v1/admin/users/" + BRUKER_ID) > -1 &&
+   kall[0].opsjoner.method === "PUT", kall[0].url);
+
+kall = stubSupabase({});
+r = await brukere(brukerBe({ passord: "riktig-passord", handling: "pin",
+  id: BRUKER_ID, pin: "12" }));
+ok("en for kort PIN stoppes her", r.status === 400 && kall.length === 0,
+   r.status + " " + kall.length);
+
+// Id-en gar inn i en adresse. Den kommer fra lista portalen nettopp fikk,
+// men den sjekkes mot formen en uuid har framfor a stoles pa.
+kall = stubSupabase({});
+r = await brukere(brukerBe({ passord: "riktig-passord", handling: "slett",
+  id: "../../noe-annet" }));
+ok("en id som ikke er en uuid stoppes for den nar en adresse",
+   r.status === 400 && kall.length === 0, r.status + " " + kall.length);
+
+kall = stubSupabase({});
+r = await brukere(brukerBe({ passord: "riktig-passord", handling: "slett", id: BRUKER_ID }));
+ok("admin kan slette en bruker",
+   r.status === 200 && (await r.json()).slettet === true, r.status);
+ok("og slettingen gar pa den ene id-en",
+   kall[0].opsjoner.method === "DELETE" &&
+   kall[0].url.indexOf("/auth/v1/admin/users/" + BRUKER_ID) > -1, kall[0].url);
+
+// De to nokkelene ser like ut, og anon-nokkelen gir 401 her. Det er den
+// feilen som kommer til a skje, sa den skal si hva den er.
+kall = stubSupabase({ msg: "User not allowed" }, 401);
+r = await brukere(brukerBe({ passord: "riktig-passord", handling: "liste" }));
+ok("en avvist nokkel sier at det kanskje er anon-nokkelen",
+   r.status === 502 && (await r.json()).feil.indexOf("anon-nøkkelen") > -1, r.status);
+
+r = await brukere(brukerBe({ passord: "riktig-passord", handling: "noe-annet" }));
+ok("en ukjent handling avvises", r.status === 400, r.status);
+
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_SERVICE_KEY;
+delete process.env.ADMIN_PASSORD;
+delete process.env.PIN_PEPPER;
+
 /* ---------------- hvem blir med ---------------- */
 
 function svarBe(kropp, metode, adresse) {
@@ -1043,7 +1173,7 @@ process.env.SUPABASE_ANON_KEY = SUPA_NOKKEL;
 
 kall = stubSupabase(SVAR_RADER);
 r = await svarfunksjon(svarBe(null, "GET", "/api/svar?kamper=7,8"));
-const lista = await r.json();
+const svarLista = await r.json();
 ok("hele runden hentes i ett kall", kall.length === 1, kall.length);
 ok("og med kampene i ett filter",
    kall[0].url.indexOf("kamp_id=in.(7,8)") > -1, kall[0].url);
@@ -1051,7 +1181,7 @@ ok("og med kampene i ett filter",
 ok("lesing sender ingen okt", !kall[0].opsjoner.headers.Authorization,
    JSON.stringify(kall[0].opsjoner.headers));
 ok("radene formes for de sendes ut",
-   lista.svar.length === 1 && lista.svar[0].navn === "Ola", JSON.stringify(lista));
+   svarLista.svar.length === 1 && svarLista.svar[0].navn === "Ola", JSON.stringify(svarLista));
 // Hvem som blir med endrer seg mens man ser pa det.
 ok("lista caches aldri", r.headers.get("Cache-Control") === "no-store");
 

@@ -20,7 +20,8 @@ import { normaliserEpost, gyldigEpost, normaliserKode, gyldigKode, maskerEpost,
          oktUtloper, oktGyldig, tolkOkt } from "../konto-data.js";
 
 import { normaliserPinNavn, pinSlug, gyldigPinNavn, pinEpost, normaliserPin, gyldigPin,
-         pinPassord, tolkPinOkt, PIN_MIN, PIN_MAKS, PIN_DOMENE } from "../pin-data.js";
+         pinPassord, tolkPinOkt, tolkBrukere, sistInneTekst,
+         PIN_MIN, PIN_MAKS, PIN_DOMENE } from "../pin-data.js";
 
 import { normaliserNavn, gyldigNavn, svarRad, tolkSvar, perKamp, blirMedTekst,
          svartekst, egetSvar, NAVN_MAKS } from "../svar-data.js";
@@ -1081,6 +1082,60 @@ ok("en okt uten navn kastes ogsa",
 ok("uten levetid far ogsa PIN-okta en kort en",
    tolkPinOkt({ access_token: "t" }, "Ola", KONTO_NAA).utloper ===
    "2026-09-11T13:00:00.000Z");
+
+/* ---------------- brukerlista i adminportalen ---------------- */
+
+const BRUKERE = tolkBrukere([
+  { id: "a", email: "ola@" + PIN_DOMENE, user_metadata: { navn: "Ola" },
+    created_at: "2026-09-01T10:00:00Z", last_sign_in_at: "2026-09-11T19:00:00Z" },
+  { id: "b", email: "bjoernaage@" + PIN_DOMENE,
+    created_at: "2026-09-02T10:00:00Z", last_sign_in_at: "2026-09-12T08:00:00Z" },
+  { id: "c", email: "noen@annensteds.no", created_at: "2026-09-03T10:00:00Z" },
+  { email: "uten-id@" + PIN_DOMENE },
+]);
+
+ok("brukerne formes til det portalen trenger", BRUKERE.length === 2,
+   JSON.stringify(BRUKERE));
+// Navnet slik personen skrev det ligger i metadata. Uten det er slugen
+// det naermeste vi kommer — ikke pent, men riktig, og bedre enn en tom rad.
+ok("navnet kommer fra metadata nar det finnes", BRUKERE[1].navn === "Ola",
+   BRUKERE[1].navn);
+ok("og fra slugen nar det ikke gjor det", BRUKERE[0].navn === "bjoernaage",
+   BRUKERE[0].navn);
+// Sist inne forst: det er den lista admin faktisk leser.
+ok("sist inne star overst", BRUKERE[0].id === "b" && BRUKERE[1].id === "a",
+   BRUKERE.map((b) => b.id).join(","));
+// Kontoen lages ved forste innlogging, sa created_at *er* forste gang.
+ok("forste og siste palogging folger med",
+   BRUKERE[1].forst === "2026-09-01T10:00:00Z" &&
+   BRUKERE[1].sist === "2026-09-11T19:00:00Z",
+   JSON.stringify(BRUKERE[1]));
+// Ligger det noe annet i Supabase-prosjektet, hoerer det ikke hjemme her.
+ok("kontoer som ikke er vare faller bort",
+   !BRUKERE.some((b) => b.id === "c"), JSON.stringify(BRUKERE));
+ok("og en rad uten id gjor det ogsa", BRUKERE.every((b) => b.id));
+ok("tull inn gir en tom liste",
+   tolkBrukere(null).length === 0 && tolkBrukere("noe").length === 0);
+// Supabase pakker av og til lista i et objekt.
+ok("lista kan ligge under users",
+   tolkBrukere({ users: [{ id: "a", email: "ola@" + PIN_DOMENE }] }).length === 1);
+
+const NAA_TID = Date.parse("2026-09-12T22:00:00Z");
+ok("i dag vises med klokkeslett",
+   sistInneTekst("2026-09-12T19:04:00Z", NAA_TID).indexOf("I dag") === 0,
+   sistInneTekst("2026-09-12T19:04:00Z", NAA_TID));
+ok("i gar ogsa", sistInneTekst("2026-09-11T19:04:00Z", NAA_TID).indexOf("I går") === 0,
+   sistInneTekst("2026-09-11T19:04:00Z", NAA_TID));
+ok("lenger tilbake teller dager",
+   sistInneTekst("2026-09-09T19:04:00Z", NAA_TID) === "3 dager siden",
+   sistInneTekst("2026-09-09T19:04:00Z", NAA_TID));
+ok("og over en uke blir en dato",
+   sistInneTekst("2026-08-01T19:04:00Z", NAA_TID).indexOf("2026") > -1,
+   sistInneTekst("2026-08-01T19:04:00Z", NAA_TID));
+// En konto som aldri har vaert inne skal gi en strek, ikke «Invalid Date».
+ok("ukjent tid gir en strek",
+   sistInneTekst("") === "—" && sistInneTekst(null) === "—" && sistInneTekst("tull") === "—",
+   sistInneTekst("tull"));
 
 /* ---------------- hvem blir med ---------------- */
 
