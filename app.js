@@ -1327,6 +1327,7 @@ function visKonto() {
   const kode = document.getElementById("kontoKode");
   const send = document.getElementById("kontoSend");
   const ut = document.getElementById("kontoUt");
+  const slett = document.getElementById("kontoSlett");
   const note = document.getElementById("kontoNote");
 
   if (kontoOkt) {
@@ -1335,12 +1336,16 @@ function visKonto() {
     kode.hidden = true;
     send.hidden = true;
     ut.hidden = false;
+    slett.hidden = false;
     note.textContent = KONTO_TEKST.inne;
     return;
   }
 
   tekst.textContent = "Logg inn";
   ut.hidden = true;
+  slett.hidden = true;
+  slett.dataset.sikker = "nei";
+  slett.textContent = "Slett kontoen min";
   send.hidden = false;
   epost.hidden = false;
   kode.hidden = kontoSteg !== "kode";
@@ -1469,6 +1474,35 @@ document.getElementById("kontoBtn").addEventListener("click", () => {
 
 document.getElementById("kontoSend").addEventListener("click", kontoSteget);
 document.getElementById("kontoUt").addEventListener("click", loggUt);
+
+// Sletting er endelig, sa den krever to trykk: det forste sier hva som
+// kommer til a skje, det andre gjor det. Ingen dialogboks — den ville
+// blitt et hinder a klikke bort framfor en setning a lese.
+document.getElementById("kontoSlett").addEventListener("click", async () => {
+  const knapp = document.getElementById("kontoSlett");
+  if (knapp.dataset.sikker !== "ja") {
+    knapp.dataset.sikker = "ja";
+    knapp.textContent = "Ja, slett alt. Dette kan ikke angres";
+    kontoSvar("Adressen din og alle «jeg blir med» forsvinner. Trykk en gang til.");
+    return;
+  }
+
+  knapp.disabled = true;
+  try {
+    await kontoKall({ handling: "slett", token: kontoOkt && kontoOkt.token });
+    lagreKonto(null);
+    kontoSteg = "epost";
+    document.getElementById("kontoEpost").value = "";
+    document.getElementById("kontoKode").value = "";
+    visKonto();
+    kontoSvar("Kontoen er slettet.");
+    track("Konto slettet");
+  } catch (err) {
+    kontoSvar(err.message);
+  } finally {
+    knapp.disabled = false;
+  }
+});
 // Enter i et felt skal gjore det samme som knappen: feltene ligger ikke i
 // et skjema, fordi et skjema i menyen ville sendt sokeskjemaet.
 ["kontoEpost", "kontoKode"].forEach((id) => {

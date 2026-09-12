@@ -30,6 +30,8 @@ prosjektet `mvp-sb`.
     svar-data.js                    «jeg blir med»: rene funksjoner
     netlify/functions/svar.mjs      samme: lesing for alle, skriving med din egen økt
 
+    personvern.html                 hva vi lagrer, og hvordan du blir kvitt det
+
     admin.html / admin.js            adminportalen: hvilke kamper viser hvilken pub
     visning-data.js                  samme: rene funksjoner, ogsa for lesersiden
     netlify/functions/visninger.mjs  samme: passord og skriving til repoet
@@ -471,9 +473,25 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   feilen: SMS-sperren hos Brevo, låste maler uten egen SMTP, stor R i
   SMTP-brukernavnet, og at appen kappet koden til seks siffer. Det siste
   var vårt.
-- Dette er første gang appen lagrer noe om en person. En
-  personvernerklæring og en måte å be om sletting på hører til her, og
-  er ikke skrevet ennå.
+- Dette er første gang appen lagrer noe om en person, og
+  `personvern.html` sier hva det er: adressen hos Supabase (EU), navnet
+  du selv skriver — synlig for andre — og økten lokalt. Sida er skrevet
+  om denne appen, ikke etter en mal: den navngir Supabase, Resend og
+  Netlify, og den sier at posisjonen i pubsøket går rett fra nettleseren
+  til OpenStreetMap uten å innom oss. Lenka står i menyen.
+- **Du sletter kontoen selv, fra menyen.** Det krever normalt admin-
+  tilgang hos Supabase og en `service_role`-nøkkel som kan slette hvem
+  som helst. Den finnes ikke her. I stedet ligger sletteretten i
+  databasen som `slett_meg()`, en `security definer`-funksjon som sletter
+  raden der id-en er `auth.uid()` og ingen andre — den tar ikke imot noen
+  id, så selv en feil i `konto.mjs` kan ikke slette en annens konto.
+  Radene i `kampsvar` følger med gjennom `on delete cascade`, så
+  slettingen er hel. SQL-en står i `docs/nokler-og-tokens.md`; uten den
+  svarer funksjonen 503 og sier det.
+- Slettingen krever to trykk: det første sier hva som kommer til å skje,
+  det andre gjør det. Ingen dialogboks — den ville blitt et hinder å
+  klikke bort framfor en setning å lese. En utlogging nullstiller
+  bekreftelsen, så den ikke står klar neste gang noen logger inn.
 
 ### Hvem blir med
 
@@ -512,8 +530,8 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 ## Testing
 
     node test/unit.mjs      353 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  179 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       268 tester, ~170 s, headless Chromium
+    node test/funksjon.mjs  185 tester, ~250 ms, ingen nettleser
+    node test/run.mjs       272 tester, ~170 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

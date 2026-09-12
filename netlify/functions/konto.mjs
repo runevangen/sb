@@ -46,6 +46,7 @@ export default async (req) => {
   if (inn.handling === "kode") return sendKode(inn);
   if (inn.handling === "logg-inn") return loggInn(inn);
   if (inn.handling === "hvem") return hvem(inn);
+  if (inn.handling === "slett") return slettMeg(inn);
   return svar({ feil: "Ukjent handling" }, 400);
 };
 
@@ -161,6 +162,62 @@ async function hvem(inn) {
   const epost = normaliserEpost(json && json.email);
   if (!gyldigEpost(epost)) return svar({ feil: "Økten gjelder ikke lenger" }, 401);
   return svar({ epost }, 200);
+}
+
+// Sletting av egen konto. Normalt krever det admin-tilgang hos Supabase,
+// og en service_role-nokkel som kan slette hvem som helst — den finnes
+// ikke her, med vilje. I stedet ligger det en databasefunksjon
+// (`slett_meg`) som sletter raden i auth.users der id-en er din egen, og
+// bare den. Den kalles med leserens egen okt, sa selv en feil her kan
+// ikke slette en annens konto.
+//
+// Radene i kampsvar folger med: fremmednokkelen star med on delete
+// cascade. En sletting er derfor hel — adressen og navnet forsvinner
+// samtidig.
+async function slettMeg(inn) {
+  const token = String(inn.token || "");
+  if (!token) return svar({ feil: "Logg inn først" }, 401);
+
+  const forsok = { kilde: "Supabase", sti: "/rest/v1/rpc/slett_meg" };
+  try {
+    const respons = await fetch(base() + "/rest/v1/rpc/slett_meg", {
+      method: "POST",
+      headers: {
+        "apikey": process.env.SUPABASE_ANON_KEY,
+        "Authorization": "Bearer " + token,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: "{}",
+    });
+    forsok.status = respons.status;
+
+    if (respons.ok) return svar({ slettet: true }, 200);
+
+    const tekst = await respons.text().catch(() => "");
+    let json = null;
+    try { json = tekst ? JSON.parse(tekst) : null; } catch (err) { json = null; }
+    const melding = kortMelding(json) || (json && json.message) || tekst.slice(0, 120);
+    if (melding) forsok.melding = melding;
+
+    if (respons.status === 401 || respons.status === 403) {
+      return svar({ feil: "Økten gjelder ikke lenger. Logg inn på nytt.", forsok: [forsok] }, 401);
+    }
+    // 404 fra PostgREST betyr som regel at funksjonen ikke er laget enda.
+    if (respons.status === 404) {
+      return svar({
+        feil: "Slettingen er ikke satt opp i Supabase ennå."
+          + " SQL-en står i docs/nokler-og-tokens.md.",
+        forsok: [forsok],
+      }, 503);
+    }
+    console.error("[konto] slett feilet:", respons.status, melding);
+    return svar({ feil: "Fikk ikke slettet kontoen. Prøv igjen om litt.", forsok: [forsok] }, 502);
+  } catch (err) {
+    forsok.utfall = String((err && err.message) || err).slice(0, 80);
+    console.error("[konto] slett feilet:", err);
+    return svar({ feil: "Fikk ikke slettet kontoen. Prøv igjen om litt.", forsok: [forsok] }, 502);
+  }
 }
 
 /* ---------- tjenesten ---------- */

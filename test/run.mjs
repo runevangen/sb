@@ -1604,6 +1604,7 @@ const SAK_18 = await kjor("innlogging", FELLES + `
         }
         return svarMed({ sendt: true });
       }
+      if (inn.handling === "slett") return svarMed({ slettet: true });
       if (inn.handling === "logg-inn") {
         if (inn.kode !== "63738168") {
           return svarMed({ feil: "Koden stemmer ikke, eller den er for gammel." }, 401);
@@ -1709,11 +1710,29 @@ const SAK_18 = await kjor("innlogging", FELLES + `
              document.getElementById("kontoNote").textContent.indexOf("med eller uten konto") > -1,
              document.getElementById("kontoNote").textContent);
 
+          // Sletting er endelig, sa den krever to trykk: det forste sier
+          // hva som kommer til a skje, det andre gjor det.
+          var slett = document.getElementById("kontoSlett");
+          ok("slett-knappen star der nar man er logget inn", !slett.hidden);
+          slett.click();
+          ok("forste trykk sletter ingenting",
+             window.__konto.indexOf("slett") === -1 && !!localStorage.getItem("sb-konto"),
+             window.__konto.join(","));
+          ok("og sier hva som kommer til a skje",
+             slett.textContent.indexOf("kan ikke angres") > -1,
+             slett.textContent);
+
           document.getElementById("kontoUt").click();
           ok("logg ut tommer okta", !localStorage.getItem("sb-konto"));
           ok("og menyen sier logg inn igjen",
              document.getElementById("kontoBtnTekst").textContent === "Logg inn",
              document.getElementById("kontoBtnTekst").textContent);
+          // Logger man ut mens slettingen star og venter pa det andre
+          // trykket, skal den ikke sta klar til a trykke neste gang.
+          ok("utlogging nullstiller slettingen",
+             document.getElementById("kontoSlett").hidden &&
+             document.getElementById("kontoSlett").textContent === "Slett kontoen min",
+             document.getElementById("kontoSlett").textContent);
           ferdig();
         } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
       } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);

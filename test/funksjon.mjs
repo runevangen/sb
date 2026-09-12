@@ -899,6 +899,46 @@ kall = stubSupabase({ msg: "invalid JWT" }, 401);
 r = await konto(kontoBe({ handling: "hvem", token: "gammelt" }));
 ok("en okt som ikke gjelder lenger gir 401", r.status === 401, r.status);
 
+// Sletting av egen konto. Ingen service_role-nokkel finnes her, sa det
+// gar gjennom en databasefunksjon som bare kan slette den okta eier.
+// PostgREST svarer 204 uten kropp pa en void-funksjon. Et Response med
+// 204 kan ikke ha kropp i det hele tatt, sa stubben ma speile det —
+// ellers tester vi noe annet enn virkeligheten.
+function stubTomt(status) {
+  const kall = [];
+  global.fetch = async (url, opsjoner) => {
+    kall.push({ url: String(url), opsjoner: opsjoner || {} });
+    return new Response(null, { status: status || 204 });
+  };
+  return kall;
+}
+
+kall = stubTomt(204);
+r = await konto(kontoBe({ handling: "slett", token: "okt-token-123" }));
+ok("kontoen kan slettes", r.status === 200 && (await r.json()).slettet === true, r.status);
+ok("slettingen gar til databasefunksjonen",
+   kall[0].url.indexOf("/rest/v1/rpc/slett_meg") > -1, kall[0].url);
+ok("og med leserens egen okt — aldri en admin-nokkel",
+   kall[0].opsjoner.headers.Authorization === "Bearer okt-token-123" &&
+   JSON.stringify(kall[0].opsjoner.headers).indexOf("service_role") === -1,
+   JSON.stringify(kall[0].opsjoner.headers));
+
+kall = stubTomt(204);
+r = await konto(kontoBe({ handling: "slett" }));
+ok("uten okt slettes ingenting", r.status === 401 && kall.length === 0,
+   r.status + " " + kall.length);
+
+// Den som setter opp prosjektet trenger a hore nyaktig dette.
+kall = stubSupabase({ message: "Could not find the function" }, 404);
+r = await konto(kontoBe({ handling: "slett", token: "okt-token-123" }));
+ok("uten funksjonen i databasen star det hva som mangler",
+   r.status === 503 && (await r.json()).feil.indexOf("docs/nokler-og-tokens.md") > -1,
+   r.status);
+
+kall = stubSupabase({ message: "JWT expired" }, 401);
+r = await konto(kontoBe({ handling: "slett", token: "gammel" }));
+ok("en utlopt okt sletter ingenting", r.status === 401, r.status);
+
 r = await konto(kontoBe({ handling: "noe-annet", epost: "leser@example.com" }));
 ok("en ukjent handling avvises", r.status === 400, r.status);
 

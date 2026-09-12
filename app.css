@@ -438,6 +438,31 @@ body {
   color: var(--text-dim);
 }
 
+/* Sletting er ikke en handling man skal snuble i: den star som tekst, i
+   dempet farge, til den er trykket en gang — da blir den rod og sier hva
+   den kommer til a gjore. */
+.konto-slett {
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: calc(12px * var(--fs));
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.konto-slett[data-sikker="ja"] {
+  color: #C0392B;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid #C0392B;
+}
+
+.konto-slett[hidden] { display: none; }
+.konto-slett:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 .konto-send:disabled { opacity: 0.45; cursor: default; }
 .konto-send[hidden], .konto-ut[hidden] { display: none; }
 
