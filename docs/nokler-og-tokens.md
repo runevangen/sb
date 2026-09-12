@@ -298,6 +298,38 @@ create policy "slett eget svar" on kampsvar
 `unique (kamp_id, bruker)` er det som gjør at to «jeg blir med» på samme
 kamp er én person og ikke to: funksjonen skriver som en upsert.
 
+#### Sletting av egen konto
+
+Å slette en bruker krever normalt admin-tilgang hos Supabase, og en
+`service_role`-nøkkel som kan slette hvem som helst. Den nøkkelen finnes
+ikke i dette prosjektet, med vilje. I stedet ligger sletteretten i
+databasen, begrenset til den som ber om den:
+
+```sql
+create or replace function public.slett_meg()
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  delete from auth.users where id = auth.uid();
+$$;
+
+revoke all on function public.slett_meg() from public, anon;
+grant execute on function public.slett_meg() to authenticated;
+```
+
+`auth.uid()` er den som er logget inn, og ingen andre. Selv en feil i
+`konto.mjs` kan derfor ikke slette en annens konto — funksjonen tar ikke
+imot noen id.
+
+Radene i `kampsvar` følger med: fremmednøkkelen står med
+`on delete cascade`. En sletting er dermed hel — adressen og navnet
+forsvinner samtidig, og det er det personvernsiden lover.
+
+Uten denne funksjonen svarer `/api/konto` 503 med «Slettingen er ikke
+satt opp i Supabase ennå».
+
 **Navnet i `navn` er synlig for alle** som åpner den kampen i appen —
 det er prisen for at lista kan leses uten konto. E-postadressen er det
 ikke; den ligger bare i `auth.users`. Derfor er feltet «navnet vennene
@@ -418,6 +450,7 @@ Det du ser først, og hva det som regel betyr.
 | Koden avvises (403) selv om den er fersk | koden er lengre enn appen tar imot, eller slås opp med feil type | begge deler er rettet i koden; sjekk «Email OTP Length» i Supabase mot `KODE_MAKS` |
 | «Fikk ikke sendt koden» og ingenting i Resend-loggen | SMTP-påloggingen avvises — som regel `Resend` med stor R | skriv `resend`, lim inn nøkkelen på nytt |
 | «Tabellen «kampsvar» finnes ikke i Supabase ennå» | SQL-en over er ikke kjørt | kjør den i Supabase → SQL Editor |
+| «Slettingen er ikke satt opp i Supabase ennå» | `slett_meg()` er ikke laget | kjør SQL-en for sletting |
 | «Jeg blir med»: «Økten gjelder ikke lenger» | utløpt økt, eller reglene slipper ikke skrivingen gjennom | logg inn på nytt; sjekk policyene |
 | Ingen «blir med»-linje, men ingen feil heller | lista er et tillegg og feiler stille | se `/api/svar?kamper=<id>` i nettleseren |
 | Pubene: «overpass-api.de svarte 406» | ikke en nøkkel — Overpass-tjeneren | som regel forbigående |

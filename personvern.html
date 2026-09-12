@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sportsbibelen — personvern</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #E9F0FA; --kort: #FFFFFF; --ramme: #DCE5F2;
+    --tekst: #16224A; --tekst-dim: #5A6785; --tekst-svak: #8A95AE;
+    --aksent: #2A50D8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 20px 16px 60px; background: var(--bg); color: var(--tekst);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 15px; line-height: 1.6;
+  }
+  main { max-width: 620px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .undertittel { margin: 0 0 20px; color: var(--tekst-dim); font-size: 14px; }
+  section { background: var(--kort); border: 1px solid var(--ramme); border-radius: 10px; padding: 16px 18px; margin-bottom: 14px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tekst-dim); margin: 0 0 10px; }
+  p { margin: 0 0 10px; }
+  p:last-child { margin-bottom: 0; }
+  ul { margin: 0 0 10px; padding-left: 20px; }
+  li { margin-bottom: 6px; }
+  a { color: var(--aksent); }
+  .sterk { font-weight: 600; }
+  .dim { color: var(--tekst-dim); font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 8px 7px 0; border-bottom: 1px solid var(--ramme); vertical-align: top; }
+  th { color: var(--tekst-dim); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  tr:last-child td { border-bottom: 0; }
+  .tilbake { display: inline-block; margin-top: 18px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Personvern</h1>
+  <p class="undertittel">Hva Sportsbibelen lagrer om deg, og hvordan du blir kvitt det.
+    Sist endret 12. september 2026.</p>
+
+  <section>
+    <h2>Kort fortalt</h2>
+    <p><span class="sterk">Leser du appen, lagrer vi ingenting om deg.</span>
+      Ingen sporing, ingen informasjonskapsler, ingen statistikk, ingen
+      samtykkebanner — fordi det ikke er noe å samtykke til. Nyheter,
+      fotballtabell, kamper, puber og vær virker uten konto.</p>
+    <p><span class="sterk">Logger du inn, lagrer vi to ting:</span>
+      e-postadressen din, og fornavnet du selv skriver når du sier at du
+      blir med på en kamp. Ikke noe mer.</p>
+  </section>
+
+  <section>
+    <h2>Hva som lagres, hvor, og hvor lenge</h2>
+    <table>
+      <tr>
+        <th>Opplysning</th><th>Hvor</th><th>Hvor lenge</th>
+      </tr>
+      <tr>
+        <td>E-postadressen din</td>
+        <td>Supabase, EU</td>
+        <td>Til du sletter kontoen</td>
+      </tr>
+      <tr>
+        <td>Navnet du skriver på «jeg blir med»</td>
+        <td>Supabase, EU</td>
+        <td>Til du fjerner svaret, eller sletter kontoen</td>
+      </tr>
+      <tr>
+        <td>Innloggingen din (økten)</td>
+        <td>Bare i din egen nettleser</td>
+        <td>Til den utløper, eller du logger ut</td>
+      </tr>
+      <tr>
+        <td>Favorittlag, puber og visningsvalg</td>
+        <td>Bare i din egen nettleser</td>
+        <td>Til du tømmer nettleseren</td>
+      </tr>
+    </table>
+    <p class="dim">Det siste punktet har aldri vært innom oss i det hele
+      tatt — det ligger lokalt, og forsvinner med nettleserdataene dine.</p>
+  </section>
+
+  <section>
+    <h2>Navnet er synlig for andre</h2>
+    <p>Skriver du at du blir med på en kamp, står fornavnet ditt under den
+      kampen for alle som åpner den — også for dem uten konto. Det er
+      med vilje: lista skal kunne leses av vennene dine uten at de må
+      lage seg noe. Derfor er feltet «navnet vennene ser», og derfor
+      holder fornavn.</p>
+    <p><span class="sterk">E-postadressen din vises aldri</span> — ikke
+      for andre lesere, ikke i lista, ikke noe sted i appen.</p>
+  </section>
+
+  <section>
+    <h2>Hvem andre er involvert</h2>
+    <ul>
+      <li><span class="sterk">Supabase</span> (EU) lagrer adressen og
+        svarene, og utsteder innloggingen.</li>
+      <li><span class="sterk">Resend</span> (USA) sender e-posten med
+        engangskoden. De ser adressen din for å kunne levere den.</li>
+      <li><span class="sterk">Netlify</span> serverer selve appen.</li>
+    </ul>
+    <p>Appen henter dessuten fotballdata, vær og kart-treff fra API-Football,
+      TheSportsDB, MET Norway, Entur og OpenStreetMap. Ingen av dem får
+      vite hvem du er. Det ene unntaket er pubsøket «nær deg»: da går
+      posisjonen din — avrundet til omtrent hundre meter — fra
+      nettleseren din rett til OpenStreetMap, uten å innom oss. Det står
+      også i appen, der du trykker.</p>
+  </section>
+
+  <section>
+    <h2>Slik sletter du</h2>
+    <p>Åpne menyen i appen, trykk på adressen din øverst, og velg
+      <span class="sterk">Slett kontoen min</span>. Du må trykke to
+      ganger — den andre gangen står det hva som forsvinner.</p>
+    <p>Da slettes adressen din og alle «jeg blir med»-svarene dine, med
+      en gang og for godt. Det finnes ingen kopi hos oss å be om.</p>
+    <p>Vil du bare fjerne ett svar, åpner du kampen og trykker
+      «Jeg blir ikke med likevel».</p>
+  </section>
+
+  <section>
+    <h2>Spørsmål</h2>
+    <p>Ta kontakt via <a href="https://sportsbibelen.no">sportsbibelen.no</a>.</p>
+  </section>
+
+  <a class="tilbake" href="/">← Tilbake til appen</a>
+</main>
+</body>
+</html>
