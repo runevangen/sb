@@ -431,7 +431,10 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   der det første ble avvist — en tjenestefeil (5xx) eller en sperre (429)
   gir aldri et kall til.
 - Feil kode og utløpt kode får samme svar. At en kode fantes, er i seg
-  selv noe om adressen. Av samme grunn svarer bestillingen likt enten
+  selv noe om adressen. Tjenestens egen melding følger likevel med i
+  `forsok`: den skiller ikke på de to tilfellene — det er samme setning
+  begge veier — men den sier hvilke typer som ble prøvd og om
+  avvisningen kom fra `verify` i det hele tatt. Av samme grunn svarer bestillingen likt enten
   adressen finnes fra før eller ikke — ellers er innloggingen et
   oppslagsverk over hvem som bruker appen.
 - Økten ligger i `localStorage` (`sb-konto`) med et utløpstidspunkt, ikke
@@ -488,7 +491,7 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 ## Testing
 
     node test/unit.mjs      350 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  174 tester, ~250 ms, ingen nettleser
+    node test/funksjon.mjs  176 tester, ~250 ms, ingen nettleser
     node test/run.mjs       267 tester, ~170 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da

@@ -852,6 +852,15 @@ ok("feil kode gir 401 uten a rope noe", r.status === 401 &&
 // En kode som er feil, er feil begge veier — og da er begge forsokene brukt.
 ok("en avvist kode provers begge veier for den gis opp", kall.length === 2,
    kall.length);
+// Meldingen skiller ikke pa feil og utlopt kode, sa den roper ingenting
+// om adressen — men den sier hva som faktisk ble prov d.
+ok("tjenestens egen melding folger med avvisningen",
+   (feilKode.forsok || []).length === 2 &&
+   feilKode.forsok[0].melding.indexOf("Token has expired") > -1,
+   JSON.stringify(feilKode.forsok));
+ok("og den royper ikke adressen",
+   JSON.stringify(feilKode).indexOf("leser@example.com") === -1,
+   JSON.stringify(feilKode));
 
 r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123" }));
 ok("en kode som ikke er seks siffer stoppes her", r.status === 400, r.status);

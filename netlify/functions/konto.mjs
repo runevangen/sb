@@ -109,7 +109,13 @@ async function loggInn(inn) {
       console.error("[konto] verify feilet:", r.status, r.melding);
       return svar({ feil: "Innloggingen svarte ikke. Prøv igjen om litt.", forsok: r.forsok }, 502);
     }
-    return svar({ feil: "Koden stemmer ikke, eller den er for gammel." }, 401);
+    // Tjenestens egen melding folger med. Den skiller ikke pa feil og
+    // utlopt kode — det er samme setning begge veier — sa den roper
+    // ingenting om adressen. Men den skiller pa om avvisningen kom fra
+    // verify i det hele tatt, og hvilke typer som ble prov d, og det er
+    // forskjellen pa a lete og a vite.
+    return svar({ feil: "Koden stemmer ikke, eller den er for gammel.",
+      forsok: r.forsok }, 401);
   }
 
   let okt;
