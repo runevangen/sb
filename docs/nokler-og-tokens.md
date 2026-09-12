@@ -210,13 +210,25 @@ flytter pa disse sidene fra tid til annen — leter du, er det siden med
 | --- | --- |
 | Host | `smtp.resend.com` |
 | Port | `587` |
-| Username | `resend` |
+| Username | `resend` — **sma bokstaver** |
 | Password | API-nøkkelen (`re_…`) |
 | Sender email | en adresse på det verifiserte domenet, eller `onboarding@resend.dev` |
 | Sender name | `Sportsbibelen` |
 
 Feltnavnene kan ha flyttet seg siden dette ble skrevet (12. september
 2026); formen er den samme.
+
+**Brukernavnet er versalfølsomt, og det kostet en ettermiddag.** Skrevet
+som `Resend` — med stor R, slik en autoutfylling eller en vanlig
+skrivemåte gjerne gir — avvises påloggingen hver gang, og det eneste
+sporet er at ingenting dukker opp i Resend sin egen e-postlogg. Det er
+samme felle som for miljøvariablene, i et felt man ikke tenker på som en
+nøkkel. Står det `resend` og det fortsatt feiler, lim inn API-nøkkelen
+på nytt: den er maskert, så en avkortet nøkkel ser helt riktig ut.
+
+*Minimum interval per user* står som standard på 60 sekunder. Prøver du
+igjen med en gang etter en retting, blir forsøket avvist av den grunnen
+i stedet — og det ser ut som om rettingen ikke virket. Vent et minutt.
 
 **To ting som følger med:**
 
@@ -403,6 +415,7 @@ Det du ser først, og hva det som regel betyr.
 | Innlogging: «For mange forsøk» (429) | Supabase sperrer e-postsending en stund | vent et minutt |
 | Innlogging: «Fikk ikke sendt koden» | se `forsok` i svaret fra `/api/konto` | som regel feil `SUPABASE_URL` |
 | E-posten har en lenke, ingen kode | malene er låst til egen SMTP er satt opp | se avsnittet over |
+| «Fikk ikke sendt koden» og ingenting i Resend-loggen | SMTP-påloggingen avvises — som regel `Resend` med stor R | skriv `resend`, lim inn nøkkelen på nytt |
 | «Tabellen «kampsvar» finnes ikke i Supabase ennå» | SQL-en over er ikke kjørt | kjør den i Supabase → SQL Editor |
 | «Jeg blir med»: «Økten gjelder ikke lenger» | utløpt økt, eller reglene slipper ikke skrivingen gjennom | logg inn på nytt; sjekk policyene |
 | Ingen «blir med»-linje, men ingen feil heller | lista er et tillegg og feiler stille | se `/api/svar?kamper=<id>` i nettleseren |
