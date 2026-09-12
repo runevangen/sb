@@ -19,6 +19,9 @@ import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
 import { normaliserEpost, gyldigEpost, normaliserKode, gyldigKode, maskerEpost,
          oktUtloper, oktGyldig, tolkOkt } from "../konto-data.js";
 
+import { normaliserPinNavn, pinSlug, gyldigPinNavn, pinEpost, normaliserPin, gyldigPin,
+         pinPassord, tolkPinOkt, PIN_MIN, PIN_MAKS, PIN_DOMENE } from "../pin-data.js";
+
 import { normaliserNavn, gyldigNavn, svarRad, tolkSvar, perKamp, blirMedTekst,
          svartekst, egetSvar, NAVN_MAKS } from "../svar-data.js";
 
@@ -1000,6 +1003,83 @@ ok("en okt uten adresse kastes ogsa",
    kaster(() => tolkOkt({ access_token: "t" }, KONTO_NAA)));
 ok("uten levetid far okta en kort en",
    tolkOkt({ access_token: "t", user: { email: "a@b.no" } }, KONTO_NAA).utloper ===
+   "2026-09-11T13:00:00.000Z");
+
+// En okt som ikke sier hvem du er, har menyen ingenting a skrive av.
+ok("en okt uten navn og uten adresse gjelder ikke",
+   !oktGyldig({ token: "t", utloper: GYLDIG.utloper }, KONTO_NAA) &&
+   !oktGyldig({ token: "t", navn: "   ", utloper: GYLDIG.utloper }, KONTO_NAA));
+// E-postinnloggingen er parkert pa en gren, men okta den lagde ligger
+// fortsatt i telefoner som har brukt den.
+ok("en okt med navn gjelder, og en med adresse gjor det fortsatt",
+   oktGyldig({ token: "t", navn: "Ola", utloper: GYLDIG.utloper }, KONTO_NAA) &&
+   oktGyldig(GYLDIG, KONTO_NAA));
+
+/* ---------------- innlogging med fornavn og PIN ---------------- */
+
+ok("navnet renses for det blir en konto",
+   normaliserPinNavn("  Ola   Kari \n") === "Ola Kari", normaliserPinNavn("  Ola   Kari \n"));
+ok("et altfor langt fornavn kappes", normaliserPinNavn("A".repeat(80)).length === 24);
+
+// Slugen er nokkelen til kontoen. Skrives navnet annerledes pa neste
+// telefon, ma det likevel bli samme konto — ellers mister man svarene
+// sine ved a skrive «ola» i stedet for «Ola».
+ok("samme navn gir samme nokkel uansett skrivemate",
+   pinSlug("Ola") === "ola" && pinSlug("  OLA ") === "ola" && pinSlug("oLa") === "ola");
+// Foldingen skjer for tegnene strippes. Uten den ville «Bjorn» og
+// «Bjørn» blitt «bjrn» begge to — to ulike navn, en konto.
+ok("norske bokstaver foldes framfor a forsvinne",
+   pinSlug("Bjørn") === "bjoern" && pinSlug("Åge") === "aage" && pinSlug("Kjærsti") === "kjaersti",
+   pinSlug("Bjørn") + "," + pinSlug("Åge") + "," + pinSlug("Kjærsti"));
+ok("og «Bjorn» og «Bjørn» blir ikke samme konto", pinSlug("Bjorn") !== pinSlug("Bjørn"));
+ok("aksenter foldes ogsa", pinSlug("Renée") === "renee", pinSlug("Renée"));
+ok("tegnsetting og mellomrom faller bort", pinSlug("Ola-Kari") === "olakari",
+   pinSlug("Ola-Kari"));
+
+// En tom nokkel ville vaert alles konto.
+ok("et navn som bare er tegnsetting er ikke et navn",
+   !gyldigPinNavn("•••") && !gyldigPinNavn("") && !gyldigPinNavn(null) && !gyldigPinNavn("  "));
+ok("ett tegn er for lite, to er nok", !gyldigPinNavn("J") && gyldigPinNavn("Jo"));
+
+ok("navnet blir en adresse pa vart eget domene",
+   pinEpost("Bjørn Åge") === "bjoernaage@" + PIN_DOMENE, pinEpost("Bjørn Åge"));
+
+ok("PIN-en renses", normaliserPin(" 12 34 ") === "1234", normaliserPin(" 12 34 "));
+ok("fire siffer er en PIN", gyldigPin("1234") && gyldigPin("12 34"));
+ok("seks siffer er ogsa en PIN", gyldigPin("123456"));
+ok("tre er for fa", !gyldigPin("123") && !gyldigPin("") && !gyldigPin(null));
+ok("og over spennet kappes", normaliserPin("12345678") === "123456" &&
+   PIN_MIN === 4 && PIN_MAKS === 6);
+ok("bokstaver i PIN-feltet er ikke en PIN", !gyldigPin("abcd"));
+
+// Passordet hos tjenesten er PIN-en pluss et pepper bare funksjonen
+// kjenner. To grunner: fire siffer er 10 000 forsok mot Supabase sitt
+// eget endepunkt, og Supabase krever minst seks tegn i et passord.
+ok("passordet er PIN-en pluss pepperet", pinPassord("1234", "hemmelig") === "1234:hemmelig",
+   pinPassord("1234", "hemmelig"));
+ok("og er langt nok for Supabase selv med en PIN pa fire",
+   pinPassord("1234", "hemmelig").length >= 6);
+ok("pepperet gjor to like PIN-er ulike passord",
+   pinPassord("1234", "a") !== pinPassord("1234", "b"));
+
+ok("svaret fra tjenesten formes til en okt med navn",
+   JSON.stringify(tolkPinOkt({ access_token: "t", expires_in: 3600,
+     user: { email: "ola@" + PIN_DOMENE, id: "u-1" } }, "  Ola  ", KONTO_NAA)) ===
+   JSON.stringify({ token: "t", navn: "Ola", bruker: "u-1",
+     utloper: "2026-09-11T13:00:00.000Z" }),
+   JSON.stringify(tolkPinOkt({ access_token: "t", expires_in: 3600,
+     user: { email: "ola@" + PIN_DOMENE, id: "u-1" } }, "  Ola  ", KONTO_NAA)));
+// Adressen vi lagde av navnet er en nokkel, ikke noe a vise noen.
+ok("okta barer ikke adressen vi lagde",
+   JSON.stringify(tolkPinOkt({ access_token: "t", user: { email: "ola@" + PIN_DOMENE } },
+     "Ola", KONTO_NAA)).indexOf(PIN_DOMENE) === -1);
+// En halv okt ville sett ut som innlogget helt til forste kall feilet.
+ok("en okt uten token kastes framfor a gis ut",
+   kaster(() => tolkPinOkt({ user: { id: "u-1" } }, "Ola", KONTO_NAA)));
+ok("en okt uten navn kastes ogsa",
+   kaster(() => tolkPinOkt({ access_token: "t" }, "•", KONTO_NAA)));
+ok("uten levetid far ogsa PIN-okta en kort en",
+   tolkPinOkt({ access_token: "t" }, "Ola", KONTO_NAA).utloper ===
    "2026-09-11T13:00:00.000Z");
 
 /* ---------------- hvem blir med ---------------- */

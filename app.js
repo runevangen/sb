@@ -7,8 +7,9 @@ import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug, ranger
   from "./lib.js";
 import { LIGAER, tolkFotballHash, fotballHash, tolkKamplenke } from "./fotball-data.js";
 import { ofteBrukt, noterPub } from "./pub-data.js";
-import { gyldigEpost, normaliserEpost, normaliserKode, gyldigKode, maskerEpost, oktGyldig }
-  from "./konto-data.js";
+import { maskerEpost, oktGyldig } from "./konto-data.js";
+import { normaliserPinNavn, gyldigPinNavn, normaliserPin, gyldigPin, PIN_MIN }
+  from "./pin-data.js";
 import { normaliserNavn } from "./svar-data.js";
 import { initFotball, visFotball } from "./fotball.js";
 
@@ -823,11 +824,19 @@ function noterDinPub(navn) {
   track("Pub delt", { pub: String(navn).slice(0, 40) });
 }
 
-// Navnet vennene ser nar du blir med pa en kamp. Ikke e-postadressen:
-// den er var, ikke deres. Det ligger med visningsvalgene, ikke i okta —
-// da star det der ogsa neste gang, uten et kall.
+// Navnet vennene ser nar du blir med pa en kamp. Det ligger med
+// visningsvalgene, ikke i okta — da star det der ogsa neste gang, uten
+// et kall.
+//
+// Men fornavnet du logget inn med er alt det navnet: PIN-innloggingen
+// ber om nyaktig det samme. Star det ingenting lagret, star derfor
+// kontonavnet der ferdig, sa den som nettopp logget inn ikke skriver
+// navnet sitt to ganger. Skriver hen noe annet, vinner det — det er
+// lagret med vilje, og feltet er fortsatt sannheten.
 function svarNavn() {
-  return normaliserNavn(prefs.svarnavn || "");
+  const lagret = normaliserNavn(prefs.svarnavn || "");
+  if (lagret) return lagret;
+  return normaliserNavn((kontoOkt && kontoOkt.navn) || "");
 }
 
 function settSvarNavn(navn) {
@@ -1268,24 +1277,24 @@ document.getElementById("menuClose").addEventListener("click", closeMenu);
 // her sa du slipper a logge inn ved hver apning.
 const KONTO_KEY = "sb-konto";
 
-// Hva innlogging er, sagt likt i alle tre tilstandene. Appen skal leses
-// og fotballen folges uten konto — innlogging er for det som gar til
-// noen andre: a dele hvor du ser kampen, og a ta med favorittlagene
-// mellom telefoner. Star det ikke her, tror leseren at knappen er en
-// port.
+// Hva innlogging er, sagt likt i begge tilstandene. Appen skal leses og
+// fotballen folges uten konto — innlogging er for det som gar til noen
+// andre: a dele hvor du ser kampen, og a ta med favorittlagene mellom
+// telefoner. Star det ikke her, tror leseren at knappen er en port.
+//
+// Fornavn og PIN, ikke engangskode pa e-post: koden krever en avsender pa
+// et verifisert domene, og domenet er ikke kjopt enda. E-postinnloggingen
+// star komplett pa grenen `epost-innlogging`.
 const KONTO_TEKST = {
-  epost: "Du trenger ikke konto for å lese eller følge fotballen — alt det"
+  ute: "Du trenger ikke konto for å lese eller følge fotballen — alt det"
     + " virker uten. Innlogging er for å dele hvor du ser kampen, og for å"
-    + " ta med favorittlagene dine mellom telefoner. Vi sender en engangskode"
-    + " på e-post; adressen er det eneste vi lagrer om deg.",
-  kode: "Skriv sifrene fra e-posten. Koden varer en liten stund; kom den"
-    + " ikke, se i søppelposten.",
+    + " ta med favorittlagene dine mellom telefoner. Velg et fornavn og en"
+    + " PIN: de to er kontoen din, og fornavnet er det vennene ser.",
   inne: "Du er logget inn. Deling av kamper og favoritter kommer hit først."
     + " Resten av appen virker som før, med eller uten konto.",
 };
 
 let kontoOkt = lesKonto();
-let kontoSteg = "epost";
 let kontoOppsett = null;
 
 function lesKonto() {
@@ -1319,21 +1328,24 @@ function kontoSvar(tekst) {
   document.getElementById("kontoSvar").textContent = tekst || "";
 }
 
-// Menyen viser hvem du er, ikke bare at du er noen: maskert, fordi
-// appen leses i en sofa med flere i.
+// Menyen viser hvem du er, ikke bare at du er noen. Med PIN er det
+// fornavnet — det samme navnet vennene ser i «blir med»-lista, sa de to
+// ikke kan bli to ulike ting. En okt fra e-postinnloggingen kan ligge
+// igjen i en telefon; da star adressen maskert, som for, fordi appen
+// leses i en sofa med flere i.
 function visKonto() {
   const tekst = document.getElementById("kontoBtnTekst");
-  const epost = document.getElementById("kontoEpost");
-  const kode = document.getElementById("kontoKode");
+  const navn = document.getElementById("kontoNavn");
+  const pin = document.getElementById("kontoPin");
   const send = document.getElementById("kontoSend");
   const ut = document.getElementById("kontoUt");
   const slett = document.getElementById("kontoSlett");
   const note = document.getElementById("kontoNote");
 
   if (kontoOkt) {
-    tekst.textContent = maskerEpost(kontoOkt.epost);
-    epost.hidden = true;
-    kode.hidden = true;
+    tekst.textContent = kontoOkt.navn || maskerEpost(kontoOkt.epost);
+    navn.hidden = true;
+    pin.hidden = true;
     send.hidden = true;
     ut.hidden = false;
     slett.hidden = false;
@@ -1347,11 +1359,10 @@ function visKonto() {
   slett.dataset.sikker = "nei";
   slett.textContent = "Slett kontoen min";
   send.hidden = false;
-  epost.hidden = false;
-  kode.hidden = kontoSteg !== "kode";
-  send.textContent = kontoSteg === "kode" ? "Logg inn" : "Send kode";
-  epost.disabled = kontoSteg === "kode";
-  note.textContent = kontoSteg === "kode" ? KONTO_TEKST.kode : KONTO_TEKST.epost;
+  navn.hidden = false;
+  pin.hidden = false;
+  send.textContent = "Logg inn";
+  note.textContent = KONTO_TEKST.ute;
 }
 
 // Oppsettet sjekkes nar panelet apnes, ikke nar leseren trykker Send:
@@ -1392,10 +1403,11 @@ async function kontoKall(kropp) {
   return data;
 }
 
-// «Fikk ikke sendt koden» alene sender leseren — og den som satte opp
-// tjenesten — ut på leting i et panel som ikke sier noe. Funksjonen
-// bærer tjenestens egen melding i `forsok`, så den settes inn her, som i
-// pubforslagene. Ingen nøkkel og ingen adresser ligger i `forsok`.
+// «Navnet eller PIN-en stemmer ikke» alene sender leseren — og den som
+// satte opp tjenesten — ut på leting i et panel som ikke sier noe.
+// Funksjonen bærer tjenestens egen melding i `forsok`, så den settes inn
+// her, som i pubforslagene. Verken pepperet, nøkkelen eller adressen vi
+// lager av navnet ligger i `forsok`.
 function tjenestenSa(data) {
   const sist = ((data && data.forsok) || []).filter(Boolean).pop();
   if (!sist) return "";
@@ -1405,42 +1417,36 @@ function tjenestenSa(data) {
     (detalj ? (sist.status ? ": " : "") + detalj : "") + ")";
 }
 
+// Ett trykk, to felt. Ingen mellomsteg: er navnet nytt, lages kontoen av
+// funksjonen i samme kall — leseren skal ikke trenge a vite om hen
+// registrerer seg eller logger inn.
 async function kontoSteget() {
   const send = document.getElementById("kontoSend");
-  const feltEpost = document.getElementById("kontoEpost");
-  const feltKode = document.getElementById("kontoKode");
-  const epost = normaliserEpost(feltEpost.value);
+  const feltNavn = document.getElementById("kontoNavn");
+  const feltPin = document.getElementById("kontoPin");
+  const navn = normaliserPinNavn(feltNavn.value);
+  const pin = normaliserPin(feltPin.value);
 
-  if (!gyldigEpost(epost)) {
-    kontoSvar("Skriv en e-postadresse.");
-    feltEpost.focus();
+  if (!gyldigPinNavn(navn)) {
+    kontoSvar("Skriv fornavnet ditt.");
+    feltNavn.focus();
+    return;
+  }
+  if (!gyldigPin(pin)) {
+    kontoSvar("PIN-en er minst " + PIN_MIN + " siffer.");
+    feltPin.focus();
     return;
   }
 
   send.disabled = true;
   try {
-    if (kontoSteg === "epost") {
-      await kontoKall({ handling: "kode", epost });
-      kontoSteg = "kode";
-      visKonto();
-      kontoSvar("Koden er sendt til " + maskerEpost(epost) + ".");
-      feltKode.focus();
-      track("Kode sendt");
-      return;
-    }
-
-    const kode = normaliserKode(feltKode.value);
-    if (!gyldigKode(kode)) {
-      kontoSvar("Skriv sifrene fra e-posten.");
-      feltKode.focus();
-      return;
-    }
-    const okt = await kontoKall({ handling: "logg-inn", epost, kode });
+    const okt = await kontoKall({ handling: "logg-inn", navn, pin });
     lagreKonto(okt);
-    kontoSteg = "epost";
-    feltKode.value = "";
+    // PIN-en skal ikke sta igjen i feltet. Navnet blir staende: det er
+    // ikke hemmelig, og det er greit a se hvem man er logget inn som.
+    feltPin.value = "";
     visKonto();
-    kontoSvar("Logget inn.");
+    kontoSvar("Logget inn som " + (okt.navn || navn) + ".");
     track("Logget inn");
   } catch (err) {
     kontoSvar(err.message);
@@ -1451,9 +1457,7 @@ async function kontoSteget() {
 
 function loggUt() {
   lagreKonto(null);
-  kontoSteg = "epost";
-  document.getElementById("kontoEpost").value = "";
-  document.getElementById("kontoKode").value = "";
+  document.getElementById("kontoPin").value = "";
   visKonto();
   kontoSvar("Logget ut.");
   track("Logget ut");
@@ -1469,7 +1473,7 @@ document.getElementById("kontoBtn").addEventListener("click", () => {
   kontoSvar("");
   visKonto();
   sjekkKontoOppsett();
-  if (!kontoOkt) document.getElementById("kontoEpost").focus();
+  if (!kontoOkt) document.getElementById("kontoNavn").focus();
 });
 
 document.getElementById("kontoSend").addEventListener("click", kontoSteget);
@@ -1483,7 +1487,8 @@ document.getElementById("kontoSlett").addEventListener("click", async () => {
   if (knapp.dataset.sikker !== "ja") {
     knapp.dataset.sikker = "ja";
     knapp.textContent = "Ja, slett alt. Dette kan ikke angres";
-    kontoSvar("Adressen din og alle «jeg blir med» forsvinner. Trykk en gang til.");
+    kontoSvar("Fornavnet ditt og alle «jeg blir med» forsvinner, og navnet"
+      + " blir ledig for andre. Trykk en gang til.");
     return;
   }
 
@@ -1491,9 +1496,8 @@ document.getElementById("kontoSlett").addEventListener("click", async () => {
   try {
     await kontoKall({ handling: "slett", token: kontoOkt && kontoOkt.token });
     lagreKonto(null);
-    kontoSteg = "epost";
-    document.getElementById("kontoEpost").value = "";
-    document.getElementById("kontoKode").value = "";
+    document.getElementById("kontoNavn").value = "";
+    document.getElementById("kontoPin").value = "";
     visKonto();
     kontoSvar("Kontoen er slettet.");
     track("Konto slettet");
@@ -1505,7 +1509,7 @@ document.getElementById("kontoSlett").addEventListener("click", async () => {
 });
 // Enter i et felt skal gjore det samme som knappen: feltene ligger ikke i
 // et skjema, fordi et skjema i menyen ville sendt sokeskjemaet.
-["kontoEpost", "kontoKode"].forEach((id) => {
+["kontoNavn", "kontoPin"].forEach((id) => {
   document.getElementById(id).addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); kontoSteget(); }
   });

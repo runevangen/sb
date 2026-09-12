@@ -893,8 +893,11 @@ function blirMedDel(kamp, lesHvor, lesSted) {
   const okt = konto.okt();
 
   if (!okt) {
+    // Fornavn og PIN star med: den som leser dette skal vite at det koster
+    // to felt, ikke en e-post og en kode.
     boks.appendChild(el("p", "kamp-note",
-      "Logg inn i menyen for å si at du blir med. Å dele kampen virker uansett."));
+      "Logg inn i menyen — et fornavn og en PIN — for å si at du blir med."
+      + " Å dele kampen virker uansett."));
     return boks;
   }
 

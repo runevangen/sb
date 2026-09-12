@@ -3,6 +3,13 @@
 // begge sider er enige om hva en gyldig adresse, en gyldig kode og en
 // utlopt okt er. Blir de uenige, far leseren «feil kode» pa en kode som
 // stemmer.
+//
+// Appen logger na inn med fornavn og PIN (pin-data.js). Adressen og
+// engangskoden star igjen her med vilje: e-postinnloggingen er parkert
+// pa grenen `epost-innlogging`, ikke kastet, og skal hentes fram nar
+// avsenderdomenet er kjopt. Enhetstestene dekker begge halvdeler, sa det
+// som star her er fortsatt holdt i orden. `oktGyldig` og `oktUtloper`
+// brukes av begge veier.
 
 // Supabase lar deg stille lengden pa engangskoden (Authentication →
 // Rate Limits → «Email OTP Length»), og standarden er ikke den samme i
@@ -66,9 +73,16 @@ export function oktUtloper(sekunder, naa = Date.now()) {
 // telefonen la i lomma. Uten et gyldig utlopstidspunkt regnes den som
 // utlopt — en okt vi ikke vet levetiden pa, er ikke en okt vi skal
 // stole pa.
+//
+// Okta ma ogsa si hvem du er, sa menyen kan vise det: et navn (PIN-
+// innloggingen) eller en adresse (e-postinnloggingen, som ligger pa
+// grenen `epost-innlogging`). En okt som bare er et token ser ut som
+// innlogget uten a vaere noen, og da har menyen ingenting a skrive.
 export function oktGyldig(okt, naa = Date.now()) {
   if (!okt || typeof okt !== "object") return false;
-  if (!okt.token || !gyldigEpost(okt.epost)) return false;
+  if (!okt.token) return false;
+  const navn = typeof okt.navn === "string" ? okt.navn.trim() : "";
+  if (!navn && !gyldigEpost(okt.epost)) return false;
 
   const utloper = Date.parse(okt.utloper);
   return !Number.isNaN(utloper) && utloper > naa;

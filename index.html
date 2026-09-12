@@ -18,7 +18,7 @@
   ingen informasjonskapsler, ingen samtykkebanner. Bruken leses av
   Usage-grafen i Netlify, som er grov men gratis.
 
-  track() i app.js star igjen som en tom skall-funksjon, sa de seksten
+  track() i app.js star igjen som en tom skall-funksjon, sa de femten
   hendelsene appen allerede sender fortsatt finnes i koden. Skal de samles
   inn, er det ett skript her og null endringer der.
 -->
@@ -94,15 +94,18 @@
           <p class="konto-note" id="kontoNote">Du trenger ikke konto for å lese
             eller følge fotballen — alt det virker uten. Innlogging er for å dele
             hvor du ser kampen, og for å ta med favorittlagene dine mellom
-            telefoner. Vi sender en engangskode på e-post; adressen er det eneste
-            vi lagrer om deg.</p>
-          <input class="konto-felt" id="kontoEpost" type="email" inputmode="email"
-                 autocomplete="email" placeholder="E-postadresse"
-                 aria-label="E-postadresse" maxlength="254">
-          <input class="konto-felt" id="kontoKode" type="text" inputmode="numeric"
-                 autocomplete="one-time-code" placeholder="Koden fra e-posten"
-                 aria-label="Koden fra e-posten" maxlength="10" hidden>
-          <button class="konto-send" id="kontoSend" type="button">Send kode</button>
+            telefoner. Velg et fornavn og en PIN: de to er kontoen din, og
+            fornavnet er det vennene ser.</p>
+          <!-- autocomplete="username" og "current-password": paret fornavn
+               + PIN er innloggingen, sa telefonen skal kunne tilby a huske
+               den. Ett trykk framfor a taste fornavnet pa nytt hver gang. -->
+          <input class="konto-felt" id="kontoNavn" type="text"
+                 autocomplete="username" placeholder="Fornavn"
+                 aria-label="Fornavnet vennene ser" maxlength="24">
+          <input class="konto-felt" id="kontoPin" type="password" inputmode="numeric"
+                 autocomplete="current-password" placeholder="PIN (4 siffer)"
+                 aria-label="PIN-koden din" maxlength="6">
+          <button class="konto-send" id="kontoSend" type="button">Logg inn</button>
           <button class="konto-ut" id="kontoUt" type="button" hidden>Logg ut</button>
           <button class="konto-slett" id="kontoSlett" type="button" hidden>Slett kontoen min</button>
           <p class="konto-svar" id="kontoSvar" aria-live="polite"></p>

@@ -1579,7 +1579,7 @@ const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
 `);
 
-/* ---------------- 18. innlogging ---------------- */
+/* ---------------- 18. innlogging med fornavn og PIN ---------------- */
 
 const SAK_18 = await kjor("innlogging", FELLES + `
   var saker = lagSaker(12);
@@ -1594,22 +1594,19 @@ const SAK_18 = await kjor("innlogging", FELLES + `
       var inn = o && o.body ? JSON.parse(o.body) : null;
       window.__konto.push(inn ? inn.handling : "oppsett");
       if (!inn) return svarMed({ klar: true, mangler: [] });
-      if (inn.handling === "kode") {
-        // Én bestilling feiler med vilje, sa vi ser at tjenestens egen
-        // melding nar fram til leseren.
-        if (inn.epost === "feil@example.no") {
-          return svarMed({ feil: "Fikk ikke sendt koden. Prøv igjen om litt.",
-            forsok: [{ kilde: "Supabase Auth", status: 500,
-              melding: "Error sending confirmation email" }] }, 502);
-        }
-        return svarMed({ sendt: true });
-      }
       if (inn.handling === "slett") return svarMed({ slettet: true });
       if (inn.handling === "logg-inn") {
-        if (inn.kode !== "63738168") {
-          return svarMed({ feil: "Koden stemmer ikke, eller den er for gammel." }, 401);
+        // «Ola» er tatt av en annen Ola. Det skal sies rett ut, med
+        // tjenestens egen melding i parentes etter.
+        if (inn.navn === "Ola") {
+          return svarMed({ feil: "«Ola» er tatt. Er PIN-en feil, eller skal du velge et annet navn?",
+            forsok: [{ kilde: "Supabase Auth", status: 400,
+              melding: "User already registered" }] }, 401);
         }
-        return svarMed({ token: "okt-123", epost: inn.epost,
+        if (inn.pin !== "1234") {
+          return svarMed({ feil: "Navnet eller PIN-en stemmer ikke." }, 401);
+        }
+        return svarMed({ token: "okt-123", navn: inn.navn, bruker: "u-1",
           utloper: new Date(Date.now() + 3600000).toISOString() });
       }
       return svarMed({ feil: "Ukjent handling" }, 400);
@@ -1622,6 +1619,8 @@ const SAK_18 = await kjor("innlogging", FELLES + `
     document.getElementById("menuBtn").click();
     var knapp = document.getElementById("kontoBtn");
     var panel = document.getElementById("kontoPanel");
+    var feltNavn = document.getElementById("kontoNavn");
+    var feltPin = document.getElementById("kontoPin");
     ok("menyen har en innlogging", knapp.textContent.indexOf("Logg inn") > -1, knapp.textContent);
     ok("panelet er lukket til man trykker", panel.hidden);
     // Ingenting er last bak innloggingen: feeden star ferdig for noen har
@@ -1632,78 +1631,90 @@ const SAK_18 = await kjor("innlogging", FELLES + `
 
     knapp.click();
     ok("trykk apner panelet", !panel.hidden && knapp.getAttribute("aria-expanded") === "true");
-    // Leseren skal vite hva som lagres for hen skriver adressen, ikke etterpa.
-    ok("det star hva vi lagrer",
-       document.getElementById("kontoNote").textContent.indexOf("det eneste vi lagrer") > -1,
-       document.getElementById("kontoNote").textContent);
     // En knapp i menyen ser ut som en port til noe. Teksten ma si at den
     // ikke er det.
-    ok("og at man ikke trenger konto for a bruke appen",
+    ok("det star at man ikke trenger konto for a bruke appen",
        document.getElementById("kontoNote").textContent.indexOf("trenger ikke konto") > -1,
        document.getElementById("kontoNote").textContent);
+    // Fornavnet er ikke bare et brukernavn: det er det vennene ser i
+    // lista. Det ma sta for det skrives, ikke etterpa.
+    ok("og at fornavnet er det vennene ser",
+       document.getElementById("kontoNote").textContent.indexOf("vennene ser") > -1,
+       document.getElementById("kontoNote").textContent);
+    ok("begge feltene star der", !feltNavn.hidden && !feltPin.hidden);
+    // PIN-en skal ikke sta lesbar i en sofa med flere i.
+    ok("PIN-feltet skjuler det som tastes", feltPin.type === "password", feltPin.type);
+    // Paret fornavn + PIN er innloggingen, sa telefonen skal kunne tilby a
+    // huske den.
+    ok("telefonen kan huske paret",
+       feltNavn.getAttribute("autocomplete") === "username" &&
+       feltPin.getAttribute("autocomplete") === "current-password");
     ok("oppsettet sjekkes ved apning", window.__konto.join(",") === "oppsett",
        window.__konto.join(","));
 
-    // En adresse som apenbart ikke er en adresse stoppes for kallet: en
-    // e-post som aldri kommer er verre enn en beskjed med en gang.
-    document.getElementById("kontoEpost").value = "ikke-en-adresse";
+    // Et navn som bare er tegnsetting ville blitt en tom nokkel, og en tom
+    // nokkel er alles konto. Det stoppes for kallet.
+    feltNavn.value = "•";
+    feltPin.value = "1234";
     document.getElementById("kontoSend").click();
-    ok("tull i adressefeltet stoppes her",
-       document.getElementById("kontoSvar").textContent.indexOf("e-postadresse") > -1 &&
+    ok("tull i navnefeltet stoppes her",
+       document.getElementById("kontoSvar").textContent.indexOf("fornavnet") > -1 &&
        window.__konto.join(",") === "oppsett",
        document.getElementById("kontoSvar").textContent + " | " + window.__konto.join(","));
 
-    // «Fikk ikke sendt koden» alene sier ikke hvorfor. Tjenestens egen
-    // melding skal sta i parentes etter, sa den kan meldes videre uten a
-    // grave i funksjonsloggen.
-    document.getElementById("kontoEpost").value = "feil@example.no";
+    feltNavn.value = "Kari";
+    feltPin.value = "12";
     document.getElementById("kontoSend").click();
-    setTimeout(function () { try {
+    ok("en for kort PIN stoppes ogsa her",
+       document.getElementById("kontoSvar").textContent.indexOf("4 siffer") > -1 &&
+       window.__konto.join(",") === "oppsett",
+       document.getElementById("kontoSvar").textContent + " | " + window.__konto.join(","));
+
+    // At et fornavn er tatt sier vi rett ut: alternativet er «feil PIN» pa
+    // en PIN som stemmer, uten a fa vite at det er en annen Ola.
+    feltNavn.value = "Ola";
+    feltPin.value = "1234";
+    document.getElementById("kontoSend").click();
+    setFo(function () {
       var feiltekst = document.getElementById("kontoSvar").textContent;
-      ok("tjenestens egen melding folger med feilen",
-         feiltekst.indexOf("Fikk ikke sendt koden") > -1 &&
-         feiltekst.indexOf("svarte 500") > -1 &&
-         feiltekst.indexOf("Error sending confirmation email") > -1, feiltekst);
-      ok("og feilen logger ingen inn", !localStorage.getItem("sb-konto"));
+      ok("et navn som er tatt sier det, med tjenestens egen melding",
+         feiltekst.indexOf("er tatt") > -1 && feiltekst.indexOf("svarte 400") > -1 &&
+         feiltekst.indexOf("User already registered") > -1, feiltekst);
+      ok("og logger ingen inn", !localStorage.getItem("sb-konto"));
 
-      document.getElementById("kontoEpost").value = "Leser@Example.no";
+      feltNavn.value = "Kari";
+      feltPin.value = "9999";
       document.getElementById("kontoSend").click();
-      setTimeout(function () { try {
-      ok("koden bestilles", window.__konto.join(",") === "oppsett,kode,kode",
-         window.__konto.join(","));
-      ok("kodefeltet kommer fram", !document.getElementById("kontoKode").hidden);
-      // Lengden stilles i Supabase. Star feltet pa seks, kapper det det
-      // leseren skriver, og en kappet kode ser ut som en feil kode.
-      ok("kodefeltet tar imot lengre koder enn seks siffer",
-         document.getElementById("kontoKode").maxLength >= 10,
-         document.getElementById("kontoKode").maxLength);
-      ok("knappen bytter til a logge inn",
-         document.getElementById("kontoSend").textContent === "Logg inn",
-         document.getElementById("kontoSend").textContent);
-      // Adressen maskeres ogsa i kvitteringen: den leses i en sofa med flere i.
-      ok("kvitteringen navngir adressen maskert",
-         document.getElementById("kontoSvar").textContent.indexOf("le•••@example.no") > -1,
-         document.getElementById("kontoSvar").textContent);
-
-      document.getElementById("kontoKode").value = "999999";
-      document.getElementById("kontoSend").click();
-      setTimeout(function () { try {
-        ok("feil kode sier ifra",
+      setFo(function () {
+        ok("feil PIN sier ifra",
            document.getElementById("kontoSvar").textContent.indexOf("stemmer ikke") > -1,
            document.getElementById("kontoSvar").textContent);
-        ok("og logger ingen inn", !localStorage.getItem("sb-konto"));
+        ok("og logger ingen inn heller", !localStorage.getItem("sb-konto"));
 
-        document.getElementById("kontoKode").value = "63 73 81 68";
+        feltNavn.value = "  Kari ";
+        feltPin.value = "12 34";
         document.getElementById("kontoSend").click();
-        setTimeout(function () { try {
+        setFo(function () {
           var lagret = JSON.parse(localStorage.getItem("sb-konto") || "null");
-          ok("riktig kode logger inn", lagret && lagret.token === "okt-123",
+          ok("riktig PIN logger inn", lagret && lagret.token === "okt-123",
              JSON.stringify(lagret));
+          ok("navnet renses for det sendes",
+             lagret && lagret.navn === "Kari", lagret && lagret.navn);
           ok("okta har et utlopstidspunkt", lagret && !isNaN(Date.parse(lagret.utloper)),
              lagret && lagret.utloper);
-          ok("menyen viser hvem du er, maskert",
-             document.getElementById("kontoBtnTekst").textContent === "le•••@example.no",
+          // Ett kall, ikke to: er navnet nytt, lages kontoen i samme kall.
+          ok("innloggingen er ett kall", window.__konto.filter(function (h) {
+             return h === "logg-inn"; }).length === 3, window.__konto.join(","));
+          ok("menyen viser fornavnet",
+             document.getElementById("kontoBtnTekst").textContent === "Kari",
              document.getElementById("kontoBtnTekst").textContent);
+          // Vi lager en adresse av navnet for a snakke med tjenesten. Den
+          // skal aldri vises noe sted, og ikke ligge i telefonen heller.
+          ok("og aldri adressen vi lagde av navnet",
+             document.body.textContent.indexOf("pin.mvp-sb") === -1 &&
+             localStorage.getItem("sb-konto").indexOf("pin.mvp-sb") === -1);
+          // PIN-en skal ikke sta igjen i feltet etterpa; navnet kan gjerne det.
+          ok("PIN-feltet tommes etter innlogging", feltPin.value === "", feltPin.value);
           // En knapp som ser ut som den gir noe den ikke gir, er verre
           // enn en knapp som sier hva den er.
           ok("og innlogget star det hva innloggingen er til",
@@ -1718,7 +1729,10 @@ const SAK_18 = await kjor("innlogging", FELLES + `
           ok("forste trykk sletter ingenting",
              window.__konto.indexOf("slett") === -1 && !!localStorage.getItem("sb-konto"),
              window.__konto.join(","));
-          ok("og sier hva som kommer til a skje",
+          ok("og sier at fornavnet blir ledig for andre",
+             document.getElementById("kontoSvar").textContent.indexOf("ledig") > -1,
+             document.getElementById("kontoSvar").textContent);
+          ok("og hva som kommer til a skje",
              slett.textContent.indexOf("kan ikke angres") > -1,
              slett.textContent);
 
@@ -1734,11 +1748,18 @@ const SAK_18 = await kjor("innlogging", FELLES + `
              document.getElementById("kontoSlett").textContent === "Slett kontoen min",
              document.getElementById("kontoSlett").textContent);
           ferdig();
-        } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
-      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
-      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
-    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+        });
+      });
+    });
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
+
+  // Hvert kall er en runde i mikrooppgavekoen. Ett sted for ventingen, sa
+  // lagene under ikke blir seks nivaer av setTimeout.
+  function setFo(f) {
+    setTimeout(function () {
+      try { f(); } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); }
+    }, 300);
+  }
 `);
 
 /* ---------------- 19. jeg blir med ---------------- */
@@ -1747,9 +1768,9 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
   // Innlogget for appen starter: okta ligger der en tidligere innlogging
-  // la den.
+  // la den. Med fornavn og PIN barer okta fornavnet, ikke en adresse.
   localStorage.setItem("sb-konto", JSON.stringify({ token: "okt-1",
-    epost: "leser@example.no", bruker: "u-1",
+    navn: "Ola", bruker: "u-1",
     utloper: new Date(Date.now() + 3600000).toISOString() }));
 
   window.__svar = [];
@@ -1810,6 +1831,10 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
        navnFelt.placeholder.indexOf("vises for andre") > -1 &&
        navnFelt.getAttribute("aria-label").indexOf("synlig for alle som åpner kampen") > -1,
        navnFelt.placeholder + " | " + navnFelt.getAttribute("aria-label"));
+    // Fornavnet du logget inn med er alt navnet vennene ser. Det skal sta
+    // ferdig i feltet, sa det ikke skrives to ganger.
+    ok("navnet fra innloggingen star ferdig i feltet", navnFelt.value === "Ola",
+       navnFelt.value);
 
     // Velger man hjemme, skal knappen slutte a pasta at man skal et sted.
     panel.querySelectorAll(".hvor-valg")[0].click();
@@ -1817,7 +1842,10 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
        knapp.textContent === "Jeg ser den hjemme", knapp.textContent);
     panel.querySelectorAll(".hvor-valg")[1].click();
 
-    // Uten navn blir lista uleselig for de andre.
+    // Uten navn blir lista uleselig for de andre. Feltet er fortsatt
+    // sannheten: tommer man det, skal det ikke gyldiggjores av at man en
+    // gang logget inn med et navn.
+    navnFelt.value = "";
     knapp.click();
     ok("uten navn sier den ifra",
        panel.querySelector(".kamp-blirmed-valg .kamp-svar").textContent.indexOf("navnet") > -1,

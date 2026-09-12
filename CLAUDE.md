@@ -25,8 +25,10 @@ prosjektet `mvp-sb`.
     puber-kontakt.js              samme puber: telefon, mat, apningstider — uverifisert
     netlify/functions/puber.mjs   samme: puber ved stadion og holdeplass, døgncache
 
-    konto-data.js                   innlogging: rene funksjoner
-    netlify/functions/konto.mjs     samme: engangskode og økt via Supabase Auth
+    pin-data.js                     innlogging med fornavn og PIN: rene funksjoner
+    konto-data.js                   innlogging: rene funksjoner (økt, og den
+                                    parkerte e-posthalvdelen)
+    netlify/functions/konto.mjs     samme: konto og økt via Supabase Auth
     svar-data.js                    «jeg blir med»: rene funksjoner
     netlify/functions/svar.mjs      samme: lesing for alle, skriving med din egen økt
 
@@ -80,14 +82,14 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   sporingsskript, ingen informasjonskapsler og ingen samtykkebanner.
   Bruken leses av Usage-grafen i Netlify — båndbredde og forespørsler —
   som er grov, men gratis og allerede der.
-  `track()` i `app.js` står igjen som en tom operasjon, så de seksten
+  `track()` i `app.js` står igjen som en tom operasjon, så de femten
   hendelsene fortsatt er merket i koden. Skal de samles inn en gang, er
   det ett skript i `index.html` og ingen endringer i resten.
   Netlify Analytics ville målt på serveren uten noe skript, men er et
   betalt tillegg per prosjekt — valgt bort inntil videre.
-  Innloggingen endrer ikke dette: den lagrer e-postadressen til den som
-  selv velger å logge inn, og fortsatt ingenting om alle andre. Ingen
-  sporing, ingen informasjonskapsler, ingen samtykkebanner.
+  Innloggingen endrer ikke dette: den lagrer fornavnet til den som selv
+  velger å logge inn, og fortsatt ingenting om alle andre. Ingen sporing,
+  ingen informasjonskapsler, ingen samtykkebanner.
 - Et søk sorteres etter relevans hos WordPress (`orderby=relevance`),
   ikke dato: ellers fyller de tolv nyeste sakene som nevner laget i
   forbifarten første side. Innenfor det som er hentet legger
@@ -392,99 +394,110 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   andre, eller til en annen telefon: å dele hvor du ser kampen, og å ta
   med favorittlagene dine. En knapp i menyen ser ut som en port, så
   panelet sier med ord at den ikke er det — teksten står ett sted
-  (`KONTO_TEKST` i `app.js`) for alle tre tilstandene, og en
-  nettlesertest sjekker at feeden står ferdig før noen har logget inn.
-- Innlogging med engangskode på e-post, fra menyen. Den er første steg
-  mot fire ting: å se hvem som blir med på kampen, at valgene dine
-  følger deg mellom enheter (#24), at pubene skriver selv (#65), og
-  faste vennegrupper. Ingen av dem er bygget ennå, og panelet lover
-  ikke noe annet.
-- Supabase Auth utsteder koden, sender e-posten og gir ut økten. Å
-  skrive det selv ville vært kryptografi, e-postsending og sperring av
-  gjentatte forsøk — feil sted å spare.
-- **Koden i e-posten krever egen SMTP.** Med Supabases innebygde
-  e-posttjeneste er malene låst, og standardmalen sender en lenke, ikke
-  en kode — da har leseren ingenting å skrive inn. Egen SMTP låser opp
-  malene, og flettefeltet `{{ .Token }}` legges inn i «Magic Link» og
-  «Confirm signup». Rekkefølgen er SMTP først, mal etterpå. Avsenderen er
-  Resend. Brevo var førstevalget fordi det er EU, men registreringen der
-  krever SMS til mobil og koden kom aldri fram — det samme gjelder
-  Mailjet og Amazon SES, og det står i nøkkelboka så ingen prøver igjen.
-  Resend er amerikansk, så e-postadressen passerer dit mens resten av
-  persondataene ligger i EU-regionen: et bevisst kompromiss, tatt fordi
-  EU-alternativene ikke lot seg registrere. API-nøkkelen hører hjemme i
-  Resend og Supabase, ikke i Netlify og ikke i repoet; appen sender ingen
-  e-post selv. Resends testavsender (`onboarding@resend.dev`) leverer
-  bare til kontoeieren; alle andre får `500: Error sending confirmation
-  email`. Skal flere kunne logge inn, må avsenderen ligge på et
-  verifisert domene — **et eget, ikke `sportsbibelen.no`**: regelen om at
-  ingenting skal kreve endringer der gjelder også DNS. Ett domene dekker
-  alle appene, siden hver app bare er en ny adresse på det. Gmail med
-  app-passord står i nøkkelboka som nødluke, ikke som oppsett. Hele oppsettet, og de to reserveveiene (app-passord hos
-  Google, eller å droppe e-post og bruke Google-innlogging), står i
-  `docs/nokler-og-tokens.md`.
-- Kallet går fra `netlify/functions/konto.mjs`, ikke fra nettleseren,
-  selv om anon-nøkkelen tåler å være offentlig: da snakker appen bare
-  med sitt eget domene. Ingen tredjepartsskript i `index.html`, ingen
-  informasjonskapsel fra noen andre. Nøklene står i
-  `docs/nokler-og-tokens.md`.
-- Oppsettet sjekkes når panelet åpnes (`GET /api/konto` svarer `klar`
-  og `mangler`), ikke når leseren trykker Send: får du vite at
-  innloggingen ikke er satt opp først etter at adressen er skrevet inn,
-  var skrivingen til ingen nytte. Samme grep som i adminportalen.
-- **Kodelengden stilles i Supabase** (*Authentication* → *Rate Limits* →
-  «Email OTP Length»), og seks er bare standarden — dette prosjektet står
-  på åtte. `KODE_MIN` og `KODE_MAKS` i `konto-data.js` er derfor et
-  spenn, ikke et tall, og `maxlength` på feltet følger `KODE_MAKS`. Var
-  det hardkodet til seks, kappet vi «63738168» til «637381», sendte den,
-  og fikk 403 — som ser nøyaktig ut som en feil kode. Det tok en kveld å
-  finne, fordi hvert ledd i kjeden kunne forklare den samme 403-en.
-- Supabase lagrer koden ulikt etter hvilken vei adressen kom inn: en
-  adresse som ikke fantes fra før får den som «signup», en som finnes
-  som «magiclink», og nyere utgaver godtar «email» som fellesnavn.
-  Utenfra ser alle tre like ut — en kode slått opp med feil type og en
-  kode som faktisk er feil gir samme 403 — så funksjonen prøver dem i
-  rekkefølge (`KODETYPER`), vanligst først, og stopper ved første som
-  slipper gjennom. Bare avvisninger gir et forsøk til: en tjenestefeil
-  (5xx) eller en sperre (429) legger aldri en runde til på noe som alt
-  er galt et annet sted. Dette kostet en kveld: koden kom fram, ble
-  avvist med 403, og både SMTP, maler og nøkler var i orden hele tiden.
-- Feil kode og utløpt kode får samme svar. At en kode fantes, er i seg
-  selv noe om adressen. Tjenestens egen melding følger likevel med i
-  `forsok`: den skiller ikke på de to tilfellene — det er samme setning
-  begge veier — men den sier hvilke typer som ble prøvd og om
-  avvisningen kom fra `verify` i det hele tatt. Av samme grunn svarer bestillingen likt enten
-  adressen finnes fra før eller ikke — ellers er innloggingen et
-  oppslagsverk over hvem som bruker appen.
+  (`KONTO_TEKST` i `app.js`) for begge tilstandene, og en nettlesertest
+  sjekker at feeden står ferdig før noen har logget inn.
+- **Fornavn og PIN, ett trykk.** Første gang velger du de to, neste gang
+  skriver du de samme, og er inne — også på en annen telefon. Paret *er*
+  kontoen. Ingen mellomsteg og ingen registreringsskjerm: er navnet nytt,
+  lages kontoen i samme kall, og leseren skal ikke trenge å vite om hen
+  registrerer seg eller logger inn.
+- **Hvorfor ikke engangskode på e-post:** den virker, men avsenderen må
+  ligge på et verifisert domene for at andre enn kontoeieren skal få
+  koden, og domenet er ikke kjøpt. Hele e-postinnloggingen — funksjonen,
+  malene, Resend-oppsettet og de fire fellene som kostet halvannen dag å
+  finne — står komplett på grenen `epost-innlogging`, og fellene står
+  fortsatt i `docs/nokler-og-tokens.md`, i et avsnitt merket som parkert.
+  `konto-data.js` beholder derfor e-posthalvdelen: den er parkert, ikke
+  kastet, og enhetstestene holder den i orden.
+- Innloggingen er første steg mot fire ting: å se hvem som blir med på
+  kampen, at valgene dine følger deg mellom enheter (#24), at pubene
+  skriver selv (#65), og faste vennegrupper. Ingen av dem er bygget ennå,
+  og panelet lover ikke noe annet.
+- Supabase Auth holder kontoen. Å skrive det selv ville vært lagring av
+  passord, sperring av gjentatte forsøk og utstedelse av økter — feil sted
+  å spare. Og identiteten *må* finnes hos tjenesten, ikke bare i
+  telefonen: hele poenget er at de samme to feltene virker på en annen
+  telefon.
+- **Fornavnet blir en adresse hos tjenesten**, fordi det er det Supabase
+  Auth kjenner: `ola@pin.mvp-sb.netlify.app` (`PIN_DOMENE` i
+  `pin-data.js`). Ingen e-post sendes noe sted — adressen er en nøkkel,
+  ikke en postkasse — og den vises aldri i appen og legges aldri i økten.
+  `pinSlug()` lager nøkkelen, og den må bli den samme hver gang: skriver
+  du «ola» på neste telefon, er det samme konto. Norske bokstaver foldes
+  (`ø` → `oe`) *før* tegnene strippes — uten foldingen ville «Bjorn» og
+  «Bjørn» blitt `bjrn` begge to, altså to ulike navn på én konto.
+- **PIN-en er PIN-en pluss et pepper** (`PIN_PEPPER` i Netlify-miljøet,
+  `pinPassord()` i `pin-data.js`). To konkrete grunner: fire siffer er
+  10 000 forsøk, og uten pepperet kunne de gjettes rett mot Supabase sitt
+  eget endepunkt — med det må gjettingen gjennom vår egen funksjon. Og
+  Supabase krever minst seks tegn i et passord, så en PIN på fire ville
+  blitt avvist ved første innlogging, med en melding om passordlengde som
+  ingen ville koblet til PIN-feltet. Pepperet må settes før den første
+  kontoen og kan ikke endres etterpå: et nytt pepper låser alle ut. Det
+  står i nøkkelboka.
+- Dette gjør ikke en PIN på fire siffer til et passord, og appen later
+  ikke som. Ingenting er låst bak innloggingen, så det verste den som
+  kommer seg inn kan gjøre, er å skrive «jeg blir med» i en annens navn.
+  Det står i `personvern.html` med de ordene, sammen med rådet om å ikke
+  bruke en PIN man bruker andre steder.
+- **At et fornavn er tatt, sier vi rett ut.** «Ola» er én konto; en annen
+  Ola får ««Ola» er tatt. Er PIN-en feil, eller skal du velge et annet
+  navn?» Det er motsatt av hva vi gjør med e-postadresser, og med vilje:
+  et fornavn i en vennegjeng er ingen hemmelighet, og alternativet er
+  «feil PIN» på en PIN som stemmer. Sletter noen kontoen, blir navnet
+  ledig igjen.
+- Supabase svarer 200 uten økt i to tilfeller som betyr helt ulike ting,
+  og skillet er `identities`: en tom liste er tjenestens måte å si «denne
+  finnes alt» uten å rope det, mens en full liste betyr at *Confirm
+  email* står på. Funksjonen kjenner igjen begge — det første blir
+  «navnet er tatt», det andre en 503 som sier hva som må slås av i
+  Supabase. «Uventet svar» ville sendt den som satte opp prosjektet ut på
+  leting.
+- Kallet går fra `netlify/functions/konto.mjs`, ikke fra nettleseren, selv
+  om anon-nøkkelen tåler å være offentlig: da snakker appen bare med sitt
+  eget domene. Ingen tredjepartsskript i `index.html`, ingen
+  informasjonskapsel fra noen andre. Og pepperet finnes bare der.
+- Oppsettet sjekkes når panelet åpnes (`GET /api/konto` svarer `klar` og
+  `mangler`), ikke når leseren trykker Logg inn: får du vite at
+  innloggingen ikke er satt opp først etter at navnet og PIN-en er
+  skrevet inn, var skrivingen til ingen nytte. Samme grep som i
+  adminportalen.
 - Økten ligger i `localStorage` (`sb-konto`) med et utløpstidspunkt, ikke
   et antall sekunder: sekunder er ubrukelige etter en omstart. En økt
   uten gyldig utløpstidspunkt regnes som utløpt og ryddes ved oppstart —
-  en økt vi ikke kjenner levetiden på, er ikke en økt å stole på.
-- Adressen vises maskert (`ru••••@gmail.com`) i menyen og i kvitteringen.
-  Appen leses i en sofa med flere i.
-- Feiler bestillingen, står tjenestens egen melding i parentes etter
-  «Fikk ikke sendt koden» (`tjenestenSa()` i `app.js`, som henter siste
-  ledd i `forsok`). «Prøv igjen om litt» alene sender både leseren og den
-  som satte opp tjenesten ut på leting i et panel som ikke sier noe —
-  mens svaret, «svarte 500: Error sending confirmation email», alt ligger
-  i kroppen. Samme grep som i pubforslagene. Hverken nøkler eller
-  adresser ligger i `forsok`.
-- `konto-data.js` er de rene funksjonene, delt mellom appen og
-  funksjonen: blir de to uenige om hva en gyldig adresse eller kode er,
-  får leseren «feil kode» på en kode som stemmer.
-- **Sett virke 12. september 2026**, i forhåndsvisningen av #68: hele
-  kjeden fra e-post til økt — Resend som avsender, malene med
-  `{{ .Token }}`, en kode på åtte siffer, oppslaget som `magiclink`, og
-  økten lagret lokalt. Fire ting sto i veien og ga alle den samme
-  feilen: SMS-sperren hos Brevo, låste maler uten egen SMTP, stor R i
-  SMTP-brukernavnet, og at appen kappet koden til seks siffer. Det siste
-  var vårt.
+  en økt vi ikke kjenner levetiden på, er ikke en økt å stole på. Økten
+  må også si *hvem* du er, ellers har menyen ingenting å skrive: et navn
+  (PIN) eller en adresse (den parkerte e-postveien, som fortsatt ligger i
+  telefoner som har brukt den).
+- Menyen viser fornavnet, ikke en maskert adresse: det er allerede
+  offentlig for vennene, og det er det samme navnet de ser i «blir
+  med»-lista. PIN-feltet er `type="password"` og tømmes etter innlogging;
+  navnet blir stående. Feltene bærer `autocomplete="username"` og
+  `current-password`, så telefonen kan tilby å huske paret — ett trykk
+  framfor å taste fornavnet på nytt hver gang.
+- **Fornavnet du logget inn med er alt navnet vennene ser.** Står det
+  ingenting lagret i `sb-visning.svarnavn`, prefylles «blir med»-feltet
+  med kontonavnet, så den som nettopp logget inn ikke skriver navnet sitt
+  to ganger. Skriver hen noe annet, vinner det og blir lagret — feltet er
+  fortsatt sannheten, og tømmer man det, er svaret ugyldig.
+- Feiler innloggingen, står tjenestens egen melding i parentes etter
+  («svarte 400: User already registered» — `tjenestenSa()` i `app.js`,
+  som henter siste ledd i `forsok`). «Prøv igjen om litt» alene sender
+  både leseren og den som satte opp tjenesten ut på leting i et panel som
+  ikke sier noe. Samme grep som i pubforslagene. Verken pepperet,
+  nøkkelen eller adressen vi lager av navnet ligger i `forsok`.
+- `pin-data.js` er de rene funksjonene, delt mellom appen og funksjonen:
+  blir de to uenige om hva et gyldig navn eller en gyldig PIN er, får
+  leseren «feil PIN» på en PIN som stemmer. Det kostet en kveld sist, da
+  appen kappet en åttesifret engangskode til seks.
 - Dette er første gang appen lagrer noe om en person, og
-  `personvern.html` sier hva det er: adressen hos Supabase (EU), navnet
-  du selv skriver — synlig for andre — og økten lokalt. Sida er skrevet
-  om denne appen, ikke etter en mal: den navngir Supabase, Resend og
+  `personvern.html` sier hva det er: fornavnet og PIN-en hos Supabase
+  (EU), navnet du selv skriver — synlig for andre — og økten lokalt. Sida
+  er skrevet om denne appen, ikke etter en mal: den navngir Supabase og
   Netlify, og den sier at posisjonen i pubsøket går rett fra nettleseren
-  til OpenStreetMap uten å innom oss. Lenka står i menyen.
+  til OpenStreetMap uten å innom oss. Lenka står i menyen. PIN-en flyttet
+  Resend ut av lista: appen sender ingen e-post nå, så ingenting passerer
+  USA.
 - **Du sletter kontoen selv, fra menyen.** Det krever normalt admin-
   tilgang hos Supabase og en `service_role`-nøkkel som kan slette hvem
   som helst. Den finnes ikke her. I stedet ligger sletteretten i
@@ -494,10 +507,42 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   Radene i `kampsvar` følger med gjennom `on delete cascade`, så
   slettingen er hel. SQL-en står i `docs/nokler-og-tokens.md`; uten den
   svarer funksjonen 503 og sier det.
-- Slettingen krever to trykk: det første sier hva som kommer til å skje,
-  det andre gjør det. Ingen dialogboks — den ville blitt et hinder å
-  klikke bort framfor en setning å lese. En utlogging nullstiller
-  bekreftelsen, så den ikke står klar neste gang noen logger inn.
+- Slettingen krever to trykk: det første sier hva som kommer til å skje —
+  og at fornavnet blir ledig for andre — det andre gjør det. Ingen
+  dialogboks; den ville blitt et hinder å klikke bort framfor en setning
+  å lese. En utlogging nullstiller bekreftelsen, så den ikke står klar
+  neste gang noen logger inn.
+
+#### Parkert: engangskoden på e-post
+
+Dette virket, sett i prod 12. september 2026 i forhåndsvisningen av #68 —
+hele kjeden fra e-post til økt, med Resend som avsender, malene med
+`{{ .Token }}`, en kode på åtte siffer og oppslaget som `magiclink`. Det
+står her fordi det skal hentes fram igjen, og fordi fire ting sto i veien
+og ga alle *den samme* feilen:
+
+- **SMS-sperren hos Brevo.** Registreringen krever kode på mobil, og den
+  kom aldri. Mailjet og Amazon SES har samme krav. Derfor Resend, som er
+  amerikansk — et bevisst kompromiss, tatt fordi EU-alternativene ikke
+  lot seg registrere.
+- **Låste maler uten egen SMTP.** Standardmalen sender en *lenke*, ikke
+  en kode. Rekkefølgen er SMTP først, mal etterpå.
+- **Stor R i SMTP-brukernavnet.** Det skal være `resend`, og feltet er
+  versalfølsomt som en miljøvariabel.
+- **At appen kappet koden til seks siffer.** Kodelengden stilles i
+  Supabase (*Authentication* → *Rate Limits* → «Email OTP Length»), og
+  dette prosjektet står på åtte. `KODE_MIN` og `KODE_MAKS` i
+  `konto-data.js` er derfor et spenn, ikke et tall. Kappet til seks
+  sendte vi «637381» og fikk 403 — som ser nøyaktig ut som en feil kode.
+  Det siste var vårt, og det tok en kveld.
+
+To ting til som gjelder den dagen koden hentes fram: Supabase lagrer
+engangskoden ulikt etter hvilken vei adressen kom inn («signup»,
+«magiclink», «email»), og alle tre gir samme 403 utenfra — derfor prøver
+funksjonen dem i rekkefølge (`KODETYPER`), og bare avvisninger gir et
+forsøk til. Og feil kode og utløpt kode får samme svar: at en kode fantes,
+er i seg selv noe om adressen.
+
 
 ### Hvem blir med
 
@@ -536,11 +581,12 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 - Svarer du to ganger, endrer du svaret ditt: skrivingen er en upsert
   mot `unique (kamp_id, bruker)`. Har du alt svart, er knappen en
   angreknapp — to knapper ville betydd at man kan bli med to ganger.
-- Navnet er «navnet vennene ser», ikke e-postadressen: den er vår, ikke
-  deres. Det lagres med visningsvalgene (`sb-visning`, feltet
-  `svarnavn`), så det ikke skrives på nytt for hver kamp. Navnet er
-  synlig for alle som åpner kampen — det er prisen for at lista kan
-  leses uten konto, og det står i panelet.
+- Navnet er «navnet vennene ser». Det lagres med visningsvalgene
+  (`sb-visning`, feltet `svarnavn`), så det ikke skrives på nytt for hver
+  kamp — og står det ingenting der, prefylles feltet med fornavnet du
+  logget inn med: det er alt det samme navnet. Navnet er synlig for alle
+  som åpner kampen — det er prisen for at lista kan leses uten konto, og
+  det står i panelet.
 - Tabellen og reglene står som SQL i `docs/nokler-og-tokens.md`. Finnes
   den ikke, svarer funksjonen 503 og sier nøyaktig det, framfor å sende
   en PostgREST-feil videre til leseren.
@@ -550,9 +596,9 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      353 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  185 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       274 tester, ~170 s, headless Chromium
+    node test/unit.mjs      379 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  186 tester, ~250 ms, ingen nettleser
+    node test/run.mjs       279 tester, ~170 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
@@ -563,29 +609,31 @@ De raske først, så en åpenbar feil stopper kjøringen før nettleseren
 i det hele tatt starter.
 
 `funksjon.mjs` kaller Netlify-funksjonene direkte med et stubbet `fetch`:
-statuskoder, cache-headere, at API-nøkkelen og Supabase-nøkkelen går til
-tjenesten og ikke til leseren, at feil og utløpt engangskode får samme
-svar, og at TheSportsDB prøves først for årets neste runde og faller
+statuskoder, cache-headere, at API-nøkkelen, Supabase-nøkkelen og
+PIN-pepperet går til tjenesten og ikke til leseren, at en ny konto lages i
+samme kall som innloggingen, at et fornavn som er tatt sier det, og at
+TheSportsDB prøves først for årets neste runde og faller
 tilbake når den svikter, og at værfunksjonen identifiserer seg for MET.
 Ingen nøkkel og ingen nettverk kreves. Én test lar en tjener tie for å se
 at kappløpet ikke venter på den; uten den ville akkurat den feilen bare
 vist seg i prod.
 
 `unit.mjs` dekker `lib.js`, `fotball-data.js`, `vaer-data.js`,
-`pub-data.js`, `konto-data.js` og `svar-data.js`: URL-validering, videovertslisten, tidsstempler,
+`pub-data.js`, `konto-data.js`, `pin-data.js` og `svar-data.js`: URL-validering, videovertslisten, tidsstempler,
 endringssignaturen, gjenkjenning av interne lenker, rangering av søketreff og favorittlag, sesongvinduet per
 liga, tolkning av API-Football-svaret, hvilken runde som er «neste», at
 døgnkvoten holder, og at ingenting i `puber-kontakt.js` slipper ut i
 appen før noen har datert det, og at en økt vi ikke kjenner levetiden på
 regnes som utløpt, og at ditt eget svar på en kamp finnes på id og ikke
-på navn. `run.mjs` dekker alt som trenger DOM: XSS i titler
+på navn, og at «Ola» og «ola» blir samme konto mens «Bjorn» og «Bjørn»
+ikke blir det. `run.mjs` dekker alt som trenger DOM: XSS i titler
 og artikkel-HTML, annonseplassering, rulleoppførsel, artikkelvisningen,
 fokusfella, korthøyden, at toppfeltet krymper, paginering, ruting,
 visningsvalgene i menyen, favorittlag fra stjerne til feed, deling av en
 kamp med sted og pubforslag, den delte lenka som åpner kampen den peker
 på hos mottakeren, adminportalen fra innlogging til lagring, innlogging i
-appen fra e-post til utlogging — med feeden ferdig lastet før noen har
-logget inn — «jeg blir med» fra navn til angring, og hele
+appen fra fornavn og PIN til utlogging — med feeden ferdig lastet før
+noen har logget inn — «jeg blir med» fra navn til angring, og hele
 fotballmodulen — fanebytte, tabell, resultater, neste runde, dyplenker og
 feilmelding fra tjenesten.
 

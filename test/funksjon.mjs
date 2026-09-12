@@ -731,173 +731,196 @@ function kontoBe(kropp, metode) {
 }
 
 const SUPA_NOKKEL = "hemmelig-anon-nokkel";
+const PEPPER = "hemmelig-pepper";
 const OKT = {
   access_token: "okt-token-123",
   expires_in: 3600,
-  user: { email: "Leser@Example.com" },
+  user: { email: "ola@pin.mvp-sb.netlify.app", id: "u-1" },
 };
 
 delete process.env.SUPABASE_URL;
 delete process.env.SUPABASE_ANON_KEY;
+delete process.env.PIN_PEPPER;
 
 kall = stubSupabase(OKT);
-r = await konto(kontoBe({ handling: "kode", epost: "leser@example.com" }));
+r = await konto(kontoBe({ handling: "logg-inn", navn: "Ola", pin: "1234" }));
 const kontoUoppsatt = await r.json();
 ok("uten oppsett svarer innloggingen 503", r.status === 503, r.status);
 ok("uten oppsett rores ikke tjenesten", kall.length === 0, kall.length);
 ok("503-svaret navngir det som mangler",
    kontoUoppsatt.feil.indexOf("SUPABASE_URL") > -1 &&
    kontoUoppsatt.feil.indexOf("SUPABASE_ANON_KEY") > -1, kontoUoppsatt.feil);
+// Uten pepperet blir passordet hos tjenesten fire siffer, og Supabase
+// krever seks tegn. Da feiler den forste innloggingen med en melding om
+// passordlengde, og ingen skjonner hvorfor. Derfor skal den star i lista.
+ok("og at pepperet mangler", kontoUoppsatt.feil.indexOf("PIN_PEPPER") > -1,
+   kontoUoppsatt.feil);
 ok("og at det ma rulles ut pa nytt",
    kontoUoppsatt.feil.indexOf("Trigger deploy") > -1, kontoUoppsatt.feil);
 
-// Appen sporr ved apning, sa det star for adressen er skrevet inn.
+// Appen sporr ved apning, sa det star for navnet er skrevet inn.
 r = await konto(kontoBe(null, "GET"));
 const kontoUklar = await r.json();
 ok("GET sier at innloggingen ikke er klar",
    r.status === 200 && kontoUklar.klar === false, JSON.stringify(kontoUklar));
 ok("og hvilke variabler som mangler",
-   kontoUklar.mangler.join(",") === "SUPABASE_URL,SUPABASE_ANON_KEY",
+   kontoUklar.mangler.join(",") === "SUPABASE_URL,SUPABASE_ANON_KEY,PIN_PEPPER",
    JSON.stringify(kontoUklar.mangler));
 
 process.env.SUPABASE_URL = "https://prosjekt.supabase.co/";
 process.env.SUPABASE_ANON_KEY = SUPA_NOKKEL;
+process.env.PIN_PEPPER = PEPPER;
 
-kall = stubSupabase({});
-r = await konto(kontoBe({ handling: "kode", epost: "  Leser@Example.com " }));
-ok("koden bestilles hos tjenesten", r.status === 200 && kall.length === 1,
-   r.status + " " + kall.length);
-ok("adressen normaliseres for den sendes",
-   JSON.parse(kall[0].opsjoner.body).email === "leser@example.com",
-   kall[0].opsjoner.body);
+// Den vanligste innloggingen: noen som har vaert her for. Ett kall.
+kall = stubSupabase(OKT);
+r = await konto(kontoBe({ handling: "logg-inn", navn: "  Ola ", pin: "12 34" }));
+const okt = await r.json();
+ok("fornavn og PIN gir en okt", r.status === 200 && okt.token === "okt-token-123",
+   r.status + " " + JSON.stringify(okt));
+ok("okta barer navnet, ikke adressen vi lagde", okt.navn === "Ola" &&
+   JSON.stringify(okt).indexOf("pin.mvp-sb.netlify.app") === -1, JSON.stringify(okt));
+ok("en som har logget inn for koster ett kall", kall.length === 1, kall.length);
 // Skragestreken pa slutten av SUPABASE_URL skal ikke gi //auth.
 ok("adressen til tjenesten er hel",
-   kall[0].url === "https://prosjekt.supabase.co/auth/v1/otp", kall[0].url);
+   kall[0].url === "https://prosjekt.supabase.co/auth/v1/token?grant_type=password",
+   kall[0].url);
+// Navnet ma bli samme nokkel uansett skrivemate, ellers mister man
+// svarene sine ved a skrive «ola» pa neste telefon.
+ok("navnet blir en adresse pa vart eget domene",
+   JSON.parse(kall[0].opsjoner.body).email === "ola@pin.mvp-sb.netlify.app",
+   kall[0].opsjoner.body);
+// Pepperet er det eneste som holder fire siffer fra a vaere fire siffer
+// mot Supabase sitt eget endepunkt.
+ok("PIN-en sendes med pepperet pa",
+   JSON.parse(kall[0].opsjoner.body).password === "1234:" + PEPPER,
+   kall[0].opsjoner.body);
 ok("nokkelen gar til tjenesten, ikke til leseren",
    kall[0].opsjoner.headers.apikey === SUPA_NOKKEL &&
-   JSON.stringify(await (await konto(kontoBe({ handling: "kode", epost: "a@b.no" }))).json())
-     .indexOf(SUPA_NOKKEL) === -1);
+   JSON.stringify(okt).indexOf(SUPA_NOKKEL) === -1);
+// Pepperet er en hemmelighet. Det skal aldri ligge i et svar leseren ser
+// — heller ikke i `forsok`.
+ok("og pepperet aldri til leseren", JSON.stringify(okt).indexOf(PEPPER) === -1,
+   JSON.stringify(okt));
 ok("svaret caches aldri",
    r.headers.get("Cache-Control") === "no-store", r.headers.get("Cache-Control"));
 
-kall = stubSupabase({});
-r = await konto(kontoBe({ handling: "kode", epost: "ikke-en-adresse" }));
-ok("en adresse som apenbart ikke er en adresse stoppes her",
+ok("samme navn gir samme konto uansett skrivemate",
+   JSON.parse(stubSupabase(OKT) && kall[0].opsjoner.body).email ===
+   JSON.parse((await (async () => {
+     const k = stubSupabase(OKT);
+     await konto(kontoBe({ handling: "logg-inn", navn: "OLA", pin: "1234" }));
+     return k[0].opsjoner.body;
+   })())).email);
+
+// Et navn som bare er tegnsetting ville blitt en tom nokkel, og en tom
+// nokkel er alles konto.
+kall = stubSupabase(OKT);
+r = await konto(kontoBe({ handling: "logg-inn", navn: "•", pin: "1234" }));
+ok("et navn som ikke er et navn stoppes her",
    r.status === 400 && kall.length === 0, r.status + " " + kall.length);
 
-// For mange forsok er den ene feilen leseren kan gjore noe med: vente.
-kall = stubSupabase({ msg: "email rate limit exceeded" }, 429);
-r = await konto(kontoBe({ handling: "kode", epost: "leser@example.com" }));
-ok("for mange forsok sier at man skal vente",
-   r.status === 429 && (await r.json()).feil.indexOf("Vent") > -1, r.status);
-
 kall = stubSupabase(OKT);
-r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "12 34 56" }));
-const okt = await r.json();
-ok("riktig kode gir en okt", r.status === 200 && okt.token === "okt-token-123",
-   r.status + " " + JSON.stringify(okt));
-ok("koden renses for den sendes",
-   JSON.parse(kall[0].opsjoner.body).token === "123456", kall[0].opsjoner.body);
-ok("adressen kommer tilbake normalisert", okt.epost === "leser@example.com", okt.epost);
-// Et antall sekunder er ubrukelig etter en omstart: appen far et
-// tidspunkt.
-ok("okta har et utlopstidspunkt, ikke et antall sekunder",
-   !Number.isNaN(Date.parse(okt.utloper)) && Date.parse(okt.utloper) > Date.now(), okt.utloper);
+r = await konto(kontoBe({ handling: "logg-inn", navn: "Ola", pin: "12" }));
+ok("en for kort PIN stoppes her", r.status === 400 && kall.length === 0,
+   r.status + " " + kall.length);
 
-// Forste innlogging med en ny adresse gar signup-veien: da heter typen
-// «signup», ikke «email». Utenfra ser en avvist kode og en feil type helt
-// like ut, sa den ene ma proves for vi vet.
-function stubType(riktigType, oktSvar) {
+// Forste gang: innloggingen avvises fordi kontoen ikke finnes enda, og da
+// lages den i samme kall. Leseren skal ikke trenge a vite om hen
+// registrerer seg eller logger inn.
+let steg = 0;
+kall = [];
+global.fetch = async (url, opsjoner) => {
+  kall.push({ url: String(url), opsjoner: opsjoner || {} });
+  steg++;
+  const feil = { error_code: "invalid_credentials", msg: "Invalid login credentials" };
+  return new Response(JSON.stringify(steg === 1 ? feil : OKT),
+    { status: steg === 1 ? 400 : 200, headers: { "Content-Type": "application/json" } });
+};
+r = await konto(kontoBe({ handling: "logg-inn", navn: "Ola", pin: "1234" }));
+ok("et nytt navn far en konto i samme kall",
+   r.status === 200 && (await r.json()).navn === "Ola", r.status);
+ok("og kontoen lages hos tjenesten, ikke her",
+   kall.length === 2 && kall[1].url.indexOf("/auth/v1/signup") > -1,
+   kall.length + " " + (kall[1] && kall[1].url));
+ok("med samme adresse og samme passord som innloggingen provde",
+   kall[0].opsjoner.body === kall[1].opsjoner.body, kall[1].opsjoner.body);
+
+// Navnet finnes med en annen PIN. Det sier vi rett ut: et fornavn i en
+// vennegjeng er ingen hemmelighet, og alternativet er at «Ola» far «feil
+// PIN» uten a fa vite at det er en annen Ola som har navnet.
+kall = stubSupabase({ error_code: "user_already_exists", msg: "User already registered" }, 400);
+r = await konto(kontoBe({ handling: "logg-inn", navn: "Ola", pin: "9999" }));
+const tatt = await r.json();
+ok("et navn som er tatt sier det",
+   r.status === 401 && tatt.feil.indexOf("er tatt") > -1, r.status + " " + tatt.feil);
+ok("og navngir navnet, sa man kan velge et annet", tatt.feil.indexOf("Ola") > -1, tatt.feil);
+ok("begge forsokene star i forsok", (tatt.forsok || []).length === 2,
+   JSON.stringify(tatt.forsok));
+
+// De to kallene svarer ulikt, sa stubben ma skille dem: innloggingen
+// avvises, og det er signup-svaret vi vil se pa.
+function stubAvvistDeretter(svar, status) {
   const kall = [];
   global.fetch = async (url, opsjoner) => {
     kall.push({ url: String(url), opsjoner: opsjoner || {} });
-    const type = JSON.parse(opsjoner.body || "{}").type;
-    if (type === riktigType) {
-      return new Response(JSON.stringify(oktSvar), { status: 200 });
-    }
-    return new Response(JSON.stringify({ error: "invalid_grant",
-      error_description: "Token has expired or is invalid" }), { status: 403 });
+    const forst = kall.length === 1;
+    return new Response(JSON.stringify(forst
+      ? { error_code: "invalid_credentials", msg: "Invalid login credentials" }
+      : svar), {
+      status: forst ? 400 : (status || 200),
+      headers: { "Content-Type": "application/json" },
+    });
   };
   return kall;
 }
 
-// Den vanligste veien: nyere utgaver godtar «email», og da koster
-// innloggingen ett kall.
-kall = stubType("email", OKT);
-r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
-ok("den vanligste veien koster ett kall",
-   r.status === 200 && kall.length === 1, r.status + " " + kall.length);
+// Supabase svarer ogsa 200 med en tom identitetsliste nar navnet finnes.
+// Det er tjenestens mate a svare «denne finnes alt» uten a rope det.
+kall = stubAvvistDeretter({ user: { id: "u-1", identities: [] } });
+r = await konto(kontoBe({ handling: "logg-inn", navn: "Ola", pin: "9999" }));
+ok("et 200-svar uten identiteter betyr ogsa at navnet er tatt",
+   r.status === 401 && (await r.json()).feil.indexOf("er tatt") > -1, r.status);
 
-// En adresse som finnes fra for far koden lagret som «magiclink».
-kall = stubType("magiclink", OKT);
-r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
-ok("en kjent adresse slipper inn som magiclink",
-   r.status === 200 && (await r.json()).token === "okt-token-123", r.status);
+// Samme svar, men med en identitet: da er det e-postbekreftelse som star
+// pa, og den kan ikke sta pa her — adressen er ikke en ekte adresse.
+kall = stubAvvistDeretter({ user: { id: "u-1", identities: [{ id: "i-1" }] } });
+r = await konto(kontoBe({ handling: "logg-inn", navn: "Nykar", pin: "1234" }));
+const ubekreftet = await r.json();
+ok("en okt som aldri kom sier hva som ma slas av i Supabase",
+   r.status === 503 && ubekreftet.feil.indexOf("e-postbekreftelse") > -1,
+   r.status + " " + ubekreftet.feil);
+ok("og hvor det star", ubekreftet.feil.indexOf("docs/nokler-og-tokens.md") > -1,
+   ubekreftet.feil);
 
-// En adresse som ikke fantes, far den som «signup».
-kall = stubType("signup", OKT);
-r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
-ok("en ny adresse slipper inn som signup",
-   r.status === 200 && (await r.json()).token === "okt-token-123", r.status);
-ok("og de tre forsokene skiller seg bare pa typen",
-   kall.length === 3 &&
-   kall.map((k) => JSON.parse(k.opsjoner.body).type).join(",") === "email,magiclink,signup",
-   kall.map((k) => JSON.parse(k.opsjoner.body).type).join(","));
-
-// En tjenestefeil eller en sperre skal ikke gi et kall til.
+// En tjenestefeil eller en sperre skal ikke legge en runde til pa noe som
+// alt er galt et annet sted.
 kall = stubSupabase({ msg: "Internal error" }, 500);
-r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
-ok("en tjenestefeil provers ikke pa nytt", kall.length === 1 && r.status === 502,
+r = await konto(kontoBe({ handling: "logg-inn", navn: "Ola", pin: "1234" }));
+ok("en tjenestefeil lager ingen konto", kall.length === 1 && r.status === 502,
    kall.length + " " + r.status);
 
-kall = stubSupabase({ msg: "rate limit" }, 429);
-r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
-ok("en sperre provers ikke pa nytt", kall.length === 1 && r.status === 429,
+kall = stubSupabase({ msg: "rate limit exceeded" }, 429);
+r = await konto(kontoBe({ handling: "logg-inn", navn: "Ola", pin: "1234" }));
+ok("en sperre lager ingen konto heller, og ber deg vente",
+   kall.length === 1 && r.status === 429 && (await r.json()).feil.indexOf("Vent") > -1,
    kall.length + " " + r.status);
 
-kall = stubSupabase({ error: "invalid_grant", error_description: "Token has expired" }, 403);
-r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
-const feilKode = await r.json();
-// Feil kode og utlopt kode far samme svar: at en kode fantes, er i seg
-// selv noe om adressen.
-ok("feil kode gir 401 uten a rope noe", r.status === 401 &&
-   feilKode.feil === "Koden stemmer ikke, eller den er for gammel.",
-   r.status + " " + feilKode.feil);
-// En kode som er feil, er feil begge veier — og da er begge forsokene brukt.
-ok("en avvist kode provers alle veier for den gis opp", kall.length === 3,
-   kall.length);
-// Meldingen skiller ikke pa feil og utlopt kode, sa den roper ingenting
-// om adressen — men den sier hva som faktisk ble prov d.
+// Feil PIN pa et navn som finnes: begge veier avvist.
+kall = stubSupabase({ error_code: "invalid_credentials", msg: "Invalid login credentials" }, 400);
+r = await konto(kontoBe({ handling: "logg-inn", navn: "Ola", pin: "9999" }));
+const feilPin = await r.json();
+ok("feil PIN gir 401", r.status === 401 &&
+   feilPin.feil === "Navnet eller PIN-en stemmer ikke.", r.status + " " + feilPin.feil);
 ok("tjenestens egen melding folger med avvisningen",
-   (feilKode.forsok || []).length === 3 &&
-   feilKode.forsok[0].melding.indexOf("Token has expired") > -1,
-   JSON.stringify(feilKode.forsok));
-ok("og den royper ikke adressen",
-   JSON.stringify(feilKode).indexOf("leser@example.com") === -1,
-   JSON.stringify(feilKode));
-
-r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123" }));
-ok("en for kort kode stoppes her", r.status === 400, r.status);
-
-// Lengden stilles i Supabase; atte siffer er en like gyldig innstilling
-// som seks, og skal ga hele veien uten a bli kappet.
-kall = stubType("email", OKT);
-r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "63738168" }));
-ok("en atte-sifret kode gar gjennom hel",
-   r.status === 200 && JSON.parse(kall[0].opsjoner.body).token === "63738168",
-   r.status + " " + JSON.parse(kall[0].opsjoner.body).token);
-
-kall = stubSupabase({ email: "leser@example.com" });
-r = await konto(kontoBe({ handling: "hvem", token: "okt-token-123" }));
-ok("okta kan sjekkes mot tjenesten",
-   r.status === 200 && (await r.json()).epost === "leser@example.com", r.status);
-ok("okta sendes som bearer-token",
-   kall[0].opsjoner.headers.Authorization === "Bearer okt-token-123",
-   JSON.stringify(kall[0].opsjoner.headers));
-
-kall = stubSupabase({ msg: "invalid JWT" }, 401);
-r = await konto(kontoBe({ handling: "hvem", token: "gammelt" }));
-ok("en okt som ikke gjelder lenger gir 401", r.status === 401, r.status);
+   (feilPin.forsok || []).length === 2 &&
+   feilPin.forsok[0].melding.indexOf("Invalid login credentials") > -1,
+   JSON.stringify(feilPin.forsok));
+// Hverken pepperet eller adressen vi lagde skal kunne leses ut av et
+// feilsvar.
+ok("og feilsvaret royper verken pepperet eller adressen",
+   JSON.stringify(feilPin).indexOf(PEPPER) === -1 &&
+   JSON.stringify(feilPin).indexOf("pin.mvp-sb.netlify.app") === -1,
+   JSON.stringify(feilPin));
 
 // Sletting av egen konto. Ingen service_role-nokkel finnes her, sa det
 // gar gjennom en databasefunksjon som bare kan slette den okta eier.
@@ -939,11 +962,12 @@ kall = stubSupabase({ message: "JWT expired" }, 401);
 r = await konto(kontoBe({ handling: "slett", token: "gammel" }));
 ok("en utlopt okt sletter ingenting", r.status === 401, r.status);
 
-r = await konto(kontoBe({ handling: "noe-annet", epost: "leser@example.com" }));
+r = await konto(kontoBe({ handling: "noe-annet", navn: "Ola", pin: "1234" }));
 ok("en ukjent handling avvises", r.status === 400, r.status);
 
 delete process.env.SUPABASE_URL;
 delete process.env.SUPABASE_ANON_KEY;
+delete process.env.PIN_PEPPER;
 
 /* ---------------- hvem blir med ---------------- */
 

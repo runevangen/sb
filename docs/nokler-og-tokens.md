@@ -19,7 +19,8 @@ Ingenting her er hemmelig i seg selv. Navnene står i koden fra før; det er
 | `GITHUB_TOKEN` | lagring fra adminportalen | portalen svarer 503 | **ja — 90 dager** |
 | `SUPABASE_URL` | innlogging i appen | innloggingen svarer 503 | nei |
 | `SUPABASE_ANON_KEY` | innlogging i appen | innloggingen svarer 503 | ved rotering |
-| *(Resend API-nøkkel)* | e-posten med engangskoden | ingen kode i e-posten | nei — settes i Supabase, ikke i Netlify |
+| `PIN_PEPPER` | innlogging med fornavn og PIN | innloggingen svarer 503 | nei — **men kan ikke endres etterpå** |
+| *(Resend API-nøkkel)* | **parkert**: e-posten med engangskoden | ingenting i dag; appen sender ingen e-post | nei — settes i Supabase, ikke i Netlify |
 | `MET_KONTAKT` | valgfri kontaktadresse til MET | ingenting; været virker | nei |
 | `GITHUB_REPO` | valgfri: hvilket repo admin skriver til | `runevangen/sb` | — |
 | `GITHUB_BRANCH` | valgfri: hvilken gren | `main` | — |
@@ -30,7 +31,7 @@ configuration → Environment variables**.
 Bare én av dem dør av seg selv. Det er `GITHUB_TOKEN`, og avsnittet om
 hva som skjer den dagen står lenger nede.
 
-## De tre fellene som allerede har kostet tid
+## De fire fellene som allerede har kostet tid
 
 **1. Funksjonene leser miljøet ved utrulling.** En variabel du setter nå,
 finnes ikke for funksjonen som kjører nå. Etter *hver* endring i
@@ -51,6 +52,12 @@ deploy*).
 Fotballfunksjonen godtar begge skrivemåtene med vilje (`NOKKELNAVN` i
 `netlify/functions/fotball.mjs`), fordi akkurat denne feilen har skjedd.
 De andre godtar bare formen som står i tabellen over.
+
+**4. `PIN_PEPPER` kan ikke endres etter at den første kontoen er laget.**
+Passordet hos Supabase er avledet av pepperet, så et nytt pepper låser
+alle ut på én gang — og det ser ut som om alle plutselig husker PIN-en
+feil. Det finnes ingen vei tilbake annet enn å slette kontoene. Sett den
+én gang, før noen logger inn.
 
 ## Hver enkelt
 
@@ -123,9 +130,14 @@ rørt tokenet.
 
 ### `SUPABASE_URL` og `SUPABASE_ANON_KEY` — innlogging i appen
 
-Innloggingen i menyen: leseren skriver e-postadressen sin, får en
-engangskode, og er logget inn. Supabase Auth gjør jobben — utsteder
-koden, sender e-posten og gir ut økten.
+Innloggingen i menyen: leseren skriver et **fornavn og en PIN**, og er
+logget inn. Paret er kontoen. Supabase Auth gjør jobben — lagrer kontoen
+og gir ut økten.
+
+Engangskoden på e-post virker, men krever en avsender på et verifisert
+domene, og domenet er ikke kjøpt ennå. Hele det oppsettet står parkert på
+grenen `epost-innlogging` og er beskrevet nedenfor, så det kan hentes fram
+uten å finnes på nytt.
 
 - **Leses av:** `netlify/functions/konto.mjs`
 - **Sendes som:** headeren `apikey` til `<SUPABASE_URL>/auth/v1/…`
@@ -143,11 +155,82 @@ domene. Ingen tredjepartsskript i `index.html`, ingen informasjonskapsel
 fra noen andre, og ingenting å gjøre om Supabase en dag bytter SDK. Det
 er samme regel som for API-Football, av en annen grunn.
 
-**Dette er første gang appen lagrer noe om en person.** Adressen ligger
+**Dette er første gang appen lagrer noe om en person.** Fornavnet ligger
 hos Supabase, økten ligger i leserens egen `localStorage`, og ingenting
 ligger hos oss. Velg region i Supabase bevisst (EU), og husk at en
 personvernerklæring og en måte å be om sletting på hører til her — det er
 ikke kode, men det hører til denne nøkkelen.
+
+### `PIN_PEPPER` — innlogging med fornavn og PIN
+
+- **Leses av:** `netlify/functions/konto.mjs`
+- **Brukes til:** passordet hos Supabase er PIN-en pluss dette pepperet
+  (`pinPassord()` i `pin-data.js`)
+- **Uten den:** `503`, og panelet sier at den mangler når det åpnes
+- **Lages av:** deg. En lang, tilfeldig streng — `openssl rand -base64 32`
+  eller hva som helst du ikke skal huske.
+
+**Den kan ikke endres etter at den første kontoen er laget.** Passordet
+hos tjenesten er avledet av pepperet, så et nytt pepper låser alle ut, og
+det finnes ingen vei tilbake annet enn å slette kontoene. Sett den én
+gang, før første innlogging.
+
+Hvorfor et pepper i det hele tatt — to konkrete grunner:
+
+1. **Fire siffer er 10 000 forsøk.** Uten pepperet kunne hvem som helst
+   gjette dem rett mot Supabase sitt eget endepunkt, som ligger åpent.
+   Med pepperet må gjettingen gjennom vår egen funksjon, på vårt eget
+   domene.
+2. **Supabase krever minst seks tegn i et passord.** En PIN på fire er
+   kortere enn det og ville blitt avvist ved den første innloggingen — med
+   en melding om passordlengde som ingen ville koblet til PIN-feltet.
+
+Dette gjør ikke en PIN på fire siffer til et passord, og appen later ikke
+som. Ingenting er låst bak innloggingen: det verste den som kommer seg inn
+kan gjøre, er å skrive «jeg blir med» i en annens navn.
+
+#### Det som må stilles i Supabase for PIN
+
+Kontoen lagres som en e-postadresse hos Supabase, fordi det er det
+Supabase Auth kjenner. Adressen lages av fornavnet:
+`ola@pin.mvp-sb.netlify.app` (`PIN_DOMENE` i `pin-data.js`). **Ingen
+e-post sendes noe sted** — adressen er en nøkkel, ikke en postkasse, og
+den vises aldri i appen.
+
+Derfor må to innstillinger stå riktig:
+
+| Sted | Innstilling | Verdi |
+| --- | --- | --- |
+| *Authentication* → *Sign In / Providers* → Email | **Confirm email** | **av** |
+| *Authentication* → *Sign In / Providers* → Email | Minimum password length | 6 (standard, og pepperet dekker den) |
+
+Står *Confirm email* på, venter Supabase på at noen skal klikke i en
+e-post som aldri kommer, og den første innloggingen svarer 200 uten økt.
+Funksjonen kjenner igjen nøyaktig det og svarer 503 med en melding som
+peker hit — framfor «uventet svar», som ikke hjelper noen.
+
+**Fornavn er unike.** «Ola» er én konto. Prøver en annen Ola samme navn
+med en annen PIN, får hen ««Ola» er tatt. Er PIN-en feil, eller skal du
+velge et annet navn?» At navnet er tatt sier vi rett ut — et fornavn i en
+vennegjeng er ingen hemmelighet, og alternativet er «feil PIN» på en PIN
+som stemmer. Sletter noen kontoen sin, blir navnet ledig igjen.
+
+
+### Parkert: engangskode på e-post
+
+**Alt fra her til «Tabellen kampsvar» gjelder e-postinnloggingen, som
+ikke er i bruk i dag.** Koden, malene, avsenderen og de fire fellene i
+e-postoppsettet står
+her fordi de kostet halvannen dag å finne, og fordi de skal hentes fram
+igjen når avsenderdomenet er kjøpt. Selve koden ligger komplett på grenen
+`epost-innlogging`:
+
+```
+git checkout epost-innlogging -- konto-data.js netlify/functions/konto.mjs app.js index.html
+```
+
+Rekkefølgen den dagen: kjøp domenet → verifiser i Resend → bytt *Sender
+email* i Supabase → hent fram grenen → deploy.
 
 #### Koden i e-posten krever egen SMTP
 
@@ -274,7 +357,7 @@ app-passord fra `myaccount.google.com/apppasswords` uten mellomrom. Taket
 er rundt 500 i døgnet, og app-utsending ligger i utkanten av Googles
 vilkår, så det er en nødluke og ikke et oppsett.
 
-#### Tabellen «kampsvar» — hvem blir med
+### Tabellen «kampsvar» — hvem blir med
 
 Innloggingen alene trenger ingen tabell. «Jeg blir med» gjør det, og den
 lages én gang med SQL-en under (Supabase → *SQL Editor*). Til den finnes,
@@ -313,7 +396,7 @@ create policy "slett eget svar" on kampsvar
 `unique (kamp_id, bruker)` er det som gjør at to «jeg blir med» på samme
 kamp er én person og ikke to: funksjonen skriver som en upsert.
 
-#### Sletting av egen konto
+### Sletting av egen konto
 
 Å slette en bruker krever normalt admin-tilgang hos Supabase, og en
 `service_role`-nøkkel som kan slette hvem som helst. Den nøkkelen finnes
@@ -458,13 +541,15 @@ Det du ser først, og hva det som regel betyr.
 | Tabellen viser i fjor, uten feilmelding | `THESPORTSDB_KEY` mangler, er utløpt, eller svaret ble avkortet | se `forsok` på `/api/fotball/tabell` |
 | `/api/konto` eller `/api/svar` svarer 404 | funksjonen er ikke merget til `main` enda | test mot deploy-preview-adressen |
 | Innlogging: «Innloggingen er ikke satt opp: X mangler» | X ikke satt i Netlify — eller deployen er eldre enn variabelen | sett X, trigger deploy |
-| Innlogging: «Koden stemmer ikke, eller den er for gammel» | feil eller utløpt kode — samme svar med vilje | be om ny kode |
-| Innlogging: «For mange forsøk» (429) | Supabase sperrer e-postsending en stund | vent et minutt |
-| Innlogging: «Fikk ikke sendt koden» | se `forsok` i svaret fra `/api/konto` | som regel feil `SUPABASE_URL` |
-| E-posten har en lenke, ingen kode | malene er låst til egen SMTP er satt opp | se avsnittet over |
-| Bare én adresse får kode; andre får 500 | Resends testavsender leverer bare til kontoeieren | verifiser et eget domene, og bytt *Sender email* i Supabase |
-| Koden avvises (403) selv om den er fersk | koden er lengre enn appen tar imot, eller slås opp med feil type | begge deler er rettet i koden; sjekk «Email OTP Length» i Supabase mot `KODE_MAKS` |
-| «Fikk ikke sendt koden» og ingenting i Resend-loggen | SMTP-påloggingen avvises — som regel `Resend` med stor R | skriv `resend`, lim inn nøkkelen på nytt |
+| Innlogging: «Navnet eller PIN-en stemmer ikke» | feil PIN, eller `PIN_PEPPER` er endret etter at kontoen ble laget | sett pepperet tilbake; endres det, må kontoene lages på nytt |
+| Innlogging: ««Ola» er tatt» | fornavnet er én konto, og noen andre har det | velg et annet fornavn |
+| Innlogging: «krever at e-postbekreftelse er slått av» | *Confirm email* står på i Supabase | slå den av; adressen er en nøkkel, ikke en postkasse |
+| Innlogging: «For mange forsøk» (429) | Supabase sperrer en stund | vent et minutt |
+| Innlogging: alle får «stemmer ikke» etter en deploy | `PIN_PEPPER` er byttet eller borte | se pepper-avsnittet |
+| *(parkert, e-post)* E-posten har en lenke, ingen kode | malene er låst til egen SMTP er satt opp | se det parkerte avsnittet |
+| *(parkert, e-post)* Bare én adresse får kode; andre får 500 | Resends testavsender leverer bare til kontoeieren | verifiser et eget domene, og bytt *Sender email* i Supabase |
+| *(parkert, e-post)* Koden avvises (403) selv om den er fersk | koden er lengre enn appen tar imot, eller slås opp med feil type | begge deler er rettet i koden; sjekk «Email OTP Length» i Supabase mot `KODE_MAKS` |
+| *(parkert, e-post)* «Fikk ikke sendt koden» og ingenting i Resend-loggen | SMTP-påloggingen avvises — som regel `Resend` med stor R | skriv `resend`, lim inn nøkkelen på nytt |
 | «Tabellen «kampsvar» finnes ikke i Supabase ennå» | SQL-en over er ikke kjørt | kjør den i Supabase → SQL Editor |
 | «Slettingen er ikke satt opp i Supabase ennå» | `slett_meg()` er ikke laget | kjør SQL-en for sletting |
 | «Jeg blir med»: «Økten gjelder ikke lenger» | utløpt økt, eller reglene slipper ikke skrivingen gjennom | logg inn på nytt; sjekk policyene |
@@ -527,6 +612,7 @@ sendes videre til hvem som helst:
 
 ```
 /api/visninger                        → {"klar":true,"mangler":[]}
+/api/konto                            → {"klar":true,"mangler":[]}
 /api/fotball/tabell?liga=eliteserien  → kilde + forsok
 /api/vaer?arena=<navn>&naar=<iso>     → forsok ved feil
 ```
