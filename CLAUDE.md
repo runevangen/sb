@@ -424,12 +424,16 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   og `mangler`), ikke når leseren trykker Send: får du vite at
   innloggingen ikke er satt opp først etter at adressen er skrevet inn,
   var skrivingen til ingen nytte. Samme grep som i adminportalen.
-- Første innlogging med en ny adresse går signup-veien hos Supabase, og
-  da heter kodetypen «signup», ikke «email». Utenfra ser en avvist kode
-  og en kode sendt med feil type helt like ut, så funksjonen prøver
-  begge: først «email», og ved avvisning én gang til som «signup». Bare
-  der det første ble avvist — en tjenestefeil (5xx) eller en sperre (429)
-  gir aldri et kall til.
+- Supabase lagrer koden ulikt etter hvilken vei adressen kom inn: en
+  adresse som ikke fantes fra før får den som «signup», en som finnes
+  som «magiclink», og nyere utgaver godtar «email» som fellesnavn.
+  Utenfra ser alle tre like ut — en kode slått opp med feil type og en
+  kode som faktisk er feil gir samme 403 — så funksjonen prøver dem i
+  rekkefølge (`KODETYPER`), vanligst først, og stopper ved første som
+  slipper gjennom. Bare avvisninger gir et forsøk til: en tjenestefeil
+  (5xx) eller en sperre (429) legger aldri en runde til på noe som alt
+  er galt et annet sted. Dette kostet en kveld: koden kom fram, ble
+  avvist med 403, og både SMTP, maler og nøkler var i orden hele tiden.
 - Feil kode og utløpt kode får samme svar. At en kode fantes, er i seg
   selv noe om adressen. Tjenestens egen melding følger likevel med i
   `forsok`: den skiller ikke på de to tilfellene — det er samme setning
@@ -491,7 +495,7 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 ## Testing
 
     node test/unit.mjs      350 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  176 tester, ~250 ms, ingen nettleser
+    node test/funksjon.mjs  178 tester, ~250 ms, ingen nettleser
     node test/run.mjs       267 tester, ~170 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da

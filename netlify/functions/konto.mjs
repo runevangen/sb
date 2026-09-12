@@ -21,6 +21,10 @@
 import { normaliserEpost, gyldigEpost, normaliserKode, gyldigKode, tolkOkt }
   from "../../konto-data.js";
 
+// Rekkefolgen er den vi tror er vanligst forst, sa de fleste
+// innloggingene koster ett kall.
+const KODETYPER = ["email", "magiclink", "signup"];
+
 export default async (req) => {
   const mangler = manglerIOppsettet();
 
@@ -77,26 +81,29 @@ async function loggInn(inn) {
   if (!gyldigEpost(epost)) return svar({ feil: "Skriv en e-postadresse" }, 400);
   if (!gyldigKode(kode)) return svar({ feil: "Koden er seks siffer" }, 400);
 
-  let r = await hosSupabase("/auth/v1/verify", {
-    email: epost,
-    token: kode,
-    type: "email",
-  });
-
-  // Forste innlogging med en ny adresse gar signup-veien, og da heter
-  // typen «signup» framfor «email». Utenfra ser de to tilfellene helt
-  // like ut — en avvist kode og en kode sendt med feil type gir samme
-  // svar — sa vi kan ikke vite hvilken det er for vi har prov d. Derfor
-  // ett forsok til, og bare der det forste ble avvist: en tjenestefeil
-  // eller en sperre skal ikke gi et kall til.
-  if (!r.ok && r.status > 0 && r.status < 500 && r.status !== 429) {
-    const paNytt = await hosSupabase("/auth/v1/verify", {
+  // Supabase lagrer koden ulikt etter hvilken vei adressen kom inn: en
+  // adresse som ikke fantes fra for far den som «signup», en som finnes
+  // som «magiclink», og nyere utgaver godtar «email» som fellesnavn.
+  // Utenfra ser alle tre like ut: en kode slatt opp med feil type og en
+  // kode som faktisk er feil gir samme 403. Vi kan altsa ikke vite
+  // hvilken det er for vi har prov d, og leseren skal ikke trenge a vite
+  // det heller.
+  //
+  // Bare avvisninger gir et forsok til. En tjenestefeil (5xx) eller en
+  // sperre (429) skal aldri legge en runde til pa noe som alt er galt et
+  // annet sted.
+  let r = null;
+  for (const type of KODETYPER) {
+    const forsok = await hosSupabase("/auth/v1/verify", {
       email: epost,
       token: kode,
-      type: "signup",
+      type,
     });
-    if (paNytt.ok) r = paNytt;
-    else r.forsok = r.forsok.concat(paNytt.forsok);
+    if (forsok.ok) { r = forsok; break; }
+
+    if (r) forsok.forsok = r.forsok.concat(forsok.forsok);
+    r = forsok;
+    if (!(r.status > 0 && r.status < 500 && r.status !== 429)) break;
   }
 
   // Feil kode og utlopt kode far samme svar: at en kode fantes er i seg

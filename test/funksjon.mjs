@@ -807,12 +807,12 @@ ok("okta har et utlopstidspunkt, ikke et antall sekunder",
 // Forste innlogging med en ny adresse gar signup-veien: da heter typen
 // «signup», ikke «email». Utenfra ser en avvist kode og en feil type helt
 // like ut, sa den ene ma proves for vi vet.
-function stubSignup(oktSvar) {
+function stubType(riktigType, oktSvar) {
   const kall = [];
   global.fetch = async (url, opsjoner) => {
     kall.push({ url: String(url), opsjoner: opsjoner || {} });
     const type = JSON.parse(opsjoner.body || "{}").type;
-    if (type === "signup") {
+    if (type === riktigType) {
       return new Response(JSON.stringify(oktSvar), { status: 200 });
     }
     return new Response(JSON.stringify({ error: "invalid_grant",
@@ -821,13 +821,27 @@ function stubSignup(oktSvar) {
   return kall;
 }
 
-kall = stubSignup(OKT);
+// Den vanligste veien: nyere utgaver godtar «email», og da koster
+// innloggingen ett kall.
+kall = stubType("email", OKT);
 r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
-ok("en ny adresse slipper inn pa andre forsok",
+ok("den vanligste veien koster ett kall",
+   r.status === 200 && kall.length === 1, r.status + " " + kall.length);
+
+// En adresse som finnes fra for far koden lagret som «magiclink».
+kall = stubType("magiclink", OKT);
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
+ok("en kjent adresse slipper inn som magiclink",
    r.status === 200 && (await r.json()).token === "okt-token-123", r.status);
-ok("og de to forsokene skiller seg pa typen",
-   kall.length === 2 && JSON.parse(kall[0].opsjoner.body).type === "email" &&
-   JSON.parse(kall[1].opsjoner.body).type === "signup",
+
+// En adresse som ikke fantes, far den som «signup».
+kall = stubType("signup", OKT);
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
+ok("en ny adresse slipper inn som signup",
+   r.status === 200 && (await r.json()).token === "okt-token-123", r.status);
+ok("og de tre forsokene skiller seg bare pa typen",
+   kall.length === 3 &&
+   kall.map((k) => JSON.parse(k.opsjoner.body).type).join(",") === "email,magiclink,signup",
    kall.map((k) => JSON.parse(k.opsjoner.body).type).join(","));
 
 // En tjenestefeil eller en sperre skal ikke gi et kall til.
@@ -850,12 +864,12 @@ ok("feil kode gir 401 uten a rope noe", r.status === 401 &&
    feilKode.feil === "Koden stemmer ikke, eller den er for gammel.",
    r.status + " " + feilKode.feil);
 // En kode som er feil, er feil begge veier — og da er begge forsokene brukt.
-ok("en avvist kode provers begge veier for den gis opp", kall.length === 2,
+ok("en avvist kode provers alle veier for den gis opp", kall.length === 3,
    kall.length);
 // Meldingen skiller ikke pa feil og utlopt kode, sa den roper ingenting
 // om adressen — men den sier hva som faktisk ble prov d.
 ok("tjenestens egen melding folger med avvisningen",
-   (feilKode.forsok || []).length === 2 &&
+   (feilKode.forsok || []).length === 3 &&
    feilKode.forsok[0].melding.indexOf("Token has expired") > -1,
    JSON.stringify(feilKode.forsok));
 ok("og den royper ikke adressen",
