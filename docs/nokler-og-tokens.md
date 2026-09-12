@@ -192,7 +192,10 @@ kompromiss, tatt fordi EU-alternativene ikke lot seg registrere.
    Skal du bare prøve først, kan `onboarding@resend.dev` brukes som
    avsender uten DNS — men den sender bare til din egen kontoadresse.
 
-**I Supabase** (*Project Settings* → *Authentication* → *SMTP Settings*):
+**I Supabase** (*Authentication* → *Emails* → *Set up SMTP*). Merk stien:
+SMTP ligger sammen med malene, ikke under *Project Settings*. Panelet
+flytter pa disse sidene fra tid til annen — leter du, er det siden med
+*Subject* og *Body* du skal til:
 
 | Felt | Verdi |
 | --- | --- |
@@ -211,9 +214,12 @@ Feltnavnene kan ha flyttet seg siden dette ble skrevet (12. september
 - Malene låses opp i samme øyeblikk. Da — og først da — kan `{{ .Token }}`
   legges inn, som beskrevet over. Rekkefølgen er SMTP først, mal etterpå.
 - Supabase har en egen grense for hvor mange e-poster som sendes per time
-  (*Authentication* → *Rate limits*). Den står lavt fra start og kan
+  (*Authentication* → *Rate Limits*). Den står lavt fra start og kan
   heves når SMTP er på plass. Treffer du «For mange forsøk» under
   testing, er det som regel den, ikke avsenderen.
+- Skal e-posten bort fra innloggingen en gang, er det *Authentication* →
+  *Sign In / Providers* som er stedet. Da slås Google på, og hele
+  SMTP-oppsettet blir overflødig.
 
 API-nøkkelen hører hjemme i Resend og i Supabase — ikke i Netlify og ikke
 i dette repoet. Appen sender ingen e-post selv; den ber Supabase gjøre
