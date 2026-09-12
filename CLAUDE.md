@@ -14,6 +14,8 @@ prosjektet `mvp-sb`.
     docs/         dypdykk og notater som ikke er kode
                   nokler-og-tokens.md: alle hemmeligheter, hvor de settes,
                   hva som svikter uten dem, og hvordan de fornyes
+                  oppsett.sql: all SQL-en Supabase trenger, i rekkefølge,
+                  trygg å kjøre om igjen
 
     fotball.js                    fotballmodulen (beta): visningen
     fotball-data.js               samme modul: rene funksjoner

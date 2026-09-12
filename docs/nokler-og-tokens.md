@@ -9,6 +9,11 @@ hva som ryker når den dør.
 Ingenting her er hemmelig i seg selv. Navnene står i koden fra før; det er
 *verdiene* som aldri skal inn i et repo, en chat eller et skjermbilde.
 
+**Skal du sette opp Supabase fra bunnen:** all SQL-en står samlet og i
+rekkefølge i [`oppsett.sql`](oppsett.sql) — lim hele fila inn i Supabase →
+*SQL Editor* → *Run*. Den kan kjøres flere ganger. Forklaringen på hvorfor
+hver bit finnes står her.
+
 ## Kortversjonen
 
 | Variabel | Trengs for | Uten den | Utløper? |
