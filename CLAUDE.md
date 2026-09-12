@@ -28,7 +28,8 @@ prosjektet `mvp-sb`.
     pin-data.js                     innlogging med fornavn og PIN: rene funksjoner
     konto-data.js                   innlogging: rene funksjoner (økt, og den
                                     parkerte e-posthalvdelen)
-    netlify/functions/konto.mjs     samme: konto og økt via Supabase Auth
+    netlify/functions/konto.mjs     samme: konto og økt via Supabase Auth,
+                                    og hvilke fornavn som er tatt
     svar-data.js                    «jeg blir med»: rene funksjoner
     netlify/functions/svar.mjs      samme: lesing for alle, skriving med din egen økt
 
@@ -394,13 +395,21 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   andre, eller til en annen telefon: å dele hvor du ser kampen, og å ta
   med favorittlagene dine. En knapp i menyen ser ut som en port, så
   panelet sier med ord at den ikke er det — teksten står ett sted
-  (`KONTO_TEKST` i `app.js`) for begge tilstandene, og en nettlesertest
-  sjekker at feeden står ferdig før noen har logget inn.
-- **Fornavn og PIN, ett trykk.** Første gang velger du de to, neste gang
-  skriver du de samme, og er inne — også på en annen telefon. Paret *er*
-  kontoen. Ingen mellomsteg og ingen registreringsskjerm: er navnet nytt,
-  lages kontoen i samme kall, og leseren skal ikke trenge å vite om hen
-  registrerer seg eller logger inn.
+  (`KONTO_TEKST` i `app.js`) for alle fire tilstandene, og en
+  nettlesertest sjekker at feeden står ferdig før noen har logget inn.
+- **Fornavn og PIN.** Første gang velger du de to, neste gang skriver du
+  de samme, og er inne — også på en annen telefon. Paret *er* kontoen.
+- **To steg: navnet først, PIN-en etterpå**, og det er ikke kosmetikk.
+  Er navnet ledig, *lages* en PIN der og da, og da må den gjentas: vi har
+  ingen e-post å sende en ny kode til, så en feiltastet PIN ved
+  opprettelse gjør kontoen utilgjengelig og brenner navnet. Er navnet
+  kjent, står det «skriv PIN-en du valgte» og ett felt — den som kommer
+  tilbake skal ikke møte noe som ser ut som en registrering. Steg to
+  viser navnet som overskrift, så du ser hvem du er i ferd med å bli, og
+  «Bytt navn» er veien tilbake. Formen er hentet fra Dagslogg-appen.
+- At de to PIN-ene er like sjekkes i appen, ikke hos tjenesten: en
+  tjeneste kan ikke se at du tastet feil to ganger på rad, og en konto
+  laget med feil PIN er ikke til å rette opp.
 - **Hvorfor ikke engangskode på e-post:** den virker, men avsenderen må
   ligge på et verifisert domene for at andre enn kontoeieren skal få
   koden, og domenet er ikke kjøpt. Hele e-postinnloggingen — funksjonen,
@@ -446,6 +455,19 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   et fornavn i en vennegjeng er ingen hemmelighet, og alternativet er
   «feil PIN» på en PIN som stemmer. Sletter noen kontoen, blir navnet
   ledig igjen.
+- **Hvilke fornavn som er tatt står i `pin_kontoer`**, en tabell med bare
+  slugen. Supabase Auth har med vilje ingen «finnes denne?»-vei utenfra,
+  og admin-veien krever en `service_role`-nøkkel som ikke finnes her.
+  Fremmednøkkelen står med `on delete cascade`, så lista kan ikke lyve:
+  sletter noen kontoen sin, blir fornavnet ledig samme øyeblikk. Raden
+  føres opp med den nye leserens egen økt, rett etter at kontoen er
+  laget; feiler den, er du likevel logget inn — kontoen finnes hos
+  Supabase uansett hva lista sier — så det logges framfor å rulle
+  tilbake noe vi ikke kan rulle tilbake. Uten tabellen svarer
+  `/api/konto` 503 og sier nøyaktig det, som `kampsvar`.
+- Navnet sendes som POST, ikke i en spørring: en adresse havner i
+  tilgangsloggene hos hvert ledd underveis, og et fornavn hører ikke
+  hjemme der.
 - Supabase svarer 200 uten økt i to tilfeller som betyr helt ulike ting,
   og skillet er `identities`: en tom liste er tjenestens måte å si «denne
   finnes alt» uten å rope det, mens en full liste betyr at *Confirm
@@ -597,8 +619,8 @@ er i seg selv noe om adressen.
 ## Testing
 
     node test/unit.mjs      379 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  186 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       279 tester, ~170 s, headless Chromium
+    node test/funksjon.mjs  194 tester, ~250 ms, ingen nettleser
+    node test/run.mjs       287 tester, ~180 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
@@ -611,7 +633,9 @@ i det hele tatt starter.
 `funksjon.mjs` kaller Netlify-funksjonene direkte med et stubbet `fetch`:
 statuskoder, cache-headere, at API-nøkkelen, Supabase-nøkkelen og
 PIN-pepperet går til tjenesten og ikke til leseren, at en ny konto lages i
-samme kall som innloggingen, at et fornavn som er tatt sier det, og at
+samme kall som innloggingen, at et fornavn som er tatt sier det både før
+og etter at PIN-en tastes, at et nytt navn føres opp i kontolista med
+leserens egen økt, og at
 TheSportsDB prøves først for årets neste runde og faller
 tilbake når den svikter, og at værfunksjonen identifiserer seg for MET.
 Ingen nøkkel og ingen nettverk kreves. Én test lar en tjener tie for å se
@@ -632,8 +656,10 @@ fokusfella, korthøyden, at toppfeltet krymper, paginering, ruting,
 visningsvalgene i menyen, favorittlag fra stjerne til feed, deling av en
 kamp med sted og pubforslag, den delte lenka som åpner kampen den peker
 på hos mottakeren, adminportalen fra innlogging til lagring, innlogging i
-appen fra fornavn og PIN til utlogging — med feeden ferdig lastet før
-noen har logget inn — «jeg blir med» fra navn til angring, og hele
+appen i to steg — et ledig navn som ber om PIN-en to ganger, to ulike
+PIN-er som stoppes før kontoen lages, «bytt navn» som tømmer det du
+tastet, og et kjent navn som bare ber om PIN-en — med feeden ferdig
+lastet før noen har logget inn, «jeg blir med» fra navn til angring, og hele
 fotballmodulen — fanebytte, tabell, resultater, neste runde, dyplenker og
 feilmelding fra tjenesten.
 

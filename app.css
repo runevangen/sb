@@ -407,6 +407,21 @@ body {
   color: var(--text-dim);
 }
 
+/* Navnet du er i ferd med a logge inn som. Star som en overskrift, ikke
+   som en setning: det skal kunne leses i et blunk, og det er svaret pa
+   «hvem er dette». */
+.konto-hvem {
+  margin: 0;
+  font-family: 'Barlow Condensed', 'Inter', sans-serif;
+  font-size: calc(19px * var(--fs));
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.konto-hvem[hidden] { display: none; }
+
 .konto-felt {
   width: 100%;
   padding: 9px 10px;
@@ -465,6 +480,7 @@ body {
 
 .konto-send:disabled { opacity: 0.45; cursor: default; }
 .konto-send[hidden], .konto-ut[hidden] { display: none; }
+.konto-send, .konto-ut { -webkit-appearance: none; }
 
 .konto-felt:focus-visible, .konto-send:focus-visible, .konto-ut:focus-visible {
   outline: 2px solid var(--accent);

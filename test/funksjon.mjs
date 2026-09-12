@@ -833,17 +833,65 @@ global.fetch = async (url, opsjoner) => {
   kall.push({ url: String(url), opsjoner: opsjoner || {} });
   steg++;
   const feil = { error_code: "invalid_credentials", msg: "Invalid login credentials" };
-  return new Response(JSON.stringify(steg === 1 ? feil : OKT),
-    { status: steg === 1 ? 400 : 200, headers: { "Content-Type": "application/json" } });
+  if (steg === 1) {
+    return new Response(JSON.stringify(feil),
+      { status: 400, headers: { "Content-Type": "application/json" } });
+  }
+  // Tredje kall er foringen i kontolista, som svarer 201 uten kropp.
+  if (steg >= 3) return new Response(null, { status: 201 });
+  return new Response(JSON.stringify(OKT),
+    { status: 200, headers: { "Content-Type": "application/json" } });
 };
 r = await konto(kontoBe({ handling: "logg-inn", navn: "Ola", pin: "1234" }));
 ok("et nytt navn far en konto i samme kall",
    r.status === 200 && (await r.json()).navn === "Ola", r.status);
 ok("og kontoen lages hos tjenesten, ikke her",
-   kall.length === 2 && kall[1].url.indexOf("/auth/v1/signup") > -1,
-   kall.length + " " + (kall[1] && kall[1].url));
+   kall[1].url.indexOf("/auth/v1/signup") > -1, kall[1].url);
 ok("med samme adresse og samme passord som innloggingen provde",
    kall[0].opsjoner.body === kall[1].opsjoner.body, kall[1].opsjoner.body);
+// Uten foringen ville neste person som skriver «Ola» fatt «lag en PIN» pa
+// et navn som er tatt — og det er den ene feilen vi ikke kan rette opp.
+ok("og navnet fores opp i kontolista",
+   kall.length === 3 && kall[2].url.indexOf("/rest/v1/pin_kontoer") > -1 &&
+   JSON.parse(kall[2].opsjoner.body).slug === "ola",
+   kall.length + " " + (kall[2] && kall[2].url));
+// Raden skrives med leserens egen okt, ikke med en nokkel som kan skrive
+// hva som helst: reglene i databasen slipper bare gjennom din egen rad.
+ok("med leserens egen okt, og uten a si hvem brukeren er",
+   kall[2].opsjoner.headers.Authorization === "Bearer okt-token-123" &&
+   JSON.parse(kall[2].opsjoner.body).bruker === undefined,
+   JSON.stringify(kall[2].opsjoner.headers));
+
+// Steg én i appen: er navnet nytt eller kjent? Uten dette vet ikke
+// panelet om det skal be om «Gjenta PIN-en».
+kall = stubSupabase([{ slug: "ola" }]);
+r = await konto(kontoBe({ handling: "finnes", navn: "  OLA " }));
+const finnesSvar = await r.json();
+ok("et navn som er tatt sier fra for PIN-en tastes",
+   r.status === 200 && finnesSvar.finnes === true, r.status + " " + JSON.stringify(finnesSvar));
+ok("og navnet kommer renset tilbake", finnesSvar.navn === "OLA", finnesSvar.navn);
+// Slaas opp pa slugen, ikke pa navnet: «Ola» og «ola» er samme konto.
+ok("oppslaget gar pa slugen",
+   kall[0].url.indexOf("slug=eq.ola") > -1, kall[0].url);
+
+kall = stubSupabase([]);
+r = await konto(kontoBe({ handling: "finnes", navn: "Nykar" }));
+ok("et ledig navn sier ogsa fra",
+   r.status === 200 && (await r.json()).finnes === false, r.status);
+
+kall = stubSupabase({});
+r = await konto(kontoBe({ handling: "finnes", navn: "•" }));
+ok("et navn som ikke er et navn stoppes for oppslaget",
+   r.status === 400 && kall.length === 0, r.status + " " + kall.length);
+
+// Den som setter opp prosjektet trenger a hore nyaktig dette.
+kall = stubSupabase({ code: "42P01", message: "relation \"pin_kontoer\" does not exist" }, 404);
+r = await konto(kontoBe({ handling: "finnes", navn: "Ola" }));
+const utenListe = await r.json();
+ok("uten tabellen star det hva som mangler",
+   r.status === 503 && utenListe.feil.indexOf("pin_kontoer") > -1 &&
+   utenListe.feil.indexOf("docs/nokler-og-tokens.md") > -1,
+   r.status + " " + utenListe.feil);
 
 // Navnet finnes med en annen PIN. Det sier vi rett ut: et fornavn i en
 // vennegjeng er ingen hemmelighet, og alternativet er at «Ola» far «feil

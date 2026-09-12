@@ -1286,16 +1286,31 @@ const KONTO_KEY = "sb-konto";
 // et verifisert domene, og domenet er ikke kjopt enda. E-postinnloggingen
 // star komplett pa grenen `epost-innlogging`.
 const KONTO_TEKST = {
-  ute: "Du trenger ikke konto for å lese eller følge fotballen — alt det"
+  navn: "Du trenger ikke konto for å lese eller følge fotballen — alt det"
     + " virker uten. Innlogging er for å dele hvor du ser kampen, og for å"
-    + " ta med favorittlagene dine mellom telefoner. Velg et fornavn og en"
-    + " PIN: de to er kontoen din, og fornavnet er det vennene ser.",
+    + " ta med favorittlagene dine mellom telefoner. Skriv fornavnet ditt:"
+    + " det er det vennene ser.",
+  // Den som lager en PIN her, kan ikke be om en ny. Det skal stå før den
+  // tastes, ikke etter.
+  ny: "PIN-en er en lett sperre mellom folk som deler en telefon, ikke ekte"
+    + " sikkerhet — ingenting i appen er låst bak den. Men vi har ingen"
+    + " e-post å sende deg en ny med, så skriv den to ganger, og bruk en du"
+    + " ikke bruker andre steder.",
+  kjent: "Skriv PIN-en du valgte. Er du ikke denne personen, bytt navn."
+    + " Favorittlagene og «jeg blir med» følger kontoen, ikke telefonen.",
   inne: "Du er logget inn. Deling av kamper og favoritter kommer hit først."
     + " Resten av appen virker som før, med eller uten konto.",
 };
 
 let kontoOkt = lesKonto();
 let kontoOppsett = null;
+
+// Hvilket steg panelet star pa: «navn», «ny» (navnet er ledig, PIN-en
+// lages) eller «kjent» (navnet finnes, PIN-en skrives). Steget avgjor
+// hva knappen heter og om «Gjenta» star der — og det er `finnes`-kallet
+// som setter det, ikke noe appen gjetter.
+let kontoSteg = "navn";
+let kontoNavnet = "";
 
 function lesKonto() {
   let lagret = null;
@@ -1333,20 +1348,29 @@ function kontoSvar(tekst) {
 // ikke kan bli to ulike ting. En okt fra e-postinnloggingen kan ligge
 // igjen i en telefon; da star adressen maskert, som for, fordi appen
 // leses i en sofa med flere i.
+//
+// Utlogget tegnes ett av tre steg. Panelet er lite, sa bare det som
+// hoerer til steget star der: ett felt, en knapp, en setning.
 function visKonto() {
   const tekst = document.getElementById("kontoBtnTekst");
+  const hvem = document.getElementById("kontoHvem");
   const navn = document.getElementById("kontoNavn");
   const pin = document.getElementById("kontoPin");
+  const pin2 = document.getElementById("kontoPin2");
   const send = document.getElementById("kontoSend");
+  const bytt = document.getElementById("kontoBytt");
   const ut = document.getElementById("kontoUt");
   const slett = document.getElementById("kontoSlett");
   const note = document.getElementById("kontoNote");
 
   if (kontoOkt) {
     tekst.textContent = kontoOkt.navn || maskerEpost(kontoOkt.epost);
+    hvem.hidden = true;
     navn.hidden = true;
     pin.hidden = true;
+    pin2.hidden = true;
     send.hidden = true;
+    bytt.hidden = true;
     ut.hidden = false;
     slett.hidden = false;
     note.textContent = KONTO_TEKST.inne;
@@ -1359,10 +1383,33 @@ function visKonto() {
   slett.dataset.sikker = "nei";
   slett.textContent = "Slett kontoen min";
   send.hidden = false;
-  navn.hidden = false;
-  pin.hidden = false;
-  send.textContent = "Logg inn";
-  note.textContent = KONTO_TEKST.ute;
+
+  const paNavn = kontoSteg === "navn";
+  hvem.hidden = paNavn;
+  hvem.textContent = paNavn ? "" : kontoNavnet;
+  navn.hidden = !paNavn;
+  pin.hidden = paNavn;
+  // «Gjenta» star bare nar en PIN lages. Den som skriver en PIN hen alt
+  // har, skal ikke skrive den to ganger.
+  pin2.hidden = kontoSteg !== "ny";
+  bytt.hidden = paNavn;
+
+  send.textContent = paNavn ? "Fortsett"
+    : (kontoSteg === "ny" ? "Opprett konto" : "Logg inn");
+  note.textContent = KONTO_TEKST[kontoSteg];
+}
+
+// Tilbake til navnefeltet. Bytter du navn, er ingenting av det du skrev i
+// PIN-feltene lenger ditt — de tommes, sa neste navn ikke arver forrige
+// PIN.
+function kontoTilbake() {
+  kontoSteg = "navn";
+  kontoNavnet = "";
+  document.getElementById("kontoPin").value = "";
+  document.getElementById("kontoPin2").value = "";
+  visKonto();
+  kontoSvar("");
+  document.getElementById("kontoNavn").focus();
 }
 
 // Oppsettet sjekkes nar panelet apnes, ikke nar leseren trykker Send:
@@ -1417,36 +1464,75 @@ function tjenestenSa(data) {
     (detalj ? (sist.status ? ": " : "") + detalj : "") + ")";
 }
 
-// Ett trykk, to felt. Ingen mellomsteg: er navnet nytt, lages kontoen av
-// funksjonen i samme kall — leseren skal ikke trenge a vite om hen
-// registrerer seg eller logger inn.
+// To steg: navnet forst, PIN-en etterpa.
+//
+// Hvorfor ikke ett: er navnet nytt, *lages* en PIN na, og da ma den
+// gjentas — vi har ingen e-post a sende en ny kode til, sa en feiltastet
+// PIN ved opprettelse ville gjort kontoen utilgjengelig og navnet brent.
+// Og den som kommer tilbake skal fa «skriv PIN-en din», ikke et skjema
+// som ser ut som en registrering.
 async function kontoSteget() {
+  if (kontoSteg === "navn") return kontoNavnSteget();
+  return kontoPinSteget();
+}
+
+async function kontoNavnSteget() {
   const send = document.getElementById("kontoSend");
   const feltNavn = document.getElementById("kontoNavn");
-  const feltPin = document.getElementById("kontoPin");
   const navn = normaliserPinNavn(feltNavn.value);
-  const pin = normaliserPin(feltPin.value);
 
   if (!gyldigPinNavn(navn)) {
     kontoSvar("Skriv fornavnet ditt.");
     feltNavn.focus();
     return;
   }
+
+  send.disabled = true;
+  try {
+    const data = await kontoKall({ handling: "finnes", navn });
+    kontoNavnet = data.navn || navn;
+    kontoSteg = data.finnes ? "kjent" : "ny";
+    visKonto();
+    kontoSvar("");
+    document.getElementById("kontoPin").focus();
+  } catch (err) {
+    kontoSvar(err.message);
+  } finally {
+    send.disabled = false;
+  }
+}
+
+async function kontoPinSteget() {
+  const send = document.getElementById("kontoSend");
+  const feltPin = document.getElementById("kontoPin");
+  const feltPin2 = document.getElementById("kontoPin2");
+  const pin = normaliserPin(feltPin.value);
+
   if (!gyldigPin(pin)) {
     kontoSvar("PIN-en er minst " + PIN_MIN + " siffer.");
     feltPin.focus();
     return;
   }
+  // Sjekken skjer her, ikke hos tjenesten: to ulike PIN-er er ikke noe
+  // tjenesten kan se, og en konto laget med feil PIN er ikke til a rette
+  // opp.
+  if (kontoSteg === "ny" && pin !== normaliserPin(feltPin2.value)) {
+    kontoSvar("De to PIN-ene er ikke like.");
+    feltPin2.value = "";
+    feltPin2.focus();
+    return;
+  }
 
   send.disabled = true;
   try {
-    const okt = await kontoKall({ handling: "logg-inn", navn, pin });
+    const okt = await kontoKall({ handling: "logg-inn", navn: kontoNavnet, pin });
     lagreKonto(okt);
-    // PIN-en skal ikke sta igjen i feltet. Navnet blir staende: det er
-    // ikke hemmelig, og det er greit a se hvem man er logget inn som.
+    // PIN-en skal ikke sta igjen i feltene etterpa.
     feltPin.value = "";
+    feltPin2.value = "";
+    kontoSteg = "navn";
     visKonto();
-    kontoSvar("Logget inn som " + (okt.navn || navn) + ".");
+    kontoSvar("Logget inn som " + (okt.navn || kontoNavnet) + ".");
     track("Logget inn");
   } catch (err) {
     kontoSvar(err.message);
@@ -1457,7 +1543,10 @@ async function kontoSteget() {
 
 function loggUt() {
   lagreKonto(null);
+  kontoSteg = "navn";
+  kontoNavnet = "";
   document.getElementById("kontoPin").value = "";
+  document.getElementById("kontoPin2").value = "";
   visKonto();
   kontoSvar("Logget ut.");
   track("Logget ut");
@@ -1473,10 +1562,15 @@ document.getElementById("kontoBtn").addEventListener("click", () => {
   kontoSvar("");
   visKonto();
   sjekkKontoOppsett();
-  if (!kontoOkt) document.getElementById("kontoNavn").focus();
+  // Star panelet pa PIN-steget fra forrige apning, er navnefeltet skjult:
+  // fokus skal treffe det feltet som faktisk star der.
+  if (!kontoOkt) {
+    document.getElementById(kontoSteg === "navn" ? "kontoNavn" : "kontoPin").focus();
+  }
 });
 
 document.getElementById("kontoSend").addEventListener("click", kontoSteget);
+document.getElementById("kontoBytt").addEventListener("click", kontoTilbake);
 document.getElementById("kontoUt").addEventListener("click", loggUt);
 
 // Sletting er endelig, sa den krever to trykk: det forste sier hva som
@@ -1496,8 +1590,11 @@ document.getElementById("kontoSlett").addEventListener("click", async () => {
   try {
     await kontoKall({ handling: "slett", token: kontoOkt && kontoOkt.token });
     lagreKonto(null);
+    kontoSteg = "navn";
+    kontoNavnet = "";
     document.getElementById("kontoNavn").value = "";
     document.getElementById("kontoPin").value = "";
+    document.getElementById("kontoPin2").value = "";
     visKonto();
     kontoSvar("Kontoen er slettet.");
     track("Konto slettet");
@@ -1509,7 +1606,7 @@ document.getElementById("kontoSlett").addEventListener("click", async () => {
 });
 // Enter i et felt skal gjore det samme som knappen: feltene ligger ikke i
 // et skjema, fordi et skjema i menyen ville sendt sokeskjemaet.
-["kontoNavn", "kontoPin"].forEach((id) => {
+["kontoNavn", "kontoPin", "kontoPin2"].forEach((id) => {
   document.getElementById(id).addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); kontoSteget(); }
   });

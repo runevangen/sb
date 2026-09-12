@@ -357,6 +357,45 @@ app-passord fra `myaccount.google.com/apppasswords` uten mellomrom. Taket
 er rundt 500 i døgnet, og app-utsending ligger i utkanten av Googles
 vilkår, så det er en nødluke og ikke et oppsett.
 
+### Tabellen «pin_kontoer» — hvilke fornavn er tatt
+
+Innloggingen spør om navnet er nytt **før** PIN-en tastes, og det er ikke
+kosmetikk: er navnet nytt, *lages* en PIN der og da, og da må den
+gjentas. Vi har ingen e-post å sende en ny kode til, så en feiltastet PIN
+ved opprettelse gjør kontoen utilgjengelig og brenner navnet.
+
+Supabase Auth har med vilje ingen «finnes denne?»-vei utenfra, og
+admin-veien krever en `service_role`-nøkkel som ikke finnes i dette
+prosjektet. Derfor en liten tabell med bare slugen — ingen navn i
+klartekst utover det leseren selv skrev, ingen PIN, ingenting annet:
+
+```sql
+create table pin_kontoer (
+  slug   text primary key check (char_length(slug) between 2 and 24),
+  bruker uuid not null default auth.uid()
+         references auth.users (id) on delete cascade,
+  laget  timestamptz not null default now()
+);
+
+alter table pin_kontoer enable row level security;
+
+-- Hvem som helst kan få vite at et fornavn er tatt: appen sier det
+-- uansett, og alternativet er «feil PIN» på en PIN som stemmer.
+create policy "les for alle" on pin_kontoer
+  for select using (true);
+
+-- Føre opp et navn kan du bare i ditt eget. `bruker` settes av databasen
+-- fra økten, og funksjonen sender den aldri selv.
+create policy "før opp eget navn" on pin_kontoer
+  for insert to authenticated with check (bruker = auth.uid());
+```
+
+`on delete cascade` er det som gjør at lista ikke kan lyve: sletter noen
+kontoen sin, forsvinner raden samtidig, og fornavnet blir ledig igjen.
+Uten den ville lista holdt på navn ingen lenger eier.
+
+Til tabellen finnes, svarer `/api/konto` 503 og sier nøyaktig det.
+
 ### Tabellen «kampsvar» — hvem blir med
 
 Innloggingen alene trenger ingen tabell. «Jeg blir med» gjør det, og den
@@ -543,6 +582,8 @@ Det du ser først, og hva det som regel betyr.
 | Innlogging: «Innloggingen er ikke satt opp: X mangler» | X ikke satt i Netlify — eller deployen er eldre enn variabelen | sett X, trigger deploy |
 | Innlogging: «Navnet eller PIN-en stemmer ikke» | feil PIN, eller `PIN_PEPPER` er endret etter at kontoen ble laget | sett pepperet tilbake; endres det, må kontoene lages på nytt |
 | Innlogging: ««Ola» er tatt» | fornavnet er én konto, og noen andre har det | velg et annet fornavn |
+| «Tabellen «pin_kontoer» finnes ikke i Supabase ennå» | SQL-en over er ikke kjørt | kjør den i Supabase → SQL Editor |
+| Et kjent navn ber om «Gjenta PIN-en» | raden i `pin_kontoer` mangler — kontoen ble laget før tabellen fantes | før opp slugen for hånd, eller la personen slette og lage kontoen på nytt |
 | Innlogging: «krever at e-postbekreftelse er slått av» | *Confirm email* står på i Supabase | slå den av; adressen er en nøkkel, ikke en postkasse |
 | Innlogging: «For mange forsøk» (429) | Supabase sperrer en stund | vent et minutt |
 | Innlogging: alle får «stemmer ikke» etter en deploy | `PIN_PEPPER` er byttet eller borte | se pepper-avsnittet |

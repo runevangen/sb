@@ -28,7 +28,14 @@
 // ingenting annet, og ingenting her.
 
 import { tolkPinOkt, normaliserPinNavn, gyldigPinNavn, normaliserPin, gyldigPin,
-         pinEpost, pinPassord, PIN_MIN, PIN_MAKS } from "../../pin-data.js";
+         pinEpost, pinSlug, pinPassord, PIN_MIN, PIN_MAKS } from "../../pin-data.js";
+
+// Supabase Auth har med vilje ingen «finnes denne?»-vei utenfra, og vi
+// har ingen service_role-nokkel til admin-veien. Derfor en liten tabell
+// med bare slugen: den sier om et fornavn er tatt, og ingenting mer.
+// Fremmednokkelen star med on delete cascade, sa den kan aldri pasta at
+// et navn er tatt av en konto som er slettet.
+const KONTOLISTE = "pin_kontoer";
 
 export default async (req) => {
   const mangler = manglerIOppsettet();
@@ -48,12 +55,38 @@ export default async (req) => {
     return svar({ feil: "Uleselig forespørsel" }, 400);
   }
 
+  if (inn.handling === "finnes") return finnesNavnet(inn);
   if (inn.handling === "logg-inn") return loggInn(inn);
   if (inn.handling === "slett") return slettMeg(inn);
   return svar({ feil: "Ukjent handling" }, 400);
 };
 
 /* ---------- handlingene ---------- */
+
+// Steg ett: er navnet nytt eller kjent?
+//
+// Appen ma vite det for PIN-en skrives, av en grunn som ikke er kosmetisk:
+// er navnet nytt, *lages* en PIN na, og da ma den gjentas. En feiltastet
+// PIN ved opprettelse er ikke til a rette opp — vi har ingen e-post a
+// sende en ny kode til. Kontoen ville vaert utilgjengelig og navnet
+// brent.
+//
+// At vi svarer pa dette i det hele tatt, er et valg: e-postadresser sier
+// vi aldri noe om, men et fornavn i en vennegjeng er ingen hemmelighet,
+// og vi sier fra om at det er tatt uansett. Det star i CLAUDE.md.
+//
+// Navnet sendes som POST og ikke i en adresse: en sporring havner i
+// tilgangsloggene hos alle ledd underveis, og et fornavn hoerer ikke
+// hjemme der.
+async function finnesNavnet(inn) {
+  const navn = normaliserPinNavn(inn.navn);
+  if (!gyldigPinNavn(navn)) return svar({ feil: "Skriv fornavnet ditt" }, 400);
+
+  const r = await iKontolista("GET",
+    "?select=slug&slug=eq." + encodeURIComponent(pinSlug(navn)) + "&limit=1", null, null);
+  if (!r.ok) return listeFeil(r);
+  return svar({ navn, finnes: Array.isArray(r.json) && r.json.length > 0 }, 200);
+}
 
 // Ett kall for de fleste, to for den forste gangen.
 //
@@ -88,7 +121,7 @@ async function loggInn(inn) {
   const ny = await hosSupabase("/auth/v1/signup", { email: epost, password: passord });
   ny.forsok = inne.forsok.concat(ny.forsok);
 
-  if (ny.ok && ny.json && ny.json.access_token) return pinOkt(ny, navn);
+  if (ny.ok && ny.json && ny.json.access_token) return pinOkt(ny, navn, true);
 
   // Supabase svarer 200 uten okt i to tilfeller, og de betyr helt ulike
   // ting. Skillet er `identities`: en tom liste er tjenestens mate a
@@ -126,7 +159,7 @@ function alleredeTatt(r) {
     || /already registered|already exists/i.test(r.melding || "");
 }
 
-function pinOkt(r, navn) {
+async function pinOkt(r, navn, erNy) {
   let okt;
   try {
     okt = tolkPinOkt(r.json, navn);
@@ -134,6 +167,21 @@ function pinOkt(r, navn) {
     console.error("[konto] uventet svar fra innloggingen:", err);
     return svar({ feil: "Uventet svar fra innloggingen", forsok: r.forsok }, 502);
   }
+
+  // En fersk konto fores opp i kontolista, sa neste som skriver det
+  // navnet far vite at det er tatt — og sa den som skriver *sitt eget*
+  // navn neste gang far «skriv PIN-en din» og ikke «lag en PIN».
+  //
+  // Raden skrives med leserens egen okt, ikke med en nokkel som kan
+  // skrive hva som helst: reglene i databasen slipper bare gjennom en rad
+  // der brukeren er deg. Feiler den, er du likevel logget inn — kontoen
+  // finnes hos Supabase uansett hva denne lista sier — sa vi logger det
+  // og gar videre framfor a rulle tilbake noe vi ikke kan rulle tilbake.
+  if (erNy) {
+    const fort = await iKontolista("POST", "", { slug: pinSlug(navn) }, okt.token);
+    if (!fort.ok) console.error("[konto] fikk ikke fort opp navnet:", fort.status, fort.melding);
+  }
+
   // Adressen vi laget av navnet folger ikke med. Appen trenger den ikke,
   // og «ola@pin.mvp-sb.netlify.app» i menyen er ingenting a vise noen.
   return svar(okt, 200);
@@ -242,6 +290,55 @@ async function hosSupabase(sti, kropp) {
     forsok.utfall = String((err && err.message) || err).slice(0, 80);
     return { ok: false, status: 0, json: null, melding: forsok.utfall, forsok: [forsok] };
   }
+}
+
+// Kontolista ligger i PostgREST, ikke i Auth, sa den har sin egen vei inn.
+// Lesing gar uten okt — hvem som helst skal kunne fa vite at et navn er
+// tatt — og skriving med leserens egen, som i svar.mjs.
+async function iKontolista(metode, hale, kropp, token) {
+  const forsok = { kilde: "Supabase", tabell: KONTOLISTE };
+  const headere = {
+    "apikey": process.env.SUPABASE_ANON_KEY,
+    "Accept": "application/json",
+  };
+  if (token) headere.Authorization = "Bearer " + token;
+  if (kropp) headere["Content-Type"] = "application/json";
+
+  try {
+    const respons = await fetch(base() + "/rest/v1/" + KONTOLISTE + hale, {
+      method: metode,
+      headers: headere,
+      body: kropp ? JSON.stringify(kropp) : undefined,
+    });
+    forsok.status = respons.status;
+
+    const tekst = await respons.text().catch(() => "");
+    let json = null;
+    try { json = tekst ? JSON.parse(tekst) : null; } catch (err) { json = null; }
+    const melding = kortMelding(json) || tekst.slice(0, 120);
+    if (melding) forsok.melding = melding;
+    return { ok: respons.ok, status: respons.status, json, melding, forsok: [forsok] };
+  } catch (err) {
+    forsok.utfall = String((err && err.message) || err).slice(0, 80);
+    return { ok: false, status: 0, json: null, melding: forsok.utfall, forsok: [forsok] };
+  }
+}
+
+// PostgREST sier «relation … does not exist» med kode 42P01 nar tabellen
+// ikke er laget enda. Det er ikke noe leseren kan gjore med, men det er
+// nyaktig det den som setter opp prosjektet trenger a hore — samme grep
+// som i svar.mjs.
+function listeFeil(r) {
+  const kode = (r.json && r.json.code) || "";
+  if (kode === "42P01" || /does not exist/i.test(r.melding || "")) {
+    return svar({
+      feil: "Tabellen «" + KONTOLISTE + "» finnes ikke i Supabase ennå."
+        + " SQL-en står i docs/nokler-og-tokens.md.",
+      forsok: r.forsok,
+    }, 503);
+  }
+  console.error("[konto] kontolista svarte " + r.status + ": " + (r.melding || ""));
+  return svar({ feil: "Innloggingen svarte ikke. Prøv igjen om litt.", forsok: r.forsok }, 502);
 }
 
 // Supabase legger feilen i ulike felt etter hvilket endepunkt det er.

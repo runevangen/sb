@@ -96,6 +96,9 @@
             hvor du ser kampen, og for å ta med favorittlagene dine mellom
             telefoner. Velg et fornavn og en PIN: de to er kontoen din, og
             fornavnet er det vennene ser.</p>
+          <!-- Steg to viser navnet du skrev, sa du ser hvem du er i ferd
+               med a logge inn som for PIN-en tastes. -->
+          <p class="konto-hvem" id="kontoHvem" hidden></p>
           <!-- autocomplete="username" og "current-password": paret fornavn
                + PIN er innloggingen, sa telefonen skal kunne tilby a huske
                den. Ett trykk framfor a taste fornavnet pa nytt hver gang. -->
@@ -104,8 +107,15 @@
                  aria-label="Fornavnet vennene ser" maxlength="24">
           <input class="konto-felt" id="kontoPin" type="password" inputmode="numeric"
                  autocomplete="current-password" placeholder="PIN (4 siffer)"
-                 aria-label="PIN-koden din" maxlength="6">
-          <button class="konto-send" id="kontoSend" type="button">Logg inn</button>
+                 aria-label="PIN-koden din" maxlength="6" hidden>
+          <!-- Gjenta star bare nar en PIN lages. En feiltastet PIN her er
+               ikke til a rette opp: vi har ingen e-post a sende en ny kode
+               til, sa kontoen ville vaert utilgjengelig og navnet brent. -->
+          <input class="konto-felt" id="kontoPin2" type="password" inputmode="numeric"
+                 autocomplete="new-password" placeholder="Gjenta PIN-en"
+                 aria-label="Gjenta PIN-koden" maxlength="6" hidden>
+          <button class="konto-send" id="kontoSend" type="button">Fortsett</button>
+          <button class="konto-ut" id="kontoBytt" type="button" hidden>Bytt navn</button>
           <button class="konto-ut" id="kontoUt" type="button" hidden>Logg ut</button>
           <button class="konto-slett" id="kontoSlett" type="button" hidden>Slett kontoen min</button>
           <p class="konto-svar" id="kontoSvar" aria-live="polite"></p>
