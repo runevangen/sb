@@ -939,7 +939,7 @@ function visInvitasjon(rot, del, data, invitasjon) {
     .find((r) => r.dataset.kamp === String(kamp.id));
   if (!rad) return;
 
-  rad.classList.add("kamp-delt");
+  rad.classList.add("kamp-invitert");
 
   const linje = el("div", "kamp-invitasjon");
   linje.appendChild(el("span", "kamp-invitasjon-tekst",

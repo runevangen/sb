@@ -211,6 +211,13 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   er testet: det er det leseren faktisk sender. Fjorårets runde kan ikke
   deles; det står hvorfor. Delingen går gjennom samme `delTekst()` i
   `app.js` som «Del appen», med utklippstavle som reserve.
+- Klassen på den delte kampen heter `.kamp-invitert`, ikke `.kamp-delt`.
+  Vokteren som sjekker at trykkflata aldri maler noe, matcher selektorer
+  på tekst — og `.kamp-del` er en bit av `.kamp-delt`. To navn én bokstav
+  fra hverandre betydde dessuten helt ulike ting: knappen som deler, og
+  kampen som ble delt. CI fanget det, ikke den lokale kjøringen: en
+  `pull_request`-kjøring tester grenen flettet med `main`, så en test som
+  er ny på main kjører der før den finnes lokalt.
 - Lenka i delingsteksten peker på kampen, ikke på runden: `kamplenke()`
   legger kampen, svaret og stedet i en spørring etter hashen
   (`#/fotball/<liga>/neste?kamp=<id>&hvor=pub&sted=…`), ikke som nye ledd
@@ -460,7 +467,7 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
     node test/unit.mjs      350 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  169 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       262 tester, ~170 s, headless Chromium
+    node test/run.mjs       265 tester, ~170 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

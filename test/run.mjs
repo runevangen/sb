@@ -1536,7 +1536,7 @@ const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
   location.hash = "#/fotball/eliteserien/neste?kamp=4&hvor=pub&sted=Pub%20X";
   window.addEventListener("load", function () { setTimeout(function () { try {
     ok("en delt lenke apner fotballfanen", !document.getElementById("fotball").hidden);
-    var merket = document.querySelectorAll(".kamp-delt");
+    var merket = document.querySelectorAll(".kamp-invitert");
     ok("bare den delte kampen loftes fram", merket.length === 1, merket.length);
     ok("og det er den lenka pekte pa",
        merket[0].dataset.kamp === "4" && merket[0].textContent.indexOf("Molde") > -1,
@@ -1570,9 +1570,9 @@ const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
     location.hash = "#/fotball/eliteserien/neste?kamp=999&hvor=hjemme";
     setTimeout(function () { try {
       ok("en kamp som ikke finnes merker ingenting",
-         document.querySelectorAll(".kamp-delt").length === 0 &&
+         document.querySelectorAll(".kamp-invitert").length === 0 &&
          document.querySelectorAll(".kamp.delbar").length === 2,
-         document.querySelectorAll(".kamp-delt").length + "/" +
+         document.querySelectorAll(".kamp-invitert").length + "/" +
          document.querySelectorAll(".kamp.delbar").length);
       ferdig();
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);

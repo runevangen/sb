@@ -1518,8 +1518,12 @@ body {
 .kamp-viser-pub:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Kampen som ble delt med deg, loftet ut av runden: en runde er ti like
-   rader, og lenka pekte pa en av dem. */
-.kamp-delt {
+   rader, og lenka pekte pa en av dem.
+   Klassen het .kamp-delt til den kolliderte med vokteren for .kamp-del:
+   den matcher pa tekst, og trykkflata far aldri male noe. To navn en
+   bokstav fra hverandre som betydde helt ulike ting — knappen som deler,
+   og kampen som ble delt. */
+.kamp-invitert {
   border-radius: 10px;
   padding: 9px 10px 11px;
   margin: 4px -6px;
