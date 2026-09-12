@@ -196,10 +196,22 @@ kompromiss, tatt fordi EU-alternativene ikke lot seg registrere.
    passordet i SMTP-oppsettet.
 2. Brukernavnet er bokstavelig `resend` — ikke adressen din.
 3. Verifiser avsenderdomenet (*Domains*). Resend gir ferdige DNS-poster
-   for DKIM og SPF som legges inn der `sportsbibelen.no` har DNS. Uten
-   dette havner e-posten lett i søppelposten.
-   Skal du bare prøve først, kan `onboarding@resend.dev` brukes som
-   avsender uten DNS — men den sender bare til din egen kontoadresse.
+   for DKIM, SPF og DMARC som legges inn der `sportsbibelen.no` har DNS.
+   **Bruk et underdomene** — `epost.sportsbibelen.no` — så utsending fra
+   appen ikke påvirker omdømmet til hoveddomenet, og så eksisterende
+   e-postoppsett står urørt.
+
+**`onboarding@resend.dev` leverer bare til deg selv.** Det er Resends
+testavsender, og den er fin til å se at kjeden virker — men alle andre
+som prøver å logge inn får `500: Error sending confirmation email`, og
+det ser ut som en feil i appen. Sett virke 12. september 2026: det var
+nøyaktig det som skjedde da andre enn kontoeieren prøvde.
+
+Når domenet er grønt i Resend, **må avsenderen byttes i Supabase også**
+(*Authentication* → *Emails* → SMTP → *Sender email*), til for eksempel
+`ikke-svar@epost.sportsbibelen.no`. Verifiserer du domenet men lar
+avsenderen stå på `onboarding@resend.dev`, endrer ingenting seg. Det er
+steget som glemmes.
 
 **I Supabase** (*Authentication* → *Emails* → *Set up SMTP*). Merk stien:
 SMTP ligger sammen med malene, ikke under *Project Settings*. Panelet
@@ -447,6 +459,7 @@ Det du ser først, og hva det som regel betyr.
 | Innlogging: «For mange forsøk» (429) | Supabase sperrer e-postsending en stund | vent et minutt |
 | Innlogging: «Fikk ikke sendt koden» | se `forsok` i svaret fra `/api/konto` | som regel feil `SUPABASE_URL` |
 | E-posten har en lenke, ingen kode | malene er låst til egen SMTP er satt opp | se avsnittet over |
+| Bare én adresse får kode; andre får 500 | avsenderen er `onboarding@resend.dev`, som bare leverer til kontoeieren | verifiser domenet, og bytt *Sender email* i Supabase |
 | Koden avvises (403) selv om den er fersk | koden er lengre enn appen tar imot, eller slås opp med feil type | begge deler er rettet i koden; sjekk «Email OTP Length» i Supabase mot `KODE_MAKS` |
 | «Fikk ikke sendt koden» og ingenting i Resend-loggen | SMTP-påloggingen avvises — som regel `Resend` med stor R | skriv `resend`, lim inn nøkkelen på nytt |
 | «Tabellen «kampsvar» finnes ikke i Supabase ennå» | SQL-en over er ikke kjørt | kjør den i Supabase → SQL Editor |
