@@ -139,6 +139,34 @@ ligger hos oss. Velg region i Supabase bevisst (EU), og husk at en
 personvernerklæring og en måte å be om sletting på hører til her — det er
 ikke kode, men det hører til denne nøkkelen.
 
+#### Koden i e-posten krever egen SMTP
+
+**Dette er fella i oppsettet, og den koster en time hvis man ikke vet
+den.** Med Supabases innebygde e-posttjeneste er malene låst — panelet
+sier «Set up custom SMTP to edit templates», og standardmalen sender en
+*lenke* («Your sign-in link»), ikke en kode. Appen spør om seks siffer.
+Får leseren bare en lenke, er det ingenting å skrive inn, og
+innloggingen står fast.
+
+Løsningen er en egen SMTP-avsender (Authentication → Emails → *Set up
+SMTP*). Da låses malene opp, og flettefeltet `{{ .Token }}` kan legges
+inn i **Magic Link** og i **Confirm signup** — den første brukes når
+adressen har logget inn før, den andre aller første gang:
+
+```html
+<h2>Logg inn i Sportsbibelen</h2>
+<p>Koden din er:</p>
+<p style="font-size:28px;letter-spacing:4px"><strong>{{ .Token }}</strong></p>
+<p>Den varer en liten stund.</p>
+```
+
+Står det `{{ .Token }}` bokstavelig i e-posten du får, er malen lagret
+med feil skrivemåte — sjekk krøllparentesene, punktumet og stor T.
+
+Egen SMTP trengs uansett før ekte lesere: den innebygde tjenesten er
+strupet til noen få e-poster i timen og er ikke ment for produksjon.
+Avsenderadressen bør ligge på et domene vi rår over.
+
 #### Tabellen «kampsvar» — hvem blir med
 
 Innloggingen alene trenger ingen tabell. «Jeg blir med» gjør det, og den
@@ -293,6 +321,7 @@ Det du ser først, og hva det som regel betyr.
 | Innlogging: «Koden stemmer ikke, eller den er for gammel» | feil eller utløpt kode — samme svar med vilje | be om ny kode |
 | Innlogging: «For mange forsøk» (429) | Supabase sperrer e-postsending en stund | vent et minutt |
 | Innlogging: «Fikk ikke sendt koden» | se `forsok` i svaret fra `/api/konto` | som regel feil `SUPABASE_URL` |
+| E-posten har en lenke, ingen kode | malene er låst til egen SMTP er satt opp | se avsnittet over |
 | «Tabellen «kampsvar» finnes ikke i Supabase ennå» | SQL-en over er ikke kjørt | kjør den i Supabase → SQL Editor |
 | «Jeg blir med»: «Økten gjelder ikke lenger» | utløpt økt, eller reglene slipper ikke skrivingen gjennom | logg inn på nytt; sjekk policyene |
 | Ingen «blir med»-linje, men ingen feil heller | lista er et tillegg og feiler stille | se `/api/svar?kamper=<id>` i nettleseren |

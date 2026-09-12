@@ -393,6 +393,12 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 - Supabase Auth utsteder koden, sender e-posten og gir ut økten. Å
   skrive det selv ville vært kryptografi, e-postsending og sperring av
   gjentatte forsøk — feil sted å spare.
+- **Koden i e-posten krever egen SMTP.** Med Supabases innebygde
+  e-posttjeneste er malene låst, og standardmalen sender en lenke, ikke
+  en kode — da har leseren ingenting å skrive inn. Egen SMTP låser opp
+  malene, og flettefeltet `{{ .Token }}` legges inn i «Magic Link» og
+  «Confirm signup». Det står i `docs/nokler-og-tokens.md`, oppdaget da
+  oppsettet ble prøvd 12. september 2026.
 - Kallet går fra `netlify/functions/konto.mjs`, ikke fra nettleseren,
   selv om anon-nøkkelen tåler å være offentlig: da snakker appen bare
   med sitt eget domene. Ingen tredjepartsskript i `index.html`, ingen
