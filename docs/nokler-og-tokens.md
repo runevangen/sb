@@ -19,7 +19,7 @@ Ingenting her er hemmelig i seg selv. Navnene står i koden fra før; det er
 | `GITHUB_TOKEN` | lagring fra adminportalen | portalen svarer 503 | **ja — 90 dager** |
 | `SUPABASE_URL` | innlogging i appen | innloggingen svarer 503 | nei |
 | `SUPABASE_ANON_KEY` | innlogging i appen | innloggingen svarer 503 | ved rotering |
-| *(Brevo SMTP-nøkkel)* | e-posten med engangskoden | ingen kode i e-posten | nei — settes i Supabase, ikke i Netlify |
+| *(Resend API-nøkkel)* | e-posten med engangskoden | ingen kode i e-posten | nei — settes i Supabase, ikke i Netlify |
 | `MET_KONTAKT` | valgfri kontaktadresse til MET | ingenting; været virker | nei |
 | `GITHUB_REPO` | valgfri: hvilket repo admin skriver til | `runevangen/sb` | — |
 | `GITHUB_BRANCH` | valgfri: hvilken gren | `main` | — |
@@ -168,35 +168,39 @@ Egen SMTP trengs uansett før ekte lesere: den innebygde tjenesten er
 strupet til noen få e-poster i timen og er ikke ment for produksjon.
 Avsenderadressen bør ligge på et domene vi rår over.
 
-#### Brevo som avsender — oppsettet
+#### Avsenderen — Resend, og hvorfor ikke Brevo
 
-Valgt fordi det er fransk (EU), har SMTP på gratisnivået og sender langt
-mer enn appen trenger: én innlogging er én e-post, og økten varer.
-E-postadressen passerer avsendertjenesten, så EU-valget her henger sammen
-med EU-regionen i Supabase.
+**Brevo ble prøvd først og forkastet.** Ikke på grunn av tjenesten, men
+på grunn av registreringen: den krever verifisering med SMS til mobil, og
+koden kom aldri fram 12. september 2026, etter flere forsøk. Mailjet og
+Amazon SES har samme type krav. Det er verdt å vite før noen prøver
+igjen — dette koster en dag, ikke en time.
 
-**I Brevo** (brevo.com → *SMTP & API*):
+Resend er valgt fordi registreringen går med e-post eller GitHub. Merk at
+selskapet er amerikansk: e-postadressen passerer dit, mens resten av
+persondataene ligger i EU-regionen i Supabase. Det er et bevisst
+kompromiss, tatt fordi EU-alternativene ikke lot seg registrere.
 
-1. Lag en **SMTP-nøkkel**. Det er ikke kontopassordet — det er en egen
-   nøkkel som kan trekkes tilbake alene.
-2. Noter brukernavnet som står på samme side. Det er ofte en generert
-   adresse (`…@smtp-brevo.com`), ikke innloggingsadressen din.
-3. Autentiser avsenderdomenet (*Senders, Domains & Dedicated IPs* →
-   *Domains*). Brevo gir ferdige DNS-poster — DKIM og en TXT for
-   verifisering — som legges inn hos den som har DNS for
-   `sportsbibelen.no`. Uten dette havner e-posten lett i søppelposten.
-   Skal du bare prøve først, har Brevo en verifisert testavsender som
-   virker uten DNS, men bare til din egen adresse.
+**I Resend** (resend.com):
+
+1. Lag en **API-nøkkel** (*API Keys*). Den begynner med `re_` og er
+   passordet i SMTP-oppsettet.
+2. Brukernavnet er bokstavelig `resend` — ikke adressen din.
+3. Verifiser avsenderdomenet (*Domains*). Resend gir ferdige DNS-poster
+   for DKIM og SPF som legges inn der `sportsbibelen.no` har DNS. Uten
+   dette havner e-posten lett i søppelposten.
+   Skal du bare prøve først, kan `onboarding@resend.dev` brukes som
+   avsender uten DNS — men den sender bare til din egen kontoadresse.
 
 **I Supabase** (*Project Settings* → *Authentication* → *SMTP Settings*):
 
 | Felt | Verdi |
 | --- | --- |
-| Host | `smtp-relay.brevo.com` |
+| Host | `smtp.resend.com` |
 | Port | `587` |
-| Username | brukernavnet fra Brevo |
-| Password | SMTP-nøkkelen |
-| Sender email | en adresse på det autentiserte domenet |
+| Username | `resend` |
+| Password | API-nøkkelen (`re_…`) |
+| Sender email | en adresse på det verifiserte domenet, eller `onboarding@resend.dev` |
 | Sender name | `Sportsbibelen` |
 
 Feltnavnene kan ha flyttet seg siden dette ble skrevet (12. september
@@ -209,11 +213,24 @@ Feltnavnene kan ha flyttet seg siden dette ble skrevet (12. september
 - Supabase har en egen grense for hvor mange e-poster som sendes per time
   (*Authentication* → *Rate limits*). Den står lavt fra start og kan
   heves når SMTP er på plass. Treffer du «For mange forsøk» under
-  testing, er det som regel den, ikke Brevo.
+  testing, er det som regel den, ikke avsenderen.
 
-SMTP-nøkkelen hører hjemme i Brevo og i Supabase — ikke i Netlify og ikke
+API-nøkkelen hører hjemme i Resend og i Supabase — ikke i Netlify og ikke
 i dette repoet. Appen sender ingen e-post selv; den ber Supabase gjøre
 det.
+
+**Går heller ikke dette**, er det to veier videre, og de står her så de
+ikke må finnes opp på nytt:
+
+- **Gmail-kontoen du alt har.** Et app-passord hos Google lar Supabase
+  sende gjennom `smtp.gmail.com` uten noen ny registrering. Avsenderen
+  blir gmail-adressen, ikke `@sportsbibelen.no`, grensa er ~500 i døgnet,
+  og det ligger i utkanten av Googles vilkår. Godt nok til å få testet at
+  innloggingen virker.
+- **Slutt å sende e-post.** Supabase har innlogging med Google innebygd:
+  ett trykk, ingen SMTP, ingen maler, ingen timesgrense. Det krever at
+  panelet og `konto.mjs` bygges om for omdirigering, og at Google ser
+  hvem som bruker appen.
 
 #### Tabellen «kampsvar» — hvem blir med
 

@@ -405,12 +405,16 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   en kode — da har leseren ingenting å skrive inn. Egen SMTP låser opp
   malene, og flettefeltet `{{ .Token }}` legges inn i «Magic Link» og
   «Confirm signup». Rekkefølgen er SMTP først, mal etterpå. Avsenderen er
-  Brevo — fransk, gratis i dette bruket, og EU-valget henger sammen med
-  EU-regionen i Supabase: e-postadressen passerer avsendertjenesten.
-  SMTP-nøkkelen hører hjemme i Brevo og Supabase, ikke i Netlify og ikke
-  i repoet; appen sender ingen e-post selv. Hele oppsettet står i
-  `docs/nokler-og-tokens.md`, skrevet da det ble prøvd 12. september
-  2026.
+  Resend. Brevo var førstevalget fordi det er EU, men registreringen der
+  krever SMS til mobil og koden kom aldri fram — det samme gjelder
+  Mailjet og Amazon SES, og det står i nøkkelboka så ingen prøver igjen.
+  Resend er amerikansk, så e-postadressen passerer dit mens resten av
+  persondataene ligger i EU-regionen: et bevisst kompromiss, tatt fordi
+  EU-alternativene ikke lot seg registrere. API-nøkkelen hører hjemme i
+  Resend og Supabase, ikke i Netlify og ikke i repoet; appen sender ingen
+  e-post selv. Hele oppsettet, og de to reserveveiene (app-passord hos
+  Google, eller å droppe e-post og bruke Google-innlogging), står i
+  `docs/nokler-og-tokens.md`.
 - Kallet går fra `netlify/functions/konto.mjs`, ikke fra nettleseren,
   selv om anon-nøkkelen tåler å være offentlig: da snakker appen bare
   med sitt eget domene. Ingen tredjepartsskript i `index.html`, ingen
