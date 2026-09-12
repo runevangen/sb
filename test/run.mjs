@@ -1799,14 +1799,23 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
     rad.querySelector(".kamp-del").click();
     var panel = document.querySelector(".kamp-panel");
     var knapp = panel.querySelector(".kamp-blimed");
-    ok("innlogget star knappen der", !!knapp && knapp.textContent === "Jeg blir med",
+    // Knappen sier hva den gjor. Uten et sted valgt er svaret «dit».
+    ok("innlogget star knappen der", !!knapp && knapp.textContent === "Jeg skal dit",
        knapp ? knapp.textContent : "ingen knapp");
     // Lista leses uten konto, sa navnet leses ogsa av andre enn
-    // vennegruppa. Det skal sta der navnet skrives.
-    ok("det star at navnet er synlig for andre",
-       panel.querySelector(".kamp-blirmed-valg .kamp-note").textContent
-         .indexOf("synlig for alle som åpner kampen") > -1,
-       panel.querySelector(".kamp-blirmed-valg .kamp-note").textContent);
+    // vennegruppa. Advarselen skal sta der navnet skrives — i feltet,
+    // ikke som en gralinje panelet blir tyngre av.
+    var navnFelt = panel.querySelector(".kamp-navn");
+    ok("det star i navnefeltet at navnet vises for andre",
+       navnFelt.placeholder.indexOf("vises for andre") > -1 &&
+       navnFelt.getAttribute("aria-label").indexOf("synlig for alle som åpner kampen") > -1,
+       navnFelt.placeholder + " | " + navnFelt.getAttribute("aria-label"));
+
+    // Velger man hjemme, skal knappen slutte a pasta at man skal et sted.
+    panel.querySelectorAll(".hvor-valg")[0].click();
+    ok("knappen folger stedet du velger",
+       knapp.textContent === "Jeg ser den hjemme", knapp.textContent);
+    panel.querySelectorAll(".hvor-valg")[1].click();
 
     // Uten navn blir lista uleselig for de andre.
     knapp.click();
@@ -1835,6 +1844,10 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
       var linje = rad.querySelector(".kamp-blirmed");
       ok("lista star under kampen", !!linje && linje.textContent.indexOf("Ola blir med") > -1,
          linje ? linje.textContent : "ingen linje");
+      // Og inne i panelet, sa man ser at det virket uten a lukke det.
+      ok("og i panelet man nettopp trykket i",
+         panel.querySelector(".kamp-panel-liste").textContent.indexOf("Ola blir med") > -1,
+         panel.querySelector(".kamp-panel-liste").textContent);
       // Linja horer til kampen, ikke til panelet: den skal sta over det.
       ok("og over panelet, ikke under",
          linje.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING);
@@ -1843,7 +1856,7 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
          document.querySelectorAll(".kamp-blirmed").length);
       // To «jeg blir med» er en person, ikke to: knappen blir en angreknapp.
       ok("knappen blir en angreknapp",
-         knapp.textContent === "Jeg blir ikke med likevel", knapp.textContent);
+         knapp.textContent === "Jeg kommer ikke likevel", knapp.textContent);
       ok("og navnefeltet er ute av veien", panel.querySelector(".kamp-navn").hidden);
 
       knapp.click();
@@ -1854,7 +1867,7 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
            JSON.stringify(fjern.map(function (k) { return k.inn; })));
         ok("og lista under kampen er borte", !rad.querySelector(".kamp-blirmed"));
         ok("knappen er tilbake til a bli med",
-           knapp.textContent === "Jeg blir med", knapp.textContent);
+           knapp.textContent === "Jeg skal dit", knapp.textContent);
         ferdig();
       } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);

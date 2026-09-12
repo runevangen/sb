@@ -332,6 +332,7 @@ function delKnapp(kamp, rad) {
     rad.appendChild(panel);
     knapp.setAttribute("aria-expanded", "true");
     apentPanel = { panel, knapp, rad };
+    tegnPanelListe(kamp);
     panel.querySelector(".hvor-valg").focus();
   });
   return knapp;
@@ -373,7 +374,10 @@ function apnePanelMed(rad, hvor, sted) {
 
 function delPanel(kamp) {
   const panel = el("div", "kamp-panel");
-  panel.appendChild(el("p", "kamp-panel-tittel", "Hvor ser du kampen?"));
+  // En erklaering, ikke et sporsmal: det du gjor her er a si at du skal
+  // se den, og hvor. Sporsmalsformen ga to likestilte knapper nederst —
+  // «Del» og «Jeg blir med» — som konkurrerte om a vaere handlingen.
+  panel.appendChild(el("p", "kamp-panel-tittel", "Jeg skal se den"));
 
   let hvor = null;
   const valg = el("div", "hvor-liste");
@@ -385,7 +389,10 @@ function delPanel(kamp) {
   pubFelt.hidden = true;
   const forslag = pubForslag(kamp, pubFelt);
   forslag.hidden = true;
-  const send = el("button", "kamp-send", "Del");
+  // Delingen er ikke lenger hovedsaken: den sender beskjeden til
+  // gruppechatten, mens lista i appen er det vennene ser nar de apner
+  // kampen. Derfor en tekstknapp under, ikke en fylt knapp ved siden av.
+  const send = el("button", "kamp-send", "Del i chatten");
   send.type = "button";
   send.disabled = true;
   const svar = el("p", "kamp-svar");
@@ -409,6 +416,8 @@ function delPanel(kamp) {
       if (nokkel === "pub") { fyllForslag(forslag, kamp); pubFelt.focus(); }
       send.disabled = false;
       svar.textContent = "";
+      const blirMed = panel.querySelector(".kamp-blirmed-valg");
+      if (blirMed && blirMed.tegnKnapp) blirMed.tegnKnapp();
     });
     valg.appendChild(b);
   });
@@ -438,9 +447,12 @@ function delPanel(kamp) {
   panel.appendChild(valg);
   panel.appendChild(forslag);
   panel.appendChild(pubFelt);
-  // To veier ut av det samme sporsmalet: si det til lista, eller si det
-  // i chatten. Lista star forst fordi den er den som svarer tilbake.
+  // Hovedhandlingen: si at du skal dit. Den star rett under stedet du
+  // valgte, ikke nederst etter alle forslagene.
   panel.appendChild(blirMedDel(kamp, () => hvor, () => pubFelt.value.trim()));
+  // Og her ser du at det virket: de samme navnene vennene dine ser nar
+  // de apner kampen. Uten dette maa man lukke panelet for a se lista.
+  panel.appendChild(el("div", "kamp-panel-liste"));
   panel.appendChild(send);
   panel.appendChild(svar);
   return panel;
@@ -481,7 +493,7 @@ function fyllForslag(boks, kamp) {
   if (bekreftede.length) {
     const bek = pubGruppe("Viser denne kampen", bekreftede, boks.pubFelt);
     bek.classList.add("pub-gruppe-bekreftet");
-    bek.appendChild(el("p", "pub-note", "Meldt inn til oss. Ring gjerne og hør før du drar."));
+    bek.appendChild(el("p", "pub-note", "Meldt inn til oss."));
     boks.appendChild(bek);
   }
 
@@ -493,7 +505,6 @@ function fyllForslag(boks, kamp) {
   knapp.type = "button";
   knapp.addEventListener("click", () => hentNaerDeg(naer, knapp, boks.pubFelt, kjent, bekreftede));
   naer.appendChild(knapp);
-  naer.appendChild(el("p", "pub-note", "Posisjonen sendes til OpenStreetMap, ikke til oss."));
   boks.appendChild(naer);
   hentNaerDeg(naer, knapp, boks.pubFelt, kjent, bekreftede);
 
@@ -529,13 +540,31 @@ function fyllForslag(boks, kamp) {
       (data.grupper || []).forEach((g) =>
         rundt.appendChild(pubGruppe(g.tittel,
           merkBekreftet(merkKuraterte(g.puber, KJENTE), bekreftede), boks.pubFelt)));
+      // Ingen treff er ingen nyhet. Fant vi noe annet sted, sier vi
+      // ingenting her — tre «fant ingen»-linjer i et panel med fire
+      // grupper er stoy, ikke apenhet. Er alt tomt, star det en linje,
+      // og den star nederst, der man ellers ville lurt.
       if (data.grupper && data.grupper.length) {
         rundt.appendChild(el("p", "pub-note", "© OpenStreetMap-bidragsytere"));
-      } else {
-        rundt.appendChild(el("p", "pub-note", "Fant ingen puber i nærheten av " + kamp.arena + "."));
       }
+      meldTomt(boks);
     });
   }
+}
+
+// Ett svar pa «fant dere noe?», ikke ett per kilde. Kom det forslag fra
+// en av dem, sier vi ingenting; kom det ingen fra noen, star det en
+// linje nederst. Tre tomme grupper som hver sier fra er stoy, og de
+// druknet det ene stedet som faktisk hadde et forslag.
+function meldTomt(boks) {
+  if (!boks) return;
+  const gammel = boks.querySelector(".pub-tomt");
+  if (gammel) gammel.remove();
+  // Venter noe fortsatt, er det for tidlig a si at ingenting finnes.
+  if (boks.querySelector(".pub-venter")) return;
+  if (boks.querySelector(".pub-chip")) return;
+  boks.appendChild(el("p", "pub-note pub-tomt",
+    "Fant ingen puber i nærheten. Skriv navnet selv."));
 }
 
 // «(overpass-api.de svarte 406)» — nok til a se hva som feiler, uten a
@@ -638,10 +667,11 @@ function hentNaerDeg(gruppe, knapp, pubFelt, kjentBoks, bekreftede) {
       if (!naerHusket.has(nokkel)) naerHusket.set(nokkel, naerePuber(p));
       const liste = (await naerHusket.get(nokkel)).slice(0, 6);
       knapp.remove();
-      if (!liste.length) { visPubFeil(gruppe, "Fant ingen puber innen 800 m."); return; }
+      if (!liste.length) { gruppe.replaceChildren(); meldTomt(gruppe.closest(".pub-forslag")); return; }
       gruppe.replaceChildren();
       gruppe.appendChild(pubGruppe("Nær deg", merkBekreftet(liste, bekreftede), pubFelt));
       gruppe.appendChild(el("p", "pub-note", "© OpenStreetMap-bidragsytere"));
+      meldTomt(gruppe.closest(".pub-forslag"));
     } catch (err) {
       naerHusket.delete(nokkel);
       knapp.disabled = false;
@@ -818,6 +848,25 @@ function tegnSvar(rot) {
   });
 }
 
+// Lista inne i det apne panelet: de samme navnene vennene dine ser nar
+// de apner kampen. Den star her sa du ser at det virket, uten a lukke
+// panelet for a lete etter linja under raden.
+function tegnPanelListe(kamp) {
+  const panel = apentPanel && apentPanel.panel;
+  const boks = panel && panel.querySelector(".kamp-panel-liste");
+  if (!boks) return;
+
+  const mine = sisteSvar.filter((s) => s.kampId === String(kamp.id));
+  const tekst = blirMedTekst(mine);
+  boks.replaceChildren();
+  if (!tekst) return;
+
+  const merke = el("span", "kamp-blirmed-merke", "✓");
+  merke.setAttribute("aria-hidden", "true");
+  boks.appendChild(merke);
+  boks.appendChild(el("span", null, tekst));
+}
+
 async function svarTjeneste(kropp) {
   const respons = await fetch("/api/svar", {
     method: "POST",
@@ -851,8 +900,11 @@ function blirMedDel(kamp, lesHvor, lesSted) {
 
   const navnFelt = el("input", "kamp-navn");
   navnFelt.type = "text";
-  navnFelt.placeholder = "Navnet vennene ser";
-  navnFelt.setAttribute("aria-label", "Navnet vennene ser");
+  // Advarselen star i feltet, ikke som en grastripe under: den hoerer
+  // hjemme der navnet skrives, og den koster da ingen egen linje.
+  navnFelt.placeholder = "Fornavn — vises for andre";
+  navnFelt.setAttribute("aria-label",
+    "Fornavn. Navnet er synlig for alle som åpner kampen.");
   navnFelt.maxLength = NAVN_MAKS;
   navnFelt.value = konto.navn();
 
@@ -863,10 +915,14 @@ function blirMedDel(kamp, lesHvor, lesSted) {
 
   // Har du alt svart, er knappen en angreknapp. To knapper ville betydd
   // at man kan bli med to ganger.
+  // Knappen sier hva den gjor, ikke hva den heter: skal du et sted, skal
+  // du «dit»; ser du den hjemme, gjor du ikke det.
   const tegnKnapp = () => {
     const mitt = egetSvar(sisteSvar.filter((s) => s.kampId === String(kamp.id)),
       okt.bruker);
-    knapp.textContent = mitt ? "Jeg blir ikke med likevel" : "Jeg blir med";
+    knapp.textContent = mitt
+      ? "Jeg kommer ikke likevel"
+      : (lesHvor() === "hjemme" ? "Jeg ser den hjemme" : "Jeg skal dit");
     knapp.dataset.med = mitt ? "ja" : "nei";
     navnFelt.hidden = !!mitt;
     return mitt;
@@ -902,6 +958,7 @@ function blirMedDel(kamp, lesHvor, lesSted) {
       }
       tegnKnapp();
       tegnSvar(document.getElementById("fotballInnhold"));
+      tegnPanelListe(kamp);
     } catch (err) {
       svar.textContent = err.message;
     } finally {
@@ -911,12 +968,10 @@ function blirMedDel(kamp, lesHvor, lesSted) {
 
   boks.appendChild(navnFelt);
   boks.appendChild(knapp);
-  // Lista kan leses uten konto, og da leses navnet ogsa av andre enn
-  // vennegruppa. Det skal sta her, der navnet skrives — ikke i en
-  // erklaering ingen apner.
-  boks.appendChild(el("p", "kamp-note",
-    "Navnet er synlig for alle som åpner kampen. Fornavn holder."));
   boks.appendChild(svar);
+  // Knappeteksten folger stedet du velger, sa panelet ma tegne den pa
+  // nytt nar valget endres.
+  boks.tegnKnapp = tegnKnapp;
   return boks;
 }
 

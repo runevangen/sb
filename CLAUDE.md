@@ -497,6 +497,21 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 - Svaret delingslenka ba om. Teksten i chatten spurte «Hvor ser du?», og
   til nå hadde det spørsmålet ingen vei tilbake til appen.
+- **Panelet har én hovedhandling, ikke to.** Tittelen er en erklæring —
+  «Jeg skal se den» — og knappen sier hva den gjør: «Jeg skal dit» på pub
+  eller stadion, «Jeg ser den hjemme» hjemme. Delingen er en tekstknapp
+  under: den sender beskjeden til gruppechatten, mens lista i appen er
+  det vennene faktisk ser når de åpner kampen. Som spørsmål, med to like
+  store knapper nederst, konkurrerte de to om å være handlingen.
+- Lista over hvem som blir med står også inne i det åpne panelet, ikke
+  bare under raden: ellers må man lukke panelet for å se at det virket.
+- **Ingen treff er ingen nyhet.** `meldTomt()` gir ett svar på «fant dere
+  noe?» for hele panelet, ikke ett per kilde. Før sa fire grupper fra
+  hver for seg, og de tre tomme druknet den ene som hadde et forslag.
+  Venter en kilde fortsatt, sies ingenting — det er for tidlig.
+- Advarselen om at navnet er synlig står i navnefeltet (plassholder og
+  `aria-label`), ikke som en grålinje under. Den hører hjemme der navnet
+  skrives, og koster da ingen egen linje i et panel som alt var tett.
 - **Lesing krever ingen konto.** «3 blir med: Ola, Kari og Per» står
   under kampen for alle, som «denne kampen vises på»-linja: den som
   blar gjennom runden ser det uten å åpne noe. Skriving krever at du er
@@ -531,7 +546,7 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
     node test/unit.mjs      353 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  185 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       272 tester, ~170 s, headless Chromium
+    node test/run.mjs       274 tester, ~170 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

@@ -1589,6 +1589,16 @@ body {
 
 .kamp-blirmed-merke { color: var(--bekreftet); font-weight: 700; margin-right: 4px; }
 
+/* De samme navnene vennene ser, inne i panelet — sa man ser at det
+   virket uten a lukke det. */
+.kamp-panel-liste {
+  font-size: calc(12px * var(--fs));
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.kamp-panel-liste:empty { display: none; }
+
 /* Svaret for deg selv, inne i panelet. */
 .kamp-blirmed-valg {
   display: flex;
@@ -1611,16 +1621,28 @@ body {
 
 .kamp-navn[hidden] { display: none; }
 
+/* Hovedhandlingen: fylt, ikke bare omrisset. Den skal vinne over
+   «Del i chatten» uten at man ma lese begge. */
 .kamp-blimed {
-  padding: 9px 12px;
+  flex: 0 0 auto;
+  padding: 10px 14px;
   border: 1px solid var(--bekreftet);
   border-radius: 8px;
-  background: none;
-  color: var(--bekreftet);
+  background: var(--bekreftet);
+  color: #fff;
   font-family: inherit;
   font-size: calc(13px * var(--fs));
   font-weight: 600;
   cursor: pointer;
+}
+
+/* Har du alt sagt at du kommer, er knappen en angreknapp — og da skal
+   den ikke rope. */
+.kamp-blimed[data-med="ja"] {
+  background: none;
+  color: var(--text-dim);
+  border-color: var(--border-btn);
+  font-weight: 400;
 }
 
 .kamp-blimed:disabled { opacity: 0.45; cursor: default; }
@@ -1762,16 +1784,19 @@ body {
 
 .kamp-pub[hidden] { display: none; }
 
+/* Delingen sender beskjeden til gruppechatten. Den er fortsatt verdt a
+   ha, men lista i appen er det vennene ser — sa dette er en tekstknapp,
+   ikke en fylt en. */
 .kamp-send {
   align-self: flex-start;
-  padding: 8px 16px;
+  padding: 6px 0;
   border: 0;
-  border-radius: 8px;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: none;
+  color: var(--accent);
   font-family: inherit;
-  font-size: calc(13.5px * var(--fs));
+  font-size: calc(13px * var(--fs));
   font-weight: 600;
+  text-decoration: underline;
   cursor: pointer;
 }
 
