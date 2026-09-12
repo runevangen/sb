@@ -30,14 +30,23 @@ configuration → Environment variables**.
 Bare én av dem dør av seg selv. Det er `GITHUB_TOKEN`, og avsnittet om
 hva som skjer den dagen står lenger nede.
 
-## De to fellene som allerede har kostet tid
+## De tre fellene som allerede har kostet tid
 
 **1. Funksjonene leser miljøet ved utrulling.** En variabel du setter nå,
 finnes ikke for funksjonen som kjører nå. Etter *hver* endring i
 Environment variables: **Deploys → Trigger deploy → Deploy site**. En
 deploy tømmer også kant-cachen, som ellers holder forrige svar.
 
-**2. Miljøvariabler er versalfølsomme.** `api_football_key` og
+**2. En funksjon som ikke er merget, finnes ikke i prod.** `mvp-sb.netlify.app`
+bygges fra `main`. Ligger funksjonen i en gren, svarer prod 404 uansett
+hvor riktig miljøet er satt — og 404 ser ut som «ikke satt opp» for den
+som feilsøker. Test mot forhåndsvisningen i stedet:
+`https://deploy-preview-<nr>--mvp-sb.netlify.app/api/…`. Husk at også den
+leste miljøet da den ble bygget: setter du en variabel etterpå, må
+forhåndsvisningen bygges på nytt (*Deploys* → finn deployen → *Retry
+deploy*).
+
+**3. Miljøvariabler er versalfølsomme.** `api_football_key` og
 `API_FOOTBALL_KEY` er to forskjellige variabler for Linux.
 Fotballfunksjonen godtar begge skrivemåtene med vilje (`NOKKELNAVN` i
 `netlify/functions/fotball.mjs`), fordi akkurat denne feilen har skjedd.
@@ -388,7 +397,8 @@ Det du ser først, og hva det som regel betyr.
 | Portalen: «… HTTP 403» | tokenet mangler `Contents: read and write` | rett rettighetene |
 | Portalen: «Fikk ikke lagret: HTTP 409» | fila endret mellom lesing og skriving | prøv igjen |
 | Tabellen viser i fjor, uten feilmelding | `THESPORTSDB_KEY` mangler, er utløpt, eller svaret ble avkortet | se `forsok` på `/api/fotball/tabell` |
-| Innlogging: «Innloggingen er ikke satt opp: X mangler» | X ikke satt i Netlify | sett X, trigger deploy |
+| `/api/konto` eller `/api/svar` svarer 404 | funksjonen er ikke merget til `main` enda | test mot deploy-preview-adressen |
+| Innlogging: «Innloggingen er ikke satt opp: X mangler» | X ikke satt i Netlify — eller deployen er eldre enn variabelen | sett X, trigger deploy |
 | Innlogging: «Koden stemmer ikke, eller den er for gammel» | feil eller utløpt kode — samme svar med vilje | be om ny kode |
 | Innlogging: «For mange forsøk» (429) | Supabase sperrer e-postsending en stund | vent et minutt |
 | Innlogging: «Fikk ikke sendt koden» | se `forsok` i svaret fra `/api/konto` | som regel feil `SUPABASE_URL` |
