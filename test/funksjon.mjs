@@ -877,7 +877,15 @@ ok("og den royper ikke adressen",
    JSON.stringify(feilKode));
 
 r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123" }));
-ok("en kode som ikke er seks siffer stoppes her", r.status === 400, r.status);
+ok("en for kort kode stoppes her", r.status === 400, r.status);
+
+// Lengden stilles i Supabase; atte siffer er en like gyldig innstilling
+// som seks, og skal ga hele veien uten a bli kappet.
+kall = stubType("email", OKT);
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "63738168" }));
+ok("en atte-sifret kode gar gjennom hel",
+   r.status === 200 && JSON.parse(kall[0].opsjoner.body).token === "63738168",
+   r.status + " " + JSON.parse(kall[0].opsjoner.body).token);
 
 kall = stubSupabase({ email: "leser@example.com" });
 r = await konto(kontoBe({ handling: "hvem", token: "okt-token-123" }));

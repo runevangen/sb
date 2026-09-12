@@ -4,7 +4,14 @@
 // utlopt okt er. Blir de uenige, far leseren «feil kode» pa en kode som
 // stemmer.
 
-export const KODE_SIFRE = 6;
+// Supabase lar deg stille lengden pa engangskoden (Authentication →
+// Rate Limits → «Email OTP Length»), og standarden er ikke den samme i
+// alle prosjekter. Hardkodet til seks kappet vi en kode pa atte til
+// «637381», sendte den, og fikk 403 — som ser nyaktig ut som en feil
+// kode. Derfor et spenn, ikke et tall: vi teller ikke sifre for leseren,
+// vi tar imot dem.
+export const KODE_MIN = 6;
+export const KODE_MAKS = 10;
 
 // Adressen skrives av et menneske pa en telefon. Store bokstaver og et
 // mellomrom pa slutten skal ikke gi en ny konto.
@@ -24,11 +31,12 @@ export function gyldigEpost(verdi) {
 // Koden limes inn fra en e-post: mellomrom, bindestreker og et
 // usynlig linjeskift skal ikke stoppe en innlogging.
 export function normaliserKode(verdi) {
-  return String(verdi == null ? "" : verdi).replace(/\D+/g, "").slice(0, KODE_SIFRE);
+  return String(verdi == null ? "" : verdi).replace(/\D+/g, "").slice(0, KODE_MAKS);
 }
 
 export function gyldigKode(verdi) {
-  return normaliserKode(verdi).length === KODE_SIFRE;
+  const n = normaliserKode(verdi).length;
+  return n >= KODE_MIN && n <= KODE_MAKS;
 }
 
 // «ru••••@gmail.com». Hele adressen i menyen er en lekkasje over

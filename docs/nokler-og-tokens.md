@@ -415,6 +415,7 @@ Det du ser først, og hva det som regel betyr.
 | Innlogging: «For mange forsøk» (429) | Supabase sperrer e-postsending en stund | vent et minutt |
 | Innlogging: «Fikk ikke sendt koden» | se `forsok` i svaret fra `/api/konto` | som regel feil `SUPABASE_URL` |
 | E-posten har en lenke, ingen kode | malene er låst til egen SMTP er satt opp | se avsnittet over |
+| Koden avvises (403) selv om den er fersk | koden er lengre enn appen tar imot, eller slås opp med feil type | begge deler er rettet i koden; sjekk «Email OTP Length» i Supabase mot `KODE_MAKS` |
 | «Fikk ikke sendt koden» og ingenting i Resend-loggen | SMTP-påloggingen avvises — som regel `Resend` med stor R | skriv `resend`, lim inn nøkkelen på nytt |
 | «Tabellen «kampsvar» finnes ikke i Supabase ennå» | SQL-en over er ikke kjørt | kjør den i Supabase → SQL Editor |
 | «Jeg blir med»: «Økten gjelder ikke lenger» | utløpt økt, eller reglene slipper ikke skrivingen gjennom | logg inn på nytt; sjekk policyene |

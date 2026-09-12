@@ -949,8 +949,16 @@ ok("en absurd lang adresse stoppes", !gyldigEpost("a".repeat(250) + "@example.no
 // Koden limes inn fra en e-post, med mellomrom og linjeskift.
 ok("koden renses", normaliserKode(" 12 34-56\n") === "123456", normaliserKode(" 12 34-56\n"));
 ok("seks siffer er en kode", gyldigKode("123456") && gyldigKode("12 34 56"));
-ok("faerre eller flere er det ikke",
-   !gyldigKode("12345") && !gyldigKode("") && normaliserKode("1234567") === "123456");
+// Lengden stilles i Supabase, og atte er en like gyldig innstilling som
+// seks. Hardkodet til seks kappet vi «63738168» til «637381» og fikk 403
+// — som ser nyaktig ut som en feil kode.
+ok("atte siffer er ogsa en kode",
+   gyldigKode("63738168") && normaliserKode("63738168") === "63738168",
+   normaliserKode("63738168"));
+ok("og ingenting kappes innenfor spennet",
+   normaliserKode("1234567890") === "1234567890");
+ok("for fa er ikke en kode", !gyldigKode("12345") && !gyldigKode(""));
+ok("og over spennet kappes", normaliserKode("123456789012") === "1234567890");
 
 // Hele adressen i menyen er en lekkasje over skulderen.
 ok("adressen maskeres", maskerEpost("runevangen@gmail.com") === "ru••••@gmail.com",

@@ -1278,8 +1278,8 @@ const KONTO_TEKST = {
     + " virker uten. Innlogging er for å dele hvor du ser kampen, og for å"
     + " ta med favorittlagene dine mellom telefoner. Vi sender en engangskode"
     + " på e-post; adressen er det eneste vi lagrer om deg.",
-  kode: "Koden er seks siffer og varer en liten stund. Kom den ikke, se i"
-    + " søppelposten.",
+  kode: "Skriv sifrene fra e-posten. Koden varer en liten stund; kom den"
+    + " ikke, se i søppelposten.",
   inne: "Du er logget inn. Deling av kamper og favoritter kommer hit først."
     + " Resten av appen virker som før, med eller uten konto.",
 };
@@ -1426,7 +1426,7 @@ async function kontoSteget() {
 
     const kode = normaliserKode(feltKode.value);
     if (!gyldigKode(kode)) {
-      kontoSvar("Koden er seks siffer.");
+      kontoSvar("Skriv sifrene fra e-posten.");
       feltKode.focus();
       return;
     }

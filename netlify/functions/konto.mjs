@@ -79,7 +79,7 @@ async function loggInn(inn) {
   const epost = normaliserEpost(inn.epost);
   const kode = normaliserKode(inn.kode);
   if (!gyldigEpost(epost)) return svar({ feil: "Skriv en e-postadresse" }, 400);
-  if (!gyldigKode(kode)) return svar({ feil: "Koden er seks siffer" }, 400);
+  if (!gyldigKode(kode)) return svar({ feil: "Skriv sifrene fra e-posten" }, 400);
 
   // Supabase lagrer koden ulikt etter hvilken vei adressen kom inn: en
   // adresse som ikke fantes fra for far den som «signup», en som finnes

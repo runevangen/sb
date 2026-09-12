@@ -1605,7 +1605,7 @@ const SAK_18 = await kjor("innlogging", FELLES + `
         return svarMed({ sendt: true });
       }
       if (inn.handling === "logg-inn") {
-        if (inn.kode !== "123456") {
+        if (inn.kode !== "63738168") {
           return svarMed({ feil: "Koden stemmer ikke, eller den er for gammel." }, 401);
         }
         return svarMed({ token: "okt-123", epost: inn.epost,
@@ -1671,6 +1671,11 @@ const SAK_18 = await kjor("innlogging", FELLES + `
       ok("koden bestilles", window.__konto.join(",") === "oppsett,kode,kode",
          window.__konto.join(","));
       ok("kodefeltet kommer fram", !document.getElementById("kontoKode").hidden);
+      // Lengden stilles i Supabase. Star feltet pa seks, kapper det det
+      // leseren skriver, og en kappet kode ser ut som en feil kode.
+      ok("kodefeltet tar imot lengre koder enn seks siffer",
+         document.getElementById("kontoKode").maxLength >= 10,
+         document.getElementById("kontoKode").maxLength);
       ok("knappen bytter til a logge inn",
          document.getElementById("kontoSend").textContent === "Logg inn",
          document.getElementById("kontoSend").textContent);
@@ -1687,7 +1692,7 @@ const SAK_18 = await kjor("innlogging", FELLES + `
            document.getElementById("kontoSvar").textContent);
         ok("og logger ingen inn", !localStorage.getItem("sb-konto"));
 
-        document.getElementById("kontoKode").value = "12 34 56";
+        document.getElementById("kontoKode").value = "63 73 81 68";
         document.getElementById("kontoSend").click();
         setTimeout(function () { try {
           var lagret = JSON.parse(localStorage.getItem("sb-konto") || "null");

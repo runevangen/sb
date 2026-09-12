@@ -424,6 +424,13 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   og `mangler`), ikke når leseren trykker Send: får du vite at
   innloggingen ikke er satt opp først etter at adressen er skrevet inn,
   var skrivingen til ingen nytte. Samme grep som i adminportalen.
+- **Kodelengden stilles i Supabase** (*Authentication* → *Rate Limits* →
+  «Email OTP Length»), og seks er bare standarden — dette prosjektet står
+  på åtte. `KODE_MIN` og `KODE_MAKS` i `konto-data.js` er derfor et
+  spenn, ikke et tall, og `maxlength` på feltet følger `KODE_MAKS`. Var
+  det hardkodet til seks, kappet vi «63738168» til «637381», sendte den,
+  og fikk 403 — som ser nøyaktig ut som en feil kode. Det tok en kveld å
+  finne, fordi hvert ledd i kjeden kunne forklare den samme 403-en.
 - Supabase lagrer koden ulikt etter hvilken vei adressen kom inn: en
   adresse som ikke fantes fra før får den som «signup», en som finnes
   som «magiclink», og nyere utgaver godtar «email» som fellesnavn.
@@ -494,9 +501,9 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ## Testing
 
-    node test/unit.mjs      350 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  178 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       267 tester, ~170 s, headless Chromium
+    node test/unit.mjs      353 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  179 tester, ~250 ms, ingen nettleser
+    node test/run.mjs       268 tester, ~170 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
