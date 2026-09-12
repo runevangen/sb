@@ -387,6 +387,74 @@ body {
   color: var(--text-dim);
 }
 
+/* Innloggingen: to felt og en knapp, rett under knappen som apner den.
+   Ingen dialog — det er ett sporsmal, og menyen er alt apen. */
+.konto-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--border-btn);
+  border-radius: 8px;
+}
+
+.konto-panel[hidden] { display: none; }
+
+.konto-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.konto-felt {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border-btn);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: calc(13px * var(--fs));
+}
+
+.konto-felt[hidden] { display: none; }
+
+.konto-send, .konto-ut {
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: calc(13px * var(--fs));
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.konto-ut {
+  background: none;
+  border: 1px solid var(--border-btn);
+  color: var(--text-dim);
+}
+
+.konto-send:disabled { opacity: 0.45; cursor: default; }
+.konto-send[hidden], .konto-ut[hidden] { display: none; }
+
+.konto-felt:focus-visible, .konto-send:focus-visible, .konto-ut:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.konto-svar {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.konto-svar:empty { display: none; }
+
 .menu-state {
   padding: 20px 18px;
   font-size: 13px;
@@ -1449,8 +1517,106 @@ body {
 
 .kamp-viser-pub:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Panelet ligger som en egen rad rett under kampen, ikke som en dialog:
-   det er ett sporsmal, og svaret skal ut av appen, ikke inn i den. */
+/* Kampen som ble delt med deg, loftet ut av runden: en runde er ti like
+   rader, og lenka pekte pa en av dem.
+   Klassen het .kamp-delt til den kolliderte med vokteren for .kamp-del:
+   den matcher pa tekst, og trykkflata far aldri male noe. To navn en
+   bokstav fra hverandre som betydde helt ulike ting — knappen som deler,
+   og kampen som ble delt. */
+.kamp-invitert {
+  border-radius: 10px;
+  padding: 9px 10px 11px;
+  margin: 4px -6px;
+  background: var(--accent-wash);
+}
+
+.kamp-invitasjon {
+  margin-top: 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: calc(12px * var(--fs));
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.kamp-invitasjon-svar {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.kamp-invitasjon-svar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* «Tre blir med: Ola, Kari og Per» under kampen, som «vises pa»-linja:
+   den som blar gjennom runden skal se det uten a apne noe. */
+.kamp-blirmed {
+  margin-top: 4px;
+  font-size: calc(12px * var(--fs));
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.kamp-blirmed-merke { color: var(--bekreftet); font-weight: 700; margin-right: 4px; }
+
+/* Svaret for deg selv, inne i panelet. */
+.kamp-blirmed-valg {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.kamp-navn {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border-btn);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: calc(13px * var(--fs));
+}
+
+.kamp-navn[hidden] { display: none; }
+
+.kamp-blimed {
+  padding: 9px 12px;
+  border: 1px solid var(--bekreftet);
+  border-radius: 8px;
+  background: none;
+  color: var(--bekreftet);
+  font-family: inherit;
+  font-size: calc(13px * var(--fs));
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kamp-blimed:disabled { opacity: 0.45; cursor: default; }
+
+.kamp-navn:focus-visible, .kamp-blimed:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Noten tar hele bredden i valgboksen, sa feltet og knappen star sammen
+   pa linja over. */
+.kamp-blirmed-valg .kamp-note { flex: 1 0 100%; }
+
+/* Star det ingenting a trykke pa, skal det sta hvorfor. */
+.kamp-note {
+  margin: 0;
+  font-size: calc(12px * var(--fs));
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
 /* Panelet ligger inne i den valgte kampen, innenfor rammen. Det trenger
    derfor ingen egen strek under — rammen er skillet. */
 .kamp-panel {

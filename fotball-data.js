@@ -308,13 +308,24 @@ export const HVOR = {
   stadion: "på stadion",
 };
 
+// Lengste stedsnavn vi tar imot — bade i feltet og fra en delt lenke.
+// Et navn lenger enn dette er ikke et pubnavn.
+export const STED_MAKS = 60;
+
+// «på Andy\'s Pub», «hjemme», «på Brann Stadion». Ett sted, fordi to
+// steder sier det ulikt til slutt: teksten som deles og linja mottakeren
+// leser skal beskrive det samme stedet med de samme ordene.
+export function stedtekst(kamp, hvor, sted) {
+  if (hvor === "pub" && sted) return "på " + sted;
+  if (hvor === "stadion" && (sted || (kamp && kamp.arena))) {
+    return "på " + (sted || kamp.arena);
+  }
+  return HVOR[hvor] || "";
+}
+
 export function delingstekst(kamp, hvor, sted, url, vaer) {
   const naar = tidstekst(kamp && kamp.dato);
-  let hvorTekst = HVOR[hvor] || "";
-  if (hvor === "pub" && sted) hvorTekst = "på " + sted;
-  if (hvor === "stadion" && (sted || (kamp && kamp.arena))) {
-    hvorTekst = "på " + (sted || kamp.arena);
-  }
+  const hvorTekst = stedtekst(kamp, hvor, sted);
   return "⚽ " + kamp.hjemme + " – " + kamp.borte + (naar ? ", " + naar : "") + "." +
     (hvorTekst ? " Jeg ser den " + hvorTekst + "." : "") +
     (vaer ? " Været ved avspark: " + vaer : "") +
@@ -364,6 +375,56 @@ export function tolkFotballHash(hash) {
 
 export function fotballHash(liga, del) {
   return "#/fotball/" + encodeURIComponent(liga) + "/" + encodeURIComponent(del);
+}
+
+/* ---------- lenka til en enkelt kamp ---------- */
+
+// Delingslenka pekte forst pa hele runden: den som trykket landet i en
+// liste pa ti kamper og matte finne igjen den det gjaldt — uten sted og
+// uten vaer. Kampen, svaret og stedet star derfor i en sporring etter
+// hashen, ikke som nye ledd i stien: tolkFotballHash kjenner igjen ledd
+// pa innhold, og en kamp-id ligner verken pa en liga eller en del. En
+// eldre utgave av appen ser bare #/fotball/<liga>/neste og apner runden
+// som for, sa en lenke som allerede er sendt fortsetter a virke.
+export function kamplenke(liga, kamp, hvor, sted) {
+  const sok = new URLSearchParams();
+  if (kamp && kamp.id != null) sok.set("kamp", String(kamp.id));
+  if (HVOR[hvor]) sok.set("hvor", hvor);
+  if (hvor === "pub" && sted) sok.set("sted", String(sted).slice(0, STED_MAKS));
+  const hale = sok.toString();
+  return fotballHash(liga, "neste") + (hale ? "?" + hale : "");
+}
+
+// Bare kamp-id-en ma vaere der: et sted uten kamp er ingenting a peke pa.
+// «hvor» valideres mot de tre svarene vi kjenner, og stedet kappes som i
+// feltet — det kommer fra en adresse hvem som helst kan skrive.
+export function tolkKamplenke(hash) {
+  const rute = tolkFotballHash(hash);
+  if (!rute) return null;
+  const skille = String(hash).indexOf("?");
+  if (skille === -1) return null;
+
+  const sok = new URLSearchParams(String(hash).slice(skille + 1));
+  const id = sok.get("kamp");
+  if (!id) return null;
+
+  const hvor = sok.get("hvor");
+  return {
+    liga: rute.liga,
+    kampId: id.slice(0, STED_MAKS),
+    hvor: HVOR[hvor] ? hvor : null,
+    sted: (sok.get("sted") || "").trim().slice(0, STED_MAKS),
+  };
+}
+
+// Linja over kampen nar leseren kom hit fra en delt lenke. «Noen», ikke
+// et navn: vi vet ikke hvem som delte, og et gjettet navn ville vaert
+// verre enn a si det som det er.
+export function invitasjonstekst(kamp, hvor, sted) {
+  const hvorTekst = stedtekst(kamp, hvor, sted);
+  return hvorTekst
+    ? "Delt med deg: noen ser kampen " + hvorTekst + "."
+    : "Delt med deg.";
 }
 
 /* ---------- lagnavn ---------- */

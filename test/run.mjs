@@ -1108,8 +1108,12 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
          String(d.text).indexOf("Hvor ser du?") > -1, d.text);
       ok("vaeret er med i teksten som deles",
          String(d.text).indexOf("Været ved avspark: 8°, føles som 4°.") > -1, d.text);
-      ok("lenken apner neste runde i appen",
-         String(d.url).indexOf("#/fotball/eliteserien/neste") > -1, d.url);
+      // Lenka skal apne kampen som ble delt, ikke bare runden: en runde er
+      // ti kamper, og mottakeren skal slippe a lete etter den det gjaldt.
+      ok("lenken apner kampen som ble delt, med sted og svar",
+         String(d.url).indexOf("#/fotball/eliteserien/neste?") > -1 &&
+         String(d.url).indexOf("kamp=3") > -1 && String(d.url).indexOf("hvor=pub") > -1 &&
+         String(d.url).indexOf("sted=Pub") > -1, d.url);
       ok("panelet lukkes etter deling", !document.querySelector(".kamp-panel"));
       ferdig();
     }
@@ -1498,9 +1502,344 @@ const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
 
 rmSync(join(tmp, "visninger.js"));
 
+/* ---------------- 17. lenka apner kampen som ble delt ---------------- */
+
+const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
+  window.fetch = function (u) {
+    u = String(u);
+    // Vaer og puber er ikke det som testes her, og et svar som lar vente
+    // pa seg stopper den virtuelle tiden.
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ svar: [] })); } });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 || u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  // Adressen slik den kommer ut av en deling: kampen, svaret og stedet.
+  location.hash = "#/fotball/eliteserien/neste?kamp=4&hvor=pub&sted=Pub%20X";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    ok("en delt lenke apner fotballfanen", !document.getElementById("fotball").hidden);
+    var merket = document.querySelectorAll(".kamp-invitert");
+    ok("bare den delte kampen loftes fram", merket.length === 1, merket.length);
+    ok("og det er den lenka pekte pa",
+       merket[0].dataset.kamp === "4" && merket[0].textContent.indexOf("Molde") > -1,
+       merket[0].dataset.kamp + " " + merket[0].textContent);
+    var linje = merket[0].querySelector(".kamp-invitasjon");
+    ok("det star hvor avsenderen ser den",
+       linje && linje.textContent.indexOf("noen ser kampen på Pub X") > -1,
+       linje ? linje.textContent : "ingen linje");
+
+    // Svaret skal koste ett trykk: panelet apnes med avsenderens sted
+    // valgt, sa «jeg blir med» ikke krever at pubnavnet skrives pa nytt.
+    linje.querySelector(".kamp-invitasjon-svar").click();
+    var panel = document.querySelector(".kamp-panel");
+    // Panelet ligger inne i den valgte kampen, innenfor rammen.
+    ok("svar apner panelet pa den kampen",
+       panel && merket[0].contains(panel) && merket[0].classList.contains("valgt"));
+    ok("med avsenderens sted ferdig valgt",
+       panel.querySelector(".kamp-pub").value === "Pub X" &&
+       panel.querySelectorAll(".hvor-valg")[1].getAttribute("aria-pressed") === "true",
+       panel.querySelector(".kamp-pub").value);
+    // Den som kommer fra en delt lenke er utlogget. Da skal det sta hva
+    // som mangler — og at delingen virker uansett.
+    ok("utlogget star det hva som skal til for a bli med",
+       panel.querySelector(".kamp-blirmed-valg .kamp-note").textContent
+         .indexOf("Logg inn i menyen") > -1 &&
+       !panel.querySelector(".kamp-blimed"),
+       panel.querySelector(".kamp-blirmed-valg").textContent);
+
+    // En lenke til en kamp som ikke star i runden lenger: runden skal sta
+    // som for, uten en feilmelding om noe leseren ikke kan gjore noe med.
+    location.hash = "#/fotball/eliteserien/neste?kamp=999&hvor=hjemme";
+    setTimeout(function () { try {
+      ok("en kamp som ikke finnes merker ingenting",
+         document.querySelectorAll(".kamp-invitert").length === 0 &&
+         document.querySelectorAll(".kamp.delbar").length === 2,
+         document.querySelectorAll(".kamp-invitert").length + "/" +
+         document.querySelectorAll(".kamp.delbar").length);
+      ferdig();
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
+`);
+
+/* ---------------- 18. innlogging ---------------- */
+
+const SAK_18 = await kjor("innlogging", FELLES + `
+  var saker = lagSaker(12);
+  window.__konto = [];
+  function svarMed(kropp, status) {
+    return Promise.resolve({ ok: !status || status < 400, status: status || 200,
+      statusText: "OK", text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, o) {
+    u = String(u);
+    if (u.indexOf("/api/konto") === 0) {
+      var inn = o && o.body ? JSON.parse(o.body) : null;
+      window.__konto.push(inn ? inn.handling : "oppsett");
+      if (!inn) return svarMed({ klar: true, mangler: [] });
+      if (inn.handling === "kode") {
+        // Én bestilling feiler med vilje, sa vi ser at tjenestens egen
+        // melding nar fram til leseren.
+        if (inn.epost === "feil@example.no") {
+          return svarMed({ feil: "Fikk ikke sendt koden. Prøv igjen om litt.",
+            forsok: [{ kilde: "Supabase Auth", status: 500,
+              melding: "Error sending confirmation email" }] }, 502);
+        }
+        return svarMed({ sendt: true });
+      }
+      if (inn.handling === "logg-inn") {
+        if (inn.kode !== "123456") {
+          return svarMed({ feil: "Koden stemmer ikke, eller den er for gammel." }, 401);
+        }
+        return svarMed({ token: "okt-123", epost: inn.epost,
+          utloper: new Date(Date.now() + 3600000).toISOString() });
+      }
+      return svarMed({ feil: "Ukjent handling" }, 400);
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return svarMed(svar);
+  };
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.getElementById("menuBtn").click();
+    var knapp = document.getElementById("kontoBtn");
+    var panel = document.getElementById("kontoPanel");
+    ok("menyen har en innlogging", knapp.textContent.indexOf("Logg inn") > -1, knapp.textContent);
+    ok("panelet er lukket til man trykker", panel.hidden);
+    // Ingenting er last bak innloggingen: feeden star ferdig for noen har
+    // logget inn, og det er hele poenget med at knappen star i menyen.
+    ok("appen virker utlogget", document.querySelectorAll("#feed .row").length > 0 &&
+       !localStorage.getItem("sb-konto"),
+       document.querySelectorAll("#feed .row").length);
+
+    knapp.click();
+    ok("trykk apner panelet", !panel.hidden && knapp.getAttribute("aria-expanded") === "true");
+    // Leseren skal vite hva som lagres for hen skriver adressen, ikke etterpa.
+    ok("det star hva vi lagrer",
+       document.getElementById("kontoNote").textContent.indexOf("det eneste vi lagrer") > -1,
+       document.getElementById("kontoNote").textContent);
+    // En knapp i menyen ser ut som en port til noe. Teksten ma si at den
+    // ikke er det.
+    ok("og at man ikke trenger konto for a bruke appen",
+       document.getElementById("kontoNote").textContent.indexOf("trenger ikke konto") > -1,
+       document.getElementById("kontoNote").textContent);
+    ok("oppsettet sjekkes ved apning", window.__konto.join(",") === "oppsett",
+       window.__konto.join(","));
+
+    // En adresse som apenbart ikke er en adresse stoppes for kallet: en
+    // e-post som aldri kommer er verre enn en beskjed med en gang.
+    document.getElementById("kontoEpost").value = "ikke-en-adresse";
+    document.getElementById("kontoSend").click();
+    ok("tull i adressefeltet stoppes her",
+       document.getElementById("kontoSvar").textContent.indexOf("e-postadresse") > -1 &&
+       window.__konto.join(",") === "oppsett",
+       document.getElementById("kontoSvar").textContent + " | " + window.__konto.join(","));
+
+    // «Fikk ikke sendt koden» alene sier ikke hvorfor. Tjenestens egen
+    // melding skal sta i parentes etter, sa den kan meldes videre uten a
+    // grave i funksjonsloggen.
+    document.getElementById("kontoEpost").value = "feil@example.no";
+    document.getElementById("kontoSend").click();
+    setTimeout(function () { try {
+      var feiltekst = document.getElementById("kontoSvar").textContent;
+      ok("tjenestens egen melding folger med feilen",
+         feiltekst.indexOf("Fikk ikke sendt koden") > -1 &&
+         feiltekst.indexOf("svarte 500") > -1 &&
+         feiltekst.indexOf("Error sending confirmation email") > -1, feiltekst);
+      ok("og feilen logger ingen inn", !localStorage.getItem("sb-konto"));
+
+      document.getElementById("kontoEpost").value = "Leser@Example.no";
+      document.getElementById("kontoSend").click();
+      setTimeout(function () { try {
+      ok("koden bestilles", window.__konto.join(",") === "oppsett,kode,kode",
+         window.__konto.join(","));
+      ok("kodefeltet kommer fram", !document.getElementById("kontoKode").hidden);
+      ok("knappen bytter til a logge inn",
+         document.getElementById("kontoSend").textContent === "Logg inn",
+         document.getElementById("kontoSend").textContent);
+      // Adressen maskeres ogsa i kvitteringen: den leses i en sofa med flere i.
+      ok("kvitteringen navngir adressen maskert",
+         document.getElementById("kontoSvar").textContent.indexOf("le•••@example.no") > -1,
+         document.getElementById("kontoSvar").textContent);
+
+      document.getElementById("kontoKode").value = "999999";
+      document.getElementById("kontoSend").click();
+      setTimeout(function () { try {
+        ok("feil kode sier ifra",
+           document.getElementById("kontoSvar").textContent.indexOf("stemmer ikke") > -1,
+           document.getElementById("kontoSvar").textContent);
+        ok("og logger ingen inn", !localStorage.getItem("sb-konto"));
+
+        document.getElementById("kontoKode").value = "12 34 56";
+        document.getElementById("kontoSend").click();
+        setTimeout(function () { try {
+          var lagret = JSON.parse(localStorage.getItem("sb-konto") || "null");
+          ok("riktig kode logger inn", lagret && lagret.token === "okt-123",
+             JSON.stringify(lagret));
+          ok("okta har et utlopstidspunkt", lagret && !isNaN(Date.parse(lagret.utloper)),
+             lagret && lagret.utloper);
+          ok("menyen viser hvem du er, maskert",
+             document.getElementById("kontoBtnTekst").textContent === "le•••@example.no",
+             document.getElementById("kontoBtnTekst").textContent);
+          // En knapp som ser ut som den gir noe den ikke gir, er verre
+          // enn en knapp som sier hva den er.
+          ok("og innlogget star det hva innloggingen er til",
+             document.getElementById("kontoNote").textContent.indexOf("med eller uten konto") > -1,
+             document.getElementById("kontoNote").textContent);
+
+          document.getElementById("kontoUt").click();
+          ok("logg ut tommer okta", !localStorage.getItem("sb-konto"));
+          ok("og menyen sier logg inn igjen",
+             document.getElementById("kontoBtnTekst").textContent === "Logg inn",
+             document.getElementById("kontoBtnTekst").textContent);
+          ferdig();
+        } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
+`);
+
+/* ---------------- 19. jeg blir med ---------------- */
+
+const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
+  // Innlogget for appen starter: okta ligger der en tidligere innlogging
+  // la den.
+  localStorage.setItem("sb-konto", JSON.stringify({ token: "okt-1",
+    epost: "leser@example.no", bruker: "u-1",
+    utloper: new Date(Date.now() + 3600000).toISOString() }));
+
+  window.__svar = [];
+  window.__lagret = [];
+  function svarMed(kropp, status) {
+    return Promise.resolve({ ok: !status || status < 400, status: status || 200,
+      statusText: "OK", text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, o) {
+    u = String(u);
+    if (u.indexOf("/api/svar") === 0) {
+      var inn = o && o.body ? JSON.parse(o.body) : null;
+      window.__svar.push({ url: u, inn: inn, headere: (o && o.headers) || null });
+      if (!inn) return svarMed({ svar: window.__lagret });
+      if (inn.handling === "fjern") {
+        window.__lagret = [];
+        return svarMed({ fjernet: true });
+      }
+      window.__lagret = [{ kamp_id: String(inn.kampId), navn: inn.navn, hvor: inn.hvor,
+        sted: inn.sted, bruker: "u-1" }];
+      return svarMed({ svar: window.__lagret });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 || u.indexOf("overpass") > -1) {
+      return svarMed({}, 502);
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return svarMed(kropp);
+    }
+    return svarMed(u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker);
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    // Ti kamper skal ikke bli ti kall.
+    var lesekall = window.__svar.filter(function (k) { return !k.inn; });
+    ok("hele runden hentes i ett kall", lesekall.length === 1, lesekall.length);
+    ok("og med begge kampene", lesekall[0].url.indexOf("kamper=3%2C4") > -1 ||
+       lesekall[0].url.indexOf("kamper=3,4") > -1, lesekall[0].url);
+    ok("ingen er med enda", !document.querySelector(".kamp-blirmed"));
+
+    var rad = document.querySelectorAll(".kamp.delbar")[0];
+    rad.querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    var knapp = panel.querySelector(".kamp-blimed");
+    ok("innlogget star knappen der", !!knapp && knapp.textContent === "Jeg blir med",
+       knapp ? knapp.textContent : "ingen knapp");
+    // Lista leses uten konto, sa navnet leses ogsa av andre enn
+    // vennegruppa. Det skal sta der navnet skrives.
+    ok("det star at navnet er synlig for andre",
+       panel.querySelector(".kamp-blirmed-valg .kamp-note").textContent
+         .indexOf("synlig for alle som åpner kampen") > -1,
+       panel.querySelector(".kamp-blirmed-valg .kamp-note").textContent);
+
+    // Uten navn blir lista uleselig for de andre.
+    knapp.click();
+    ok("uten navn sier den ifra",
+       panel.querySelector(".kamp-blirmed-valg .kamp-svar").textContent.indexOf("navnet") > -1,
+       panel.querySelector(".kamp-blirmed-valg .kamp-svar").textContent);
+    ok("og ingenting er sendt", window.__svar.filter(function (k) { return !!k.inn; }).length === 0);
+
+    panel.querySelectorAll(".hvor-valg")[1].click();   // pa pub
+    panel.querySelector(".kamp-pub").value = "Pub X";
+    panel.querySelector(".kamp-navn").value = " Ola ";
+    knapp.click();
+    setTimeout(function () { try {
+      var skriv = window.__svar.filter(function (k) { return !!k.inn; });
+      ok("svaret sendes med okta", skriv.length === 1 && skriv[0].inn.token === "okt-1",
+         JSON.stringify(skriv.map(function (k) { return k.inn; })));
+      ok("med kamp, navn og sted",
+         skriv[0].inn.kampId === 3 && skriv[0].inn.navn === "Ola" &&
+         skriv[0].inn.hvor === "pub" && skriv[0].inn.sted === "Pub X",
+         JSON.stringify(skriv[0].inn));
+      // Navnet skal ikke skrives pa nytt for hver kamp.
+      ok("navnet huskes til neste gang",
+         (JSON.parse(localStorage.getItem("sb-visning")) || {}).svarnavn === "Ola",
+         localStorage.getItem("sb-visning"));
+
+      var linje = rad.querySelector(".kamp-blirmed");
+      ok("lista star under kampen", !!linje && linje.textContent.indexOf("Ola blir med") > -1,
+         linje ? linje.textContent : "ingen linje");
+      // Linja horer til kampen, ikke til panelet: den skal sta over det.
+      ok("og over panelet, ikke under",
+         linje.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING);
+      ok("bare pa den kampen man svarte pa",
+         document.querySelectorAll(".kamp-blirmed").length === 1,
+         document.querySelectorAll(".kamp-blirmed").length);
+      // To «jeg blir med» er en person, ikke to: knappen blir en angreknapp.
+      ok("knappen blir en angreknapp",
+         knapp.textContent === "Jeg blir ikke med likevel", knapp.textContent);
+      ok("og navnefeltet er ute av veien", panel.querySelector(".kamp-navn").hidden);
+
+      knapp.click();
+      setTimeout(function () { try {
+        var fjern = window.__svar.filter(function (k) { return k.inn && k.inn.handling === "fjern"; });
+        ok("angre sender en fjerning med okta",
+           fjern.length === 1 && fjern[0].inn.token === "okt-1" && fjern[0].inn.kampId === 3,
+           JSON.stringify(fjern.map(function (k) { return k.inn; })));
+        ok("og lista under kampen er borte", !rad.querySelector(".kamp-blirmed"));
+        ok("knappen er tilbake til a bli med",
+           knapp.textContent === "Jeg blir med", knapp.textContent);
+        ferdig();
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
+`);
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16];
+const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_19];
 let feilet = 0;
 
 for (const t of alle) {

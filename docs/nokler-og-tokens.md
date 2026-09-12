@@ -17,6 +17,9 @@ Ingenting her er hemmelig i seg selv. Navnene står i koden fra før; det er
 | `THESPORTSDB_KEY` | årets sesong i fotballfanen | faller tilbake til fjorårets tall | med abonnementet |
 | `ADMIN_PASSORD` | innlogging i adminportalen | portalen svarer 503 | nei |
 | `GITHUB_TOKEN` | lagring fra adminportalen | portalen svarer 503 | **ja — 90 dager** |
+| `SUPABASE_URL` | innlogging i appen | innloggingen svarer 503 | nei |
+| `SUPABASE_ANON_KEY` | innlogging i appen | innloggingen svarer 503 | ved rotering |
+| *(Resend API-nøkkel)* | e-posten med engangskoden | ingen kode i e-posten | nei — settes i Supabase, ikke i Netlify |
 | `MET_KONTAKT` | valgfri kontaktadresse til MET | ingenting; været virker | nei |
 | `GITHUB_REPO` | valgfri: hvilket repo admin skriver til | `runevangen/sb` | — |
 | `GITHUB_BRANCH` | valgfri: hvilken gren | `main` | — |
@@ -27,14 +30,23 @@ configuration → Environment variables**.
 Bare én av dem dør av seg selv. Det er `GITHUB_TOKEN`, og avsnittet om
 hva som skjer den dagen står lenger nede.
 
-## De to fellene som allerede har kostet tid
+## De tre fellene som allerede har kostet tid
 
 **1. Funksjonene leser miljøet ved utrulling.** En variabel du setter nå,
 finnes ikke for funksjonen som kjører nå. Etter *hver* endring i
 Environment variables: **Deploys → Trigger deploy → Deploy site**. En
 deploy tømmer også kant-cachen, som ellers holder forrige svar.
 
-**2. Miljøvariabler er versalfølsomme.** `api_football_key` og
+**2. En funksjon som ikke er merget, finnes ikke i prod.** `mvp-sb.netlify.app`
+bygges fra `main`. Ligger funksjonen i en gren, svarer prod 404 uansett
+hvor riktig miljøet er satt — og 404 ser ut som «ikke satt opp» for den
+som feilsøker. Test mot forhåndsvisningen i stedet:
+`https://deploy-preview-<nr>--mvp-sb.netlify.app/api/…`. Husk at også den
+leste miljøet da den ble bygget: setter du en variabel etterpå, må
+forhåndsvisningen bygges på nytt (*Deploys* → finn deployen → *Retry
+deploy*).
+
+**3. Miljøvariabler er versalfølsomme.** `api_football_key` og
 `API_FOOTBALL_KEY` er to forskjellige variabler for Linux.
 Fotballfunksjonen godtar begge skrivemåtene med vilje (`NOKKELNAVN` i
 `netlify/functions/fotball.mjs`), fordi akkurat denne feilen har skjedd.
@@ -108,6 +120,180 @@ Ikke en konto, ikke en bruker.
 
 Passordet når aldri GitHub: er det feil, svarer funksjonen 401 før den har
 rørt tokenet.
+
+### `SUPABASE_URL` og `SUPABASE_ANON_KEY` — innlogging i appen
+
+Innloggingen i menyen: leseren skriver e-postadressen sin, får en
+engangskode, og er logget inn. Supabase Auth gjør jobben — utsteder
+koden, sender e-posten og gir ut økten.
+
+- **Leses av:** `netlify/functions/konto.mjs`
+- **Sendes som:** headeren `apikey` til `<SUPABASE_URL>/auth/v1/…`
+- **Uten dem:** `503`, og appen sier hvilken som mangler allerede når
+  panelet åpnes (`GET /api/konto` spør bare om oppsettet)
+- **Lages på:** https://supabase.com → prosjektet → *Project Settings* →
+  *API*. `SUPABASE_URL` er *Project URL*, `SUPABASE_ANON_KEY` er den
+  offentlige *anon*-nøkkelen — **ikke** `service_role`, som kan lese alt.
+- **Utløper:** ikke av seg selv. Roterer du nøkkelen i Supabase, må
+  verdien byttes her og deployes.
+
+Hvorfor kallet går fra funksjonen og ikke fra nettleseren, når
+anon-nøkkelen tåler å være offentlig: da snakker appen bare med sitt eget
+domene. Ingen tredjepartsskript i `index.html`, ingen informasjonskapsel
+fra noen andre, og ingenting å gjøre om Supabase en dag bytter SDK. Det
+er samme regel som for API-Football, av en annen grunn.
+
+**Dette er første gang appen lagrer noe om en person.** Adressen ligger
+hos Supabase, økten ligger i leserens egen `localStorage`, og ingenting
+ligger hos oss. Velg region i Supabase bevisst (EU), og husk at en
+personvernerklæring og en måte å be om sletting på hører til her — det er
+ikke kode, men det hører til denne nøkkelen.
+
+#### Koden i e-posten krever egen SMTP
+
+**Dette er fella i oppsettet, og den koster en time hvis man ikke vet
+den.** Med Supabases innebygde e-posttjeneste er malene låst — panelet
+sier «Set up custom SMTP to edit templates», og standardmalen sender en
+*lenke* («Your sign-in link»), ikke en kode. Appen spør om seks siffer.
+Får leseren bare en lenke, er det ingenting å skrive inn, og
+innloggingen står fast.
+
+Løsningen er en egen SMTP-avsender (Authentication → Emails → *Set up
+SMTP*). Da låses malene opp, og flettefeltet `{{ .Token }}` kan legges
+inn i **Magic Link** og i **Confirm signup** — den første brukes når
+adressen har logget inn før, den andre aller første gang:
+
+```html
+<h2>Logg inn i Sportsbibelen</h2>
+<p>Koden din er:</p>
+<p style="font-size:28px;letter-spacing:4px"><strong>{{ .Token }}</strong></p>
+<p>Den varer en liten stund.</p>
+```
+
+Står det `{{ .Token }}` bokstavelig i e-posten du får, er malen lagret
+med feil skrivemåte — sjekk krøllparentesene, punktumet og stor T.
+
+Egen SMTP trengs uansett før ekte lesere: den innebygde tjenesten er
+strupet til noen få e-poster i timen og er ikke ment for produksjon.
+Avsenderadressen bør ligge på et domene vi rår over.
+
+#### Avsenderen — Resend, og hvorfor ikke Brevo
+
+**Brevo ble prøvd først og forkastet.** Ikke på grunn av tjenesten, men
+på grunn av registreringen: den krever verifisering med SMS til mobil, og
+koden kom aldri fram 12. september 2026, etter flere forsøk. Mailjet og
+Amazon SES har samme type krav. Det er verdt å vite før noen prøver
+igjen — dette koster en dag, ikke en time.
+
+Resend er valgt fordi registreringen går med e-post eller GitHub. Merk at
+selskapet er amerikansk: e-postadressen passerer dit, mens resten av
+persondataene ligger i EU-regionen i Supabase. Det er et bevisst
+kompromiss, tatt fordi EU-alternativene ikke lot seg registrere.
+
+**I Resend** (resend.com):
+
+1. Lag en **API-nøkkel** (*API Keys*). Den begynner med `re_` og er
+   passordet i SMTP-oppsettet.
+2. Brukernavnet er bokstavelig `resend` — ikke adressen din.
+3. Verifiser avsenderdomenet (*Domains*). Resend gir ferdige DNS-poster
+   for DKIM og SPF som legges inn der `sportsbibelen.no` har DNS. Uten
+   dette havner e-posten lett i søppelposten.
+   Skal du bare prøve først, kan `onboarding@resend.dev` brukes som
+   avsender uten DNS — men den sender bare til din egen kontoadresse.
+
+**I Supabase** (*Authentication* → *Emails* → *Set up SMTP*). Merk stien:
+SMTP ligger sammen med malene, ikke under *Project Settings*. Panelet
+flytter pa disse sidene fra tid til annen — leter du, er det siden med
+*Subject* og *Body* du skal til:
+
+| Felt | Verdi |
+| --- | --- |
+| Host | `smtp.resend.com` |
+| Port | `587` |
+| Username | `resend` |
+| Password | API-nøkkelen (`re_…`) |
+| Sender email | en adresse på det verifiserte domenet, eller `onboarding@resend.dev` |
+| Sender name | `Sportsbibelen` |
+
+Feltnavnene kan ha flyttet seg siden dette ble skrevet (12. september
+2026); formen er den samme.
+
+**To ting som følger med:**
+
+- Malene låses opp i samme øyeblikk. Da — og først da — kan `{{ .Token }}`
+  legges inn, som beskrevet over. Rekkefølgen er SMTP først, mal etterpå.
+- Supabase har en egen grense for hvor mange e-poster som sendes per time
+  (*Authentication* → *Rate Limits*). Den står lavt fra start og kan
+  heves når SMTP er på plass. Treffer du «For mange forsøk» under
+  testing, er det som regel den, ikke avsenderen.
+- Skal e-posten bort fra innloggingen en gang, er det *Authentication* →
+  *Sign In / Providers* som er stedet. Da slås Google på, og hele
+  SMTP-oppsettet blir overflødig.
+
+API-nøkkelen hører hjemme i Resend og i Supabase — ikke i Netlify og ikke
+i dette repoet. Appen sender ingen e-post selv; den ber Supabase gjøre
+det.
+
+**Går heller ikke dette**, er det to veier videre, og de står her så de
+ikke må finnes opp på nytt:
+
+- **Gmail-kontoen du alt har.** Et app-passord hos Google lar Supabase
+  sende gjennom `smtp.gmail.com` uten noen ny registrering. Avsenderen
+  blir gmail-adressen, ikke `@sportsbibelen.no`, grensa er ~500 i døgnet,
+  og det ligger i utkanten av Googles vilkår. Godt nok til å få testet at
+  innloggingen virker.
+- **Slutt å sende e-post.** Supabase har innlogging med Google innebygd:
+  ett trykk, ingen SMTP, ingen maler, ingen timesgrense. Det krever at
+  panelet og `konto.mjs` bygges om for omdirigering, og at Google ser
+  hvem som bruker appen.
+
+#### Tabellen «kampsvar» — hvem blir med
+
+Innloggingen alene trenger ingen tabell. «Jeg blir med» gjør det, og den
+lages én gang med SQL-en under (Supabase → *SQL Editor*). Til den finnes,
+svarer `/api/svar` 503 og sier nøyaktig det.
+
+```sql
+create table kampsvar (
+  id        uuid primary key default gen_random_uuid(),
+  kamp_id   text not null,
+  bruker    uuid not null default auth.uid()
+            references auth.users (id) on delete cascade,
+  navn      text not null check (char_length(navn) between 1 and 24),
+  hvor      text check (hvor in ('hjemme', 'pub', 'stadion')),
+  sted      text check (char_length(sted) <= 60),
+  opprettet timestamptz not null default now(),
+  unique (kamp_id, bruker)
+);
+
+alter table kampsvar enable row level security;
+
+-- Alle kan se hvem som blir med: appen skal kunne leses uten konto.
+create policy "les for alle" on kampsvar
+  for select using (true);
+
+-- Skrive kan du bare i ditt eget navn. `bruker` settes av databasen fra
+-- økten, og funksjonen sender den aldri selv.
+create policy "skriv eget svar" on kampsvar
+  for insert to authenticated with check (bruker = auth.uid());
+create policy "endre eget svar" on kampsvar
+  for update to authenticated using (bruker = auth.uid())
+  with check (bruker = auth.uid());
+create policy "slett eget svar" on kampsvar
+  for delete to authenticated using (bruker = auth.uid());
+```
+
+`unique (kamp_id, bruker)` er det som gjør at to «jeg blir med» på samme
+kamp er én person og ikke to: funksjonen skriver som en upsert.
+
+**Navnet i `navn` er synlig for alle** som åpner den kampen i appen —
+det er prisen for at lista kan leses uten konto. E-postadressen er det
+ikke; den ligger bare i `auth.users`. Derfor er feltet «navnet vennene
+ser», ikke adressen, og fornavn holder.
+
+Tabellen kan ikke leses eller skrives med `service_role`-nøkkelen fra
+denne koden, for den nøkkelen finnes ikke her. Det er med vilje: da kan
+heller ikke en feil i funksjonen skrive i en annens navn.
 
 ### `GITHUB_TOKEN` — adminportalens lagring
 
@@ -211,6 +397,15 @@ Det du ser først, og hva det som regel betyr.
 | Portalen: «… HTTP 403» | tokenet mangler `Contents: read and write` | rett rettighetene |
 | Portalen: «Fikk ikke lagret: HTTP 409» | fila endret mellom lesing og skriving | prøv igjen |
 | Tabellen viser i fjor, uten feilmelding | `THESPORTSDB_KEY` mangler, er utløpt, eller svaret ble avkortet | se `forsok` på `/api/fotball/tabell` |
+| `/api/konto` eller `/api/svar` svarer 404 | funksjonen er ikke merget til `main` enda | test mot deploy-preview-adressen |
+| Innlogging: «Innloggingen er ikke satt opp: X mangler» | X ikke satt i Netlify — eller deployen er eldre enn variabelen | sett X, trigger deploy |
+| Innlogging: «Koden stemmer ikke, eller den er for gammel» | feil eller utløpt kode — samme svar med vilje | be om ny kode |
+| Innlogging: «For mange forsøk» (429) | Supabase sperrer e-postsending en stund | vent et minutt |
+| Innlogging: «Fikk ikke sendt koden» | se `forsok` i svaret fra `/api/konto` | som regel feil `SUPABASE_URL` |
+| E-posten har en lenke, ingen kode | malene er låst til egen SMTP er satt opp | se avsnittet over |
+| «Tabellen «kampsvar» finnes ikke i Supabase ennå» | SQL-en over er ikke kjørt | kjør den i Supabase → SQL Editor |
+| «Jeg blir med»: «Økten gjelder ikke lenger» | utløpt økt, eller reglene slipper ikke skrivingen gjennom | logg inn på nytt; sjekk policyene |
+| Ingen «blir med»-linje, men ingen feil heller | lista er et tillegg og feiler stille | se `/api/svar?kamper=<id>` i nettleseren |
 | Pubene: «overpass-api.de svarte 406» | ikke en nøkkel — Overpass-tjeneren | som regel forbigående |
 | Alt ser gammelt ut etter en endring | kant-cachen | trigger deploy tømmer den |
 

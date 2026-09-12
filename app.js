@@ -5,8 +5,11 @@
 
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug, rangerTreff, listeTekst }
   from "./lib.js";
-import { LIGAER, tolkFotballHash, fotballHash } from "./fotball-data.js";
+import { LIGAER, tolkFotballHash, fotballHash, tolkKamplenke } from "./fotball-data.js";
 import { ofteBrukt, noterPub } from "./pub-data.js";
+import { gyldigEpost, normaliserEpost, normaliserKode, gyldigKode, maskerEpost, oktGyldig }
+  from "./konto-data.js";
+import { normaliserNavn } from "./svar-data.js";
 import { initFotball, visFotball } from "./fotball.js";
 
 // Bytt WP_HOST til din egen WordPress-side når som helst.
@@ -820,6 +823,18 @@ function noterDinPub(navn) {
   track("Pub delt", { pub: String(navn).slice(0, 40) });
 }
 
+// Navnet vennene ser nar du blir med pa en kamp. Ikke e-postadressen:
+// den er var, ikke deres. Det ligger med visningsvalgene, ikke i okta —
+// da star det der ogsa neste gang, uten et kall.
+function svarNavn() {
+  return normaliserNavn(prefs.svarnavn || "");
+}
+
+function settSvarNavn(navn) {
+  prefs.svarnavn = normaliserNavn(navn);
+  savePrefs(prefs);
+}
+
 // Et segment velger en verdi, det veksler ikke. Da kan den som allerede
 // star der trykkes uten at noe skrives eller spores.
 function settVisning(felt, verdi, hendelse, navn) {
@@ -1078,7 +1093,9 @@ function visFane(visning, liga, del) {
   merkFane("fanenFotball", visning === "fotball");
 
   visToppTekst();
-  if (visning === "fotball") visFotball(fotballLiga, fotballDel);
+  // Adressen tolkes her, ikke i modulen: ruting er app.js sin jobb. Kom
+  // leseren fra en delt lenke, folger kampen med inn.
+  if (visning === "fotball") visFotball(fotballLiga, fotballDel, tolkKamplenke(location.hash));
 
   // Menyen beskriver den visningen du star i. Star den apen nar du bytter,
   // skal innholdet folge med.
@@ -1238,6 +1255,230 @@ function isMenuOpen() {
 document.getElementById("menuBtn").addEventListener("click", openMenu);
 document.getElementById("menuClose").addEventListener("click", closeMenu);
 
+/* ---------- konto ---------- */
+
+// Innlogging er forste steg mot a se hvem som blir med pa kampen, og mot
+// at valgene dine folger deg mellom telefoner (#24) og at pubene skriver
+// selv (#65). Den gjor ingenting alene enda, og det star i panelet —
+// en knapp som ser ut som den gir noe, og ikke gir det, er verre enn en
+// knapp som sier hva den er.
+//
+// Okta ligger lokalt, som visningsvalgene. Vi har ingen server som
+// husker deg; vi har en tjeneste som utsteder okta, og en kopi av den
+// her sa du slipper a logge inn ved hver apning.
+const KONTO_KEY = "sb-konto";
+
+// Hva innlogging er, sagt likt i alle tre tilstandene. Appen skal leses
+// og fotballen folges uten konto — innlogging er for det som gar til
+// noen andre: a dele hvor du ser kampen, og a ta med favorittlagene
+// mellom telefoner. Star det ikke her, tror leseren at knappen er en
+// port.
+const KONTO_TEKST = {
+  epost: "Du trenger ikke konto for å lese eller følge fotballen — alt det"
+    + " virker uten. Innlogging er for å dele hvor du ser kampen, og for å"
+    + " ta med favorittlagene dine mellom telefoner. Vi sender en engangskode"
+    + " på e-post; adressen er det eneste vi lagrer om deg.",
+  kode: "Koden er seks siffer og varer en liten stund. Kom den ikke, se i"
+    + " søppelposten.",
+  inne: "Du er logget inn. Deling av kamper og favoritter kommer hit først."
+    + " Resten av appen virker som før, med eller uten konto.",
+};
+
+let kontoOkt = lesKonto();
+let kontoSteg = "epost";
+let kontoOppsett = null;
+
+function lesKonto() {
+  let lagret = null;
+  try {
+    lagret = JSON.parse(localStorage.getItem(KONTO_KEY));
+  } catch (err) {
+    return null;
+  }
+  // En utlopt okt er ingen okt. Den ryddes med en gang, sa menyen ikke
+  // star og pastar at du er logget inn.
+  if (!oktGyldig(lagret)) {
+    try { localStorage.removeItem(KONTO_KEY); } catch (err) { /* privat modus */ }
+    return null;
+  }
+  return lagret;
+}
+
+function lagreKonto(okt) {
+  kontoOkt = okt;
+  try {
+    if (okt) localStorage.setItem(KONTO_KEY, JSON.stringify(okt));
+    else localStorage.removeItem(KONTO_KEY);
+  } catch (err) {
+    // Privat modus: okta gjelder da bare denne okta i nettleseren, og
+    // det er greit.
+  }
+}
+
+function kontoSvar(tekst) {
+  document.getElementById("kontoSvar").textContent = tekst || "";
+}
+
+// Menyen viser hvem du er, ikke bare at du er noen: maskert, fordi
+// appen leses i en sofa med flere i.
+function visKonto() {
+  const tekst = document.getElementById("kontoBtnTekst");
+  const epost = document.getElementById("kontoEpost");
+  const kode = document.getElementById("kontoKode");
+  const send = document.getElementById("kontoSend");
+  const ut = document.getElementById("kontoUt");
+  const note = document.getElementById("kontoNote");
+
+  if (kontoOkt) {
+    tekst.textContent = maskerEpost(kontoOkt.epost);
+    epost.hidden = true;
+    kode.hidden = true;
+    send.hidden = true;
+    ut.hidden = false;
+    note.textContent = KONTO_TEKST.inne;
+    return;
+  }
+
+  tekst.textContent = "Logg inn";
+  ut.hidden = true;
+  send.hidden = false;
+  epost.hidden = false;
+  kode.hidden = kontoSteg !== "kode";
+  send.textContent = kontoSteg === "kode" ? "Logg inn" : "Send kode";
+  epost.disabled = kontoSteg === "kode";
+  note.textContent = kontoSteg === "kode" ? KONTO_TEKST.kode : KONTO_TEKST.epost;
+}
+
+// Oppsettet sjekkes nar panelet apnes, ikke nar leseren trykker Send:
+// far du vite at innloggingen ikke er satt opp forst etter at adressen
+// er skrevet inn, er skrivingen gjort til ingen nytte. Samme grep som i
+// adminportalen.
+async function sjekkKontoOppsett() {
+  if (kontoOppsett) return kontoOppsett;
+  try {
+    const respons = await fetch("/api/konto", { headers: { "Accept": "application/json" } });
+    kontoOppsett = JSON.parse(await respons.text());
+  } catch (err) {
+    return null;
+  }
+  if (kontoOppsett && kontoOppsett.klar === false) {
+    kontoSvar("Innloggingen er ikke satt opp: " + (kontoOppsett.mangler || []).join(" og ")
+      + " mangler i Netlify-miljøet.");
+  }
+  return kontoOppsett;
+}
+
+async function kontoKall(kropp) {
+  const respons = await fetch("/api/konto", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    body: JSON.stringify(kropp),
+  });
+  let data = null;
+  try {
+    data = JSON.parse(await respons.text());
+  } catch (err) {
+    throw new Error("Uventet svar fra innloggingen.");
+  }
+  if (!respons.ok || !data || data.feil) {
+    throw new Error(((data && data.feil) || "Innloggingen svarte " + respons.status + ".")
+      + tjenestenSa(data));
+  }
+  return data;
+}
+
+// «Fikk ikke sendt koden» alene sender leseren — og den som satte opp
+// tjenesten — ut på leting i et panel som ikke sier noe. Funksjonen
+// bærer tjenestens egen melding i `forsok`, så den settes inn her, som i
+// pubforslagene. Ingen nøkkel og ingen adresser ligger i `forsok`.
+function tjenestenSa(data) {
+  const sist = ((data && data.forsok) || []).filter(Boolean).pop();
+  if (!sist) return "";
+  const detalj = sist.melding || sist.utfall || "";
+  if (!detalj && !sist.status) return "";
+  return " (" + (sist.status ? "svarte " + sist.status : "") +
+    (detalj ? (sist.status ? ": " : "") + detalj : "") + ")";
+}
+
+async function kontoSteget() {
+  const send = document.getElementById("kontoSend");
+  const feltEpost = document.getElementById("kontoEpost");
+  const feltKode = document.getElementById("kontoKode");
+  const epost = normaliserEpost(feltEpost.value);
+
+  if (!gyldigEpost(epost)) {
+    kontoSvar("Skriv en e-postadresse.");
+    feltEpost.focus();
+    return;
+  }
+
+  send.disabled = true;
+  try {
+    if (kontoSteg === "epost") {
+      await kontoKall({ handling: "kode", epost });
+      kontoSteg = "kode";
+      visKonto();
+      kontoSvar("Koden er sendt til " + maskerEpost(epost) + ".");
+      feltKode.focus();
+      track("Kode sendt");
+      return;
+    }
+
+    const kode = normaliserKode(feltKode.value);
+    if (!gyldigKode(kode)) {
+      kontoSvar("Koden er seks siffer.");
+      feltKode.focus();
+      return;
+    }
+    const okt = await kontoKall({ handling: "logg-inn", epost, kode });
+    lagreKonto(okt);
+    kontoSteg = "epost";
+    feltKode.value = "";
+    visKonto();
+    kontoSvar("Logget inn.");
+    track("Logget inn");
+  } catch (err) {
+    kontoSvar(err.message);
+  } finally {
+    send.disabled = false;
+  }
+}
+
+function loggUt() {
+  lagreKonto(null);
+  kontoSteg = "epost";
+  document.getElementById("kontoEpost").value = "";
+  document.getElementById("kontoKode").value = "";
+  visKonto();
+  kontoSvar("Logget ut.");
+  track("Logget ut");
+}
+
+document.getElementById("kontoBtn").addEventListener("click", () => {
+  const panel = document.getElementById("kontoPanel");
+  const knapp = document.getElementById("kontoBtn");
+  const apen = !panel.hidden;
+  panel.hidden = apen;
+  knapp.setAttribute("aria-expanded", apen ? "false" : "true");
+  if (apen) return;
+  kontoSvar("");
+  visKonto();
+  sjekkKontoOppsett();
+  if (!kontoOkt) document.getElementById("kontoEpost").focus();
+});
+
+document.getElementById("kontoSend").addEventListener("click", kontoSteget);
+document.getElementById("kontoUt").addEventListener("click", loggUt);
+// Enter i et felt skal gjore det samme som knappen: feltene ligger ikke i
+// et skjema, fordi et skjema i menyen ville sendt sokeskjemaet.
+["kontoEpost", "kontoKode"].forEach((id) => {
+  document.getElementById(id).addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); kontoSteget(); }
+  });
+});
+
+visKonto();
+
 /* ---------- detaljvisning ---------- */
 
 function openDetail(post, trigger) {
@@ -1372,7 +1613,10 @@ initFotball(
   // «Hvor ser du kampen?» gar inn i gruppechatten leseren allerede har.
   // Ingen konto, ingen lagring: chatten er vennegruppa.
   (tekst, url) => delTekst({ title: "Sportsbibelen", text: tekst, url }, "Kamp delt"),
-  { liste: dinePuber, noter: noterDinPub });
+  { liste: dinePuber, noter: noterDinPub },
+  // Innlogging og navn eies av app.js (det er lagring). Modulen far tre
+  // sporsmal: har du en okt, hva heter du for vennene, og husk navnet.
+  { okt: () => kontoOkt, navn: svarNavn, settNavn: settSvarNavn });
 
 document.getElementById("fanenNyheter").addEventListener("click", () => {
   if (aktivVisning !== "nyheter") settFane("nyheter");
