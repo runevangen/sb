@@ -13,6 +13,8 @@ import vaer from "../netlify/functions/vaer.mjs";
 import puber from "../netlify/functions/puber.mjs";
 import { OVERPASS_SPEIL } from "../pub-data.js";
 import visninger from "../netlify/functions/visninger.mjs";
+import konto from "../netlify/functions/konto.mjs";
+import svarfunksjon from "../netlify/functions/svar.mjs";
 import { lesVisninger } from "../visning-data.js";
 
 let feilet = 0;
@@ -703,6 +705,302 @@ ok("far vi ikke skrevet, gir det 502 med grunn",
 
 delete process.env.ADMIN_PASSORD;
 delete process.env.GITHUB_TOKEN;
+
+/* ---------------- innlogging ---------------- */
+
+// Kallet mot Supabase gar fra funksjonen, ikke fra nettleseren: nokkelen
+// skal aldri na leseren, og appen skal bare snakke med sitt eget domene.
+function stubSupabase(svar, status) {
+  const kall = [];
+  global.fetch = async (url, opsjoner) => {
+    kall.push({ url: String(url), opsjoner: opsjoner || {} });
+    return new Response(JSON.stringify(svar === undefined ? {} : svar), {
+      status: status || 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  return kall;
+}
+
+function kontoBe(kropp, metode) {
+  return new Request("https://mvp-sb.netlify.app/api/konto", {
+    method: metode || "POST",
+    headers: { "Content-Type": "application/json" },
+    body: metode === "GET" ? undefined : JSON.stringify(kropp),
+  });
+}
+
+const SUPA_NOKKEL = "hemmelig-anon-nokkel";
+const OKT = {
+  access_token: "okt-token-123",
+  expires_in: 3600,
+  user: { email: "Leser@Example.com" },
+};
+
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_ANON_KEY;
+
+kall = stubSupabase(OKT);
+r = await konto(kontoBe({ handling: "kode", epost: "leser@example.com" }));
+const kontoUoppsatt = await r.json();
+ok("uten oppsett svarer innloggingen 503", r.status === 503, r.status);
+ok("uten oppsett rores ikke tjenesten", kall.length === 0, kall.length);
+ok("503-svaret navngir det som mangler",
+   kontoUoppsatt.feil.indexOf("SUPABASE_URL") > -1 &&
+   kontoUoppsatt.feil.indexOf("SUPABASE_ANON_KEY") > -1, kontoUoppsatt.feil);
+ok("og at det ma rulles ut pa nytt",
+   kontoUoppsatt.feil.indexOf("Trigger deploy") > -1, kontoUoppsatt.feil);
+
+// Appen sporr ved apning, sa det star for adressen er skrevet inn.
+r = await konto(kontoBe(null, "GET"));
+const kontoUklar = await r.json();
+ok("GET sier at innloggingen ikke er klar",
+   r.status === 200 && kontoUklar.klar === false, JSON.stringify(kontoUklar));
+ok("og hvilke variabler som mangler",
+   kontoUklar.mangler.join(",") === "SUPABASE_URL,SUPABASE_ANON_KEY",
+   JSON.stringify(kontoUklar.mangler));
+
+process.env.SUPABASE_URL = "https://prosjekt.supabase.co/";
+process.env.SUPABASE_ANON_KEY = SUPA_NOKKEL;
+
+kall = stubSupabase({});
+r = await konto(kontoBe({ handling: "kode", epost: "  Leser@Example.com " }));
+ok("koden bestilles hos tjenesten", r.status === 200 && kall.length === 1,
+   r.status + " " + kall.length);
+ok("adressen normaliseres for den sendes",
+   JSON.parse(kall[0].opsjoner.body).email === "leser@example.com",
+   kall[0].opsjoner.body);
+// Skragestreken pa slutten av SUPABASE_URL skal ikke gi //auth.
+ok("adressen til tjenesten er hel",
+   kall[0].url === "https://prosjekt.supabase.co/auth/v1/otp", kall[0].url);
+ok("nokkelen gar til tjenesten, ikke til leseren",
+   kall[0].opsjoner.headers.apikey === SUPA_NOKKEL &&
+   JSON.stringify(await (await konto(kontoBe({ handling: "kode", epost: "a@b.no" }))).json())
+     .indexOf(SUPA_NOKKEL) === -1);
+ok("svaret caches aldri",
+   r.headers.get("Cache-Control") === "no-store", r.headers.get("Cache-Control"));
+
+kall = stubSupabase({});
+r = await konto(kontoBe({ handling: "kode", epost: "ikke-en-adresse" }));
+ok("en adresse som apenbart ikke er en adresse stoppes her",
+   r.status === 400 && kall.length === 0, r.status + " " + kall.length);
+
+// For mange forsok er den ene feilen leseren kan gjore noe med: vente.
+kall = stubSupabase({ msg: "email rate limit exceeded" }, 429);
+r = await konto(kontoBe({ handling: "kode", epost: "leser@example.com" }));
+ok("for mange forsok sier at man skal vente",
+   r.status === 429 && (await r.json()).feil.indexOf("Vent") > -1, r.status);
+
+kall = stubSupabase(OKT);
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "12 34 56" }));
+const okt = await r.json();
+ok("riktig kode gir en okt", r.status === 200 && okt.token === "okt-token-123",
+   r.status + " " + JSON.stringify(okt));
+ok("koden renses for den sendes",
+   JSON.parse(kall[0].opsjoner.body).token === "123456", kall[0].opsjoner.body);
+ok("adressen kommer tilbake normalisert", okt.epost === "leser@example.com", okt.epost);
+// Et antall sekunder er ubrukelig etter en omstart: appen far et
+// tidspunkt.
+ok("okta har et utlopstidspunkt, ikke et antall sekunder",
+   !Number.isNaN(Date.parse(okt.utloper)) && Date.parse(okt.utloper) > Date.now(), okt.utloper);
+
+// Forste innlogging med en ny adresse gar signup-veien: da heter typen
+// «signup», ikke «email». Utenfra ser en avvist kode og en feil type helt
+// like ut, sa den ene ma proves for vi vet.
+function stubType(riktigType, oktSvar) {
+  const kall = [];
+  global.fetch = async (url, opsjoner) => {
+    kall.push({ url: String(url), opsjoner: opsjoner || {} });
+    const type = JSON.parse(opsjoner.body || "{}").type;
+    if (type === riktigType) {
+      return new Response(JSON.stringify(oktSvar), { status: 200 });
+    }
+    return new Response(JSON.stringify({ error: "invalid_grant",
+      error_description: "Token has expired or is invalid" }), { status: 403 });
+  };
+  return kall;
+}
+
+// Den vanligste veien: nyere utgaver godtar «email», og da koster
+// innloggingen ett kall.
+kall = stubType("email", OKT);
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
+ok("den vanligste veien koster ett kall",
+   r.status === 200 && kall.length === 1, r.status + " " + kall.length);
+
+// En adresse som finnes fra for far koden lagret som «magiclink».
+kall = stubType("magiclink", OKT);
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
+ok("en kjent adresse slipper inn som magiclink",
+   r.status === 200 && (await r.json()).token === "okt-token-123", r.status);
+
+// En adresse som ikke fantes, far den som «signup».
+kall = stubType("signup", OKT);
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
+ok("en ny adresse slipper inn som signup",
+   r.status === 200 && (await r.json()).token === "okt-token-123", r.status);
+ok("og de tre forsokene skiller seg bare pa typen",
+   kall.length === 3 &&
+   kall.map((k) => JSON.parse(k.opsjoner.body).type).join(",") === "email,magiclink,signup",
+   kall.map((k) => JSON.parse(k.opsjoner.body).type).join(","));
+
+// En tjenestefeil eller en sperre skal ikke gi et kall til.
+kall = stubSupabase({ msg: "Internal error" }, 500);
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
+ok("en tjenestefeil provers ikke pa nytt", kall.length === 1 && r.status === 502,
+   kall.length + " " + r.status);
+
+kall = stubSupabase({ msg: "rate limit" }, 429);
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
+ok("en sperre provers ikke pa nytt", kall.length === 1 && r.status === 429,
+   kall.length + " " + r.status);
+
+kall = stubSupabase({ error: "invalid_grant", error_description: "Token has expired" }, 403);
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
+const feilKode = await r.json();
+// Feil kode og utlopt kode far samme svar: at en kode fantes, er i seg
+// selv noe om adressen.
+ok("feil kode gir 401 uten a rope noe", r.status === 401 &&
+   feilKode.feil === "Koden stemmer ikke, eller den er for gammel.",
+   r.status + " " + feilKode.feil);
+// En kode som er feil, er feil begge veier — og da er begge forsokene brukt.
+ok("en avvist kode provers alle veier for den gis opp", kall.length === 3,
+   kall.length);
+// Meldingen skiller ikke pa feil og utlopt kode, sa den roper ingenting
+// om adressen — men den sier hva som faktisk ble prov d.
+ok("tjenestens egen melding folger med avvisningen",
+   (feilKode.forsok || []).length === 3 &&
+   feilKode.forsok[0].melding.indexOf("Token has expired") > -1,
+   JSON.stringify(feilKode.forsok));
+ok("og den royper ikke adressen",
+   JSON.stringify(feilKode).indexOf("leser@example.com") === -1,
+   JSON.stringify(feilKode));
+
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123" }));
+ok("en for kort kode stoppes her", r.status === 400, r.status);
+
+// Lengden stilles i Supabase; atte siffer er en like gyldig innstilling
+// som seks, og skal ga hele veien uten a bli kappet.
+kall = stubType("email", OKT);
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "63738168" }));
+ok("en atte-sifret kode gar gjennom hel",
+   r.status === 200 && JSON.parse(kall[0].opsjoner.body).token === "63738168",
+   r.status + " " + JSON.parse(kall[0].opsjoner.body).token);
+
+kall = stubSupabase({ email: "leser@example.com" });
+r = await konto(kontoBe({ handling: "hvem", token: "okt-token-123" }));
+ok("okta kan sjekkes mot tjenesten",
+   r.status === 200 && (await r.json()).epost === "leser@example.com", r.status);
+ok("okta sendes som bearer-token",
+   kall[0].opsjoner.headers.Authorization === "Bearer okt-token-123",
+   JSON.stringify(kall[0].opsjoner.headers));
+
+kall = stubSupabase({ msg: "invalid JWT" }, 401);
+r = await konto(kontoBe({ handling: "hvem", token: "gammelt" }));
+ok("en okt som ikke gjelder lenger gir 401", r.status === 401, r.status);
+
+r = await konto(kontoBe({ handling: "noe-annet", epost: "leser@example.com" }));
+ok("en ukjent handling avvises", r.status === 400, r.status);
+
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_ANON_KEY;
+
+/* ---------------- hvem blir med ---------------- */
+
+function svarBe(kropp, metode, adresse) {
+  return new Request("https://mvp-sb.netlify.app" + (adresse || "/api/svar"), {
+    method: metode || "POST",
+    headers: { "Content-Type": "application/json" },
+    body: metode === "GET" ? undefined : JSON.stringify(kropp),
+  });
+}
+
+const SVAR_RADER = [
+  { kamp_id: 7, navn: "Ola", hvor: "pub", sted: "Andy's Pub", bruker: "u-1" },
+];
+
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_ANON_KEY;
+kall = stubSupabase(SVAR_RADER);
+r = await svarfunksjon(svarBe(null, "GET", "/api/svar?kamper=7"));
+ok("uten oppsett svarer lista 503", r.status === 503 && kall.length === 0,
+   r.status + " " + kall.length);
+
+process.env.SUPABASE_URL = "https://prosjekt.supabase.co";
+process.env.SUPABASE_ANON_KEY = SUPA_NOKKEL;
+
+kall = stubSupabase(SVAR_RADER);
+r = await svarfunksjon(svarBe(null, "GET", "/api/svar?kamper=7,8"));
+const lista = await r.json();
+ok("hele runden hentes i ett kall", kall.length === 1, kall.length);
+ok("og med kampene i ett filter",
+   kall[0].url.indexOf("kamp_id=in.(7,8)") > -1, kall[0].url);
+// A se hvem som blir med krever ingen konto: appen skal kunne leses uten.
+ok("lesing sender ingen okt", !kall[0].opsjoner.headers.Authorization,
+   JSON.stringify(kall[0].opsjoner.headers));
+ok("radene formes for de sendes ut",
+   lista.svar.length === 1 && lista.svar[0].navn === "Ola", JSON.stringify(lista));
+// Hvem som blir med endrer seg mens man ser pa det.
+ok("lista caches aldri", r.headers.get("Cache-Control") === "no-store");
+
+kall = stubSupabase(SVAR_RADER);
+r = await svarfunksjon(svarBe(null, "GET", "/api/svar?kamper=drop%20table"));
+ok("tull i kamplista gir tom liste, ikke et kall",
+   r.status === 200 && (await r.json()).svar.length === 0 && kall.length === 0,
+   kall.length);
+
+// Skriving krever okta, og den gar med som leserens egen: databasen
+// setter «bruker» fra den, sa ingen kan skrive i en annens navn.
+kall = stubSupabase(SVAR_RADER);
+r = await svarfunksjon(svarBe({ kampId: 7, navn: "Ola" }));
+ok("uten okt far man ikke skrive", r.status === 401 && kall.length === 0, r.status);
+
+kall = stubSupabase(SVAR_RADER);
+r = await svarfunksjon(svarBe({ token: "okt-1", kampId: 7, navn: "  ", hvor: "pub" }));
+ok("uten navn far man ikke skrive", r.status === 400 && kall.length === 0, r.status);
+
+kall = stubSupabase(SVAR_RADER);
+r = await svarfunksjon(svarBe({ token: "okt-1", kampId: "7; drop", navn: "Ola" }));
+ok("en kamp-id som ikke er et tall stoppes her",
+   r.status === 400 && kall.length === 0, r.status);
+
+kall = stubSupabase(SVAR_RADER);
+r = await svarfunksjon(svarBe({ token: "okt-1", kampId: 7, navn: " Ola ", hvor: "pub",
+  sted: "Andy's Pub" }));
+ok("svaret skrives", r.status === 200 && kall.length === 1, r.status + " " + kall.length);
+ok("med leserens egen okt",
+   kall[0].opsjoner.headers.Authorization === "Bearer okt-1",
+   JSON.stringify(kall[0].opsjoner.headers));
+ok("og uten a si hvem brukeren er — det gjor databasen",
+   JSON.parse(kall[0].opsjoner.body).bruker === undefined, kall[0].opsjoner.body);
+// To «jeg blir med» pa samme kamp er en person, ikke to.
+ok("skrivingen er en upsert",
+   kall[0].url.indexOf("on_conflict=kamp_id,bruker") > -1 &&
+   String(kall[0].opsjoner.headers.Prefer).indexOf("merge-duplicates") > -1,
+   kall[0].url + " " + kall[0].opsjoner.headers.Prefer);
+
+kall = stubSupabase({});
+r = await svarfunksjon(svarBe({ handling: "fjern", token: "okt-1", kampId: 7 }));
+ok("man kan angre", r.status === 200 && kall[0].opsjoner.method === "DELETE",
+   r.status + " " + kall[0].opsjoner.method);
+ok("og slettingen gar ogsa med leserens egen okt",
+   kall[0].opsjoner.headers.Authorization === "Bearer okt-1");
+
+// Den som setter opp prosjektet trenger a hore nyaktig dette.
+kall = stubSupabase({ code: "42P01", message: 'relation "public.kampsvar" does not exist' }, 404);
+r = await svarfunksjon(svarBe(null, "GET", "/api/svar?kamper=7"));
+const utenTabell = await r.json();
+ok("mangler tabellen, star det hva som mangler",
+   r.status === 503 && utenTabell.feil.indexOf("kampsvar") > -1 &&
+   utenTabell.feil.indexOf("docs/nokler-og-tokens.md") > -1, utenTabell.feil);
+
+kall = stubSupabase({ message: "JWT expired" }, 401);
+r = await svarfunksjon(svarBe({ token: "gammel", kampId: 7, navn: "Ola" }));
+ok("en utlopt okt sier at man ma logge inn pa nytt",
+   r.status === 401 && (await r.json()).feil.indexOf("Logg inn") > -1, r.status);
+
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_ANON_KEY;
 
 /* ---------------- rapport ---------------- */
 

@@ -7,7 +7,10 @@
 // app.js gjennom naviger(), som setter adressen — da virker tilbakeknappen
 // likt her som i resten av appen.
 
-import { LIGAER, DELER, DEL_NAVN, HVOR, delingstekst, fotballHash } from "./fotball-data.js";
+import { LIGAER, DELER, DEL_NAVN, HVOR, STED_MAKS, delingstekst,
+         kamplenke, invitasjonstekst } from "./fotball-data.js";
+import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn, NAVN_MAKS }
+  from "./svar-data.js";
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte } from "./pub-data.js";
 import { PUBER_OSLO } from "./puber-oslo.js";
@@ -31,6 +34,9 @@ let favoritter = { er: () => false, veksle: () => false };
 let deling = async () => "feil";
 // Dine puber eies av app.js (det er lagring): lista, og noter en brukt.
 let puber = { liste: () => [], noter: () => {} };
+// Innlogging og navn eies ogsa av app.js: modulen sporr bare om okta og
+// om navnet vennene ser.
+let konto = { okt: () => null, navn: () => "", settNavn: () => {} };
 let aktivLiga = "eliteserien";
 let aktivDel = "tabell";
 
@@ -48,12 +54,13 @@ function el(tag, klasse, tekst) {
 
 /* ---------- oppsett ---------- */
 
-export function initFotball(paNavigering, paLagsok, paFavoritt, paDeling, paPuber) {
+export function initFotball(paNavigering, paLagsok, paFavoritt, paDeling, paPuber, paKonto) {
   naviger = paNavigering;
   if (paLagsok) sokEtterLag = paLagsok;
   if (paFavoritt) favoritter = paFavoritt;
   if (paDeling) deling = paDeling;
   if (paPuber) puber = paPuber;
+  if (paKonto) konto = paKonto;
 
   const ligaer = document.getElementById("ligaVelger");
   Object.keys(LIGAER).forEach((nokkel) => {
@@ -85,7 +92,9 @@ function merk(rot, verdi) {
 
 /* ---------- visning ---------- */
 
-export async function visFotball(liga, del) {
+// invitasjon: kampen, svaret og stedet fra en delt lenke, tolket av
+// app.js. Modulen eier ikke ruting og leser derfor ikke adressen selv.
+export async function visFotball(liga, del, invitasjon) {
   aktivLiga = liga;
   aktivDel = del;
   merk(document.getElementById("ligaVelger"), liga);
@@ -97,6 +106,8 @@ export async function visFotball(liga, del) {
 
   if (lagret && Date.now() - lagret.hentet < HUSKE_MS) {
     tegn(rot, del, lagret.data);
+    visInvitasjon(rot, del, lagret.data, invitasjon);
+    hentSvar(rot, del, lagret.data);
     return;
   }
 
@@ -109,6 +120,8 @@ export async function visFotball(liga, del) {
     husket.set(nokkel, { data, hentet: Date.now() });
     if (aktivLiga !== liga || aktivDel !== del) return;
     tegn(rot, del, data);
+    visInvitasjon(rot, del, data, invitasjon);
+    hentSvar(rot, del, data);
   } catch (err) {
     if (aktivLiga !== liga || aktivDel !== del) return;
     console.error("[Sportsbibelen] fotball · " + nokkel + " feilet:", err);
@@ -336,6 +349,28 @@ function lukkPanel() {
   apentPanel = null;
 }
 
+// Apner delingspanelet pa en rad med svaret ferdig valgt. To veier inn
+// hit: linja som sier hvem som viser kampen, og invitasjonen fra en delt
+// lenke. Begge har allerede svart «hvor» for leseren, og begge skal lande
+// i det samme panelet — ellers finnes det to mater a dele pa.
+function apnePanelMed(rad, hvor, sted) {
+  const knapp = rad && rad.querySelector(".kamp-del");
+  if (!knapp) return null;
+  if (knapp.getAttribute("aria-expanded") !== "true") knapp.click();
+
+  const panel = apentPanel && apentPanel.panel;
+  if (!panel) return null;
+
+  const valg = panel.querySelector(".hvor-valg[data-hvor=\"" + hvor + "\"]");
+  if (valg) valg.click();
+  if (hvor === "pub" && sted) {
+    const felt = panel.querySelector(".kamp-pub");
+    felt.value = sted;
+    felt.dispatchEvent(new Event("input"));
+  }
+  return panel;
+}
+
 function delPanel(kamp) {
   const panel = el("div", "kamp-panel");
   panel.appendChild(el("p", "kamp-panel-tittel", "Hvor ser du kampen?"));
@@ -346,7 +381,7 @@ function delPanel(kamp) {
   pubFelt.type = "text";
   pubFelt.placeholder = "Hvilken pub?";
   pubFelt.setAttribute("aria-label", "Hvilken pub?");
-  pubFelt.maxLength = 60;
+  pubFelt.maxLength = STED_MAKS;
   pubFelt.hidden = true;
   const forslag = pubForslag(kamp, pubFelt);
   forslag.hidden = true;
@@ -380,7 +415,10 @@ function delPanel(kamp) {
 
   send.addEventListener("click", async () => {
     if (!hvor) return;
-    const url = location.origin + location.pathname + fotballHash(aktivLiga, "neste");
+    // Lenka barer kampen, svaret og stedet: mottakeren skal lande pa
+    // kampen det gjelder, ikke i en runde hen ma lete i.
+    const url = location.origin + location.pathname +
+      kamplenke(aktivLiga, kamp, hvor, pubFelt.value.trim());
     // Vaeret er hentet da raden ble apnet, og husket per kamp; er det ikke der,
     // deles teksten uten. Ingen skal vente pa MET for a sende en melding.
     const vaer = kamp.arena ? await hentVaer(kamp) : null;
@@ -400,6 +438,9 @@ function delPanel(kamp) {
   panel.appendChild(valg);
   panel.appendChild(forslag);
   panel.appendChild(pubFelt);
+  // To veier ut av det samme sporsmalet: si det til lista, eller si det
+  // i chatten. Lista star forst fordi den er den som svarer tilbake.
+  panel.appendChild(blirMedDel(kamp, () => hvor, () => pubFelt.value.trim()));
   panel.appendChild(send);
   panel.appendChild(svar);
   return panel;
@@ -666,6 +707,9 @@ function tomtekst(del, data) {
 // kamplinja er rutenettet, og bare den dekkes av trykkflata.
 function kamprad(kamp, del, delbar) {
   const rad = el("li", delbar ? "kamp delbar" : "kamp");
+  // Id-en pa raden, sa en delt lenke finner igjen kampen sin i runden.
+  if (kamp.id != null) rad.dataset.kamp = String(kamp.id);
+
   const linje = el("div", "kamp-linje");
   linje.appendChild(el("span", "kamp-lag", kamp.hjemme));
 
@@ -711,20 +755,210 @@ function viserlinje(kamp) {
     knapp.title = "Meldt inn til oss. Trykk for å dele at du ser kampen her.";
     knapp.addEventListener("click", (e) => {
       e.stopPropagation();
-      const rad = knapp.closest(".kamp");
-      const del = rad && rad.querySelector(".kamp-del");
-      if (!del) return;
-      if (del.getAttribute("aria-expanded") !== "true") del.click();
-      const panel = apentPanel && apentPanel.panel;
-      if (!panel) return;
-      panel.querySelectorAll(".hvor-valg")[1].click();
-      const felt = panel.querySelector(".kamp-pub");
-      felt.value = p.navn;
-      felt.dispatchEvent(new Event("input"));
+      apnePanelMed(knapp.closest(".kamp"), "pub", p.navn);
     });
     linje.appendChild(knapp);
   });
   return linje;
+}
+
+/* ---------- hvem blir med ---------- */
+
+// Svaret delingslenka ba om. Teksten i chatten spurte «Hvor ser du?», og
+// til na hadde det sporsmalet ingen vei tilbake til appen.
+//
+// Hele runden hentes i ett kall: ti kamper skal ikke bli ti kall. Lista
+// star under kampen, sa den som blar ser den uten a apne noe — samme
+// grunn som for «denne kampen vises pa».
+let sisteSvar = [];
+
+async function hentSvar(rot, del, data) {
+  if (del !== "neste" || !data || !Array.isArray(data.kamper)) return;
+
+  const ider = data.kamper.map((k) => k.id).filter((id) => id != null);
+  if (!ider.length) return;
+
+  try {
+    const respons = await fetch("/api/svar?kamper=" + encodeURIComponent(ider.join(",")),
+      { headers: { "Accept": "application/json" } });
+    const json = JSON.parse(await respons.text());
+    // Stille her, med vilje: lista er et tillegg til kampen, ikke kampen.
+    // En feilmelding under hver eneste rad ville dekket over runden. Den
+    // som faktisk trykker «Jeg blir med», far beskjed — det er der man
+    // venter et svar.
+    if (!respons.ok || json.feil) return;
+    sisteSvar = tolkSvar(json.svar);
+  } catch (err) {
+    return;
+  }
+  tegnSvar(rot);
+}
+
+function tegnSvar(rot) {
+  const kart = perKamp(sisteSvar);
+  Array.from(rot.querySelectorAll(".kamp")).forEach((rad) => {
+    const gammel = rad.querySelector(".kamp-blirmed");
+    if (gammel) gammel.remove();
+
+    const svar = kart.get(String(rad.dataset.kamp || "")) || [];
+    const tekst = blirMedTekst(svar);
+    if (!tekst) return;
+
+    const linje = el("div", "kamp-blirmed");
+    const merke = el("span", "kamp-blirmed-merke", "✓");
+    merke.setAttribute("aria-hidden", "true");
+    linje.appendChild(merke);
+    linje.appendChild(el("span", null, tekst));
+
+    // Linja horer til kampen, ikke til panelet: den skal sta over
+    // panelet nar det er apent, sa rekkefolgen blir lik med og uten.
+    const panel = rad.querySelector(".kamp-panel");
+    if (panel) rad.insertBefore(linje, panel);
+    else rad.appendChild(linje);
+  });
+}
+
+async function svarTjeneste(kropp) {
+  const respons = await fetch("/api/svar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    body: JSON.stringify(kropp),
+  });
+  let json = null;
+  try {
+    json = JSON.parse(await respons.text());
+  } catch (err) {
+    throw new Error("Uventet svar fra tjenesten.");
+  }
+  if (!respons.ok || !json || json.feil) {
+    throw new Error((json && json.feil) || "Tjenesten svarte " + respons.status + ".");
+  }
+  return json;
+}
+
+// Delen av panelet som svarer for deg selv. Utlogget star det hva som
+// mangler og at resten virker uansett — innlogging er ikke en port inn i
+// appen, bare veien til a stille seg pa lista.
+function blirMedDel(kamp, lesHvor, lesSted) {
+  const boks = el("div", "kamp-blirmed-valg");
+  const okt = konto.okt();
+
+  if (!okt) {
+    boks.appendChild(el("p", "kamp-note",
+      "Logg inn i menyen for å si at du blir med. Å dele kampen virker uansett."));
+    return boks;
+  }
+
+  const navnFelt = el("input", "kamp-navn");
+  navnFelt.type = "text";
+  navnFelt.placeholder = "Navnet vennene ser";
+  navnFelt.setAttribute("aria-label", "Navnet vennene ser");
+  navnFelt.maxLength = NAVN_MAKS;
+  navnFelt.value = konto.navn();
+
+  const knapp = el("button", "kamp-blimed");
+  knapp.type = "button";
+  const svar = el("p", "kamp-svar");
+  svar.setAttribute("aria-live", "polite");
+
+  // Har du alt svart, er knappen en angreknapp. To knapper ville betydd
+  // at man kan bli med to ganger.
+  const tegnKnapp = () => {
+    const mitt = egetSvar(sisteSvar.filter((s) => s.kampId === String(kamp.id)),
+      okt.bruker);
+    knapp.textContent = mitt ? "Jeg blir ikke med likevel" : "Jeg blir med";
+    knapp.dataset.med = mitt ? "ja" : "nei";
+    navnFelt.hidden = !!mitt;
+    return mitt;
+  };
+  tegnKnapp();
+
+  knapp.addEventListener("click", async () => {
+    const mitt = knapp.dataset.med === "ja";
+    const navn = normaliserNavn(navnFelt.value);
+    if (!mitt && !gyldigNavn(navn)) {
+      svar.textContent = "Skriv navnet vennene ser deg som.";
+      navnFelt.focus();
+      return;
+    }
+
+    knapp.disabled = true;
+    try {
+      if (mitt) {
+        await svarTjeneste({ handling: "fjern", token: okt.token, kampId: kamp.id });
+        sisteSvar = sisteSvar.filter(
+          (s) => !(s.kampId === String(kamp.id) && s.bruker === okt.bruker));
+        svar.textContent = "Du står ikke på lista lenger.";
+      } else {
+        konto.settNavn(navn);
+        const json = await svarTjeneste({
+          token: okt.token, kampId: kamp.id, navn,
+          hvor: lesHvor(), sted: lesSted(),
+        });
+        const mine = tolkSvar(json.svar);
+        sisteSvar = sisteSvar.filter(
+          (s) => !(s.kampId === String(kamp.id) && s.bruker === okt.bruker)).concat(mine);
+        svar.textContent = "Du står på lista.";
+      }
+      tegnKnapp();
+      tegnSvar(document.getElementById("fotballInnhold"));
+    } catch (err) {
+      svar.textContent = err.message;
+    } finally {
+      knapp.disabled = false;
+    }
+  });
+
+  boks.appendChild(navnFelt);
+  boks.appendChild(knapp);
+  // Lista kan leses uten konto, og da leses navnet ogsa av andre enn
+  // vennegruppa. Det skal sta her, der navnet skrives — ikke i en
+  // erklaering ingen apner.
+  boks.appendChild(el("p", "kamp-note",
+    "Navnet er synlig for alle som åpner kampen. Fornavn holder."));
+  boks.appendChild(svar);
+  return boks;
+}
+
+/* ---------- invitasjonen fra en delt lenke ---------- */
+
+// Kom leseren hit fra en delt lenke, skal kampen det gjelder sta fram, og
+// svaret vaere ett trykk unna. Uten dette lander mottakeren i runden og
+// ma finne kampen selv — og da er delingen bare en lenke til appen.
+//
+// Finner vi ikke kampen, sier vi ingenting: runden star der som for. En
+// feilmelding om en kamp som er spilt ferdig hjelper ingen.
+function visInvitasjon(rot, del, data, invitasjon) {
+  if (!invitasjon || del !== "neste") return;
+
+  const kamp = ((data && data.kamper) || [])
+    .find((k) => String(k.id) === String(invitasjon.kampId));
+  if (!kamp) return;
+
+  const rad = Array.from(rot.querySelectorAll(".kamp"))
+    .find((r) => r.dataset.kamp === String(kamp.id));
+  if (!rad) return;
+
+  rad.classList.add("kamp-invitert");
+
+  const linje = el("div", "kamp-invitasjon");
+  linje.appendChild(el("span", "kamp-invitasjon-tekst",
+    invitasjonstekst(kamp, invitasjon.hvor, invitasjon.sted)));
+
+  // Svaret starter der avsenderen er: a bli med er det vanligste svaret,
+  // og det skal koste ett trykk. Et annet sted velges i panelet som for.
+  if (rad.querySelector(".kamp-del")) {
+    const svar = el("button", "kamp-invitasjon-svar", "Svar");
+    svar.type = "button";
+    svar.title = "Si hvor du ser kampen";
+    svar.addEventListener("click",
+      () => apnePanelMed(rad, invitasjon.hvor || "pub", invitasjon.sted));
+    linje.appendChild(svar);
+  }
+  rad.appendChild(linje);
+
+  // En runde er ti kamper lang. Den delte skal vaere den man ser.
+  if (rad.scrollIntoView) rad.scrollIntoView({ block: "center" });
 }
 
 /* ---------- vaeret ved avspark ---------- */
