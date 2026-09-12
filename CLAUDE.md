@@ -464,6 +464,13 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 - `konto-data.js` er de rene funksjonene, delt mellom appen og
   funksjonen: blir de to uenige om hva en gyldig adresse eller kode er,
   får leseren «feil kode» på en kode som stemmer.
+- **Sett virke 12. september 2026**, i forhåndsvisningen av #68: hele
+  kjeden fra e-post til økt — Resend som avsender, malene med
+  `{{ .Token }}`, en kode på åtte siffer, oppslaget som `magiclink`, og
+  økten lagret lokalt. Fire ting sto i veien og ga alle den samme
+  feilen: SMS-sperren hos Brevo, låste maler uten egen SMTP, stor R i
+  SMTP-brukernavnet, og at appen kappet koden til seks siffer. Det siste
+  var vårt.
 - Dette er første gang appen lagrer noe om en person. En
   personvernerklæring og en måte å be om sletting på hører til her, og
   er ikke skrevet ennå.
@@ -498,6 +505,9 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 - Tabellen og reglene står som SQL i `docs/nokler-og-tokens.md`. Finnes
   den ikke, svarer funksjonen 503 og sier nøyaktig det, framfor å sende
   en PostgREST-feil videre til leseren.
+- **Sett virke 12. september 2026**, i forhåndsvisningen av #68: en rad
+  skrevet fra appen med leserens egen økt, gjennom de fire RLS-reglene,
+  og lista tegnet under kampen med en gang.
 
 ## Testing
 
