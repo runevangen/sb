@@ -414,11 +414,13 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   persondataene ligger i EU-regionen: et bevisst kompromiss, tatt fordi
   EU-alternativene ikke lot seg registrere. API-nøkkelen hører hjemme i
   Resend og Supabase, ikke i Netlify og ikke i repoet; appen sender ingen
-  e-post selv. Så lenge avsenderen er `onboarding@resend.dev` — Resends
-  testavsender — kommer koden bare fram til kontoeieren selv; alle andre
-  får `500: Error sending confirmation email`. Skal flere enn én kunne
-  logge inn, må domenet verifiseres i Resend *og* avsenderen byttes i
-  Supabase. Hele oppsettet, og de to reserveveiene (app-passord hos
+  e-post selv. Resends testavsender leverer bare til kontoeieren, og et
+  verifisert domene hos Resend ville krevd DNS på `sportsbibelen.no` —
+  mot regelen om at ingenting skal kreve endringer der. Derfor sendes
+  koden fra en Gmail-konto med app-passord. Brukernavnet er da **hele
+  adressen**, motsatt av Resend, der det var bokstavelig `resend`.
+  Grensa er ~500 i døgnet. Vokser appen, er veien videre et eget domene
+  eller Google-innlogging, som fjerner hele SMTP-kjeden. Hele oppsettet, og de to reserveveiene (app-passord hos
   Google, eller å droppe e-post og bruke Google-innlogging), står i
   `docs/nokler-og-tokens.md`.
 - Kallet går fra `netlify/functions/konto.mjs`, ikke fra nettleseren,

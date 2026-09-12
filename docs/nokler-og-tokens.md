@@ -258,18 +258,40 @@ API-nøkkelen hører hjemme i Resend og i Supabase — ikke i Netlify og ikke
 i dette repoet. Appen sender ingen e-post selv; den ber Supabase gjøre
 det.
 
-**Går heller ikke dette**, er det to veier videre, og de står her så de
-ikke må finnes opp på nytt:
+#### Gmail som avsender — det som faktisk er i bruk
 
-- **Gmail-kontoen du alt har.** Et app-passord hos Google lar Supabase
-  sende gjennom `smtp.gmail.com` uten noen ny registrering. Avsenderen
-  blir gmail-adressen, ikke `@sportsbibelen.no`, grensa er ~500 i døgnet,
-  og det ligger i utkanten av Googles vilkår. Godt nok til å få testet at
-  innloggingen virker.
-- **Slutt å sende e-post.** Supabase har innlogging med Google innebygd:
-  ett trykk, ingen SMTP, ingen maler, ingen timesgrense. Det krever at
-  panelet og `konto.mjs` bygges om for omdirigering, og at Google ser
-  hvem som bruker appen.
+Resend krever et verifisert domene for å sende til andre enn kontoeieren,
+og appen skal ikke være avhengig av `sportsbibelen.no` — det står som
+regel i `CLAUDE.md`, og et eget domene bare for e-post var ikke verdt
+det. Derfor sendes koden fra Gmail-kontoen som alt fantes.
+
+1. **To-trinnsverifisering må være på** på Google-kontoen. App-passord
+   finnes ikke uten.
+2. **myaccount.google.com/apppasswords** → lag ett, navn `Sportsbibelen`.
+   Seksten tegn, vist som fire grupper — **fjern mellomrommene** når det
+   limes inn.
+3. I Supabase (*Authentication* → *Emails* → SMTP):
+
+| Felt | Verdi |
+| --- | --- |
+| Host | `smtp.gmail.com` |
+| Port | `587` |
+| Username | **hele e-postadressen** |
+| Password | app-passordet, uten mellomrom |
+| Sender email | samme adresse som brukernavnet |
+| Sender name | `Sportsbibelen` |
+
+**Brukernavnet er motsatt av Resend.** Der var det bokstavelig `resend`;
+her er det adressen din. Samme felt, motsatt regel — og feilen ser lik ut
+begge veier: ingenting kommer fram, og ingenting står i noen logg utenfor
+Supabase.
+
+Grensene er ~500 e-poster i døgnet, og app-utsending ligger i utkanten av
+Googles vilkår. Det holder for en vennegjeng. Vokser appen, er veien
+videre enten et eget domene hos Resend, eller å slutte å sende e-post og
+bruke Google-innlogging (*Authentication* → *Sign In / Providers*) — da
+forsvinner hele SMTP-kjeden, med alle leddene som kan svikte.
+
 
 #### Tabellen «kampsvar» — hvem blir med
 
@@ -459,7 +481,8 @@ Det du ser først, og hva det som regel betyr.
 | Innlogging: «For mange forsøk» (429) | Supabase sperrer e-postsending en stund | vent et minutt |
 | Innlogging: «Fikk ikke sendt koden» | se `forsok` i svaret fra `/api/konto` | som regel feil `SUPABASE_URL` |
 | E-posten har en lenke, ingen kode | malene er låst til egen SMTP er satt opp | se avsnittet over |
-| Bare én adresse får kode; andre får 500 | avsenderen er `onboarding@resend.dev`, som bare leverer til kontoeieren | verifiser domenet, og bytt *Sender email* i Supabase |
+| Bare én adresse får kode; andre får 500 | Resends testavsender leverer bare til kontoeieren | bytt til Gmail-oppsettet under, eller verifiser et eget domene |
+| Gmail: ingenting kommer fram | brukernavnet er ikke hele adressen, eller app-passordet har mellomrom i seg | begge deler rettes i SMTP-feltene |
 | Koden avvises (403) selv om den er fersk | koden er lengre enn appen tar imot, eller slås opp med feil type | begge deler er rettet i koden; sjekk «Email OTP Length» i Supabase mot `KODE_MAKS` |
 | «Fikk ikke sendt koden» og ingenting i Resend-loggen | SMTP-påloggingen avvises — som regel `Resend` med stor R | skriv `resend`, lim inn nøkkelen på nytt |
 | «Tabellen «kampsvar» finnes ikke i Supabase ennå» | SQL-en over er ikke kjørt | kjør den i Supabase → SQL Editor |
