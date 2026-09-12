@@ -424,6 +424,12 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   og `mangler`), ikke når leseren trykker Send: får du vite at
   innloggingen ikke er satt opp først etter at adressen er skrevet inn,
   var skrivingen til ingen nytte. Samme grep som i adminportalen.
+- Første innlogging med en ny adresse går signup-veien hos Supabase, og
+  da heter kodetypen «signup», ikke «email». Utenfra ser en avvist kode
+  og en kode sendt med feil type helt like ut, så funksjonen prøver
+  begge: først «email», og ved avvisning én gang til som «signup». Bare
+  der det første ble avvist — en tjenestefeil (5xx) eller en sperre (429)
+  gir aldri et kall til.
 - Feil kode og utløpt kode får samme svar. At en kode fantes, er i seg
   selv noe om adressen. Av samme grunn svarer bestillingen likt enten
   adressen finnes fra før eller ikke — ellers er innloggingen et
@@ -482,7 +488,7 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 ## Testing
 
     node test/unit.mjs      350 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  169 tester, ~250 ms, ingen nettleser
+    node test/funksjon.mjs  174 tester, ~250 ms, ingen nettleser
     node test/run.mjs       267 tester, ~170 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da

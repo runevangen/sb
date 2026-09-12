@@ -77,11 +77,27 @@ async function loggInn(inn) {
   if (!gyldigEpost(epost)) return svar({ feil: "Skriv en e-postadresse" }, 400);
   if (!gyldigKode(kode)) return svar({ feil: "Koden er seks siffer" }, 400);
 
-  const r = await hosSupabase("/auth/v1/verify", {
+  let r = await hosSupabase("/auth/v1/verify", {
     email: epost,
     token: kode,
     type: "email",
   });
+
+  // Forste innlogging med en ny adresse gar signup-veien, og da heter
+  // typen «signup» framfor «email». Utenfra ser de to tilfellene helt
+  // like ut — en avvist kode og en kode sendt med feil type gir samme
+  // svar — sa vi kan ikke vite hvilken det er for vi har prov d. Derfor
+  // ett forsok til, og bare der det forste ble avvist: en tjenestefeil
+  // eller en sperre skal ikke gi et kall til.
+  if (!r.ok && r.status > 0 && r.status < 500 && r.status !== 429) {
+    const paNytt = await hosSupabase("/auth/v1/verify", {
+      email: epost,
+      token: kode,
+      type: "signup",
+    });
+    if (paNytt.ok) r = paNytt;
+    else r.forsok = r.forsok.concat(paNytt.forsok);
+  }
 
   // Feil kode og utlopt kode far samme svar: at en kode fantes er i seg
   // selv noe om adressen.

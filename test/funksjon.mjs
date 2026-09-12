@@ -804,6 +804,43 @@ ok("adressen kommer tilbake normalisert", okt.epost === "leser@example.com", okt
 ok("okta har et utlopstidspunkt, ikke et antall sekunder",
    !Number.isNaN(Date.parse(okt.utloper)) && Date.parse(okt.utloper) > Date.now(), okt.utloper);
 
+// Forste innlogging med en ny adresse gar signup-veien: da heter typen
+// «signup», ikke «email». Utenfra ser en avvist kode og en feil type helt
+// like ut, sa den ene ma proves for vi vet.
+function stubSignup(oktSvar) {
+  const kall = [];
+  global.fetch = async (url, opsjoner) => {
+    kall.push({ url: String(url), opsjoner: opsjoner || {} });
+    const type = JSON.parse(opsjoner.body || "{}").type;
+    if (type === "signup") {
+      return new Response(JSON.stringify(oktSvar), { status: 200 });
+    }
+    return new Response(JSON.stringify({ error: "invalid_grant",
+      error_description: "Token has expired or is invalid" }), { status: 403 });
+  };
+  return kall;
+}
+
+kall = stubSignup(OKT);
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
+ok("en ny adresse slipper inn pa andre forsok",
+   r.status === 200 && (await r.json()).token === "okt-token-123", r.status);
+ok("og de to forsokene skiller seg pa typen",
+   kall.length === 2 && JSON.parse(kall[0].opsjoner.body).type === "email" &&
+   JSON.parse(kall[1].opsjoner.body).type === "signup",
+   kall.map((k) => JSON.parse(k.opsjoner.body).type).join(","));
+
+// En tjenestefeil eller en sperre skal ikke gi et kall til.
+kall = stubSupabase({ msg: "Internal error" }, 500);
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
+ok("en tjenestefeil provers ikke pa nytt", kall.length === 1 && r.status === 502,
+   kall.length + " " + r.status);
+
+kall = stubSupabase({ msg: "rate limit" }, 429);
+r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
+ok("en sperre provers ikke pa nytt", kall.length === 1 && r.status === 429,
+   kall.length + " " + r.status);
+
 kall = stubSupabase({ error: "invalid_grant", error_description: "Token has expired" }, 403);
 r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123456" }));
 const feilKode = await r.json();
@@ -812,6 +849,9 @@ const feilKode = await r.json();
 ok("feil kode gir 401 uten a rope noe", r.status === 401 &&
    feilKode.feil === "Koden stemmer ikke, eller den er for gammel.",
    r.status + " " + feilKode.feil);
+// En kode som er feil, er feil begge veier — og da er begge forsokene brukt.
+ok("en avvist kode provers begge veier for den gis opp", kall.length === 2,
+   kall.length);
 
 r = await konto(kontoBe({ handling: "logg-inn", epost: "leser@example.com", kode: "123" }));
 ok("en kode som ikke er seks siffer stoppes her", r.status === 400, r.status);
