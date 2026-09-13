@@ -27,7 +27,7 @@ import { normaliserPinNavn, pinSlug, gyldigPinNavn, pinEpost, normaliserPin, gyl
 
 import { normaliserNavn, gyldigNavn, svarRad, tolkSvar, perKamp, blirMedTekst,
          svartekst, egetSvar, loftMedSvar, bareMedSvar, stederFraSvar, perSted,
-         stedNokkel, NAVN_MAKS } from "../svar-data.js";
+         stedNokkel, blirMedLinje, mittSted, NAVN_MAKS } from "../svar-data.js";
 
 import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
   from "../vaer-data.js";
@@ -1335,6 +1335,38 @@ ok("ditt eget svar finnes pa id, ikke pa navn",
    egetSvar(BLIRMED, "Kari") === null &&
    egetSvar(BLIRMED, "u-9") === null && egetSvar(BLIRMED, "") === null,
    JSON.stringify(MITT_SVAR));
+
+// «Rune blir med» sier hvem, ikke hvor — og hvor er det man apner kortet
+// for a finne ut.
+const MIN_RUNDE = tolkSvar([
+  { kamp_id: 3, navn: "Rune", hvor: "pub", sted: "Grønland", bruker: "u-1" },
+  { kamp_id: 3, navn: "Ola", hvor: "pub", sted: "Andy's Pub", bruker: "u-2" },
+  { kamp_id: 3, navn: "Kari", hvor: "pub", sted: "Andy's Pub", bruker: "u-3" },
+]);
+ok("stedet ditt star forst i linja under kampen",
+   blirMedLinje(MIN_RUNDE, "u-1", {}) === "Du skal til Grønland. Ola og Kari blir med.",
+   blirMedLinje(MIN_RUNDE, "u-1", {}));
+ok("alene star det bare hvor du skal",
+   blirMedLinje([MIN_RUNDE[0]], "u-1", {}) === "Du skal til Grønland.",
+   blirMedLinje([MIN_RUNDE[0]], "u-1", {}));
+// Star du ikke pa lista, er linja som for: tallet forst, sa navnene.
+ok("uten deg pa lista er linja som for",
+   blirMedLinje(MIN_RUNDE, "u-9", {}) === "3 blir med: Rune, Ola og Kari",
+   blirMedLinje(MIN_RUNDE, "u-9", {}));
+ok("utlogget ogsa", blirMedLinje(MIN_RUNDE, "", {}).indexOf("3 blir med") === 0);
+ok("ingen svar gir ingen linje", blirMedLinje([], "u-1", {}) === "");
+
+// «Du skal til stadion» sier ingenting man ikke visste. Arenaen gjor det.
+const PAA_STADION = tolkSvar([
+  { kamp_id: 3, navn: "Rune", hvor: "stadion", bruker: "u-1" },
+]);
+ok("stadion uten navn faller tilbake pa arenaen",
+   mittSted(PAA_STADION, "u-1", { arena: "Aspmyra Stadion" }) === "Aspmyra Stadion",
+   mittSted(PAA_STADION, "u-1", { arena: "Aspmyra Stadion" }));
+ok("og uten arena star det ingen sted framfor et tomt et",
+   mittSted(PAA_STADION, "u-1", {}) === "", mittSted(PAA_STADION, "u-1", {}));
+ok("den som ikke star pa lista har ingen sted",
+   mittSted(MIN_RUNDE, "u-9", {}) === "");
 
 /* ---------------- stedene i kampkortet ---------------- */
 

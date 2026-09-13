@@ -875,6 +875,25 @@ er i seg selv noe om adressen.
 - Meldinga sier hva du nettopp gjorde, ikke hvilken liste du havnet i:
   «Du har planlagt å dra til Grønland Boulebar & Spiseri.» «Du står på
   lista» beskrev vår datamodell, ikke leserens handling.
+- **Kortet sier med ord hvor du skal, ikke bare med en merket chip.**
+  Meldinga over er flyktig — den står rett etter et trykk og er borte ved
+  neste lasting — så uten `.kamp-mitt` sa kortet ingenting om hvor du
+  skulle når du kom tilbake til appen. Meldt fra prod 13. september 2026:
+  «Jeg markerte pub tidligere i dag. Ser ikke nå hvor jeg skal gå.»
+- **Linja under kampen sier hvor du skal, ikke bare hvem som blir med.**
+  «Rune blir med» svarer på hvem; hvor er det man åpner kortet for å
+  finne ut. `blirMedLinje()` i `svar-data.js` leser stedet ditt først —
+  «Du skal til Grønland. Ola og Kari blir med.» — og faller tilbake til
+  den gamle formen («3 blir med: …») for den som ikke står på lista selv.
+  `mittSted()` lar stadion uten navn falle tilbake på arenaen: «Du skal
+  til stadion» sier ingenting man ikke visste.
+- **`tegnSvar()` tegner også et åpent kort på nytt.** Svarene hentes etter
+  at runden står ferdig, så åpner man en kamp med det samme — som man gjør
+  når man åpner appen nettopp for å sjekke hvor man skal — var kortet
+  ferdig tegnet før svarene kom, og ingenting tegnet det på nytt. Stedet
+  sto umerket og lista nederst tom, selv om raden var i basen hele tiden.
+  Kampen huskes derfor på `rad.kamp` og `panel.kamp`, så en tegning
+  utenfra vet hvilken kamp den gjelder.
 - **Utlogget er et trykk på et sted et delingsvalg, ikke en påmelding**, og
   de to skal ikke se like ut. Chipen får aksentfargen og stiplet ramme
   (`.kun-deling`), aldri den grønne bekreftelsen, og skjermleseren får
@@ -911,9 +930,9 @@ er i seg selv noe om adressen.
 
 ## Testing
 
-    node test/unit.mjs      429 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      437 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  229 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       362 tester, ~200 s, headless Chromium
+    node test/run.mjs       369 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

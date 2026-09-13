@@ -2314,9 +2314,17 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
          pubX.querySelector(".sted-folk").textContent === "1",
          pubX.querySelector(".sted-folk").textContent);
 
+      // «Ola blir med» sier hvem, ikke hvor — og hvor er det man apner
+      // kortet for a finne ut. Star du selv pa lista, leses stedet ditt
+      // forst, sa du ser det mens du blar uten a apne noe.
       var linje = rad.querySelector(".kamp-blirmed");
-      ok("lista star under kampen", !!linje && linje.textContent.indexOf("Ola blir med") > -1,
+      ok("linja under kampen sier hvor du skal",
+         !!linje && linje.textContent.indexOf("Du skal til Pub X.") > -1,
          linje ? linje.textContent : "ingen linje");
+      // Og i kortet, med ord — ikke bare som en merket chip.
+      ok("og kortet sier det ogsa, med ord",
+         panel.querySelector(".kamp-mitt").textContent === "Du skal til Pub X.",
+         panel.querySelector(".kamp-mitt").textContent);
       // Star det folk pa to av ti kamper, er det de to man leter etter.
       // Runden deles i to merkede bolker framfor a stokkes om flatt:
       // dagskillene ville ellers havnet pa feil kamper.
@@ -2385,7 +2393,7 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
         setTimeout(function () { try {
           ok("et tomt svar pa skrivingen mister deg ikke",
              !!rad.querySelector(".kamp-blirmed") &&
-             rad.querySelector(".kamp-blirmed").textContent.indexOf("Ola blir med") > -1,
+             rad.querySelector(".kamp-blirmed").textContent.indexOf("Du skal til Pub X") > -1,
              rad.querySelector(".kamp-blirmed")
                ? rad.querySelector(".kamp-blirmed").textContent : "ingen linje");
           ok("stedet star fortsatt som valgt",
@@ -2400,6 +2408,11 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
             hvor: "pub", sted: "Pub X", bruker: "u-2" }]);
           stedChip("Pub X").click();
           setTimeout(function () { try {
+            // Du gikk av lista, sa linja i kortet skal ikke lenger pasta
+            // at du skal noe sted.
+            ok("og nar du gar av lista, star det ikke lenger hvor du skal",
+               panel.querySelector(".kamp-mitt").textContent === "",
+               panel.querySelector(".kamp-mitt").textContent);
             ok("venner som svarte etterpa dukker opp i kortet",
                panel.querySelector(".kamp-panel-liste").textContent.indexOf("Kari") > -1,
                panel.querySelector(".kamp-panel-liste").textContent);
@@ -2413,6 +2426,90 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
         return;
       } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
+`);
+
+/* ---------------- 19a. kortet apnet for svarene landet ---------------- */
+
+// Meldt fra prod 13. september 2026: «Jeg markerte pub tidligere i dag.
+// Ser ikke na hvor jeg skal ga.»
+//
+// Svarene hentes etter at runden star ferdig. Apner man en kamp med det
+// samme — som man gjor nar man apner appen for a sjekke hvor man skal —
+// var kortet ferdig tegnet for svarene kom, og ingenting tegnet det pa
+// nytt. Stedet sto umerket, og kortet sa ingenting om hvor man skulle.
+const SAK_19A = await kjor("kort-for-svar", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
+  localStorage.setItem("sb-konto", JSON.stringify({ token: "okt-1", navn: "Ola",
+    bruker: "u-1", fornyer: "f-1",
+    utloper: new Date(Date.now() + 3600000).toISOString() }));
+
+  // Svaret ligger i basen fra for — det ble skrevet en annen dag.
+  var LAGRET = [{ kamp_id: "3", navn: "Ola", hvor: "pub", sted: "Pub X", bruker: "u-1" },
+                { kamp_id: "3", navn: "Kari", hvor: "pub", sted: "Pub X", bruker: "u-2" }];
+  window.__slippSvar = null;
+  function svarMed(kropp) {
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, o) {
+    u = String(u);
+    if (u.indexOf("/api/svar") === 0) {
+      // Svaret holdes tilbake til testen slipper det: sa apner vi kampen
+      // imens, nettopp slik en leser gjor.
+      return new Promise(function (slipp) {
+        window.__slippSvar = function () { slipp(svarMed({ svar: LAGRET })); };
+      });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 || u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return svarMed(kropp);
+    }
+    return svarMed(u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker);
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    // Kampen apnes mens svarene fortsatt henger.
+    var rad = document.querySelectorAll(".kamp.delbar")[0];
+    rad.querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    var stedChip = function (navn) {
+      return Array.prototype.find.call(panel.querySelectorAll(".sted-chip"),
+        function (c) { return c.querySelector(".sted-navn").textContent === navn; });
+    };
+    ok("kortet star apent for svarene har landet",
+       !!panel && !stedChip("Pub X"), panel ? "apent" : "ikke apent");
+
+    window.__slippSvar();
+    setTimeout(function () { try {
+      // Dette var feilen: kortet ble aldri tegnet pa nytt.
+      var min = stedChip("Pub X");
+      ok("stedet du skal til blir merket nar svarene lander",
+         min && min.getAttribute("aria-pressed") === "true",
+         min ? min.getAttribute("aria-pressed") : "ingen chip");
+      ok("og kortet sier hvor du skal, med ord",
+         panel.querySelector(".kamp-mitt").textContent === "Du skal til Pub X.",
+         panel.querySelector(".kamp-mitt").textContent);
+      // Vennene nederst skal ogsa komme, ikke bare chipen.
+      ok("og vennene star nederst i kortet",
+         panel.querySelector(".kamp-panel-liste").textContent.indexOf("Kari") > -1,
+         panel.querySelector(".kamp-panel-liste").textContent);
+      // Og linja under kampen, som er den man ser mens man blar.
+      ok("linja under kampen sier hvor du skal, ikke bare hvem",
+         rad.querySelector(".kamp-blirmed").textContent.indexOf("Du skal til Pub X.") > -1,
+         rad.querySelector(".kamp-blirmed").textContent);
+      ferdig();
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
 `);
 
@@ -2595,7 +2692,7 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
 
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_19, ...SAK_19B, ...SAK_19C, ...SAK_20];
+const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_19, ...SAK_19A, ...SAK_19B, ...SAK_19C, ...SAK_20];
 let feilet = 0;
 
 for (const t of alle) {

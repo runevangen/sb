@@ -178,3 +178,34 @@ export function stedNokkel(verdi) {
     .normalize("NFD").replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]/g, "");
 }
+
+/* ---------- ditt eget svar, skrevet ut ---------- */
+
+// Stedet du selv skal til. Stadion uten navn faller tilbake pa arenaen:
+// «Du skal til Aspmyra Stadion» sier noe, «Du skal til stadion» sier
+// ingenting man ikke visste.
+export function mittSted(svar, bruker, kamp) {
+  const mitt = egetSvar(svar, bruker);
+  if (!mitt) return "";
+  if (mitt.sted) return mitt.sted;
+  if (mitt.hvor === "stadion" && kamp && kamp.arena) return String(kamp.arena);
+  return "";
+}
+
+// Linja under kampen. «Rune blir med» sier hvem, ikke hvor — og hvor er
+// det man apner kortet for a finne ut. Star du selv pa lista, leses
+// stedet ditt forst, sa du ser det mens du blar uten a apne noe.
+//
+// Uten deg pa lista er linja som for: tallet forst, sa navnene.
+export function blirMedLinje(svar, bruker, kamp) {
+  const alle = (Array.isArray(svar) ? svar : []).filter((s) => s && gyldigNavn(s.navn));
+  const mitt = egetSvar(alle, bruker);
+  if (!mitt) return blirMedTekst(alle);
+
+  const sted = mittSted(alle, bruker, kamp);
+  const meg = sted ? "Du skal til " + sted : "Du blir med";
+  const andre = alle.filter((s) => s !== mitt);
+  if (!andre.length) return meg + ".";
+  return meg + ". " + listeTekst(andre.map((s) => s.navn)) +
+    (andre.length === 1 ? " blir med." : " blir med.");
+}

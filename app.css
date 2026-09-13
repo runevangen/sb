@@ -1799,6 +1799,20 @@ a.ad-cta:focus-visible {
 
 .kamp-panel-liste:empty { display: none; }
 
+/* Hvor du skal, med ord. Meldinga under kortet er flyktig — den star rett
+   etter et trykk — sa uten denne sa kortet ingenting om hvor du skulle
+   nar du kom tilbake til appen. Gronn som resten av «bekreftet»-familien:
+   det er en avtale, ikke en beskjed. */
+.kamp-mitt {
+  margin: 0;
+  font-size: calc(13px * var(--fs));
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--bekreftet);
+}
+
+.kamp-mitt:empty { display: none; }
+
 /* Vennene nederst i kortet, gruppert etter stedet de skal til. Stedet
    forst pa linja, fordi det er det man leter etter: et navn uten et sted
    sier ikke hvor man moter noen. */

@@ -11,7 +11,7 @@ import { LIGAER, DELER, FANER, DEL_NAVN, HVOR, STED_MAKS, delingstekst,
          kamplenke, invitasjonstekst, stedtekst } from "./fotball-data.js";
 import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
          loftMedSvar, bareMedSvar, stederFraSvar, perSted,
-         stedNokkel } from "./svar-data.js";
+         stedNokkel, blirMedLinje, mittSted } from "./svar-data.js";
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
          rangerForslag, FORSLAG_MAKS } from "./pub-data.js";
@@ -480,6 +480,9 @@ function apnePanelMed(rad, hvor, sted) {
 // hvor du er.
 function delPanel(kamp) {
   const panel = el("div", "kamp-panel");
+  // Kampen huskes pa panelet, sa en ny tegning utenfra — nar svarene
+  // lander etter at kortet ble apnet — vet hvilken kamp den gjelder.
+  panel.kamp = kamp;
   const bekreftede = bekreftetFor(kamp, VISNINGER, KJENTE);
 
   // Overskrifta i kortet sier hva lista under er. Lagene er overskrifta
@@ -491,6 +494,11 @@ function delPanel(kamp) {
 
   const steder = el("div", "sted-liste");
   panel.appendChild(steder);
+
+  // Hvor du skal, med ord. Star rett under stedene, som en kvittering pa
+  // den merkede chipen.
+  const mitt_linje = el("p", "kamp-mitt");
+  panel.appendChild(mitt_linje);
 
   const melding = el("p", "kamp-svar");
   melding.setAttribute("aria-live", "polite");
@@ -603,6 +611,14 @@ function delPanel(kamp) {
     // Ingen steder a trykke pa: da er forslagene ikke et tillegg, de er
     // hele svaret, og de skal sta apne.
     if (!steder.children.length && utvidet.hidden) vis(true);
+
+    // Og sagt med ord, ikke bare som en merket chip. Meldinga under er
+    // flyktig — den star rett etter et trykk og er borte ved neste
+    // lasting — sa uten denne sa kortet ingenting om hvor du skulle.
+    const okt = konto.okt();
+    const ditt = okt ? mittSted(sisteSvar.filter((s) => s.kampId === String(kamp.id)),
+      okt.bruker, kamp) : "";
+    mitt_linje.textContent = ditt ? "Du skal til " + ditt + "." : "";
 
     // Merkene i forslagslista skal si det samme som chipene over: stedet
     // du alt har sagt at du skal til, er merket der ogsa.
@@ -1139,6 +1155,9 @@ function kamprad(kamp, del, delbar) {
   const rad = el("li", delbar ? "kamp delbar" : "kamp");
   // Id-en pa raden, sa en delt lenke finner igjen kampen sin i runden.
   if (kamp.id != null) rad.dataset.kamp = String(kamp.id);
+  // Og kampen selv: arenaen trengs for a skrive «Du skal til Aspmyra
+  // Stadion» nar noen valgte stadion uten a skrive et navn.
+  rad.kamp = kamp;
 
   const linje = el("div", "kamp-linje");
   linje.appendChild(el("span", "kamp-lag", kamp.hjemme));
@@ -1232,7 +1251,11 @@ function tegnSvar(rot) {
     if (gammel) gammel.remove();
 
     const svar = kart.get(String(rad.dataset.kamp || "")) || [];
-    const tekst = blirMedTekst(svar);
+    const okt = konto.okt();
+    // «Rune blir med» sier hvem, ikke hvor — og hvor er det man apner
+    // kortet for a finne ut. Star du selv pa lista, leses stedet ditt
+    // forst, sa du ser det mens du blar.
+    const tekst = blirMedLinje(svar, okt && okt.bruker, radensKamp(rad));
     if (!tekst) return;
 
     const linje = el("div", "kamp-blirmed");
@@ -1247,6 +1270,22 @@ function tegnSvar(rot) {
     if (panel) rad.insertBefore(linje, panel);
     else rad.appendChild(linje);
   });
+
+  // Star et kort apent, ma det tegnes pa nytt na. Svarene lander etter at
+  // runden star ferdig, sa apner man en kamp med det samme, var stedet
+  // man skal til aldri merket — og ingenting i kortet sa hvor man skulle.
+  // Det var den halvdelen av feilen som ikke var synlig.
+  if (apentPanel && apentPanel.panel.tegnSteder) {
+    apentPanel.panel.tegnSteder();
+    const kamp = apentPanel.panel.kamp;
+    if (kamp) tegnPanelListe(kamp);
+  }
+}
+
+// Kampen en rad hoerer til. Vaeret og arenaen ligger pa kampobjektet,
+// ikke pa raden, sa den huskes der nar raden tegnes.
+function radensKamp(rad) {
+  return (rad && rad.kamp) || null;
 }
 
 // Kampene noen blir med pa, loftet opp.
