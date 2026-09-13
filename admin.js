@@ -284,8 +284,16 @@ async function hentKamper() {
     const data = JSON.parse(await respons.text());
     if (data.feil) throw new Error(data.feil);
     kamper = data.kamper || [];
-    felt("kampHint").textContent = data.runde
-      ? data.runde + ", sesong " + data.sesong + ". Kilde: " + (data.kilde || "ukjent") + "."
+    // Funksjonen gir hele vinduet av kommende kamper, ikke bare neste
+    // runde: en pub som vet hva den viser om to uker, skal kunne fore det
+    // inn na. Leseren ser fortsatt en runde om gangen.
+    const runder = data.runder && data.runder.length
+      ? data.runder
+      : (data.runde ? [data.runde] : []);
+    felt("kampHint").textContent = runder.length
+      ? runder.length + (runder.length === 1 ? " runde" : " runder") +
+        " framover (" + runder.join(", ") + "), sesong " + data.sesong +
+        ". Kilde: " + (data.kilde || "ukjent") + "."
       : "";
     if (data.sisteSesong === false) {
       felt("kampHint").textContent += " Merk: dette er ikke inneværende sesong.";
@@ -310,7 +318,17 @@ function tegnKamper() {
     ? "Viser " + alt.length + " kamper fra før."
     : "Ingen kamper satt på denne puben ennå.";
 
+  let sisteRunde = null;
   kamper.forEach((k) => {
+    // En overskrift per runde: krysser du av tjue kamper i strekk, skal du
+    // se hvor den ene runden slutter og den neste begynner.
+    if (k.runde && k.runde !== sisteRunde) {
+      sisteRunde = k.runde;
+      const skille = document.createElement("li");
+      skille.className = "runde-skille";
+      skille.textContent = k.runde;
+      liste.appendChild(skille);
+    }
     const rad = document.createElement("li");
     const merke = document.createElement("label");
     merke.className = "kamp";

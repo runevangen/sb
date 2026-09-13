@@ -485,6 +485,16 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   åpning: da står det der før kampene er krysset av, ikke etter. Husk at
   funksjonene leser miljøet ved utrulling, så en ny variabel krever en
   ny deploy.
+- `/api/fotball/neste` gir **hele vinduet** av kommende kamper, ikke bare
+  den neste runden. Vi henter tjue uansett (`next=20`, og TheSportsDBs
+  `schedule/next`) og kastet alt utenom første runde i funksjonen — da
+  kunne ikke admin føre inn en kamp som spilles om to uker. Utvelgelsen
+  hører hjemme i visningen, som er den som vil ha én runde om gangen:
+  `nesteRunde()` kalles fra `tegn()` i `fotball.js`. Da deler leseren og
+  admin ett svar og én cache-nøkkel, og døgnkvoten står urørt — det er
+  samme kall som før. Svaret bærer `runde` (den første, som før, så en
+  eldre utrullet app fortsatt viser noe riktig) og `runder` i rekkefølge.
+  Portalen setter en overskrift per runde.
 - Kampene admin krysser av hentes fra `/api/fotball/neste` — samme
   endepunkt som fotballfanen. Ligaene kommer fra `LIGAER` i
   `fotball-data.js`, ikke fra en egen liste, så de to ikke kan gli fra
