@@ -84,6 +84,20 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 - Lenker i artikkelteksten til vårt eget domene får `data-slug` og åpnes i
   appen. `href` beholdes, så lenken virker om noe feiler, og lang-trykk
   oppfører seg normalt.
+- **Den ledige annonseplassen er vår egen, og merkes ikke som reklame.**
+  Fire av de fem annonsørene i `ADS` i `app.js` er oppdiktede (#25). Den
+  femte er ingen annonsør: den selger plassen den står i, og ber om en
+  prat med Prem. Den står først i lista, så den ene som er sann er den man
+  ser først. Merket sier «Ledig plass» og `aria-label` «Ledig
+  annonseplass» — å merke vår egen tekst som reklame fra en annonsør ville
+  vært å lyve i akkurat den merkingen appen ellers er nøye på, og
+  markedsføringsloven ber om det motsatte. Formen er stiplet ramme og
+  ingen fylt flate, men den roper ikke høyere enn en ekte annonse ville
+  gjort: en plass som overdøver innholdet rundt seg selger ikke plassen.
+  `MESSENGER` i `app.js` er brukernavnet etter `m.me/` — det samme som
+  står etter `facebook.com/` i profilen. Står det tomt, blir knappen ren
+  tekst framfor en død lenke. Lenka åpner i en ny fane med `noopener`, så
+  den nye fanen ikke kan røre appen bak.
 - Ingen statistikk i det hele tatt, med vilje. Appen har null
   sporingsskript, ingen informasjonskapsler og ingen samtykkebanner.
   Bruken leses av Usage-grafen i Netlify — båndbredde og forespørsler —
@@ -802,7 +816,7 @@ er i seg selv noe om adressen.
 
     node test/unit.mjs      420 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  219 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       329 tester, ~200 s, headless Chromium
+    node test/run.mjs       333 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

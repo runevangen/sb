@@ -885,6 +885,41 @@ body {
   border-radius: 5px;
 }
 
+/* Den ledige plassen. Den selger seg selv, sa den skal se ut som noe som
+   mangler noe — stiplet ramme, ingen fylt flate, aksentfargen pa
+   merkelappen. De to andre formatene later som de er annonser; denne
+   later som ingenting.
+
+   Den star med vilje ikke ut mer enn en ekte annonse ville gjort: en
+   plass som roper hoyere enn innholdet rundt, selger ikke plassen, den
+   selger stoy. */
+.ad-ledig {
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px dashed var(--accent);
+  border-radius: 12px;
+  background: none;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.ad-ledig .ad-label { color: var(--accent); }
+
+/* Lenka til Messenger. Samme form som en ad-cta, men den er en ekte
+   lenke — den gar et sted. */
+a.ad-cta {
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+a.ad-cta:hover { opacity: 0.88; }
+
+a.ad-cta:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* Stripa gar helt ut i kanten og bryter feedens marg. Det ene grepet er
    det som gjor den umiskjennelig, uten at den trenger a vaere stor. */
 .ad-stripe {

@@ -88,6 +88,7 @@ const HARNESS = `
       if (n.classList.contains("row")) return "sak";
       if (n.classList.contains("ad-banner")) return "banner";
       if (n.classList.contains("ad-stripe")) return "stripe";
+      if (n.classList.contains("ad-ledig")) return "ledig";
       if (n.classList.contains("vis-flere")) return "mer";
       return "?";
     }).join(" ");
@@ -208,7 +209,30 @@ const SAK_1 = await kjor("feed", FELLES + `
     ok("tidsstempel bruker date_gmt", tid.textContent === "2t siden", tid.textContent);
 
     ok("annonse etter hver fjerde sak",
-       sekvens() === "topp sak sak sak banner sak sak sak sak stripe sak sak sak sak mer", sekvens());
+       sekvens() === "topp sak sak sak ledig sak sak sak sak banner sak sak sak sak mer", sekvens());
+
+    // Den ledige plassen er var egen, ikke en annonsors. A merke den som
+    // «Reklame» ville vaert a lyve i nettopp den merkingen appen ellers er
+    // noye pa — bade for oyet og for skjermlesere.
+    var ledig = document.querySelector(".ad-ledig");
+    ok("den ledige plassen sier at den er ledig",
+       ledig.querySelector(".ad-label").textContent === "Ledig plass",
+       ledig.querySelector(".ad-label").textContent);
+    ok("og pastar ikke a vaere reklame fra noen",
+       ledig.getAttribute("aria-label") === "Ledig annonseplass" &&
+       ledig.textContent.indexOf("Reklame") === -1,
+       ledig.getAttribute("aria-label"));
+    // Knappen er en ekte lenke rett inn i Messenger — ingen mellomside,
+    // ingen innlogging forst. Star brukernavnet tomt, blir den ren tekst i
+    // stedet: en knapp som ikke gar noe sted er verre enn en setning.
+    var kall = ledig.querySelector(".ad-cta");
+    ok("knappen apner Messenger direkte",
+       kall.tagName === "A" && kall.href.indexOf("https://m.me/") === 0,
+       kall.tagName + " " + (kall.href || ""));
+    // Den nye fanen skal ikke fa tilgang til appen bak.
+    ok("og den apner i en ny fane, uten tilgang til appen bak",
+       kall.target === "_blank" && kall.rel.indexOf("noopener") > -1,
+       kall.target + " " + kall.rel);
 
     // Intensjonen er at feeden ikke skal avsluttes med reklame. "Vis flere"
     // er en knapp, ikke innhold, sa den ser vi bort fra her.
