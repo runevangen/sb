@@ -948,6 +948,23 @@ ok("en okt som aldri kom sier hva som ma slas av i Supabase",
 ok("og hvor det star", ubekreftet.feil.indexOf("docs/nokler-og-tokens.md") > -1,
    ubekreftet.feil);
 
+// Star e-postbekreftelse pa, ryker signup i e-postsendingen for den
+// rekker a svare 200 uten okt. Da kommer en 500 — og «prov igjen om
+// litt» ville sendt leseren ut pa a vente pa noe som aldri gar over av
+// seg selv.
+kall = stubAvvistDeretter({ msg: "Error sending confirmation email" }, 500);
+r = await konto(kontoBe({ handling: "logg-inn", navn: "Nykar", pin: "1234" }));
+const epostfeil = await r.json();
+ok("en feilet e-postsending sier hvilken innstilling det er",
+   r.status === 503 && epostfeil.feil.indexOf("Confirm email") > -1,
+   r.status + " " + epostfeil.feil);
+ok("og hvor den star", epostfeil.feil.indexOf("Sign In / Providers") > -1,
+   epostfeil.feil);
+// Tjenestens egen melding folger med, som ellers.
+ok("med tjenestens egen melding i forsok",
+   JSON.stringify(epostfeil.forsok).indexOf("Error sending confirmation email") > -1,
+   JSON.stringify(epostfeil.forsok));
+
 // En tjenestefeil eller en sperre skal ikke legge en runde til pa noe som
 // alt er galt et annet sted.
 kall = stubSupabase({ msg: "Internal error" }, 500);

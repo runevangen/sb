@@ -146,7 +146,36 @@ async function loggInn(inn) {
   }
 
   if (alleredeTatt(ny)) return navnetErTatt(navn, ny);
+
+  // Supabase prover a sende en e-post, og det gjor den bare hvis
+  // e-postbekreftelse star pa. Da kommer feilen som 500 «Error sending
+  // confirmation email» — ikke som 200-svaret over, fordi den ryker i
+  // e-postsendingen for den rekker a svare noe fornuftig.
+  //
+  // «Innloggingen svarte ikke. Prov igjen om litt» ville sendt leseren ut
+  // pa a vente pa noe som aldri gar over av seg selv. Dette er en
+  // innstilling, og da skal det sta hvilken.
+  if (proverASendeEpost(ny)) return bekreftelseStarPa(ny);
+
   return pinFeil(ny);
+}
+
+// «Error sending confirmation email», «Error sending magic link email».
+// Vi matcher pa formen framfor den ene setningen: tjenesten har flere av
+// dem, og de betyr det samme her.
+function proverASendeEpost(r) {
+  return /sending\b.*\bemail|smtp/i.test(r.melding || "");
+}
+
+function bekreftelseStarPa(r) {
+  return svar({
+    feil: "Supabase prøvde å sende en e-post, og det gjør den bare hvis"
+      + " e-postbekreftelse står på. Slå av «Confirm email» under"
+      + " Authentication → Sign In / Providers → Email — husk Save —"
+      + " og prøv igjen. Adressen vi lager av fornavnet er en nøkkel,"
+      + " ikke en postkasse.",
+    forsok: r.forsok,
+  }, 503);
 }
 
 // At et fornavn er tatt, sier vi rett ut. Det er det motsatte av hva vi

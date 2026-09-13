@@ -275,10 +275,24 @@ har ingen slik bryter — den er lett å gå i, fordi «Confirm sign up» står
 *Sign In / Providers*, inne i **Email**-kortet, som må foldes ut før den
 vises. Sett i panelet 13. september 2026.
 
-Står *Confirm email* på, venter Supabase på at noen skal klikke i en
-e-post som aldri kommer, og den første innloggingen svarer 200 uten økt.
-Funksjonen kjenner igjen nøyaktig det og svarer 503 med en melding som
-peker hit — framfor «uventet svar», som ikke hjelper noen.
+Står *Confirm email* på, skjer ett av to, og begge ender med en 503 som
+peker hit:
+
+- **Er det satt opp en SMTP-avsender** — og det er det her, fra
+  e-postinnloggingen — prøver Supabase å sende bekreftelsen, og ryker i
+  sendingen: `500 Error sending confirmation email`. Avsenderen
+  `onboarding@resend.dev` leverer bare til kontoeieren, så alle andre får
+  den feilen.
+- **Uten SMTP** svarer den 200 uten økt, og venter på et klikk i en
+  e-post som aldri kommer.
+
+Funksjonen kjenner igjen begge framfor å si «prøv igjen om litt» — dette
+går ikke over av seg selv.
+
+**Husk Save.** Supabase lagrer ikke provider-innstillingene på selve
+bryteren: du må folde ut *Email*-kortet, slå av, og trykke **Save**
+nederst i kortet. Bytter du side uten det, står bryteren tilbake som før
+— og det ser ut som om den ikke virket. Skjedde 13. september 2026.
 
 **Fornavn er unike.** «Ola» er én konto. Prøver en annen Ola samme navn
 med en annen PIN, får hen ««Ola» er tatt. Er PIN-en feil, eller skal du
@@ -714,6 +728,7 @@ Det du ser først, og hva det som regel betyr.
 | Ny PIN virker ikke for personen | `PIN_PEPPER` var ikke satt da PIN-en ble satt | sett pepperet, deploy, sett PIN-en på nytt |
 | Et kjent navn ber om «Gjenta PIN-en» | raden i `pin_kontoer` mangler — kontoen ble laget før tabellen fantes | før opp slugen for hånd, eller la personen slette og lage kontoen på nytt |
 | Innlogging: «krever at e-postbekreftelse er slått av» | *Confirm email* står på i Supabase | slå den av; adressen er en nøkkel, ikke en postkasse |
+| Innlogging: «Supabase prøvde å sende en e-post» (503) | samme sak, men SMTP er satt opp, så den ryker i sendingen i stedet | slå av *Confirm email* — **og trykk Save** |
 | Innlogging: «For mange forsøk» (429) | Supabase sperrer en stund | vent et minutt |
 | Innlogging: alle får «stemmer ikke» etter en deploy | `PIN_PEPPER` er byttet eller borte | se pepper-avsnittet |
 | *(parkert, e-post)* E-posten har en lenke, ingen kode | malene er låst til egen SMTP er satt opp | se det parkerte avsnittet |

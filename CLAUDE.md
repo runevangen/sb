@@ -477,6 +477,15 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 - Navnet sendes som POST, ikke i en spørring: en adresse havner i
   tilgangsloggene hos hvert ledd underveis, og et fornavn hører ikke
   hjemme der.
+- **Står «Confirm email» på, ser det ulikt ut alt etter om SMTP er satt
+  opp.** Uten SMTP svarer signup 200 uten økt. Med SMTP — og det står
+  igjen her, fra e-postinnloggingen — prøver Supabase å sende
+  bekreftelsen og ryker i sendingen: `500 Error sending confirmation
+  email`. Funksjonen kjenner igjen begge og svarer 503 med hvilken
+  innstilling det er og hvor den står. «Prøv igjen om litt» ville sendt
+  leseren ut på å vente på noe som aldri går over av seg selv. Og
+  Supabase lagrer ikke provider-innstillinger på selve bryteren — det må
+  trykkes Save, ellers står den tilbake som før.
 - Supabase svarer 200 uten økt i to tilfeller som betyr helt ulike ting,
   og skillet er `identities`: en tom liste er tjenestens måte å si «denne
   finnes alt» uten å rope det, mens en full liste betyr at *Confirm
@@ -670,7 +679,7 @@ er i seg selv noe om adressen.
 ## Testing
 
     node test/unit.mjs      393 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  216 tester, ~250 ms, ingen nettleser
+    node test/funksjon.mjs  219 tester, ~250 ms, ingen nettleser
     node test/run.mjs       301 tester, ~190 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
