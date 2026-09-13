@@ -18,7 +18,8 @@ import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
   from "../fotball-data.js";
 
 import { normaliserEpost, gyldigEpost, normaliserKode, gyldigKode, maskerEpost,
-         oktUtloper, oktGyldig, tolkOkt } from "../konto-data.js";
+         oktUtloper, oktGyldig, tolkOkt, kanFornyes, maaFornyes,
+         FORNY_MARGIN } from "../konto-data.js";
 
 import { normaliserPinNavn, pinSlug, gyldigPinNavn, pinEpost, normaliserPin, gyldigPin,
          pinPassord, tolkPinOkt, tolkBrukere, sistInneTekst,
@@ -1072,12 +1073,20 @@ ok("pepperet gjor to like PIN-er ulike passord",
    pinPassord("1234", "a") !== pinPassord("1234", "b"));
 
 ok("svaret fra tjenesten formes til en okt med navn",
-   JSON.stringify(tolkPinOkt({ access_token: "t", expires_in: 3600,
+   JSON.stringify(tolkPinOkt({ access_token: "t", expires_in: 3600, refresh_token: "f-1",
      user: { email: "ola@" + PIN_DOMENE, id: "u-1" } }, "  Ola  ", KONTO_NAA)) ===
    JSON.stringify({ token: "t", navn: "Ola", bruker: "u-1",
-     utloper: "2026-09-11T13:00:00.000Z" }),
-   JSON.stringify(tolkPinOkt({ access_token: "t", expires_in: 3600,
+     utloper: "2026-09-11T13:00:00.000Z", fornyer: "f-1" }),
+   JSON.stringify(tolkPinOkt({ access_token: "t", expires_in: 3600, refresh_token: "f-1",
      user: { email: "ola@" + PIN_DOMENE, id: "u-1" } }, "  Ola  ", KONTO_NAA)));
+
+// Fornyeren er det som gjor telefonen til en telefon du er logget inn
+// pa. Tilgangstokenet varer én time; uten denne ble man logget ut hver
+// time, og det var nettopp det som ble meldt fra prod.
+ok("okta barer fornyeren fra tjenesten",
+   tolkPinOkt({ access_token: "t", refresh_token: "f-1" }, "Ola", KONTO_NAA).fornyer === "f-1");
+ok("og et svar uten fornyer gir en tom, ikke en udefinert",
+   tolkPinOkt({ access_token: "t" }, "Ola", KONTO_NAA).fornyer === "");
 // Adressen vi lagde av navnet er en nokkel, ikke noe a vise noen.
 ok("okta barer ikke adressen vi lagde",
    JSON.stringify(tolkPinOkt({ access_token: "t", user: { email: "ola@" + PIN_DOMENE } },
@@ -1090,6 +1099,29 @@ ok("en okt uten navn kastes ogsa",
 ok("uten levetid far ogsa PIN-okta en kort en",
    tolkPinOkt({ access_token: "t" }, "Ola", KONTO_NAA).utloper ===
    "2026-09-11T13:00:00.000Z");
+
+// Et utlopt tilgangstoken er ikke det samme som a vaere logget ut. Var
+// de det samme, ble man logget ut hver time — og det var de.
+const MED_FORNYER = { token: "t", navn: "Ola", fornyer: "f-1",
+                      utloper: new Date(KONTO_NAA + 3600000).toISOString() };
+ok("en okt med fornyer kan fornyes", kanFornyes(MED_FORNYER));
+ok("en okt uten fornyer kan ikke",
+   !kanFornyes({ token: "t", navn: "Ola", utloper: "2030-01-01T00:00:00.000Z" }) &&
+   !kanFornyes(null) && !kanFornyes("nei"));
+
+ok("en fersk okt trenger ingen fornying", !maaFornyes(MED_FORNYER, KONTO_NAA));
+// Fornyes den for den ryker, merker ingen at den var innom — og et kall
+// som starter rett for utlopet rekker fram.
+ok("men den fornyes for den ryker, ikke etter",
+   maaFornyes(MED_FORNYER, KONTO_NAA + 3600000 - FORNY_MARGIN));
+ok("en utlopt okt ma fornyes", maaFornyes(MED_FORNYER, KONTO_NAA + 7200000));
+ok("en okt uten fornyer fornyes ikke, uansett hvor gammel",
+   !maaFornyes({ token: "t", navn: "Ola", utloper: "2020-01-01T00:00:00.000Z" },
+     KONTO_NAA));
+// En okt vi ikke kjenner levetiden pa er ikke en okt a stole pa — men
+// har den en fornyer, er veien ut a fornye, ikke a logge ut.
+ok("ugyldig utlopstid ber om fornying framfor a gjettes pa",
+   maaFornyes({ token: "t", navn: "Ola", fornyer: "f-1", utloper: "tull" }, KONTO_NAA));
 
 /* ---------------- kampene noen blir med pa ---------------- */
 

@@ -110,6 +110,11 @@ export function tolkPinOkt(json, navn, naa = Date.now()) {
     // over hvem som blir med sammenliknes pa id.
     bruker: String((json.user && json.user.id) || ""),
     utloper: oktUtloper(json.expires_in, naa) || oktUtloper(3600, naa),
+    // Fornyeren er det som gjor telefonen til en telefon du er logget
+    // inn pa. Tilgangstokenet over varer én time — det er ferskvare — og
+    // uten denne ble man logget ut hver time. Den byttes inn i et nytt
+    // token uten at PIN-en tastes pa nytt.
+    fornyer: String((json && json.refresh_token) || ""),
   };
 }
 

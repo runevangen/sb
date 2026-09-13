@@ -2416,6 +2416,99 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
 `);
 
+/* ---------------- 19b. et gammelt token logger deg ikke ut ---------------- */
+
+// Supabase gir et tilgangstoken som varer én time. Appen kastet
+// fornyeren og ryddet okta med en gang tokenet var utlopt — sa man ble
+// logget ut hver time, og matte taste PIN-en pa nytt. Meldt fra prod
+// 13. september 2026.
+//
+// Okta i telefonen har et utlopt token og en fornyer. Det er ikke det
+// samme som a vaere logget ut: du er fortsatt logget inn her, det er bare
+// ferskvaren som er gammel.
+function fornySide(fornyerSvar) {
+  return FELLES + `
+  var saker = lagSaker(12);
+  localStorage.setItem("sb-konto", JSON.stringify({ token: "gammelt", navn: "Rune",
+    bruker: "u-1", fornyer: "forny-1",
+    utloper: new Date(Date.now() - 60000).toISOString() }));
+
+  window.__forny = [];
+  window.fetch = function (u, o) {
+    u = String(u);
+    if (u.indexOf("/api/konto") === 0) {
+      var inn = o && o.body ? JSON.parse(o.body) : null;
+      if (inn && inn.handling === "forny") {
+        window.__forny.push(inn);
+        return (${fornyerSvar})();
+      }
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ klar: true, mangler: [] })); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+`;
+}
+
+const SAK_19B = await kjor("fornying", fornySide(`function () {
+  return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+    text: function () { return Promise.resolve(JSON.stringify({
+      token: "ferskt", navn: "Rune", bruker: "u-1", fornyer: "forny-2",
+      utloper: new Date(Date.now() + 3600000).toISOString() })); } });
+}`) + `
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    ok("et utlopt token ber om fornying ved oppstart",
+       window.__forny.length === 1, window.__forny.length);
+    // PIN-en tastes ikke pa nytt: fornyeren *er* beviset.
+    ok("og den sender fornyeren, ikke PIN-en",
+       window.__forny[0].fornyer === "forny-1" &&
+       JSON.stringify(window.__forny[0]).indexOf("pin") === -1,
+       JSON.stringify(window.__forny[0]));
+
+    var lagret = JSON.parse(localStorage.getItem("sb-konto") || "null");
+    ok("det ferske tokenet lagres", lagret && lagret.token === "ferskt",
+       JSON.stringify(lagret));
+    // Fornyeren roterer: den brukte er dod i samme oyeblikk, sa den nye
+    // ma lagres i stedet. Blir den gamle staende, blir neste fornying
+    // avvist og man er like langt.
+    ok("og den nye fornyeren erstatter den brukte",
+       lagret && lagret.fornyer === "forny-2", lagret && lagret.fornyer);
+    // Det synlige beviset: du er fortsatt logget inn.
+    var merke = document.getElementById("hvemTag");
+    ok("du star fortsatt som innlogget",
+       !merke.hidden && merke.textContent === "Rune",
+       merke.hidden + " " + merke.textContent);
+    ferdig();
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
+`);
+
+/* ---------------- 19c. en avvist fornyer logger deg ut ---------------- */
+
+// En avvist fornyer er noe annet enn et nettverksblaff: den er brukt,
+// trukket tilbake eller utlopt, og da hjelper det ikke a prove igjen.
+// Appen skal logge ut framfor a sta og prove.
+const SAK_19C = await kjor("fornying-avvist", fornySide(`function () {
+  return Promise.resolve({ ok: false, status: 401, statusText: "Unauthorized",
+    text: function () { return Promise.resolve(JSON.stringify({
+      feil: "Innloggingen er utløpt. Logg inn på nytt.", utlogget: true })); } });
+}`) + `
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    ok("en avvist fornyer prover ikke om igjen",
+       window.__forny.length === 1, window.__forny.length);
+    ok("og den logger deg ut",
+       !localStorage.getItem("sb-konto"), localStorage.getItem("sb-konto"));
+    var merke = document.getElementById("hvemTag");
+    ok("merket i toppfeltet forsvinner", merke.hidden, merke.textContent);
+    // Resten av appen skal sta som for: ingenting er last bak innlogging.
+    ok("og feeden star der som om ingenting hendte",
+       document.querySelectorAll(".row").length > 0,
+       document.querySelectorAll(".row").length);
+    ferdig();
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
+`);
+
 /* ---------------- 20. vennefanen ---------------- */
 
 // Kampene noen blir med pa, pa tvers av ligaer. Loftingen i Neste runde
@@ -2502,7 +2595,7 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
 
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_19, ...SAK_20];
+const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_19, ...SAK_19B, ...SAK_19C, ...SAK_20];
 let feilet = 0;
 
 for (const t of alle) {

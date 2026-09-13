@@ -78,6 +78,30 @@ export function oktUtloper(sekunder, naa = Date.now()) {
 // innloggingen) eller en adresse (e-postinnloggingen, som ligger pa
 // grenen `epost-innlogging`). En okt som bare er et token ser ut som
 // innlogget uten a vaere noen, og da har menyen ingenting a skrive.
+// Hvor lenge for utlopet okta fornyes. Fornyes den for den ryker, merker
+// ingen at den var innom — og et kall som starter rett for utlopet rekker
+// fram.
+export const FORNY_MARGIN = 5 * 60 * 1000;
+
+// En okt kan fornyes sa lenge den barer en fornyer. Da er du fortsatt
+// logget inn pa denne telefonen: det er bare tilgangstokenet som er
+// ferskvare, og det byttes uten at PIN-en tastes pa nytt.
+//
+// Dette er skillet mellom «utlogget» og «tokenet er gammelt», og for det
+// fantes var de det samme — derfor ble man logget ut hver time.
+export function kanFornyes(okt) {
+  return !!(okt && typeof okt === "object" && okt.fornyer && okt.token);
+}
+
+// Pa tide a fornye: utlopt, eller sa nar at et kall som starter na kan
+// rekke a ryke underveis.
+export function maaFornyes(okt, naa = Date.now(), margin = FORNY_MARGIN) {
+  if (!kanFornyes(okt)) return false;
+  const utloper = Date.parse(okt.utloper);
+  if (Number.isNaN(utloper)) return true;
+  return utloper - margin <= naa;
+}
+
 export function oktGyldig(okt, naa = Date.now()) {
   if (!okt || typeof okt !== "object") return false;
   if (!okt.token) return false;

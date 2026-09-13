@@ -58,10 +58,46 @@ export default async (req) => {
   if (inn.handling === "finnes") return finnesNavnet(inn);
   if (inn.handling === "logg-inn") return loggInn(inn);
   if (inn.handling === "slett") return slettMeg(inn);
+  if (inn.handling === "forny") return fornyOkt(inn);
   return svar({ feil: "Ukjent handling" }, 400);
 };
 
 /* ---------- handlingene ---------- */
+
+// Fornyelsen: bytt en fornyer i et ferskt tilgangstoken.
+//
+// Uten denne varer en innlogging én time, og appen ba om PIN-en pa nytt
+// hver gang — det var det «jeg blir ofte logget ut» var. Fornyeren
+// roterer hos Supabase, sa svaret barer en ny som ma lagres i stedet for
+// den gamle; den brukte er dod i samme oyeblikk.
+//
+// PIN-en tastes ikke her, og pepperet rores ikke: fornyeren *er*
+// beviset. Den kom fra en innlogging som hadde begge deler.
+async function fornyOkt(inn) {
+  const fornyer = String(inn.fornyer || "");
+  if (!fornyer) return svar({ feil: "Mangler fornyer" }, 400);
+
+  const r = await hosSupabase("/auth/v1/token?grant_type=refresh_token",
+    { refresh_token: fornyer });
+
+  // En avvist fornyer er ikke en feil a prove pa nytt: den er brukt,
+  // trukket tilbake eller utlopt, og da ma PIN-en tastes. Appen skal
+  // logge ut framfor a sta og prove.
+  if (!(r.ok && r.json && r.json.access_token)) {
+    if (r.status > 0 && r.status < 500) {
+      return svar({ feil: "Innloggingen er utløpt. Logg inn på nytt.",
+                    utlogget: true, forsok: r.forsok }, 401);
+    }
+    return pinFeil(r);
+  }
+
+  // Navnet star hos tjenesten som metadata, skrevet slik personen selv
+  // skrev det. Kontoer laget for vi sendte det med har det ikke, og da er
+  // navnet appen alt kjenner det naermeste vi kommer.
+  const fraTjenesten = r.json.user && r.json.user.user_metadata
+    && r.json.user.user_metadata.navn;
+  return pinOkt(r, normaliserPinNavn(fraTjenesten || inn.navn || ""));
+}
 
 // Steg ett: er navnet nytt eller kjent?
 //

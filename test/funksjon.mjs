@@ -736,6 +736,7 @@ const PEPPER = "hemmelig-pepper";
 const OKT = {
   access_token: "okt-token-123",
   expires_in: 3600,
+  refresh_token: "forny-1",
   user: { email: "ola@pin.mvp-sb.netlify.app", id: "u-1" },
 };
 
@@ -781,6 +782,10 @@ ok("fornavn og PIN gir en okt", r.status === 200 && okt.token === "okt-token-123
 ok("okta barer navnet, ikke adressen vi lagde", okt.navn === "Ola" &&
    JSON.stringify(okt).indexOf("pin.mvp-sb.netlify.app") === -1, JSON.stringify(okt));
 ok("en som har logget inn for koster ett kall", kall.length === 1, kall.length);
+// Fornyeren er det som gjor telefonen til en telefon du er logget inn pa.
+// Uten den varer innloggingen én time, og da ble PIN-en bedt om pa nytt.
+ok("okta barer fornyeren fra tjenesten", okt.fornyer === "forny-1", JSON.stringify(okt));
+
 // Skragestreken pa slutten av SUPABASE_URL skal ikke gi //auth.
 ok("adressen til tjenesten er hel",
    kall[0].url === "https://prosjekt.supabase.co/auth/v1/token?grant_type=password",
@@ -804,6 +809,54 @@ ok("og pepperet aldri til leseren", JSON.stringify(okt).indexOf(PEPPER) === -1,
    JSON.stringify(okt));
 ok("svaret caches aldri",
    r.headers.get("Cache-Control") === "no-store", r.headers.get("Cache-Control"));
+
+// Fornyelsen: bytt fornyeren i et ferskt token, uten at PIN-en tastes.
+kall = stubSupabase({ access_token: "okt-token-456", expires_in: 3600,
+  refresh_token: "forny-2",
+  user: { email: "ola@pin.mvp-sb.netlify.app", id: "u-1",
+          user_metadata: { navn: "Ola" } } });
+r = await konto(kontoBe({ handling: "forny", fornyer: "forny-1", navn: "Ola" }));
+const fornyet = await r.json();
+ok("en fornyer gir et ferskt token", r.status === 200 && fornyet.token === "okt-token-456",
+   r.status + " " + JSON.stringify(fornyet));
+ok("og den gar til grant_type=refresh_token",
+   kall[0].url === "https://prosjekt.supabase.co/auth/v1/token?grant_type=refresh_token",
+   kall[0].url);
+ok("fornyeren sendes med, PIN-en og pepperet ikke",
+   JSON.parse(kall[0].opsjoner.body).refresh_token === "forny-1" &&
+   kall[0].opsjoner.body.indexOf(PEPPER) === -1 &&
+   kall[0].opsjoner.body.indexOf("password") === -1,
+   kall[0].opsjoner.body);
+// Fornyeren roterer hos Supabase: den brukte er dod, sa den nye ma
+// lagres i stedet. Barer ikke svaret den, blir neste fornying avvist.
+ok("den nye fornyeren folger med tilbake", fornyet.fornyer === "forny-2",
+   JSON.stringify(fornyet));
+// Navnet star hos tjenesten, skrevet slik personen selv skrev det.
+ok("navnet hentes fra tjenesten, ikke fra det appen sendte",
+   fornyet.navn === "Ola", fornyet.navn);
+ok("og adressen vi lagde folger fortsatt ikke med",
+   JSON.stringify(fornyet).indexOf("pin.mvp-sb.netlify.app") === -1,
+   JSON.stringify(fornyet));
+
+// En avvist fornyer er ikke noe a prove pa nytt: den er brukt, trukket
+// tilbake eller utlopt. Da ma appen logge ut framfor a sta og prove.
+kall = stubSupabase({ error: "invalid_grant", error_description: "Refresh Token Not Found" }, 400);
+r = await konto(kontoBe({ handling: "forny", fornyer: "gammel", navn: "Ola" }));
+const avvist = await r.json();
+ok("en avvist fornyer svarer 401 og sier at du er logget ut",
+   r.status === 401 && avvist.utlogget === true, r.status + " " + JSON.stringify(avvist));
+ok("og ber deg logge inn framfor a prove igjen",
+   avvist.feil.indexOf("Logg inn") > -1, avvist.feil);
+
+// Uten fornyer rores ikke tjenesten i det hele tatt.
+kall = stubSupabase(OKT);
+r = await konto(kontoBe({ handling: "forny", navn: "Ola" }));
+ok("en fornying uten fornyer nar aldri tjenesten",
+   r.status === 400 && kall.length === 0, r.status + " " + kall.length);
+
+// Tilbake til innloggingen: testene under leser `kall` fra den.
+kall = stubSupabase(OKT);
+r = await konto(kontoBe({ handling: "logg-inn", navn: "  Ola ", pin: "12 34" }));
 
 ok("samme navn gir samme konto uansett skrivemate",
    JSON.parse(stubSupabase(OKT) && kall[0].opsjoner.body).email ===

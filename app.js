@@ -7,7 +7,8 @@ import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug, ranger
   from "./lib.js";
 import { LIGAER, tolkFotballHash, fotballHash, tolkKamplenke } from "./fotball-data.js";
 import { ofteBrukt, noterPub } from "./pub-data.js";
-import { maskerEpost, oktGyldig } from "./konto-data.js";
+import { maskerEpost, oktGyldig, kanFornyes, maaFornyes,
+         FORNY_MARGIN } from "./konto-data.js";
 import { normaliserPinNavn, gyldigPinNavn, normaliserPin, gyldigPin, PIN_MIN }
   from "./pin-data.js";
 import { normaliserNavn } from "./svar-data.js";
@@ -1546,13 +1547,87 @@ function lesKonto() {
   } catch (err) {
     return null;
   }
-  // En utlopt okt er ingen okt. Den ryddes med en gang, sa menyen ikke
-  // star og pastar at du er logget inn.
-  if (!oktGyldig(lagret)) {
+  // Et utlopt tilgangstoken er ikke det samme som a vaere logget ut.
+  // Barer okta en fornyer, er du fortsatt logget inn pa denne telefonen —
+  // det er bare ferskvaren som er gammel, og den byttes uten at PIN-en
+  // tastes. Ryddet vi den her, var nettopp det som gjorde at man ble
+  // logget ut hver time.
+  if (!oktGyldig(lagret) && !kanFornyes(lagret)) {
     try { localStorage.removeItem(KONTO_KEY); } catch (err) { /* privat modus */ }
     return null;
   }
   return lagret;
+}
+
+// Fornyelsen, og klokka som holder den i gang.
+//
+// Supabase gir et tilgangstoken som varer én time. Fornyes det for det
+// ryker, merker ingen at det var innom; gjor vi ikke det, ba appen om
+// PIN-en pa nytt hver time. Fornyeren roterer, sa svaret barer en ny som
+// ma lagres i stedet for den gamle.
+let fornyerKlokke = null;
+let fornyerGar = null;
+
+async function fornyOkt() {
+  // Ett forsok om gangen: to samtidige ville brukt den samme fornyeren,
+  // og den andre ville fatt den avvist fordi den forste nettopp brukte
+  // den opp.
+  if (fornyerGar) return fornyerGar;
+  if (!kanFornyes(kontoOkt)) return null;
+
+  // Eget kall framfor kontoKall: den kaster pa feil, og da forsvinner
+  // forskjellen mellom «fornyeren er avvist» og «nettet blafret». Den
+  // forskjellen er hele poenget — den ene skal logge deg ut, den andre
+  // skal ikke rore noe.
+  fornyerGar = (async () => {
+    let data = null;
+    try {
+      const respons = await fetch("/api/konto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({
+          handling: "forny", fornyer: kontoOkt.fornyer, navn: kontoOkt.navn,
+        }),
+      });
+      data = JSON.parse(await respons.text());
+    } catch (err) {
+      // Nettverksblaff eller uleselig svar: la okta sta. Neste apning
+      // prover igjen, og til da er du fortsatt logget inn her.
+      return null;
+    }
+
+    // Tjenesten svarer med okta flatt, ikke pakket inn.
+    if (data && data.token) {
+      lagreKonto(data);
+      planleggFornying();
+      return data;
+    }
+    // Bare en avvist fornyer betyr utlogget: den er brukt, trukket
+    // tilbake eller utlopt, og da hjelper det ikke a prove igjen.
+    if (data && data.utlogget) {
+      lagreKonto(null);
+      visHvem();
+      tegnKonto();
+    }
+    return null;
+  })().finally(() => { fornyerGar = null; });
+
+  return fornyerGar;
+}
+
+// Fornyes mens appen star apen, sa et trykk etter en time ikke moter et
+// dodt token.
+function planleggFornying() {
+  if (fornyerKlokke) clearTimeout(fornyerKlokke);
+  fornyerKlokke = null;
+  if (!kanFornyes(kontoOkt)) return;
+
+  const utloper = Date.parse(kontoOkt.utloper);
+  if (Number.isNaN(utloper)) return;
+  // Minst et halvt minutt fram: en klokke som ringer med en gang ville
+  // blitt en lokke.
+  const om = Math.max(30000, utloper - FORNY_MARGIN - Date.now());
+  fornyerKlokke = setTimeout(() => { fornyOkt(); }, om);
 }
 
 function lagreKonto(okt) {
@@ -2001,6 +2076,19 @@ function fangFokus(e) {
 }
 
 /* ---------- oppstart ---------- */
+
+// Er tokenet gammelt, fornyes det med en gang appen apnes — og ellers
+// settes klokka som holder det ferskt mens appen star apen.
+if (maaFornyes(kontoOkt)) fornyOkt();
+else planleggFornying();
+
+// Telefonen fryser tidtakere nar appen ligger i bakgrunnen, sa klokka
+// over ringer ikke nar skjermen har vaert av i to timer. Derfor sjekkes
+// det ogsa nar appen kommer fram igjen: det er nettopp da man tar den
+// opp for a trykke pa noe.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && maaFornyes(kontoOkt)) fornyOkt();
+});
 
 initFotball(
   (liga, del) => settFane("fotball", liga, del),

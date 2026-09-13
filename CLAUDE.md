@@ -637,12 +637,40 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   skrevet inn, var skrivingen til ingen nytte. Samme grep som i
   adminportalen.
 - Økten ligger i `localStorage` (`sb-konto`) med et utløpstidspunkt, ikke
-  et antall sekunder: sekunder er ubrukelige etter en omstart. En økt
-  uten gyldig utløpstidspunkt regnes som utløpt og ryddes ved oppstart —
-  en økt vi ikke kjenner levetiden på, er ikke en økt å stole på. Økten
+  et antall sekunder: sekunder er ubrukelige etter en omstart. Økten
   må også si *hvem* du er, ellers har menyen ingenting å skrive: et navn
   (PIN) eller en adresse (den parkerte e-postveien, som fortsatt ligger i
   telefoner som har brukt den).
+- **Et utløpt tilgangstoken er ikke det samme som å være logget ut**, og
+  så lenge de var det samme ble man logget ut hver time. Supabase gir et
+  token som varer én time, og `refresh_token` ble kastet — så appen ba om
+  PIN-en på nytt hver time. Meldt fra prod 13. september 2026 som «jeg
+  blir ofte logget ut».
+  Fornyeren lagres nå i økten (`fornyer`), og det er den som gjør
+  telefonen til en telefon du er logget inn på: `handling: "forny"` i
+  `konto.mjs` bytter den i et ferskt token mot
+  `grant_type=refresh_token`, uten at PIN-en eller pepperet er innom.
+  `kanFornyes()` og `maaFornyes()` i `konto-data.js` er skillet, og
+  `lesKonto` rydder derfor bare en økt som *hverken* er gyldig eller kan
+  fornyes.
+  Fornyeren **roterer**: den brukte er død i samme øyeblikk, så den nye
+  må lagres i stedet for den gamle — blir den gamle stående, blir neste
+  fornying avvist og man er like langt.
+  Fornyingen skjer tre steder: ved oppstart om tokenet er gammelt, på en
+  klokke fem minutter før utløp mens appen står åpen, og når appen kommer
+  fram igjen — telefonen fryser tidtakere i bakgrunnen, så klokka ringer
+  ikke etter to timer med skjermen av, og det er nettopp da man tar den
+  opp for å trykke på noe. Ett forsøk om gangen: to samtidige ville brukt
+  den samme fornyeren, og den andre fått den avvist.
+- **Bare en avvist fornyer logger deg ut, aldri et nettverksblaff.** De to
+  ser like ut fra en `fetch` som kaster, så fornyingen gjør sitt eget kall
+  framfor å gå gjennom `kontoKall` — den kaster på feil, og da forsvinner
+  nettopp den forskjellen. En 4xx med `utlogget: true` betyr brukt,
+  trukket tilbake eller utløpt fornyer, og da hjelper det ikke å prøve
+  igjen. Alt annet lar økten stå, og neste åpning prøver på nytt.
+- Dette gjør telefonen stående innlogget til man logger ut, og det står i
+  `personvern.html` med de ordene, sammen med at «Logg ut» er veien ut
+  for den som deler telefon.
 - Menyen viser fornavnet, ikke en maskert adresse: det er allerede
   offentlig for vennene, og det er det samme navnet de ser i «blir
   med»-lista. PIN-feltet er `type="password"` og tømmes etter innlogging;
@@ -883,9 +911,9 @@ er i seg selv noe om adressen.
 
 ## Testing
 
-    node test/unit.mjs      420 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  219 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       353 tester, ~200 s, headless Chromium
+    node test/unit.mjs      429 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  229 tester, ~250 ms, ingen nettleser
+    node test/run.mjs       362 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
