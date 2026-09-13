@@ -757,13 +757,20 @@ function stedChip(kamp, panel, sted, form) {
   return b;
 }
 
-// Din egen rad, byttet ut med den tjenesten nettopp bekreftet. Er
-// representasjonen tom, beholdes den vi hadde: en tom liste fra en
-// upsert betyr «ingenting endret», ikke «raden finnes ikke».
-function leggInnSvar(kampId, bruker, ferske) {
-  if (!ferske.length) return;
-  sisteSvar = sisteSvar.filter(
-    (s) => !(s.kampId === String(kampId) && s.bruker === bruker)).concat(ferske);
+// Kampens rader, byttet ut med dem tjenesten nettopp leste tilbake.
+//
+// Hele kampen, ikke bare din egen rad: skrivingen leser tilbake alle
+// radene for a bevise at din landet, og de andre folger med. Byttet vi
+// bare ut din, ville de andre blitt lagt oppa dem som alt la der — og da
+// sto vennene dobbelt i lista til neste henting ryddet opp.
+//
+// Er svaret tomt, beholdes det vi hadde: tjenesten svarer 502 nar raden
+// ikke finnes, sa en tom liste her er ikke et bevis paa noe.
+function leggInnSvar(kampId, ferske) {
+  if (!ferske.length) return false;
+  sisteSvar = sisteSvar.filter((s) => s.kampId !== String(kampId))
+    .concat(ferske.filter((s) => s.kampId === String(kampId)));
+  return true;
 }
 
 // Kampens svar, hentet pa nytt. Ett kall for én kamp, og bare etter noe
@@ -811,6 +818,9 @@ async function svarSted(kamp, panel, hvor, sted, melding, avmeld) {
 
   panel.querySelectorAll(".sted-chip, .pub-chip, .sted-egen")
     .forEach((k) => { k.disabled = true; });
+  // Leste skrivingen kampen tilbake for oss, trengs ingen oppfriskning:
+  // svaret er alt det ferskeste vi kan fa.
+  let ferdigLest = false;
   try {
     if (avmeld) {
       await svarTjeneste({ handling: "fjern", token: okt.token, kampId: kamp.id });
@@ -823,7 +833,7 @@ async function svarSted(kamp, panel, hvor, sted, melding, avmeld) {
       const json = await svarTjeneste({
         token: okt.token, kampId: kamp.id, navn, hvor, sted,
       });
-      leggInnSvar(kamp.id, okt.bruker, tolkSvar(json.svar));
+      ferdigLest = leggInnSvar(kamp.id, tolkSvar(json.svar));
       panel.settLokalt({ hvor, sted });
       melding.textContent = "Du har planlagt å dra til " + (sted || stedtekst(kamp, hvor, sted)) + ".";
       // Tjenesten sier fra nar raden er skrevet, men ingen andre kan lese
@@ -831,15 +841,13 @@ async function svarSted(kamp, panel, hvor, sted, melding, avmeld) {
       // og det er verre a la det sta som en vellykket lagring.
       if (json.advarsel) melding.textContent += " " + json.advarsel;
     }
-    // Hent kampens svar pa nytt. Vi kan ikke bygge lista pa det skrivingen
-    // ga tilbake alene: en upsert som ikke endret noe kan svare med en tom
-    // representasjon, og da forsvant din egen rad lokalt selv om
-    // skrivingen gikk bra — uten linja under kampen, uten tellingen pa
-    // stedet og uten deg i lista nederst.
+    // Hent kampens svar pa nytt nar skrivingen ikke alt ga oss dem. En
+    // fjerning svarer bare «fjernet», og da er dette den eneste veien til
+    // a vite hva som star igjen.
     //
     // Og det er her vennene kommer inn: har noen svart siden runden ble
     // hentet, star de i kortet med det samme framfor ved neste lasting.
-    await friskeOppSvar(kamp.id);
+    if (!ferdigLest) await friskeOppSvar(kamp.id);
     // Rekkefolgen i runden og linja under kampen skal si det samme som
     // kortet: ett svar, ett sted som tegner det.
     tegnSvar(document.getElementById("fotballInnhold"));

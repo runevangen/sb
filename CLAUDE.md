@@ -887,6 +887,11 @@ er i seg selv noe om adressen.
   feil, så en stille tom liste er ikke til å skille fra «ingen har svart».
   To ekstra kall per skriving er prisen, og skrivinger er sjeldne og
   utløst av leseren selv.
+  Svaret bærer dermed **hele kampen**, ikke bare din egen rad, så
+  `leggInnSvar()` bytter ut kampens rader i sin helhet framfor å legge de
+  nye oppå. Og da trengs ingen `friskeOppSvar()` etterpå: svaret er alt
+  det ferskeste vi kan få. En fjerning svarer bare «fjernet», så der er
+  oppfriskningen fortsatt den eneste veien til å vite hva som står igjen.
 - **Etter en skriving hentes kampens svar på nytt** (`friskeOppSvar`), og
   lista bygges aldri på det upserten ga tilbake alene. En upsert som ikke
   endret noe kan svare med tom representasjon — raden finnes, svaret sier
@@ -963,7 +968,7 @@ er i seg selv noe om adressen.
 
     node test/unit.mjs      438 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  236 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       374 tester, ~200 s, headless Chromium
+    node test/run.mjs       376 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

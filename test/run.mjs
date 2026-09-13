@@ -2225,10 +2225,15 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
         window.__lagret = window.__lagret.filter(function (r) { return r.bruker !== "u-1"; });
         return svarMed({ fjernet: true });
       }
-      window.__lagret = [{ kamp_id: String(inn.kampId), navn: inn.navn, hvor: inn.hvor,
-        sted: inn.sted, bruker: "u-1" }];
-      // PostgREST kan svare med tom representasjon pa en upsert som ikke
-      // endret noe. Raden finnes — svaret sier bare ingenting om den.
+      // En upsert bytter ut din egen rad og lar de andres sta. Stubben ma
+      // speile det, ellers tester vi noe tjenesten aldri gjor.
+      window.__lagret = window.__lagret
+        .filter(function (r) { return r.bruker !== "u-1"; })
+        .concat([{ kamp_id: String(inn.kampId), navn: inn.navn, hvor: inn.hvor,
+          sted: inn.sted, bruker: "u-1" }]);
+      // Skrivingen leser hele kampen tilbake, sa svaret barer alle radene.
+      // Det tomme svaret finnes fordi tjenesten en gang stolte pa
+      // representasjonen fra upserten.
       return svarMed({ svar: window.__tomRepresentasjon ? [] : window.__lagret });
     }
     if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 || u.indexOf("overpass") > -1) {
@@ -2420,7 +2425,20 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
             ok("og din egen fjerning rorte ikke hennes",
                panel.querySelector(".kamp-panel-liste").textContent.indexOf("Ola") === -1,
                panel.querySelector(".kamp-panel-liste").textContent);
-            ferdig();
+
+            // Skrivingen leser hele kampen tilbake for a bevise at din rad
+            // landet, og de andre folger med. Byttes bare din ut, blir de
+            // andre lagt oppa dem som alt la der.
+            stedChip("Pub X").click();
+            setTimeout(function () { try {
+              var tekst = panel.querySelector(".kamp-panel-liste").textContent;
+              var antall = tekst.split("Kari").length - 1;
+              ok("vennene star én gang, ikke to, etter en skriving",
+                 antall === 1, antall + " ganger: " + tekst);
+              ok("og du star der selv", tekst.indexOf("Ola") > -1, tekst);
+              ferdig();
+            } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+            return;
           } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
         } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
         return;
