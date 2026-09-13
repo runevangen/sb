@@ -519,6 +519,17 @@ const ADS = [
     headline: "Det finnes ikke dårlig vær.",
     sub: "Det finnes bare Bjerke.",
     cta: "Ta det med Prem"
+  },
+  {
+    format: "spok",
+    form: "portrett",
+    brand: "SPØK",
+    bilde: "/bilder/prem-portrett.jpg",
+    bredde: 400,
+    hoyde: 400,
+    headline: "Null skjermer. Null odds.",
+    sub: "Én vaffel.",
+    cta: "Ta det med Prem"
   }
 ];
 
