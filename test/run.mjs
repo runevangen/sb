@@ -292,17 +292,20 @@ const SAK_1B = await kjor("annonse-varianter", FELLES + `
 
   window.addEventListener("load", function () { setTimeout(function () {
     blaVidere(4, function () { try {
+      // Spokene barer de samme fasong-klassene, sa uten :not(.ad-spok)
+      // kan denne fa en spok i fanget og passere av feil grunn.
+      var vaar = function (f) {
+        return document.querySelector(".ad-ledig:not(.ad-spok).ad-ledig-" + f);
+      };
       var former = ["portrett", "bred", "hoy"];
-      var funnet = former.filter(function (f) {
-        return !!document.querySelector(".ad-ledig-" + f);
-      });
+      var funnet = former.filter(function (f) { return !!vaar(f); });
       ok("alle tre formene dukker opp nar man blar",
          funnet.length === 3, funnet.join(",") + " av " + former.join(","));
 
       // Formene skal vaere ulike fasonger, ikke tre like bokser: de tre
       // bruker tre ulike bildefiler.
       var bilder = former.map(function (f) {
-        var b = document.querySelector(".ad-ledig-" + f + " .ad-ledig-bilde");
+        var b = vaar(f) && vaar(f).querySelector(".ad-ledig-bilde");
         return b ? b.getAttribute("src") : "";
       });
       ok("hver form har sitt eget bilde",
@@ -320,6 +323,7 @@ const SAK_1B = await kjor("annonse-varianter", FELLES + `
         if (a.textContent.indexOf("Reklame") > -1) feil.push("reklame");
         if (a.querySelector(".ad-label").textContent !== "Ledig plass") feil.push("merke");
         if (!bilde || bilde.getAttribute("alt") !== "Prem") feil.push("alt");
+        if (!bilde.getAttribute("src")) feil.push("src");
         // Uten bredde og hoyde pa taggen vokser annonsen nar bildet lastes,
         // og dytter saken man holder pa a lese nedover.
         if (!bilde.getAttribute("width") || !bilde.getAttribute("height")) feil.push("mal");
@@ -363,6 +367,24 @@ const SAK_1B = await kjor("annonse-varianter", FELLES + `
       });
       ok("en spok sier at den er en spok, aldri at den er reklame",
          spokFeil.length === 0, spokFeil.join(",") || "ingen");
+
+      // alt-teksten ligger pa annonsen, ikke i koden. Den sto som «Prem»
+      // sa lenge alle bildene var av ham, og ble feil i det oyeblikket et
+      // treskilt kom inn i lista: en skjermleser som sier «Prem» om et
+      // skilt er verre enn ingenting.
+      var altFeil = [];
+      Array.prototype.forEach.call(document.querySelectorAll(".ad-ledig-bilde"),
+        function (b) {
+          var a = b.getAttribute("alt");
+          if (!a) { altFeil.push("tom"); return; }
+          // Et skilt skal ikke leses opp som en person.
+          if (b.getAttribute("src").indexOf("skilt") > -1 &&
+              a.toLowerCase().indexOf("skilt") === -1) {
+            altFeil.push("skiltet heter «" + a + "»");
+          }
+        });
+      ok("hvert bilde beskriver seg selv, ogsa de som ikke er av Prem",
+         altFeil.length === 0, altFeil.join(", ") || "ingen");
 
       // Ullevalseter-vitsen er delt i oppsett og poeng. I én setning er
       // den en opplysning.

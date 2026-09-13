@@ -10,8 +10,8 @@ prosjektet `mvp-sb`.
     sw.js         service worker: cacher bare skallet, aldri /api/
     netlify.toml  proxy mot WordPress
 
-    bilder/       annonsebilder. prem-{portrett,bred,hoy}.jpg er samme
-                  bilde i tre utsnitt, ett per form pa den ledige plassen
+    bilder/       annonsebilder, ett utsnitt per form: prem-* er den
+                  ledige plassen, skilt-* og tur-* er spokene
 
     BACKLOGG.md   peker til issues, som er den ekte backloggen
     docs/         dypdykk og notater som ikke er kode
@@ -119,9 +119,17 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   Utsnittene ligger ferdig beskåret i `bilder/` — ingen byggesteg, så
   nettleseren skal ikke skalere et kvadratisk bilde ned til et band.
   Bredde og høyde står på hver `<img>`: uten dem vokser annonsen når
-  bildet lastes, og dytter saken man holder på å lese nedover. `alt` er
-  navnet hans, ikke en beskrivelse av bildet — den som ikke ser det, skal
-  vite at det er en person her.
+  bildet lastes, og dytter saken man holder på å lese nedover.
+- **`alt` står på annonsen, ikke i koden.** Den var hardkodet «Prem» så
+  lenge alle bildene var av ham, og ble feil i det øyeblikket et treskilt
+  kom inn i lista: en skjermleser som sier «Prem» om et skilt er verre enn
+  ingenting. En nettlesertest slår ut hvis et bilde mangler `alt`, eller
+  hvis skiltet beskriver seg som en person.
+- Skiltet får det høye kortet og ikke det brede bandet: det er høyere enn
+  et 16:9-utsnitt tar ved bildets egen bredde, så et band ville kuttet
+  «sportsstue». Den røde veggen under skiltet er dessuten en ren flate for
+  teksten. Samme avveining som med ansiktet i bannerformatet — fasongen
+  følger motivet, ikke omvendt.
 - **Spøkene er merket «Spøk», ikke «Reklame».** De bruker de samme
   fasongene og det samme ansiktet, men Ullevålseter er et ekte sted, og en
   tulleannonse merket «Reklame» ville påstått at de har kjøpt plassen. Det
@@ -853,7 +861,7 @@ er i seg selv noe om adressen.
 
     node test/unit.mjs      420 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  219 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       344 tester, ~200 s, headless Chromium
+    node test/run.mjs       345 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

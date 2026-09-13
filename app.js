@@ -448,6 +448,7 @@ const ADS = [
     bilde: "/bilder/prem-portrett.jpg",
     bredde: 400,
     hoyde: 400,
+    alt: "Prem",
     headline: "Her kunne det stått noe om deg.",
     cta: "Ta en prat med Prem"
   },
@@ -457,17 +458,17 @@ const ADS = [
     headline: "Tre måneder trening. Ingen binding.",
     cta: "Se tilbudet"
   },
-  // Spøkene. Samme ansikt og samme fasonger som den ledige plassen — men
-  // merket «Spøk», fordi Ullevålseter er et ekte sted som ikke har kjøpt
-  // noe som helst. Knappen går til Prem, som er den som må svare for
-  // påstanden.
+  // Spøkene. Samme fasonger som den ledige plassen — men merket «Spøk»,
+  // fordi Ullevålseter er et ekte sted som ikke har kjøpt noe som helst.
+  // Knappen går til Prem, som er den som må svare for påstanden.
   {
     format: "spok",
-    form: "bred",
+    form: "hoy",
     brand: "SPØK",
-    bilde: "/bilder/prem-bred.jpg",
-    bredde: 1000,
-    hoyde: 562,
+    bilde: "/bilder/skilt-hoy.jpg",
+    bredde: 800,
+    hoyde: 1000,
+    alt: "Skiltet på Ullevålseter sportsstue",
     headline: "Opplev Ullevålseter.",
     sub: "Mye bedre enn øl og vin på travbanen.",
     cta: "Si imot"
@@ -479,25 +480,27 @@ const ADS = [
     sub: "Book time · padelhuset.no"
   },
   {
+    format: "spok",
+    form: "bred",
+    brand: "SPØK",
+    bilde: "/bilder/tur-bred.jpg",
+    bredde: 1000,
+    hoyde: 562,
+    alt: "To turgåere utenfor Ullevålseter",
+    headline: "Ingen her har satt penger på noe.",
+    sub: "Det er derfor de smiler.",
+    cta: "Ta det med Prem"
+  },
+  {
     format: "ledig",
     form: "bred",
     brand: "LEDIG PLASS",
     bilde: "/bilder/prem-bred.jpg",
     bredde: 1000,
     hoyde: 562,
+    alt: "Prem",
     headline: "Vil du nå folk som leser om norsk fotball?",
     cta: "Snakk med Prem"
-  },
-  {
-    format: "spok",
-    form: "hoy",
-    brand: "SPØK",
-    bilde: "/bilder/prem-hoy.jpg",
-    bredde: 800,
-    hoyde: 1000,
-    headline: "Det finnes ikke dårlig vær.",
-    sub: "Det finnes bare Bjerke.",
-    cta: "Ta det med Prem"
   },
   {
     format: "banner",
@@ -506,14 +509,45 @@ const ADS = [
     cta: "Se skoene"
   },
   {
+    format: "spok",
+    form: "portrett",
+    brand: "SPØK",
+    bilde: "/bilder/tur-portrett.jpg",
+    bredde: 400,
+    hoyde: 400,
+    alt: "To turgåere utenfor Ullevålseter",
+    headline: "Vi byttet pils mot solbærtoddy.",
+    sub: "Spør oss gjerne om det.",
+    cta: "Ikke spør"
+  },
+  {
     format: "ledig",
     form: "hoy",
     brand: "LEDIG PLASS",
     bilde: "/bilder/prem-hoy.jpg",
     bredde: 800,
     hoyde: 1000,
+    alt: "Prem",
     headline: "Se for deg merket ditt her.",
     cta: "Send Prem en melding"
+  },
+  {
+    format: "spok",
+    form: "hoy",
+    brand: "SPØK",
+    bilde: "/bilder/prem-hoy.jpg",
+    bredde: 800,
+    hoyde: 1000,
+    alt: "Prem",
+    headline: "Det finnes ikke dårlig vær.",
+    sub: "Det finnes bare Bjerke.",
+    cta: "Ta det med Prem"
+  },
+  {
+    format: "stripe",
+    brand: "TRIBUNE",
+    headline: "Billetter til høstens toppkamper",
+    sub: "tribune.no"
   },
   {
     format: "spok",
@@ -522,15 +556,10 @@ const ADS = [
     bilde: "/bilder/prem-portrett.jpg",
     bredde: 400,
     hoyde: 400,
+    alt: "Prem",
     headline: "Null skjermer. Null odds.",
     sub: "Én vaffel.",
     cta: "Ta det med Prem"
-  },
-  {
-    format: "stripe",
-    brand: "TRIBUNE",
-    headline: "Billetter til høstens toppkamper",
-    sub: "tribune.no"
   }
 ];
 
@@ -591,7 +620,7 @@ function egenPlass(ad, slot) {
   if (ad.format === "spok") boks.classList.add("ad-spok");
   boks.setAttribute("role", "group");
   boks.setAttribute("aria-label", merking.lest);
-  boks.appendChild(premBilde(ad));
+  boks.appendChild(annonseBilde(ad));
 
   const kropp = el("div", "ad-ledig-kropp");
   if (ad.form === "hoy") kropp.classList.add("ad-ledig-overlegg");
@@ -607,20 +636,21 @@ function egenPlass(ad, slot) {
   return boks;
 }
 
-// Bildet av Prem. Bredden og høyden står på taggen, så plassen er satt av
-// før bildet er lastet: uten dem vokser annonsen og dytter saken man
-// holder på å lese nedover. Samme grunn som at været hentes først når en
-// kamp åpnes.
+// Bildet i en av våre egne plasser. Bredden og høyden står på taggen, så
+// plassen er satt av før bildet er lastet: uten dem vokser annonsen og
+// dytter saken man holder på å lese nedover. Samme grunn som at været
+// hentes først når en kamp åpnes.
 //
-// `alt` er navnet hans, ikke en beskrivelse av bildet: den som ikke ser
-// det, skal vite at det er en person her — det er hele poenget med å
-// spørre om en prat.
-function premBilde(ad) {
+// `alt` står på annonsen, ikke her. Det var «Prem» i koden så lenge alle
+// bildene var av ham, og det ble feil i det øyeblikket et skilt kom inn i
+// lista — en skjermleser som sier «Prem» om et treskilt er verre enn
+// ingenting.
+function annonseBilde(ad) {
   const bilde = el("img", "ad-ledig-bilde");
   bilde.src = ad.bilde;
   bilde.width = ad.bredde;
   bilde.height = ad.hoyde;
-  bilde.alt = "Prem";
+  bilde.alt = ad.alt;
   bilde.loading = "lazy";
   bilde.decoding = "async";
   return bilde;
