@@ -46,12 +46,20 @@ bytte dem ut, og begge virker:
 | `SUPABASE_ANON_KEY` | `anon` `public` | Publishable key (`sb_publishable_…`) |
 | `SUPABASE_SERVICE_KEY` | `service_role` `secret` | Secret key (`sb_secret_…`) |
 
-De nye skal virke likt: koden sender dem som `apikey` og
-`Authorization: Bearer`, og det er det begge generasjoner forventer. Men
-det er de gamle koden er skrevet og testet mot, så får du 401 fra
-`/api/brukere` eller `/api/konto` etter et nøkkelbytte, er «Legacy API
-keys» det trygge valget — og funksjonen sier selv fra at nøkkelen ble
-avvist.
+**Ta de gamle så lenge de finnes.** Det er `anon` og `service_role` koden
+er skrevet og testet mot, og admin-kallene i `brukere.mjs` går mot
+`/auth/v1/admin/users`, der `service_role` er den kjente veien inn. De nye
+skal etter alt å dømme virke likt — koden sender dem som `apikey` og
+`Authorization: Bearer`, som begge generasjoner forventer — men det er en
+vei ingen har prøvd i dette prosjektet. Ligger de gamle under «Legacy API
+keys», er det dem du vil ha.
+
+**Slik skiller du dem på sida:** `service_role`/Secret ligger bak en
+«Reveal»-knapp med en advarsel ved siden av om at den omgår all
+sikkerhet. `anon`/Publishable står åpent, uten advarsel. Begge begynner
+med `eyJ…` og er like lange, så det er advarselen som er kjennetegnet,
+ikke utseendet. Bytter du dem om, svarer `/api/brukere` 401 — og
+funksjonen sier det med de ordene, framfor å la deg lete.
 
 ## Kortversjonen
 
