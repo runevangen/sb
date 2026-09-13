@@ -88,9 +88,14 @@ const HARNESS = `
       if (n.classList.contains("row")) return "sak";
       if (n.classList.contains("ad-banner")) return "banner";
       if (n.classList.contains("ad-stripe")) return "stripe";
-      if (n.classList.contains("ad-ledig-portrett")) return "ledig-portrett";
-      if (n.classList.contains("ad-ledig-bred")) return "ledig-bred";
-      if (n.classList.contains("ad-ledig-hoy")) return "ledig-hoy";
+      if (n.classList.contains("ad-ledig")) {
+        // Spokene barer de samme fasong-klassene som den ledige plassen,
+        // sa fasongen alene sier ikke hva kortet er.
+        var slag = n.classList.contains("ad-spok") ? "spok" : "ledig";
+        if (n.classList.contains("ad-ledig-portrett")) return slag + "-portrett";
+        if (n.classList.contains("ad-ledig-bred")) return slag + "-bred";
+        if (n.classList.contains("ad-ledig-hoy")) return slag + "-hoy";
+      }
       if (n.classList.contains("vis-flere")) return "mer";
       return "?";
     }).join(" ");
@@ -211,44 +216,31 @@ const SAK_1 = await kjor("feed", FELLES + `
     ok("tidsstempel bruker date_gmt", tid.textContent === "2t siden", tid.textContent);
 
     ok("annonse etter hver fjerde sak",
-       sekvens() === "topp sak sak sak ledig-portrett sak sak sak sak banner sak sak sak sak mer",
+       sekvens() === "topp sak sak sak spok-hoy sak sak sak sak spok-bred sak sak sak sak mer",
        sekvens());
 
-    // Den ledige plassen er var egen, ikke en annonsors. A merke den som
-    // «Reklame» ville vaert a lyve i nettopp den merkingen appen ellers er
-    // noye pa — bade for oyet og for skjermlesere.
-    var ledig = document.querySelector(".ad-ledig");
-    ok("den ledige plassen sier at den er ledig",
-       ledig.querySelector(".ad-label").textContent === "Ledig plass",
-       ledig.querySelector(".ad-label").textContent);
-    ok("og pastar ikke a vaere reklame fra noen",
-       ledig.getAttribute("aria-label") === "Ledig annonseplass" &&
-       ledig.textContent.indexOf("Reklame") === -1,
-       ledig.getAttribute("aria-label"));
-    // Knappen er en ekte lenke rett inn i Messenger — ingen mellomside,
-    // ingen innlogging forst. Star brukernavnet tomt, blir den ren tekst i
-    // stedet: en knapp som ikke gar noe sted er verre enn en setning.
-    var kall = ledig.querySelector(".ad-cta");
-    ok("knappen apner Messenger direkte",
-       kall.tagName === "A" && kall.href.indexOf("https://m.me/") === 0,
-       kall.tagName + " " + (kall.href || ""));
-    // Den nye fanen skal ikke fa tilgang til appen bak.
-    ok("og den apner i en ny fane, uten tilgang til appen bak",
-       kall.target === "_blank" && kall.rel.indexOf("noopener") > -1,
-       kall.target + " " + kall.rel);
-
-    // Ansiktet er poenget: det er en person man skal sende en melding til.
-    // Bredden og hoyden star pa taggen, sa plassen er satt av for bildet er
-    // lastet — uten dem vokser annonsen og dytter saken man leser nedover.
-    var portrett = ledig.querySelector(".ad-ledig-bilde");
-    ok("bildet av Prem star i annonsen",
-       portrett && portrett.getAttribute("src").indexOf("/bilder/prem-") === 0,
-       portrett && portrett.getAttribute("src"));
-    ok("og det tar plassen sin for det er lastet",
-       portrett.getAttribute("width") === "400" && portrett.getAttribute("height") === "400",
-       portrett.getAttribute("width") + "x" + portrett.getAttribute("height"));
-    ok("den som ikke ser bildet far vite hvem det er",
-       portrett.getAttribute("alt") === "Prem", portrett.getAttribute("alt"));
+    // Spokene star forst i rotasjonen: de er det folk blar for a se, og en
+    // vits bak fire annonseplasser er en vits ingen leser. Det viktigste
+    // om den forste plassen er derfor at den sier hva den er — Ullevalseter
+    // er et ekte sted som ikke har kjopt noe.
+    var forste = document.querySelector(".ad-ledig");
+    ok("den forste annonseplassen er en spok",
+       forste.classList.contains("ad-spok"), forste.className);
+    ok("og den sier det, bade for oyet og for skjermleseren",
+       forste.querySelector(".ad-label").textContent === "Spøk" &&
+       forste.getAttribute("aria-label") === "Spøk, ikke en ekte annonse" &&
+       forste.textContent.indexOf("Reklame") === -1,
+       forste.querySelector(".ad-label").textContent + " / " +
+       forste.getAttribute("aria-label"));
+    // Bildet tar plassen sin for det er lastet: uten mal vokser annonsen
+    // og dytter saken man holder pa a lese nedover.
+    var bilde = forste.querySelector(".ad-ledig-bilde");
+    ok("bildet tar plassen sin for det er lastet",
+       bilde.getAttribute("width") === "800" && bilde.getAttribute("height") === "1000",
+       bilde.getAttribute("width") + "x" + bilde.getAttribute("height"));
+    ok("og det beskriver seg selv",
+       (bilde.getAttribute("alt") || "").toLowerCase().indexOf("skilt") > -1,
+       bilde.getAttribute("alt"));
 
     // Intensjonen er at feeden ikke skal avsluttes med reklame. "Vis flere"
     // er en knapp, ikke innhold, sa den ser vi bort fra her.
@@ -364,6 +356,15 @@ const SAK_1B = await kjor("annonse-varianter", FELLES + `
         if ((a.getAttribute("aria-label") || "").indexOf("Reklame") > -1) spokFeil.push("aria-reklame");
         // Og den skal ikke pasta at plassen er ledig: det er to ulike ting.
         if (a.textContent.indexOf("Ledig plass") > -1) spokFeil.push("ledig");
+        // Spokene er hovedannonsene na, sa knappene deres ma vaere like
+        // trygge som de ledige plassenes: ekte lenke, ny fane, noopener.
+        var k = a.querySelector(".ad-cta");
+        if (!k || k.tagName !== "A") spokFeil.push("lenke");
+        else if (k.href.indexOf("https://m.me/") !== 0) spokFeil.push("m.me");
+        else if (k.target !== "_blank" || k.rel.indexOf("noopener") === -1) spokFeil.push("rel");
+        // Oppsett og poeng pa hver sin linje — det er det som gjor en vits
+        // til en vits framfor en opplysning.
+        if (!a.querySelector(".ad-sub")) spokFeil.push("poeng");
       });
       ok("en spok sier at den er en spok, aldri at den er reklame",
          spokFeil.length === 0, spokFeil.join(",") || "ingen");

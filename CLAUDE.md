@@ -130,6 +130,11 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   «sportsstue». Den røde veggen under skiltet er dessuten en ren flate for
   teksten. Samme avveining som med ansiktet i bannerformatet — fasongen
   følger motivet, ikke omvendt.
+- **Spøkene står først i rotasjonen.** De er det folk faktisk blar for å
+  se, og en vits som ligger bak fire annonseplasser er en vits ingen
+  leser. Sju spøker, tre ledige plasser og de fire oppdiktede annonsørene
+  veksler, med en spøk i seks av sju lastinger — begge plassene i den
+  første er vitser.
 - **Spøkene er merket «Spøk», ikke «Reklame».** De bruker de samme
   fasongene og det samme ansiktet, men Ullevålseter er et ekte sted, og en
   tulleannonse merket «Reklame» ville påstått at de har kjøpt plassen. Det
@@ -861,7 +866,7 @@ er i seg selv noe om adressen.
 
     node test/unit.mjs      420 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  219 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       345 tester, ~200 s, headless Chromium
+    node test/run.mjs       342 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

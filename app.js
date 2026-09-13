@@ -441,26 +441,12 @@ const MESSENGER = "premern";
 // Ansiktet er poenget. Det er en person man skal sende en melding til,
 // ikke et skjema — og da skal man se hvem.
 const ADS = [
-  {
-    format: "ledig",
-    form: "portrett",
-    brand: "LEDIG PLASS",
-    bilde: "/bilder/prem-portrett.jpg",
-    bredde: 400,
-    hoyde: 400,
-    alt: "Prem",
-    headline: "Her kunne det stått noe om deg.",
-    cta: "Ta en prat med Prem"
-  },
-  {
-    format: "banner",
-    brand: "NORDBANE",
-    headline: "Tre måneder trening. Ingen binding.",
-    cta: "Se tilbudet"
-  },
-  // Spøkene. Samme fasonger som den ledige plassen — men merket «Spøk»,
-  // fordi Ullevålseter er et ekte sted som ikke har kjøpt noe som helst.
-  // Knappen går til Prem, som er den som må svare for påstanden.
+  // Spøkene står først. De er det folk faktisk blar for å se, og en vits
+  // som ligger bak fire annonseplasser er en vits ingen leser.
+  //
+  // De er merket «Spøk», ikke «Reklame», fordi Ullevålseter er et ekte
+  // sted som ikke har kjøpt noe som helst. Knappen går til Prem, som er
+  // den som må svare for påstanden.
   {
     format: "spok",
     form: "hoy",
@@ -472,12 +458,6 @@ const ADS = [
     headline: "Opplev Ullevålseter.",
     sub: "Mye bedre enn øl og vin på travbanen.",
     cta: "Si imot"
-  },
-  {
-    format: "stripe",
-    brand: "PADELHUSET",
-    headline: "Fire nye baner åpner i Bergen i oktober",
-    sub: "Book time · padelhuset.no"
   },
   {
     format: "spok",
@@ -493,20 +473,26 @@ const ADS = [
   },
   {
     format: "ledig",
-    form: "bred",
+    form: "portrett",
     brand: "LEDIG PLASS",
-    bilde: "/bilder/prem-bred.jpg",
-    bredde: 1000,
-    hoyde: 562,
+    bilde: "/bilder/prem-portrett.jpg",
+    bredde: 400,
+    hoyde: 400,
     alt: "Prem",
-    headline: "Vil du nå folk som leser om norsk fotball?",
-    cta: "Snakk med Prem"
+    headline: "Her kunne det stått noe om deg.",
+    cta: "Ta en prat med Prem"
   },
   {
-    format: "banner",
-    brand: "SPRINTA",
-    headline: "Nye Sprinta Terreng. Bygget for norsk høst.",
-    cta: "Se skoene"
+    format: "spok",
+    form: "hoy",
+    brand: "SPØK",
+    bilde: "/bilder/tur-hoy.jpg",
+    bredde: 800,
+    hoyde: 1000,
+    alt: "To turgåere utenfor Ullevålseter",
+    headline: "Odds: 100 %.",
+    sub: "På at du kommer hjem edru.",
+    cta: "Sett imot"
   },
   {
     format: "spok",
@@ -522,14 +508,32 @@ const ADS = [
   },
   {
     format: "ledig",
-    form: "hoy",
+    form: "bred",
     brand: "LEDIG PLASS",
-    bilde: "/bilder/prem-hoy.jpg",
-    bredde: 800,
-    hoyde: 1000,
+    bilde: "/bilder/prem-bred.jpg",
+    bredde: 1000,
+    hoyde: 562,
     alt: "Prem",
-    headline: "Se for deg merket ditt her.",
-    cta: "Send Prem en melding"
+    headline: "Vil du nå folk som leser om norsk fotball?",
+    cta: "Snakk med Prem"
+  },
+  {
+    format: "spok",
+    form: "bred",
+    brand: "SPØK",
+    bilde: "/bilder/prem-bred.jpg",
+    bredde: 1000,
+    hoyde: 562,
+    alt: "Prem",
+    headline: "Samme rus. Uten bakrus.",
+    sub: "Frisk luft-edition.",
+    cta: "Ta det med Prem"
+  },
+  {
+    format: "banner",
+    brand: "NORDBANE",
+    headline: "Tre måneder trening. Ingen binding.",
+    cta: "Se tilbudet"
   },
   {
     format: "spok",
@@ -544,10 +548,15 @@ const ADS = [
     cta: "Ta det med Prem"
   },
   {
-    format: "stripe",
-    brand: "TRIBUNE",
-    headline: "Billetter til høstens toppkamper",
-    sub: "tribune.no"
+    format: "ledig",
+    form: "hoy",
+    brand: "LEDIG PLASS",
+    bilde: "/bilder/prem-hoy.jpg",
+    bredde: 800,
+    hoyde: 1000,
+    alt: "Prem",
+    headline: "Se for deg merket ditt her.",
+    cta: "Send Prem en melding"
   },
   {
     format: "spok",
@@ -560,6 +569,24 @@ const ADS = [
     headline: "Null skjermer. Null odds.",
     sub: "Én vaffel.",
     cta: "Ta det med Prem"
+  },
+  {
+    format: "stripe",
+    brand: "PADELHUSET",
+    headline: "Fire nye baner åpner i Bergen i oktober",
+    sub: "Book time · padelhuset.no"
+  },
+  {
+    format: "banner",
+    brand: "SPRINTA",
+    headline: "Nye Sprinta Terreng. Bygget for norsk høst.",
+    cta: "Se skoene"
+  },
+  {
+    format: "stripe",
+    brand: "TRIBUNE",
+    headline: "Billetter til høstens toppkamper",
+    sub: "tribune.no"
   }
 ];
 
