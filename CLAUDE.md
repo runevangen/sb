@@ -707,6 +707,19 @@ er i seg selv noe om adressen.
   ikke en feil i den fila skrive i en annens navn.
 - Hele runden hentes i ett kall (`/api/svar?kamper=3,4,5`). Ti kamper
   skal ikke bli ti kall.
+- **Kampene noen blir med på løftes øverst**, i to merkede bolker: «2
+  kamper noen blir med på» og «Resten av runden». Ikke som en flat
+  omstokking — lista har dagskiller, og en søndagskamp løftet over
+  fredagsskillet ville havnet under feil dag. Hver bolk får sine egne
+  dagskiller. Ingenting dupliseres og ingenting skjules, så det trengs
+  ingen vei ut; men leseren skal se hvorfor rekkefølgen ikke er den hen
+  ventet — samme grep som linja over feeden når favorittlag løftes.
+- Løftingen skjer i `tegnSvar()`, ikke der runden tegnes: svarene kommer
+  etterpå, og runden står ferdig lenge før vi vet om noen blir med.
+  Radene **flyttes**, de tegnes ikke på nytt, så et åpent panel og en
+  hentet værlinje overlever. Dagen ligger i `dataset.dag` på raden, så
+  dagskillene kan tegnes på nytt uten å regnes ut igjen. Blir ingen med
+  lenger, forsvinner bolkene og runden ser ut som en runde igjen.
 - Feiler lista, sier den ingenting. Den er et tillegg til kampen, ikke
   kampen, og en feilmelding under hver eneste rad ville dekket over
   runden. Den som trykker «Jeg blir med», får derimot beskjed — det er
@@ -729,9 +742,9 @@ er i seg selv noe om adressen.
 
 ## Testing
 
-    node test/unit.mjs      402 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      409 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  219 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       308 tester, ~190 s, headless Chromium
+    node test/run.mjs       313 tester, ~190 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

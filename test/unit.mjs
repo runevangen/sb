@@ -24,7 +24,7 @@ import { normaliserPinNavn, pinSlug, gyldigPinNavn, pinEpost, normaliserPin, gyl
          PIN_MIN, PIN_MAKS, PIN_DOMENE } from "../pin-data.js";
 
 import { normaliserNavn, gyldigNavn, svarRad, tolkSvar, perKamp, blirMedTekst,
-         svartekst, egetSvar, NAVN_MAKS } from "../svar-data.js";
+         svartekst, egetSvar, loftMedSvar, bareMedSvar, NAVN_MAKS } from "../svar-data.js";
 
 import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
   from "../vaer-data.js";
@@ -1083,6 +1083,38 @@ ok("en okt uten navn kastes ogsa",
 ok("uten levetid far ogsa PIN-okta en kort en",
    tolkPinOkt({ access_token: "t" }, "Ola", KONTO_NAA).utloper ===
    "2026-09-11T13:00:00.000Z");
+
+/* ---------------- kampene noen blir med pa ---------------- */
+
+const RUNDE = [
+  { id: 1, dato: "2026-09-20T17:00:00+00:00" },
+  { id: 3, dato: "2026-09-21T15:00:00+00:00" },
+  { id: 4, dato: "2026-09-22T15:00:00+00:00" },
+  { id: 5, dato: "2026-09-19T17:00:00+00:00" },
+];
+const HVEM = perKamp(tolkSvar([
+  { kamp_id: "3", navn: "Ola" }, { kamp_id: "5", navn: "Kari" },
+]));
+
+const LOFTET = loftMedSvar(RUNDE, HVEM);
+// Star det folk pa to av ti kamper, er det de to man leter etter.
+ok("kampene noen blir med pa loftes",
+   LOFTET.kamper.map((k) => k.id).join(",") === "3,5,1,4",
+   LOFTET.kamper.map((k) => k.id).join(","));
+ok("og det sies hvor mange som ble loftet", LOFTET.loftet === 2, LOFTET.loftet);
+// Ingenting skjules: det er de samme kampene, i en annen rekkefolge.
+ok("alle kampene er fortsatt med", LOFTET.kamper.length === RUNDE.length);
+ok("uten svar star runden som den er",
+   loftMedSvar(RUNDE, new Map()).kamper.map((k) => k.id).join(",") === "1,3,4,5" &&
+   loftMedSvar(RUNDE, new Map()).loftet === 0);
+ok("tull inn gir tomt ut",
+   loftMedSvar(null, HVEM).kamper.length === 0 && loftMedSvar(RUNDE, null).loftet === 0);
+
+// Egen visning: bare kampene noen blir med pa, eldste forst.
+ok("bare kampene med folk, i tidsrekkefolge",
+   bareMedSvar(RUNDE, HVEM).map((k) => k.id).join(",") === "5,3",
+   bareMedSvar(RUNDE, HVEM).map((k) => k.id).join(","));
+ok("uten svar er lista tom", bareMedSvar(RUNDE, new Map()).length === 0);
 
 /* ---------------- ett sporsmal, ett svar ---------------- */
 

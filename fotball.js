@@ -9,8 +9,8 @@
 
 import { LIGAER, DELER, DEL_NAVN, HVOR, STED_MAKS, delingstekst,
          kamplenke, invitasjonstekst, normaliserLagnavn } from "./fotball-data.js";
-import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn, NAVN_MAKS }
-  from "./svar-data.js";
+import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
+         loftMedSvar, NAVN_MAKS } from "./svar-data.js";
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
          rangerForslag, FORSLAG_MAKS } from "./pub-data.js";
@@ -292,7 +292,11 @@ function kampliste(kamper, del, data) {
       const skille = el("li", "kamp-dag", dag);
       liste.appendChild(skille);
     }
-    liste.appendChild(kamprad(kamp, del, delbar));
+    const rad = kamprad(kamp, del, delbar);
+    // Dagen huskes pa raden: blir lista delt i to bolker senere, ma
+    // dagskillene kunne tegnes pa nytt uten a regne dem ut igjen.
+    rad.dataset.dag = dag;
+    liste.appendChild(rad);
   });
 
   if (del === "neste" && !delbar) {
@@ -845,6 +849,7 @@ async function hentSvar(rot, del, data) {
 
 function tegnSvar(rot) {
   const kart = perKamp(sisteSvar);
+  loftKamper(rot, kart);
   Array.from(rot.querySelectorAll(".kamp")).forEach((rad) => {
     const gammel = rad.querySelector(".kamp-blirmed");
     if (gammel) gammel.remove();
@@ -865,6 +870,79 @@ function tegnSvar(rot) {
     if (panel) rad.insertBefore(linje, panel);
     else rad.appendChild(linje);
   });
+}
+
+// Kampene noen blir med pa, loftet opp.
+//
+// En runde er en tidsrekke, og lista har dagskiller. A stokke om pa den
+// flate rekkefolgen ville satt en sondagskamp under fredagsskillet — sa
+// i stedet deles lista i to merkede seksjoner, hver med sine egne
+// dagskiller. Ingenting dupliseres, og ingenting skjules: det er de
+// samme kampene, i to bolker.
+//
+// Loftingen skjer her og ikke der runden tegnes, fordi svarene kommer
+// etterpa: runden star ferdig lenge for vi vet om noen blir med.
+function loftKamper(rot, kart) {
+  const liste = rot.querySelector(".kamper");
+  if (!liste) return;
+
+  // Rader vi har tegnet fra for. Radene flyttes, ikke lages pa nytt:
+  // et apent panel og en hentet vaerlinje skal overleve.
+  const rader = Array.from(liste.querySelectorAll(".kamp"));
+  if (!rader.length) return;
+
+  const { loftet } = loftMedSvar(
+    rader.map((r) => ({ id: r.dataset.kamp })), kart);
+
+  // Ingen blir med enda: lista skal sta som runden, uten overskrifter.
+  liste.querySelectorAll(".kamp-bolk").forEach((b) => b.remove());
+  if (!loftet) {
+    if (liste.dataset.loftet) {
+      liste.dataset.loftet = "";
+      tegnBolker(liste, rader, () => false);
+    }
+    return;
+  }
+
+  liste.dataset.loftet = String(loftet);
+  tegnBolker(liste, rader, (rad) => (kart.get(String(rad.dataset.kamp)) || []).length > 0);
+}
+
+// Bygger lista pa nytt i riktig rekkefolge, med dagskiller som stemmer
+// innenfor hver bolk. Radene gjenbrukes.
+function tegnBolker(liste, rader, harSvar) {
+  const med = rader.filter(harSvar);
+  const uten = rader.filter((r) => !harSvar(r));
+  const notis = liste.querySelector(".kamp-notis");
+
+  liste.replaceChildren();
+
+  const bolk = (tittel, gruppe) => {
+    if (!gruppe.length) return;
+    if (tittel) {
+      const h = el("li", "kamp-bolk", tittel);
+      liste.appendChild(h);
+    }
+    let forrigeDag = null;
+    gruppe.forEach((rad) => {
+      const dag = rad.dataset.dag || "";
+      if (dag && dag !== forrigeDag) {
+        forrigeDag = dag;
+        liste.appendChild(el("li", "kamp-dag", dag));
+      }
+      liste.appendChild(rad);
+    });
+  };
+
+  if (med.length) {
+    bolk(med.length === 1 ? "Én kamp noen blir med på" :
+      med.length + " kamper noen blir med på", med);
+    bolk("Resten av runden", uten);
+  } else {
+    bolk(null, uten);
+  }
+
+  if (notis) liste.appendChild(notis);
 }
 
 // Lista inne i det apne panelet: de samme navnene vennene dine ser nar

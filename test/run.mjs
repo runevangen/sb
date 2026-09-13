@@ -2036,6 +2036,25 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
       var linje = rad.querySelector(".kamp-blirmed");
       ok("lista star under kampen", !!linje && linje.textContent.indexOf("Ola blir med") > -1,
          linje ? linje.textContent : "ingen linje");
+      // Star det folk pa to av ti kamper, er det de to man leter etter.
+      // Runden deles i to merkede bolker framfor a stokkes om flatt:
+      // dagskillene ville ellers havnet pa feil kamper.
+      var bolker = Array.prototype.map.call(document.querySelectorAll(".kamp-bolk"),
+        function (b) { return b.textContent; });
+      ok("kampen med folk far en egen bolk overst",
+         bolker.length === 2 && bolker[0].indexOf("blir med på") > -1 &&
+         bolker[1] === "Resten av runden", bolker.join("|"));
+      var forste = document.querySelector(".kamper").querySelector(".kamp-bolk, .kamp");
+      ok("og bolken star forst i lista",
+         forste && forste.classList.contains("kamp-bolk"),
+         forste ? forste.className : "tom");
+      // Raden flyttes, ikke tegnes pa nytt: det apne panelet skal overleve.
+      ok("panelet overlever loftingen", !!rad.querySelector(".kamp-panel"));
+      ok("og raden ligger i den forste bolken",
+         rad.previousElementSibling &&
+         (rad.previousElementSibling.classList.contains("kamp-dag") ||
+          rad.previousElementSibling.classList.contains("kamp-bolk")),
+         rad.previousElementSibling ? rad.previousElementSibling.className : "ingen");
       // Og inne i panelet, sa man ser at det virket uten a lukke det.
       ok("og i panelet man nettopp trykket i",
          panel.querySelector(".kamp-panel-liste").textContent.indexOf("Ola blir med") > -1,
@@ -2058,6 +2077,10 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
            fjern.length === 1 && fjern[0].inn.token === "okt-1" && fjern[0].inn.kampId === 3,
            JSON.stringify(fjern.map(function (k) { return k.inn; })));
         ok("og lista under kampen er borte", !rad.querySelector(".kamp-blirmed"));
+        // Ingen igjen som blir med: runden skal se ut som en runde igjen.
+        ok("bolkene forsvinner nar ingen blir med",
+           document.querySelectorAll(".kamp-bolk").length === 0,
+           document.querySelectorAll(".kamp-bolk").length);
         ok("knappen er tilbake til a bli med",
            knapp.textContent === "Jeg skal dit", knapp.textContent);
         ferdig();

@@ -1448,6 +1448,25 @@ body {
 
 .kamper { list-style: none; margin: 0; padding: 0; }
 
+/* Overskrifta over en bolk i runden. Den star bare nar rekkefolgen er
+   endret — ellers er runden en tidsrekke, og da skal den se ut som en.
+   Samme tanke som linja over feeden nar favorittlag loftes: ingenting
+   skjules, men leseren skal se hvorfor rekkefolgen ikke er den hen
+   ventet. */
+.kamp-bolk {
+  list-style: none;
+  margin: 14px 0 2px;
+  padding: 0 2px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: calc(14px * var(--fs));
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.kamp-bolk:first-child { margin-top: 0; }
+
 .kamp-dag {
   margin: 14px 0 6px;
   color: var(--text-faint);

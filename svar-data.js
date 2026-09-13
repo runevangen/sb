@@ -82,6 +82,35 @@ export function svartekst(svar, kamp) {
   return hvor ? svar.navn + " ser den " + hvor : svar.navn + " blir med";
 }
 
+// Kampene noen har sagt at de blir med pa, forst.
+//
+// En runde er en tidsrekke, og den skal den vaere — men star det folk pa
+// to av ti kamper, er det de to man leter etter. De loftes, tidsrekka
+// beholdes innenfor hver gruppe, og at rekkefolgen er endret sies med en
+// linje over lista. Samme grep som favorittlagene i feeden: ingenting
+// skjules, sa det trengs ingen vei ut — men leseren skal se hvorfor
+// rekkefolgen ikke er den hen ventet.
+export function loftMedSvar(kamper, kart) {
+  const liste = Array.isArray(kamper) ? kamper : [];
+  const med = [];
+  const uten = [];
+  liste.forEach((k) => {
+    const svar = (kart && kart.get(String(k.id))) || [];
+    (svar.length ? med : uten).push(k);
+  });
+  return { kamper: med.concat(uten), loftet: med.length };
+}
+
+// Bare kampene noen blir med pa, eldste forst. Grunnlaget for en egen
+// visning: det er ei liste som er tom til noen svarer, og da er nettopp
+// den lista hele poenget.
+export function bareMedSvar(kamper, kart) {
+  return (Array.isArray(kamper) ? kamper : [])
+    .filter((k) => ((kart && kart.get(String(k.id))) || []).length > 0)
+    .slice()
+    .sort((a, b) => String(a.dato || "").localeCompare(String(b.dato || "")));
+}
+
 // Ditt eget svar, om du har gitt et. Brukeren er id-en fra okta — to
 // personer kan hete det samme, og navnet er ikke identitet.
 export function egetSvar(svar, bruker) {
