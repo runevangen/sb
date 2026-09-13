@@ -1339,6 +1339,17 @@ function lagreKonto(okt) {
   }
 }
 
+// Hvem du er, pa hovedskjermen. «Er jeg logget inn?» skal ikke kreve at
+// man apner menyen for a finne ut av det — og etter en innlogging skal
+// svaret sta der med en gang, ikke bak et trykk til.
+function visHvem() {
+  const merke = document.getElementById("hvemTag");
+  const navn = kontoOkt && (kontoOkt.navn || "");
+  merke.hidden = !navn;
+  merke.textContent = navn || "";
+  if (navn) merke.setAttribute("aria-label", "Logget inn som " + navn + ". Åpne kontoen.");
+}
+
 function kontoSvar(tekst) {
   document.getElementById("kontoSvar").textContent = tekst || "";
 }
@@ -1362,6 +1373,8 @@ function visKonto() {
   const ut = document.getElementById("kontoUt");
   const slett = document.getElementById("kontoSlett");
   const note = document.getElementById("kontoNote");
+
+  visHvem();
 
   if (kontoOkt) {
     tekst.textContent = kontoOkt.navn || maskerEpost(kontoOkt.epost);
@@ -1534,6 +1547,12 @@ async function kontoPinSteget() {
     visKonto();
     kontoSvar("Logget inn som " + (okt.navn || kontoNavnet) + ".");
     track("Logget inn");
+    // Du er ferdig her. Menyen og panelet lukkes, sa du star igjen pa
+    // hovedskjermen — med fornavnet ditt i toppfeltet, som er svaret pa
+    // «gikk det bra?». A bli staende i et panel som ikke har mer a si,
+    // er et trykk til uten grunn.
+    lukkKontoPanel();
+    closeMenu();
   } catch (err) {
     kontoSvar(err.message);
   } finally {
@@ -1551,6 +1570,24 @@ function loggUt() {
   kontoSvar("Logget ut.");
   track("Logget ut");
 }
+
+function lukkKontoPanel() {
+  document.getElementById("kontoPanel").hidden = true;
+  document.getElementById("kontoBtn").setAttribute("aria-expanded", "false");
+}
+
+// Fornavnet i toppfeltet er en knapp: den apner menyen med kontopanelet
+// ute, sa «logg ut» og «slett kontoen» er ett trykk unna der du ser navnet.
+document.getElementById("hvemTag").addEventListener("click", () => {
+  openMenu();
+  const panel = document.getElementById("kontoPanel");
+  panel.hidden = false;
+  document.getElementById("kontoBtn").setAttribute("aria-expanded", "true");
+  kontoSvar("");
+  visKonto();
+});
+
+document.getElementById("menuLukk").addEventListener("click", closeMenu);
 
 document.getElementById("kontoBtn").addEventListener("click", () => {
   const panel = document.getElementById("kontoPanel");

@@ -1720,6 +1720,15 @@ const SAK_18 = await kjor("innlogging", FELLES + `
        !localStorage.getItem("sb-konto"),
        document.querySelectorAll("#feed .row").length);
 
+    // Krysset i toppen ligger under statuslinja pa iPhone. Den andre
+    // veien ut star nederst, der tommelen er.
+    ok("menyen har en lukkeknapp nederst ogsa",
+       !!document.getElementById("menuLukk"));
+    document.getElementById("menuLukk").click();
+    ok("og den lukker menyen",
+       !document.getElementById("menuPanel").classList.contains("open"));
+    document.getElementById("menuBtn").click();
+
     knapp.click();
     ok("trykk apner panelet", !panel.hidden && knapp.getAttribute("aria-expanded") === "true");
     // Steg en er ett felt. Et panel med to felt og en knapp ser ut som en
@@ -1821,6 +1830,21 @@ const SAK_18 = await kjor("innlogging", FELLES + `
             ok("menyen viser fornavnet",
                document.getElementById("kontoBtnTekst").textContent === "Ola",
                document.getElementById("kontoBtnTekst").textContent);
+          // Etter innlogging er du ferdig i panelet. Menyen lukkes, og
+          // svaret pa «gikk det bra?» star i toppfeltet — ikke bak et
+          // trykk til.
+          ok("menyen lukkes etter innlogging",
+             !document.getElementById("menuPanel").classList.contains("open") &&
+             document.getElementById("kontoPanel").hidden === true);
+          var hvem = document.getElementById("hvemTag");
+          ok("og fornavnet star pa hovedskjermen",
+             !hvem.hidden && hvem.textContent === "Ola", hvem.textContent);
+          // Merket er en knapp: den apner menyen med kontoen ute, sa
+          // «logg ut» er ett trykk fra der du ser navnet.
+          hvem.click();
+          ok("merket apner kontoen igjen",
+             document.getElementById("menuPanel").classList.contains("open") &&
+             document.getElementById("kontoPanel").hidden === false);
             // Vi lager en adresse av navnet for a snakke med tjenesten. Den
             // skal aldri vises noe sted, og ikke ligge i telefonen heller.
             ok("og aldri adressen vi lagde av navnet",
@@ -1848,6 +1872,9 @@ const SAK_18 = await kjor("innlogging", FELLES + `
 
             document.getElementById("kontoUt").click();
             ok("logg ut tommer okta", !localStorage.getItem("sb-konto"));
+            ok("og fornavnet forsvinner fra toppfeltet",
+               document.getElementById("hvemTag").hidden,
+               document.getElementById("hvemTag").textContent);
             ok("og menyen sier logg inn igjen",
                document.getElementById("kontoBtnTekst").textContent === "Logg inn",
                document.getElementById("kontoBtnTekst").textContent);

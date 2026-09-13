@@ -48,6 +48,10 @@
              et sok eller en kategori filtrerer nyhetene. -->
         <span class="filter-tag" id="filterTag"></span>
       </div>
+      <!-- Hvem du er, pa hovedskjermen. Etter innlogging skal du se at du
+           er inne uten a apne menyen igjen. Knappen apner menyen med
+           kontopanelet ute, sa veien til «logg ut» er ett trykk. -->
+      <button class="hvem-tag" id="hvemTag" type="button" hidden></button>
     </div>
 
     <nav class="menu-panel" id="menuPanel" aria-label="Hovedmeny">
@@ -124,6 +128,9 @@
         <p class="action-note"><a class="admin-lenke" href="/personvern.html">Personvern og sletting</a></p>
         <!-- Adminportalen. Apen, men uten passord skjer ingenting. -->
         <p class="action-note"><a class="admin-lenke" href="/admin.html">Hvem viser kampen (admin)</a></p>
+        <!-- Krysset i toppen ligger under statuslinja pa iPhone og er vondt
+             a treffe med tommelen. Denne star der hanmden er. -->
+        <button class="menu-lukk" id="menuLukk" type="button">Lukk menyen</button>
       </div>
     </nav>
     <div class="feed" id="feed" aria-live="polite" aria-busy="true">

@@ -115,6 +115,10 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   og linja er en knapp til tabellen, der valget gjøres om. Et søk
   overstyrer favorittene: da rangeres det etter søkeordet.
   Innlogging (#24) er dermed en synkroniseringssak, ikke en forutsetning.
+- Menyen har to veier ut: krysset i hjørnet og en bred knapp nederst.
+  Krysset ligger under statuslinja på iPhone, der tommelen ikke rekker og
+  fingeren treffer skjermkanten i stedet. Meldt fra faktisk bruk
+  13. september 2026.
 - Filtrerer noe feeden — et søk eller en kategori — står det i toppfeltet
   som en knapp med kryss, ikke som ren tekst. Et filter uten vei ut blir
   stående til man åpner menyen og finner «Alle saker», og krysset i
@@ -515,6 +519,12 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   navnet blir stående. Feltene bærer `autocomplete="username"` og
   `current-password`, så telefonen kan tilby å huske paret — ett trykk
   framfor å taste fornavnet på nytt hver gang.
+- **Etter innlogging er du ferdig i panelet.** Menyen og kontopanelet
+  lukkes, og fornavnet står i toppfeltet på hovedskjermen — det er svaret
+  på «gikk det bra?». Å bli stående i et panel som ikke har mer å si er
+  et trykk til uten grunn. Merket i toppfeltet er en knapp: den åpner
+  menyen med kontoen ute, så «logg ut» og «slett kontoen» er ett trykk
+  fra der du ser navnet.
 - **Fornavnet du logget inn med er alt navnet vennene ser.** Står det
   ingenting lagret i `sb-visning.svarnavn`, prefylles «blir med»-feltet
   med kontonavnet, så den som nettopp logget inn ikke skriver navnet sitt
@@ -693,11 +703,18 @@ er i seg selv noe om adressen.
 
     node test/unit.mjs      393 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  219 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       301 tester, ~190 s, headless Chromium
+    node test/run.mjs       307 tester, ~190 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
 funksjonstestene 122 mens 119 kjørte.
+
+**Og tallet er sjekken på at en ny test faktisk kjørte.** La du til seks
+tester og tallet står stille, kjørte de ikke — da traff ikke redigeringen
+fila, eller de ligger bak noe som returnerte før. Grønt på en test som
+aldri kjørte er verre enn rødt. Det skjedde 13. september 2026: et
+redigeringsskript feilet, testene kjørte mot den gamle fila, og alt så
+grønt ut.
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`.
 De raske først, så en åpenbar feil stopper kjøringen før nettleseren
