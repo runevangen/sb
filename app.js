@@ -457,6 +457,21 @@ const ADS = [
     headline: "Tre måneder trening. Ingen binding.",
     cta: "Se tilbudet"
   },
+  // Spøkene. Samme ansikt og samme fasonger som den ledige plassen — men
+  // merket «Spøk», fordi Ullevålseter er et ekte sted som ikke har kjøpt
+  // noe som helst. Knappen går til Prem, som er den som må svare for
+  // påstanden.
+  {
+    format: "spok",
+    form: "bred",
+    brand: "SPØK",
+    bilde: "/bilder/prem-bred.jpg",
+    bredde: 1000,
+    hoyde: 562,
+    headline: "Opplev Ullevålseter.",
+    sub: "Mye bedre enn øl og vin på travbanen.",
+    cta: "Si imot"
+  },
   {
     format: "stripe",
     brand: "PADELHUSET",
@@ -474,42 +489,6 @@ const ADS = [
     cta: "Snakk med Prem"
   },
   {
-    format: "banner",
-    brand: "SPRINTA",
-    headline: "Nye Sprinta Terreng. Bygget for norsk høst.",
-    cta: "Se skoene"
-  },
-  {
-    format: "stripe",
-    brand: "TRIBUNE",
-    headline: "Billetter til høstens toppkamper",
-    sub: "tribune.no"
-  },
-  {
-    format: "ledig",
-    form: "hoy",
-    brand: "LEDIG PLASS",
-    bilde: "/bilder/prem-hoy.jpg",
-    bredde: 800,
-    hoyde: 1000,
-    headline: "Se for deg merket ditt her.",
-    cta: "Send Prem en melding"
-  },
-  // Spøkene. Samme ansikt, samme fasonger — men merket «Spøk», fordi
-  // Ullevålseter er et ekte sted og ikke har kjøpt noe som helst.
-  // Knappen går til Prem, som er den som må svare for påstanden.
-  {
-    format: "spok",
-    form: "bred",
-    brand: "SPØK",
-    bilde: "/bilder/prem-bred.jpg",
-    bredde: 1000,
-    hoyde: 562,
-    headline: "Opplev Ullevålseter.",
-    sub: "Mye bedre enn øl og vin på travbanen.",
-    cta: "Si imot"
-  },
-  {
     format: "spok",
     form: "hoy",
     brand: "SPØK",
@@ -521,6 +500,22 @@ const ADS = [
     cta: "Ta det med Prem"
   },
   {
+    format: "banner",
+    brand: "SPRINTA",
+    headline: "Nye Sprinta Terreng. Bygget for norsk høst.",
+    cta: "Se skoene"
+  },
+  {
+    format: "ledig",
+    form: "hoy",
+    brand: "LEDIG PLASS",
+    bilde: "/bilder/prem-hoy.jpg",
+    bredde: 800,
+    hoyde: 1000,
+    headline: "Se for deg merket ditt her.",
+    cta: "Send Prem en melding"
+  },
+  {
     format: "spok",
     form: "portrett",
     brand: "SPØK",
@@ -530,6 +525,12 @@ const ADS = [
     headline: "Null skjermer. Null odds.",
     sub: "Én vaffel.",
     cta: "Ta det med Prem"
+  },
+  {
+    format: "stripe",
+    brand: "TRIBUNE",
+    headline: "Billetter til høstens toppkamper",
+    sub: "tribune.no"
   }
 ];
 
