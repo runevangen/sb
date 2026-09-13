@@ -2089,9 +2089,93 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
 `);
 
+/* ---------------- 20. vennefanen ---------------- */
+
+// Kampene noen blir med pa, pa tvers av ligaer. Loftingen i Neste runde
+// svarer innenfor én liga; denne fanen finnes for det som ligger i en
+// annen.
+const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
+  var PL = [{ id: 901, hjemme: "Arsenal", borte: "Liverpool",
+              dato: "2026-09-19T14:00:00+00:00", arena: "Emirates Stadium" }];
+  window.__svarKall = 0;
+  window.__ligaer = [];
+  window.__harSvar = true;
+
+  function svarMed(kropp) {
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("/api/svar") === 0) {
+      window.__svarKall++;
+      // Svaret ligger pa Premier League-kampen, ikke i eliteserien: det
+      // er nettopp den en fane per liga ikke ville vist.
+      return svarMed({ svar: window.__harSvar
+        ? [{ kamp_id: "901", navn: "Kari", hvor: "pub", sted: "Andys", bruker: "u-2" }]
+        : [] });
+    }
+    if (u.indexOf("/api/fotball/neste") === 0) {
+      var pl = u.indexOf("liga=premier") > -1;
+      window.__ligaer.push(pl ? "premier" : "eliteserien");
+      return svarMed({ liga: pl ? "Premier League" : "Eliteserien", sesong: 2026,
+        sisteSesong: true, kilde: "TheSportsDB", runde: "Runde 5",
+        kamper: pl ? PL : ARETS });
+    }
+    if (u.indexOf("/api/fotball") === 0) return svarMed({ kamper: [] });
+    if (u.indexOf("/api/vaer") === 0) return svarMed({ timer: [] });
+    if (u.indexOf("/api/puber") === 0) return svarMed({ grupper: [] });
+    return svarMed(u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker);
+  };
+
+  location.hash = "#/fotball/venner";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var faner = document.querySelectorAll("#fotballFaner .segment-del");
+    ok("vennefanen star i segmentet", faner.length === 4 &&
+       faner[3].dataset.verdi === "venner", faner.length);
+    ok("og en delt lenke apner den",
+       faner[3].getAttribute("aria-current") === "true",
+       faner[3].getAttribute("aria-current"));
+
+    var rot = document.getElementById("fotballInnhold");
+    // Begge ligaene sporres, ellers er fanen bare Neste runde om igjen.
+    ok("begge ligaenes runder hentes",
+       window.__ligaer.indexOf("eliteserien") > -1 &&
+       window.__ligaer.indexOf("premier") > -1, window.__ligaer.join(","));
+    // Ti kamper skal ikke bli ti kall.
+    ok("hvem som blir med hentes i ett kall", window.__svarKall === 1, window.__svarKall);
+
+    var rader = rot.querySelectorAll(".kamp");
+    ok("bare kampen noen blir med pa star der", rader.length === 1, rader.length);
+    ok("og det er den fra den andre ligaen",
+       rot.textContent.indexOf("Arsenal") > -1 && rot.textContent.indexOf("Rosenborg") === -1,
+       rot.textContent.slice(0, 100));
+    ok("med lista over hvem som blir med",
+       rot.textContent.indexOf("Kari blir med") > -1, rot.textContent.slice(0, 160));
+    // Navnet lover mer enn det holder til vennegrupper finnes.
+    ok("det star hvem «venner» er i dag",
+       rot.textContent.indexOf("Alle som er logget inn") > -1, rot.textContent.slice(-120));
+
+    // Tom til noen svarer — og da skal det sta hva som skal til.
+    window.__harSvar = false;
+    document.querySelector("#fotballFaner .segment-del[data-verdi='tabell']").click();
+    setTimeout(function () { try {
+      document.querySelector("#fotballFaner .segment-del[data-verdi='venner']").click();
+      setTimeout(function () { try {
+        ok("tom liste sier hva som skal til",
+           rot.textContent.indexOf("Åpne en kamp under Neste runde") > -1,
+           rot.textContent.slice(0, 160));
+        ferdig();
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
+`);
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_19];
+const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_19, ...SAK_20];
 let feilet = 0;
 
 for (const t of alle) {

@@ -7,10 +7,10 @@
 // app.js gjennom naviger(), som setter adressen — da virker tilbakeknappen
 // likt her som i resten av appen.
 
-import { LIGAER, DELER, DEL_NAVN, HVOR, STED_MAKS, delingstekst,
+import { LIGAER, DELER, FANER, DEL_NAVN, HVOR, STED_MAKS, delingstekst,
          kamplenke, invitasjonstekst, normaliserLagnavn } from "./fotball-data.js";
 import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
-         loftMedSvar, NAVN_MAKS } from "./svar-data.js";
+         loftMedSvar, bareMedSvar, NAVN_MAKS } from "./svar-data.js";
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
          rangerForslag, FORSLAG_MAKS } from "./pub-data.js";
@@ -70,7 +70,7 @@ export function initFotball(paNavigering, paLagsok, paFavoritt, paDeling, paPube
   });
 
   const faner = document.getElementById("fotballFaner");
-  DELER.forEach((del) => {
+  FANER.forEach((del) => {
     faner.appendChild(velgerknapp(del, DEL_NAVN[del],
       () => naviger(aktivLiga, del)));
   });
@@ -102,6 +102,11 @@ export async function visFotball(liga, del, invitasjon) {
   merk(document.getElementById("fotballFaner"), del);
 
   const rot = document.getElementById("fotballInnhold");
+
+  // Vennefanen svarer pa tvers av ligaer, sa den har ingen liga og
+  // ingen egen henting — den slar sammen de andre.
+  if (del === "venner") return visVenner(rot);
+
   const nokkel = liga + "/" + del;
   const lagret = husket.get(nokkel);
 
@@ -269,6 +274,74 @@ function merkStjerne(knapp, lag, valgt) {
   knapp.setAttribute("aria-pressed", valgt ? "true" : "false");
   knapp.setAttribute("aria-label", (valgt ? "Slutt å følge " : "Følg ") + lag);
   knapp.title = valgt ? "Favorittlag — trykk for å fjerne" : "Sett som favorittlag";
+}
+
+/* ---------- vennene ---------- */
+
+// Kampene noen har sagt at de blir med pa, pa tvers av ligaer.
+//
+// Loftingen i Neste runde svarer innenfor én liga. Star Ola pa en
+// Premier League-kamp og Kari pa en eliteseriekamp, ser du dem bare ved
+// a bytte fane — og det er nettopp det denne fanen finnes for.
+//
+// «Venner» er alle som er logget inn og har svart. Det star i teksten
+// under lista, for navnet lover mer enn det holder til faste
+// vennegrupper finnes (#71).
+async function visVenner(rot) {
+  rot.replaceChildren(tilstand("Ser hvem som blir med …"));
+
+  let runder;
+  try {
+    // Ligaenes neste runder, samtidig. Svarene caches pa Netlifys kant,
+    // sa dette koster ikke et nytt kall mot API-Football per apning —
+    // dognkvoten er hundre.
+    runder = await Promise.all(Object.keys(LIGAER).map((liga) =>
+      hent(liga, "neste").catch(() => null)));
+  } catch (err) {
+    rot.replaceChildren(tilstand("Klarte ikke å hente kampene."));
+    return;
+  }
+  if (aktivDel !== "venner") return;
+
+  const kamper = [];
+  runder.forEach((data) => {
+    if (data && Array.isArray(data.kamper)) data.kamper.forEach((k) => kamper.push(k));
+  });
+
+  if (!kamper.length) {
+    rot.replaceChildren(tilstand("Fant ingen kommende kamper."));
+    return;
+  }
+
+  // Hvem som blir med, i ett kall for alle ligaene samlet.
+  let svar = [];
+  try {
+    const ider = kamper.map((k) => k.id).filter((id) => id != null);
+    const respons = await fetch("/api/svar?kamper=" + encodeURIComponent(ider.join(",")),
+      { headers: { "Accept": "application/json" } });
+    const json = JSON.parse(await respons.text());
+    if (respons.ok && !json.feil) svar = tolkSvar(json.svar);
+  } catch (err) {
+    // Stille: lista er et tillegg til kampene, ikke kampene.
+  }
+  if (aktivDel !== "venner") return;
+
+  sisteSvar = svar;
+  const med = bareMedSvar(kamper, perKamp(svar));
+
+  if (!med.length) {
+    // Tom til noen svarer — og da er nettopp den lista hele poenget. Da
+    // skal det sta hva som skal til, ikke bare at det er tomt.
+    rot.replaceChildren(tilstand(
+      "Ingen har sagt at de blir med ennå. Åpne en kamp under Neste runde"
+      + " og si hvor du ser den, så står den her."));
+    return;
+  }
+
+  rot.replaceChildren(kampliste(med, "neste", { sisteSesong: true }));
+  rot.appendChild(el("p", "fotball-stempel",
+    "Alle som er logget inn og har svart. Faste vennegrupper kommer."));
+  tegnSvar(rot);
 }
 
 /* ---------- kamper ---------- */
@@ -826,7 +899,7 @@ function viserlinje(kamp) {
 let sisteSvar = [];
 
 async function hentSvar(rot, del, data) {
-  if (del !== "neste" || !data || !Array.isArray(data.kamper)) return;
+  if ((del !== "neste" && del !== "venner") || !data || !Array.isArray(data.kamper)) return;
 
   const ider = data.kamper.map((k) => k.id).filter((id) => id != null);
   if (!ider.length) return;

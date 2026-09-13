@@ -739,12 +739,29 @@ er i seg selv noe om adressen.
 - **Sett virke 12. september 2026**, i forhåndsvisningen av #68: en rad
   skrevet fra appen med leserens egen økt, gjennom de fire RLS-reglene,
   og lista tegnet under kampen med en gang.
+- **Vennefanen** (`#/fotball/venner`, #71) svarer på tvers av ligaer:
+  løftingen i Neste runde gjelder én liga, så står Ola på en Premier
+  League-kamp og Kari på en eliteseriekamp, ser du dem bare ved å bytte
+  fane. Fanen slår sammen ligaenes neste runder og viser bare kampene
+  noen blir med på, med `bareMedSvar()`.
+- **`FANER` er ikke `DELER`.** `DELER` er datasettene funksjonen serverer,
+  og `netlify/functions/fotball.mjs` validerer `del` mot lista — et
+  fjerde navn der ville blitt en rute funksjonen godtar og så feiler på i
+  `apiSti`. `FANER` er `DELER` pluss `venner`, og det er den `tolkFotballHash`
+  kjenner igjen.
+- «Venner» er i dag **alle som er logget inn og har svart**; det finnes
+  ikke noe skille. Navnet lover mer enn det holder, så det står med ord
+  under lista: «Alle som er logget inn og har svart. Faste vennegrupper
+  kommer.» Samme regel som ellers — en knapp som ser ut som den gir noe
+  den ikke gir, er verre enn en som sier hva den er.
+- Fanen er tom til noen svarer, og da er nettopp den lista hele poenget.
+  Tomteksten sier derfor hva som skal til, ikke bare at det er tomt.
 
 ## Testing
 
-    node test/unit.mjs      409 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      412 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  219 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       313 tester, ~190 s, headless Chromium
+    node test/run.mjs       322 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

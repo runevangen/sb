@@ -13,6 +13,7 @@ import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          apiSti, tolkKamper, nesteRunde, tolkFotballHash, fotballHash,
          tilgjengeligSesong, SESONGVINDU, redaksjonsnavn, normaliserLagnavn,
          tsdbSti, tsdbHeadere, tolkKamperTsdb, tolkTabellTsdb, tsdbSesong, delingstekst, tidstekst, HVOR,
+         FANER, DELER, DEL_NAVN,
          kamplenke, tolkKamplenke, invitasjonstekst, stedtekst, STED_MAKS }
   from "../fotball-data.js";
 
@@ -1115,6 +1116,19 @@ ok("bare kampene med folk, i tidsrekkefolge",
    bareMedSvar(RUNDE, HVEM).map((k) => k.id).join(",") === "5,3",
    bareMedSvar(RUNDE, HVEM).map((k) => k.id).join(","));
 ok("uten svar er lista tom", bareMedSvar(RUNDE, new Map()).length === 0);
+
+// Fanene og datasettene er to lister. «venner» henter ingenting eget, og
+// et fjerde navn i DELER ville blitt en rute funksjonen godtar og sa
+// feiler pa i apiSti.
+ok("vennefanen star i FANER, ikke i DELER",
+   FANER.indexOf("venner") > -1 && DELER.indexOf("venner") === -1,
+   FANER.join(",") + " / " + DELER.join(","));
+ok("og fanene er datasettene pluss den ene",
+   FANER.length === DELER.length + 1 && DEL_NAVN.venner === "Venner",
+   FANER.join(","));
+// En delt lenke til vennefanen skal apne den, ikke falle til tabellen.
+ok("ruta kjennes igjen", tolkFotballHash("#/fotball/venner").del === "venner",
+   JSON.stringify(tolkFotballHash("#/fotball/venner")));
 
 /* ---------------- ett sporsmal, ett svar ---------------- */
 

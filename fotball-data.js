@@ -103,10 +103,17 @@ export function tolkTabell(json) {
 // Datasettene modulen viser, i den rekkefolgen fanene star.
 export const DELER = ["tabell", "resultater", "neste"];
 
+// Fanene i visningen. «venner» star med her og ikke i DELER, fordi DELER
+// er datasettene funksjonen serverer — den validerer `del` mot lista, og
+// et fjerde navn der ville blitt en rute som feiler i apiSti. Vennefanen
+// henter ingenting eget: den slar sammen ligaenes neste runder.
+export const FANER = DELER.concat(["venner"]);
+
 export const DEL_NAVN = {
   tabell: "Tabell",
   resultater: "Resultater",
   neste: "Neste runde",
+  venner: "Venner",
 };
 
 // Adressen hos API-Football for hvert datasett. Bygges her, ikke i
@@ -368,7 +375,7 @@ export function tolkFotballHash(hash) {
 
   for (const bit of ledd) {
     if (ligaFor(bit)) liga = bit;
-    else if (DELER.indexOf(bit) !== -1) del = bit;
+    else if (FANER.indexOf(bit) !== -1) del = bit;
   }
   return { liga, del };
 }
