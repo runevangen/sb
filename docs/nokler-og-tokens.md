@@ -249,6 +249,12 @@ Derfor må to innstillinger stå riktig:
 | *Authentication* → *Sign In / Providers* → Email | **Confirm email** | **av** |
 | *Authentication* → *Sign In / Providers* → Email | Minimum password length | 6 (standard, og pepperet dekker den) |
 
+**Ikke under *Authentication* → *Emails*.** Den sida er maler og SMTP, og
+har ingen slik bryter — den er lett å gå i, fordi «Confirm sign up» står
+øverst der og ser ut som den samme innstillingen. Bryteren ligger under
+*Sign In / Providers*, inne i **Email**-kortet, som må foldes ut før den
+vises. Sett i panelet 13. september 2026.
+
 Står *Confirm email* på, venter Supabase på at noen skal klikke i en
 e-post som aldri kommer, og den første innloggingen svarer 200 uten økt.
 Funksjonen kjenner igjen nøyaktig det og svarer 503 med en melding som
