@@ -211,9 +211,18 @@ ok("uten kamper fra TheSportsDB er kilden API-Football",
 ok("tilbakefallet forklarer forsoket",
    Array.isArray(nes.forsok) && nes.forsok.length === 1 && nes.forsok[0].utfall === "avkortet",
    JSON.stringify(nes.forsok));
-ok("bare den forste runden er med", nes.kamper.length === 2, nes.kamper.length);
+// Hele vinduet folger med, ikke bare forste runde: adminportalen skal
+// kunne fore inn en kamp som spilles om to uker. Leseren filtrerer til en
+// runde i visningen.
+ok("hele vinduet av kommende kamper er med", nes.kamper.length === 3, nes.kamper.length);
 ok("lagnavn i kampene oversettes ogsa", nes.kamper[0].borte === "Bodø/Glimt", nes.kamper[0].borte);
-ok("runden navngis i svaret", nes.runde === "Runde 21", nes.runde);
+ok("forste runde navngis som for", nes.runde === "Runde 21", nes.runde);
+ok("og rundene star oppfort i rekkefolge",
+   Array.isArray(nes.runder) && nes.runder[0] === "Runde 21" && nes.runder.length > 1,
+   JSON.stringify(nes.runder));
+ok("kampene kommer i tidsrekkefolge",
+   nes.kamper.every((k, i) => i === 0 || nes.kamper[i - 1].dato <= k.dato),
+   nes.kamper.map((k) => k.dato).join(" "));
 
 /* ---------------- neste runde fra TheSportsDB ---------------- */
 
@@ -249,7 +258,8 @@ ok("testnokkelen 3 brukes uten egen nokkel",
 ok("svaret er merket med kilde og inneværende sesong",
    arets.kilde === "TheSportsDB" && arets.sisteSesong === true &&
    arets.sesong === new Date().getUTCFullYear(), JSON.stringify([arets.kilde, arets.sisteSesong, arets.sesong]));
-ok("bare forste runde er med", arets.kamper.length === 2 && arets.runde === "Runde 21",
+ok("hele vinduet er med, med forste runde navngitt",
+   arets.kamper.length === 3 && arets.runde === "Runde 21",
    arets.kamper.length + " " + arets.runde);
 ok("tidspunktet er UTC med sone", arets.kamper[0].dato === "2026-09-13T15:00:00Z", arets.kamper[0].dato);
 ok("lagnavn oversettes ogsa herfra", arets.kamper[0].borte === "Bodø/Glimt", arets.kamper[0].borte);
@@ -270,7 +280,7 @@ ok("nokkelen sendes som X-API-KEY",
    tsdbKall(kall)[0].opsjoner.headers["X-API-KEY"] === "min-nokkel");
 ok("nokkelen star ikke i v2-adressen", tsdbKall(kall)[0].url.indexOf("min-nokkel") === -1);
 ok("nokkelen lekker ikke ut til leseren", JSON.stringify(v2).indexOf("min-nokkel") === -1);
-ok("v2-svaret leses", r.status === 200 && v2.kilde === "TheSportsDB" && v2.kamper.length === 2,
+ok("v2-svaret leses", r.status === 200 && v2.kilde === "TheSportsDB" && v2.kamper.length === 3,
    JSON.stringify([r.status, v2.kilde, v2.kamper && v2.kamper.length]));
 ok("forsokene star i svaret, uten adresser",
    Array.isArray(v2.forsok) && v2.forsok.length === 1 && v2.forsok[0].status === 200 &&

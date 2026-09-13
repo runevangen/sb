@@ -670,8 +670,15 @@ const FOTBALL = `
     { id: 3, dato: "2026-09-20T17:00:00+00:00", runde: "Runde 21", hjemme: "Brann",
       borte: "Bodo/Glimt", malHjemme: null, malBorte: null, spilt: false },
     { id: 4, dato: "2026-09-21T17:00:00+00:00", runde: "Runde 21", hjemme: "Molde",
-      borte: "Rosenborg", malHjemme: null, malBorte: null, spilt: false }
+      borte: "Rosenborg", malHjemme: null, malBorte: null, spilt: false },
+    // Funksjonen gir hele vinduet, ikke bare forste runde: admin skal
+    // kunne fore inn en kamp som spilles om to uker. Leseren skal
+    // fortsatt bare se den forste runden — den utvelgelsen skjer i
+    // visningen, og det er nettopp den forskjellen testene vokter.
+    { id: 5, dato: "2026-09-27T16:00:00+00:00", runde: "Runde 22", hjemme: "Viking",
+      borte: "Lillestrom", malHjemme: null, malBorte: null, spilt: false }
   ];
+  var RUNDER = ["Runde 21", "Runde 22"];
 `;
 
 function mockAlt(saker, fotballFeil) {
@@ -1132,6 +1139,12 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
   window.addEventListener("load", function () { setTimeout(function () { try {
     var knapper = document.querySelectorAll(".kamp-del");
     ok("hver kamp i arets runde kan deles", knapper.length === 2, knapper.length);
+    // Tjenesten gir hele vinduet — tre kamper over to runder. Leseren skal
+    // bare se den forste: utvelgelsen skjer i visningen, ikke i tjenesten.
+    var tekstNa = document.getElementById("fotballInnhold").textContent;
+    ok("neste runde viser bare den ene runden",
+       tekstNa.indexOf("Brann") > -1 && tekstNa.indexOf("Molde") > -1 &&
+       tekstNa.indexOf("Viking") === -1, tekstNa.slice(0, 200));
     ok("kilden star i stempelet",
        document.querySelector(".fotball-kilde").textContent === "TheSportsDB",
        document.querySelector(".fotball-kilde").textContent);
@@ -1459,8 +1472,11 @@ const SAK_14 = await kjor("pub-feil", FELLES + FOTBALL + `
 // POST-en og sjekker at det som sendes er det samme som sto pa skjermen.
 const SAK_15 = await kjor("admin", `
   var KAMPER_ES = [
-    { id: 501, hjemme: "Rosenborg", borte: "Brann", dato: "2026-09-20T17:00:00+00:00", arena: "Lerkendal Stadion" },
-    { id: 502, hjemme: "Vaalerenga", borte: "Bodo/Glimt", dato: "2026-09-21T15:00:00+00:00", arena: "Intility Arena" }
+    { id: 501, hjemme: "Rosenborg", borte: "Brann", dato: "2026-09-20T17:00:00+00:00", arena: "Lerkendal Stadion", runde: "Runde 21" },
+    { id: 502, hjemme: "Vaalerenga", borte: "Bodo/Glimt", dato: "2026-09-21T15:00:00+00:00", arena: "Intility Arena", runde: "Runde 21" },
+    // Runde 22: en pub som vet hva den viser om to uker, skal kunne fore
+    // det inn na. For stoppet lista ved neste runde.
+    { id: 503, hjemme: "Viking", borte: "Lillestrom", dato: "2026-09-27T16:00:00+00:00", arena: "SR-Bank Arena", runde: "Runde 22" }
   ];
   var KAMPER_PL = [
     { id: 901, hjemme: "Arsenal", borte: "Liverpool", dato: "2026-09-19T14:00:00+00:00", arena: "Emirates Stadium" }
@@ -1481,6 +1497,7 @@ const SAK_15 = await kjor("admin", `
       return svar(200, {
         liga: pl ? "Premier League" : "Eliteserien", sesong: 2026, sisteSesong: true,
         kilde: "TheSportsDB", runde: pl ? "Runde 5" : "Runde 21",
+        runder: pl ? ["Runde 5"] : ["Runde 21", "Runde 22"],
         kamper: pl ? KAMPER_PL : KAMPER_ES });
     }
     if (u.indexOf("/api/brukere") === 0) {
@@ -1578,7 +1595,18 @@ const SAK_15 = await kjor("admin", `
         ok("kampene hentes fra fotball-funksjonen, etter innlogging",
            telt("/api/fotball/neste") === 1, bedtOm.join(" "));
         var bokser = document.querySelectorAll(".kamp input");
-        ok("de kommende kampene er avkryssbare", bokser.length === 2, bokser.length);
+        ok("hele vinduet er avkryssbart, ikke bare neste runde",
+           bokser.length === 3, bokser.length);
+        var skiller = document.querySelectorAll(".runde-skille");
+        ok("hver runde far sin egen overskrift",
+           skiller.length === 2 && skiller[0].textContent === "Runde 21" &&
+           skiller[1].textContent === "Runde 22",
+           Array.prototype.map.call(skiller, function (r) { return r.textContent; }).join("|"));
+        ok("kampen to uker fram er med",
+           document.getElementById("kamper").textContent.indexOf("Viking") > -1);
+        ok("og hintet sier hvor langt fram lista gar",
+           document.getElementById("kampHint").textContent.indexOf("2 runder framover") > -1,
+           document.getElementById("kampHint").textContent);
         ok("kampen star med lag og tid",
            document.getElementById("kamper").textContent.indexOf("Rosenborg – Brann") > -1,
            document.getElementById("kamper").textContent.slice(0, 120));
@@ -1595,9 +1623,13 @@ const SAK_15 = await kjor("admin", `
          sendt.kampIder.length === 1 && sendt.kampIder[0] === 501, JSON.stringify(sendt.kampIder));
       ok("puben blir med", sendt.pub === puber.value, sendt.pub);
       ok("passordet blir med", sendt.passord === "hemmelig");
+      // Alle kampene pa skjermen sendes med, ogsa de i runden etter:
+      // slaSammen rorer bare dem, og en kamp admin fjernet avkryssingen
+      // pa skal faktisk bli fjernet.
       ok("kampene pa skjermen sendes med, sa tjenesten slipper a gjette",
-         sendt.kamper.length === 2 && sendt.kamper[0].hjemme === "Rosenborg",
-         JSON.stringify(sendt.kamper[0]));
+         sendt.kamper.length === 3 && sendt.kamper[0].hjemme === "Rosenborg" &&
+         sendt.kamper[2].hjemme === "Viking",
+         JSON.stringify(sendt.kamper.map(function (k) { return k.hjemme; })));
       ok("svaret fra tjenesten vises",
          document.getElementById("melding").textContent.indexOf("Lagret 1 kamper") > -1,
          document.getElementById("melding").textContent);

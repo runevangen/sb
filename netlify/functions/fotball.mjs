@@ -12,7 +12,7 @@
 
 import {
   ligaFor, sesongFor, tilgjengeligSesong, apiSti, tolkTabell, tolkKamper,
-  nesteRunde, LEVETID, DELER, tsdbSti, tsdbHeadere, tolkKamperTsdb, tolkTabellTsdb, TSDB_MINST,
+  LEVETID, DELER, tsdbSti, tsdbHeadere, tolkKamperTsdb, tolkTabellTsdb, TSDB_MINST,
 } from "../../fotball-data.js";
 
 const API = "https://v3.football.api-sports.io";
@@ -149,9 +149,9 @@ async function hentTsdbVersjon(del, liga, nokkel, versjon) {
         (a, b) => String(b.dato).localeCompare(String(a.dato)));
       return kamper.length ? { notat, innhold: { kamper } } : { notat: Object.assign(notat, { utfall: "ingen spilte" }) };
     }
-    const kommende = nesteRunde(alle.filter((k) => !k.spilt));
-    return kommende.length
-      ? { notat, innhold: { kamper: kommende, runde: kommende[0].runde } }
+    const kommende = kommendeKamper(alle.filter((k) => !k.spilt));
+    return kommende.kamper.length
+      ? { notat, innhold: kommende }
       : { notat: Object.assign(notat, { utfall: "ingen kommende" }) };
   } catch (err) {
     console.error("[fotball] TheSportsDB " + versjon + " feilet:", err);
@@ -175,8 +175,30 @@ function tolk(del, json) {
       (a, b) => String(b.dato).localeCompare(String(a.dato)));
     return { kamper };
   }
-  const kommende = nesteRunde(tolkKamper(json));
-  return { kamper: kommende, runde: kommende.length ? kommende[0].runde : "" };
+  return kommendeKamper(tolkKamper(json));
+}
+
+// Hele vinduet, ikke bare forste runde.
+//
+// Vi henter tjue kommende kamper uansett (next=20, og TheSportsDBs
+// «schedule/next»), og kastet alt utenom den forste runden her. Da fikk
+// adminportalen aldri se lenger fram enn til neste helg, og kunne ikke
+// fore inn en kamp som spilles om to uker.
+//
+// Filtreringen hoerer hjemme i visningen, som er den som vil ha en runde
+// om gangen: nesteRunde() i fotball-data.js gjor det der. Da deler
+// leseren og admin ett svar og en cache-nokkel, og dognkvoten star
+// urort — det er samme kall som for.
+function kommendeKamper(alle) {
+  const kamper = alle.slice().sort(
+    (a, b) => String(a.dato).localeCompare(String(b.dato)));
+  const runder = [];
+  kamper.forEach((k) => {
+    if (k.runde && runder.indexOf(k.runde) === -1) runder.push(k.runde);
+  });
+  // runde er forste runde, som for: en eldre utgave av appen leser den og
+  // skal fortsatt vise noe riktig.
+  return { kamper, runde: runder[0] || "", runder };
 }
 
 function svar(kropp, status, levetid) {

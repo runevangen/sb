@@ -8,7 +8,7 @@
 // likt her som i resten av appen.
 
 import { LIGAER, DELER, FANER, DEL_NAVN, HVOR, STED_MAKS, delingstekst,
-         kamplenke, invitasjonstekst, stedtekst } from "./fotball-data.js";
+         kamplenke, invitasjonstekst, stedtekst, nesteRunde } from "./fotball-data.js";
 import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
          loftMedSvar, bareMedSvar, stederFraSvar, perSted,
          stedNokkel, blirMedLinje, mittSted } from "./svar-data.js";
@@ -166,6 +166,10 @@ function tegn(rot, del, data) {
   const sesong = sesongmerke(data);
   if (sesong) deler.push(sesong);
   if (del === "tabell") deler.push(tabell(data.tabell || []));
+  // Funksjonen gir hele vinduet av kommende kamper, sa adminportalen kan
+  // planlegge lenger fram enn til neste helg. Leseren vil ha en runde om
+  // gangen — den utvelgelsen hoerer hjemme her, ikke i tjenesten.
+  else if (del === "neste") deler.push(kampliste(nesteRunde(data.kamper || []), del, data));
   else deler.push(kampliste(data.kamper || [], del, data));
   deler.push(stempel(data));
   rot.replaceChildren(...deler);
