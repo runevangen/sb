@@ -1666,9 +1666,12 @@ body {
 
 .kamp-blirmed-merke { color: var(--bekreftet); font-weight: 700; margin-right: 4px; }
 
-/* De samme navnene vennene ser, inne i panelet — sa man ser at det
-   virket uten a lukke det. */
+/* Vennene som har planlagt turen, nederst i kortet: «List opp nederst
+   venner som har planlagt turen dit». Linja under kampen sier hvor mange;
+   dette sier hvor man moter dem. */
 .kamp-panel-liste {
+  display: flex;
+  flex-direction: column;
   font-size: calc(12px * var(--fs));
   line-height: 1.4;
   color: var(--text-dim);
@@ -1676,62 +1679,19 @@ body {
 
 .kamp-panel-liste:empty { display: none; }
 
-/* Svaret for deg selv, inne i panelet. */
-.kamp-blirmed-valg {
+/* Vennene nederst i kortet, gruppert etter stedet de skal til. Stedet
+   forst pa linja, fordi det er det man leter etter: et navn uten et sted
+   sier ikke hvor man moter noen. */
+.sted-rad {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  gap: 0 6px;
+  margin-top: 2px;
 }
 
-.kamp-navn {
-  flex: 1 1 140px;
-  min-width: 0;
-  padding: 9px 10px;
-  border: 1px solid var(--border-btn);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--text);
-  font-family: inherit;
-  font-size: calc(13px * var(--fs));
-}
-
-.kamp-navn[hidden] { display: none; }
-
-/* Hovedhandlingen: fylt, ikke bare omrisset. Den skal vinne over
-   «Del i chatten» uten at man ma lese begge. */
-.kamp-blimed {
-  flex: 0 0 auto;
-  padding: 10px 14px;
-  border: 1px solid var(--bekreftet);
-  border-radius: 8px;
-  background: var(--bekreftet);
-  color: #fff;
-  font-family: inherit;
-  font-size: calc(13px * var(--fs));
-  font-weight: 600;
-  cursor: pointer;
-}
-
-/* Har du alt sagt at du kommer, er knappen en angreknapp — og da skal
-   den ikke rope. */
-.kamp-blimed[data-med="ja"] {
-  background: none;
-  color: var(--text-dim);
-  border-color: var(--border-btn);
-  font-weight: 400;
-}
-
-.kamp-blimed:disabled { opacity: 0.45; cursor: default; }
-
-.kamp-navn:focus-visible, .kamp-blimed:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* Noten tar hele bredden i valgboksen, sa feltet og knappen star sammen
-   pa linja over. */
-.kamp-blirmed-valg .kamp-note { flex: 1 0 100%; }
+.sted-rad-sted { color: var(--text-strong); font-weight: 600; }
+.sted-rad-navn { color: var(--text-dim); }
 
 /* Star det ingenting a trykke pa, skal det sta hvorfor. */
 .kamp-note {
@@ -1757,29 +1717,113 @@ body {
   color: var(--text-strong);
 }
 
-.hvor-liste { display: flex; gap: 6px; flex-wrap: wrap; }
+/* Stedene: kortets ene handling. Ett trykk pa et sted er svaret «jeg
+   skal dit», sa chipene er storre enn forslagene under — de er ikke
+   forslag, de er knapper man trykker.
 
-.hvor-valg {
-  padding: 7px 11px;
+   For sto det tre valg her (hjemme / pa pub / pa stadion), og stedet
+   matte skrives i et felt etterpa. Tre steg for a si én ting. */
+.sted-liste {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sted-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 9px 13px;
   border: 1px solid var(--border-btn);
   border-radius: 999px;
-  background: none;
+  background: var(--bg-raised);
   color: var(--text);
+  font-family: inherit;
+  font-size: calc(13.5px * var(--fs));
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Stedet du sa du skal til. Gront som resten av «bekreftet»-familien:
+   det er en avtale, ikke et valg i et skjema. Trykker du en gang til,
+   gar du av lista — derfor er den fortsatt en knapp, ikke en tilstand. */
+.sted-chip[aria-pressed="true"] {
+  background: var(--bekreftet);
+  border-color: var(--bekreftet);
+  color: #fff;
+}
+
+.sted-chip[aria-pressed="true"] .pub-bekreftet,
+.sted-chip[aria-pressed="true"] .sted-folk { color: #fff; }
+
+/* Stedet en delt lenke pekte pa. Det blir pekt ut, ikke valgt: svaret
+   skal leseren gi selv, sa chipen markeres og far fokus. */
+.sted-chip.pekt {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.sted-chip.bekreftet:not([aria-pressed="true"]) { border-color: var(--bekreftet); }
+
+.sted-chip:disabled { opacity: 0.5; cursor: default; }
+
+.sted-merke { font-size: 11px; line-height: 1; }
+.sted-folk { font-size: 11px; color: var(--text-faint); font-weight: 600; }
+
+.sted-chip:focus-visible, .pub-apne:focus-visible, .sted-egen:focus-visible,
+.kamp-send:focus-visible, .kamp-pub:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Veien til pubene som pleier a vise fotball. En lenke, ikke en knapp
+   blant stedene: den apner noe, den svarer ikke pa noe. Har ingen meldt
+   inn noe pa kampen, er den den eneste veien videre — da star lista
+   apen med en gang, og lenka sier hva den er. */
+.pub-apne {
+  align-self: flex-start;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: calc(12.5px * var(--fs));
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.pub-utvidet {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.pub-utvidet[hidden] { display: none; }
+
+/* Et sted du skrev selv. Samme svar som en chip, bare med et navn vi
+   ikke hadde pa lista. */
+.sted-egen {
+  align-self: flex-start;
+  padding: 8px 13px;
+  border: 1px solid var(--bekreftet);
+  border-radius: 8px;
+  background: var(--bekreftet);
+  color: #fff;
   font-family: inherit;
   font-size: calc(13px * var(--fs));
   font-weight: 600;
   cursor: pointer;
 }
 
-.hvor-valg[aria-pressed="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
-}
-
-.hvor-valg:focus-visible, .kamp-send:focus-visible, .kamp-pub:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.sted-egen:disabled {
+  background: none;
+  color: var(--text-faint);
+  border-color: var(--border-btn);
+  cursor: default;
 }
 
 /* Pubforslagene: én rangert liste med chips, over feltet. Feltet er
@@ -1854,7 +1898,6 @@ body {
   font-size: calc(14px * var(--fs));
 }
 
-.kamp-pub[hidden] { display: none; }
 
 /* Delingen sender beskjeden til gruppechatten. Den er fortsatt verdt a
    ha, men lista i appen er det vennene ser — sa dette er en tekstknapp,

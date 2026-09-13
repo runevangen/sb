@@ -25,7 +25,8 @@ import { normaliserPinNavn, pinSlug, gyldigPinNavn, pinEpost, normaliserPin, gyl
          PIN_MIN, PIN_MAKS, PIN_DOMENE } from "../pin-data.js";
 
 import { normaliserNavn, gyldigNavn, svarRad, tolkSvar, perKamp, blirMedTekst,
-         svartekst, egetSvar, loftMedSvar, bareMedSvar, NAVN_MAKS } from "../svar-data.js";
+         svartekst, egetSvar, loftMedSvar, bareMedSvar, stederFraSvar, perSted,
+         stedNokkel, NAVN_MAKS } from "../svar-data.js";
 
 import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
   from "../vaer-data.js";
@@ -398,12 +399,11 @@ const NAAR = tidstekst(KAMPEN.dato);
 ok("tidsteksten er norsk tid", /søndag 13\. sep.* kl\. 17[.:]00/.test(NAAR), NAAR);
 ok("ugyldig tid gir tom tekst", tidstekst("nei") === "" && tidstekst(null) === "");
 
-const HJEMME = delingstekst(KAMPEN, "hjemme", "", "https://x/#/fotball/eliteserien/neste");
+const PUBEN = delingstekst(KAMPEN, "pub", "Pub X", "https://x/#/fotball/eliteserien/neste");
 ok("teksten har kamp, tid, sted, sporsmal og lenke",
-   HJEMME.indexOf("Brann – Bodø/Glimt") > -1 && HJEMME.indexOf(NAAR) > -1 &&
-   HJEMME.indexOf("Jeg ser den hjemme.") > -1 && HJEMME.indexOf("Hvor ser du?") > -1 &&
-   HJEMME.indexOf("https://x/#/fotball/eliteserien/neste") > -1, HJEMME);
-ok("pub med navn", delingstekst(KAMPEN, "pub", "Pub X", "").indexOf("Jeg ser den på Pub X.") > -1);
+   PUBEN.indexOf("Brann – Bodø/Glimt") > -1 && PUBEN.indexOf(NAAR) > -1 &&
+   PUBEN.indexOf("Jeg ser den på Pub X.") > -1 && PUBEN.indexOf("Hvor ser du?") > -1 &&
+   PUBEN.indexOf("https://x/#/fotball/eliteserien/neste") > -1, PUBEN);
 ok("pub uten navn", delingstekst(KAMPEN, "pub", "", "").indexOf("Jeg ser den på pub.") > -1);
 ok("stadion far arenaens navn",
    delingstekst(KAMPEN, "stadion", "", "").indexOf("Jeg ser den på Brann Stadion.") > -1);
@@ -411,8 +411,14 @@ ok("stadion uten arena",
    delingstekst({ hjemme: "A", borte: "B" }, "stadion", "", "").indexOf("Jeg ser den på stadion.") > -1);
 ok("ukjent sted utelates", delingstekst(KAMPEN, "rart", "", "").indexOf("Jeg ser") === -1);
 ok("uten lenke ender teksten med sporsmalet",
-   /Hvor ser du\?$/.test(delingstekst(KAMPEN, "hjemme", "", "")));
-ok("HVOR har de tre stedene", Object.keys(HVOR).join(",") === "hjemme,pub,stadion");
+   /Hvor ser du\?$/.test(delingstekst(KAMPEN, "pub", "", "")));
+// «hjemme» er borte: kampkortet er en liste over steder man kan dra, og
+// sofaen er ikke et motested. Et gammelt svar faller til null framfor a
+// bli tegnet som et sted.
+ok("HVOR har bare stedene man kan dra til",
+   Object.keys(HVOR).join(",") === "pub,stadion");
+ok("hjemme er ikke et sted lenger",
+   delingstekst(KAMPEN, "hjemme", "", "").indexOf("Jeg ser") === -1);
 
 /* ---------------- deling: lenka til kampen ---------------- */
 
@@ -1243,9 +1249,17 @@ ok("raden barer kamp, navn og sted",
    SVAR_RAD.kamp_id === "7" && SVAR_RAD.navn === "Ola" && SVAR_RAD.hvor === "pub" && SVAR_RAD.sted === "Andy's Pub",
    JSON.stringify(SVAR_RAD));
 ok("raden sier aldri hvem du er", SVAR_RAD.bruker === undefined, JSON.stringify(SVAR_RAD));
-ok("stedet folger bare med pa pub",
-   svarRad(7, "Ola", "hjemme", "Andy's Pub").sted === undefined);
+// Stedet folger stadion ogsa na. Kortet grupperer vennene etter stedet
+// de skal til, og «på stadion» er ikke et sted a mote noen — «på
+// Lerkendal» er det.
+ok("stadion barer arenaens navn",
+   svarRad(7, "Ola", "stadion", "Lerkendal").sted === "Lerkendal",
+   JSON.stringify(svarRad(7, "Ola", "stadion", "Lerkendal")));
 ok("et ukjent svar utelates", svarRad(7, "Ola", "rart", "").hvor === undefined);
+ok("hjemme er ikke et svar lenger",
+   svarRad(7, "Ola", "hjemme", "Sofaen").hvor === undefined &&
+   svarRad(7, "Ola", "hjemme", "Sofaen").sted === undefined,
+   JSON.stringify(svarRad(7, "Ola", "hjemme", "Sofaen")));
 
 const SVAR_RADER = [
   { kamp_id: 7, navn: "Ola", hvor: "pub", sted: "Andy's Pub", bruker: "u-1" },
@@ -1289,6 +1303,52 @@ ok("ditt eget svar finnes pa id, ikke pa navn",
    egetSvar(BLIRMED, "Kari") === null &&
    egetSvar(BLIRMED, "u-9") === null && egetSvar(BLIRMED, "") === null,
    JSON.stringify(MITT_SVAR));
+
+/* ---------------- stedene i kampkortet ---------------- */
+
+// Kortet er en liste over steder man kan dra, og et trykk pa et sted er
+// svaret. Da ma stedet vaere én ting: skriver to venner «Lincoln Pub» og
+// «lincoln pub», er det samme pub — ellers star det to chips for den.
+ok("stedsnokkelen folder skrivematen",
+   stedNokkel("Lincoln's Pub") === stedNokkel("lincoln s pub") &&
+   stedNokkel("Bodø Café") === "bodoecafe" &&
+   stedNokkel("") === "" && stedNokkel(null) === "",
+   stedNokkel("Lincoln's Pub") + " / " + stedNokkel("Bodø Café"));
+
+const STED_SVAR = tolkSvar([
+  { kamp_id: 7, navn: "Ola", hvor: "pub", sted: "Lincoln Pub", bruker: "u-1" },
+  { kamp_id: 7, navn: "Kari", hvor: "pub", sted: "lincoln pub", bruker: "u-2" },
+  { kamp_id: 7, navn: "Per", hvor: "stadion", sted: "Lerkendal", bruker: "u-3" },
+  { kamp_id: 7, navn: "Nils", hvor: null, bruker: "u-4" },
+]);
+
+// Stedene noen alt skal til horer med blant chipene: er det en pub ingen
+// har meldt inn og ingen kart kjenner, men to venner skal dit, er den det
+// mest relevante stedet pa hele kortet.
+const STEDENE = stederFraSvar(STED_SVAR);
+ok("stedene noen skal til star én gang hver",
+   STEDENE.length === 2 && STEDENE[0].navn === "Lincoln Pub" &&
+   STEDENE[0].hvor === "pub" && STEDENE[1].navn === "Lerkendal" &&
+   STEDENE[1].hvor === "stadion", JSON.stringify(STEDENE));
+ok("et svar uten sted gir ingen chip",
+   stederFraSvar([{ navn: "Ola", hvor: null, sted: "" }]).length === 0);
+ok("soppel gir ingen steder",
+   stederFraSvar(null).length === 0 && stederFraSvar("nei").length === 0);
+
+// «List opp nederst venner som har planlagt turen dit»: stedet forst,
+// fordi det er det man leter etter. Flest forst, og den som ikke sa hvor,
+// sist — hen blir med, men sa ikke hvor.
+const STED_GRUPPER = perSted(STED_SVAR, { arena: "Lerkendal" });
+ok("vennene grupperes etter stedet de skal til",
+   STED_GRUPPER.length === 3 &&
+   STED_GRUPPER[0].sted === "på Lincoln Pub" && STED_GRUPPER[0].navn.join(",") === "Ola,Kari" &&
+   STED_GRUPPER[1].sted === "på Lerkendal" && STED_GRUPPER[1].navn.join(",") === "Per",
+   JSON.stringify(STED_GRUPPER));
+ok("den som ikke sa hvor, star sist og uten sted",
+   STED_GRUPPER[2].sted === "" && STED_GRUPPER[2].navn.join(",") === "Nils",
+   JSON.stringify(STED_GRUPPER[2]));
+ok("ingen svar gir ingen grupper",
+   perSted([], {}).length === 0 && perSted(null, {}).length === 0);
 
 /* ---------------- kontaktopplysninger ---------------- */
 

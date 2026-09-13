@@ -202,7 +202,7 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   en knapp finnes ikke — så `.kamp-del` er en ekte knapp lagt utstrakt
   over `.kamp-linje` (`position: absolute; inset: 0`), mens pubnavnet
   løftes over med `z-index`. Ett tastaturmål per kamp, lest opp som
-  «Rosenborg – Tromsø. Hvor ser du kampen?». Pilen er dekor
+  «Rosenborg – Tromsø. Hvor skal du se den?». Pilen er dekor
   (`pointer-events: none`) og roterer når raden er åpen, så den viser
   tilstand framfor å være det eneste man kan treffe.
 - Den åpne kampen får en ramme i aksentfargen. Raden er derfor en
@@ -217,10 +217,48 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   hoppet mens den ble lest. `hentVaer` husker per kamp, så å åpne den
   samme igjen koster ingenting, og delingsteksten henter fra samme minne.
   Linja fjernes når raden lukkes.
-- «Hvor ser du kampen?» Årets kommende kamper har en delingsknapp som
-  åpner ett spørsmål under raden: hjemme, på pub (med navn) eller på
-  stadion (med arena). Svaret deles som tekst inn i gruppechatten leseren
-  allerede har — ingen konto, ingen lagring, chatten er vennegruppa.
+- **Kampkortet er en liste over steder man kan dra, og ett trykk på et
+  sted er svaret.** Overskriften i kortet er «Disse viser kampen:» når en
+  pub har meldt inn, ellers «Hvor skal du se den?» — lagene er
+  overskriften på selve kampen og står i linja over, så kortet skal ikke
+  ha en tittel til som konkurrerer med dem.
+  Stedene er pubene som har meldt inn *denne* kampen, arenaen («en plass
+  man kan dra», på linje med pubene), stedene vennene alt har sagt at de
+  skal til, og stedet en delt lenke pekte på — deduplisert på
+  `stedNokkel()`, så en pub som både er meldt inn og har folk står én
+  gang. Trykker du på stedet du alt står på, går du av lista igjen: to
+  knapper ville betydd at man kan bli med to ganger.
+  Før var det tre steg — velg hjemme/pub/stadion, skriv pubnavnet, trykk
+  «Jeg skal dit» — og et navnefelt i tillegg, på hver eneste kamp. Tre
+  steg for å si én ting.
+- **«Hjemme» er borte.** Kortet handler om hvor man møter noen, og sofaen
+  er ikke et møtested; det var også det eneste svaret som ikke sa noe om
+  hvor du er. Nøkkelen er tatt ut av `HVOR`, så ingenting skriver den
+  lenger. Rader som alt står i basen med `hvor='hjemme'` faller til `null`
+  i `tolkSvar` — personen står fortsatt på lista, bare uten et sted, og
+  det er riktig: hen sa aldri at hen skulle noe sted. Sjekken i SQL-en
+  godtar den fortsatt, så ingen migrering trengs. En lenke som alt er
+  sendt med `?hvor=hjemme` åpner kampen som før, bare uten et sted pekt
+  ut.
+- **Pubene som pleier å vise fotball ligger bak en lenke i kortet**, ikke
+  framme. De fleste kamper trenger dem ikke, og de var størstedelen av
+  støyen: listen, feltet og forslagene kostet fire linjer før man hadde
+  sett et eneste sted som svarte på kampen. Har ingen meldt inn noe, er
+  lenka den eneste veien videre — da sier den det («Puber som pleier å
+  vise fotball»), og lista står åpen med en gang. Ingenting hentes før
+  den åpnes: før kostet et trykk på «på pub» to nettkall uansett.
+  Et sted du skriver selv er samme svar, bare med et navn vi ikke hadde
+  på lista. Stedene du har trykket på blir stående som chips så lenge
+  kortet er åpent, også etter at svaret er angret — en chip som
+  forsvinner under fingeren er verre enn en chip for mye.
+- Stedet fra en delt lenke eller fra «denne kampen vises på»-linja blir
+  **pekt ut, ikke valgt**: chipen markeres og får fokus, så svaret koster
+  fortsatt ett trykk — leserens eget. Å melde noen på uten at de trykket
+  ville vært å svare i deres navn.
+- Delingen sender teksten inn i gruppechatten leseren allerede har, og
+  krever ingen konto — den går til vennene, ikke til oss. Utlogget velger
+  et trykk på et sted stedet *lokalt* i kortet, så teksten kan bære det;
+  det som skal stå på lista i appen må noen ha sagt, og det står i kortet.
   Teksten lages av `delingstekst()` i `fotball-data.js`, i norsk tid, og
   er testet: det er det leseren faktisk sender. Fjorårets runde kan ikke
   deles; det står hvorfor. Delingen går gjennom samme `delTekst()` i
@@ -681,21 +719,26 @@ er i seg selv noe om adressen.
 
 - Svaret delingslenka ba om. Teksten i chatten spurte «Hvor ser du?», og
   til nå hadde det spørsmålet ingen vei tilbake til appen.
-- **Panelet har én hovedhandling, ikke to.** Tittelen er en erklæring —
-  «Jeg skal se den» — og knappen sier hva den gjør: «Jeg skal dit» på pub
-  eller stadion, «Jeg ser den hjemme» hjemme. Delingen er en tekstknapp
-  under: den sender beskjeden til gruppechatten, mens lista i appen er
-  det vennene faktisk ser når de åpner kampen. Som spørsmål, med to like
-  store knapper nederst, konkurrerte de to om å være handlingen.
-- Lista over hvem som blir med står også inne i det åpne panelet, ikke
-  bare under raden: ellers må man lukke panelet for å se at det virket.
+- **Stedet er handlingen.** Det finnes ingen egen «Jeg skal dit»-knapp og
+  ingen erklæring på toppen: du trykker på et sted, og det *er* svaret.
+  Delingen er en tekstknapp under — den sender beskjeden til gruppechatten,
+  mens lista i appen er det vennene faktisk ser når de åpner kampen.
+- **Navnet kommer fra innloggingen, ikke fra et felt i kortet.** Det er alt
+  det samme fornavnet: PIN-innloggingen ber om nøyaktig det, og
+  `svarNavn()` i `app.js` faller tilbake på kontonavnet. Et felt man måtte
+  fylle før trykket virket ville betydd at «ett trykk» ikke var sant — og
+  feltet sto på hver eneste kamp. Har noen skrevet et annet navn før,
+  ligger det fortsatt i `sb-visning.svarnavn` og vinner som før.
+- **Vennene står nederst i kortet, gruppert etter stedet de skal til**
+  («Lincoln Pub — Ola og Kari»), av `perSted()` i `svar-data.js`. Flest
+  først, og den som ikke sa hvor, sist og uten sted. Linja under kampen
+  sier hvor mange og hvem — nok når man blar; kortet sier hvor man møter
+  dem, og det er spørsmålet man åpnet kortet for å svare på. «3 blir med:
+  Ola, Kari og Per» sa ingenting om det.
 - **Ingen treff er ingen nyhet.** `meldTomt()` gir ett svar på «fant dere
   noe?» for hele panelet, ikke ett per kilde. Før sa fire grupper fra
   hver for seg, og de tre tomme druknet den ene som hadde et forslag.
   Venter en kilde fortsatt, sies ingenting — det er for tidlig.
-- Advarselen om at navnet er synlig står i navnefeltet (plassholder og
-  `aria-label`), ikke som en grålinje under. Den hører hjemme der navnet
-  skrives, og koster da ingen egen linje i et panel som alt var tett.
 - **Lesing krever ingen konto.** «3 blir med: Ola, Kari og Per» står
   under kampen for alle, som «denne kampen vises på»-linja: den som
   blar gjennom runden ser det uten å åpne noe. Skriving krever at du er
@@ -725,14 +768,12 @@ er i seg selv noe om adressen.
   runden. Den som trykker «Jeg blir med», får derimot beskjed — det er
   der man venter et svar.
 - Svarer du to ganger, endrer du svaret ditt: skrivingen er en upsert
-  mot `unique (kamp_id, bruker)`. Har du alt svart, er knappen en
-  angreknapp — to knapper ville betydd at man kan bli med to ganger.
-- Navnet er «navnet vennene ser». Det lagres med visningsvalgene
-  (`sb-visning`, feltet `svarnavn`), så det ikke skrives på nytt for hver
-  kamp — og står det ingenting der, prefylles feltet med fornavnet du
-  logget inn med: det er alt det samme navnet. Navnet er synlig for alle
-  som åpner kampen — det er prisen for at lista kan leses uten konto, og
-  det står i panelet.
+  mot `unique (kamp_id, bruker)`. Trykker du på et annet sted, flytter
+  svaret ditt dit; trykker du på det samme igjen, går du av lista.
+- Navnet er «navnet vennene ser», og det er synlig for alle som åpner
+  kampen — det er prisen for at lista kan leses uten konto. Det lagres
+  med visningsvalgene (`sb-visning`, feltet `svarnavn`) ved hvert svar, så
+  det ikke hentes på nytt for hver kamp.
 - Tabellen og reglene står som SQL i `docs/nokler-og-tokens.md`. Finnes
   den ikke, svarer funksjonen 503 og sier nøyaktig det, framfor å sende
   en PostgREST-feil videre til leseren.
@@ -759,9 +800,9 @@ er i seg selv noe om adressen.
 
 ## Testing
 
-    node test/unit.mjs      412 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      420 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  219 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       322 tester, ~200 s, headless Chromium
+    node test/run.mjs       329 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

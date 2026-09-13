@@ -32,7 +32,10 @@ export function gyldigNavn(verdi) {
 export function svarRad(kampId, navn, hvor, sted) {
   const rad = { kamp_id: String(kampId), navn: normaliserNavn(navn) };
   if (HVOR[hvor]) rad.hvor = hvor;
-  if (hvor === "pub" && sted) rad.sted = String(sted).slice(0, 60);
+  // Stedet lagres for bade pub og stadion: lista nederst i kampkortet
+  // grupperer vennene etter sted, og «på stadion» er ikke et sted a mote
+  // noen — «på Lerkendal» er det.
+  if (HVOR[hvor] && sted) rad.sted = String(sted).slice(0, 60);
   return rad;
 }
 
@@ -116,4 +119,62 @@ export function bareMedSvar(kamper, kart) {
 export function egetSvar(svar, bruker) {
   if (!bruker) return null;
   return (svar || []).find((s) => s.bruker && s.bruker === bruker) || null;
+}
+
+/* ---------- stedene i kampkortet ---------- */
+
+// Stedene noen alt har sagt at de skal til.
+//
+// De horer med blant stedene du kan velge, og ikke bare som en linje
+// nederst: er det en pub ingen har meldt inn og ingen kart kjenner, men
+// to venner skal dit, er den det mest relevante stedet pa hele kortet.
+// Nokkelen er stedet normalisert, sa «Lincoln pub» og «Lincoln Pub» er
+// ett sted — ellers ville lista hatt to chips for samme pub.
+export function stederFraSvar(svar) {
+  const sett = new Map();
+  (Array.isArray(svar) ? svar : []).forEach((s) => {
+    if (!s || !HVOR[s.hvor] || !s.sted) return;
+    const nokkel = stedNokkel(s.sted);
+    if (!nokkel || sett.has(nokkel)) return;
+    sett.set(nokkel, { hvor: s.hvor, navn: String(s.sted) });
+  });
+  return Array.from(sett.values());
+}
+
+// Vennene gruppert etter stedet de skal til: «Lincoln Pub — Ola og Kari».
+//
+// Et navn uten et sted sier ikke hvor man moter noen, og det var alt
+// lista under kampen sa. Den som ikke har valgt et sted star sist, uten
+// overskrift: hen blir med, men sa ikke hvor.
+export function perSted(svar, kamp) {
+  const grupper = new Map();
+  const uten = [];
+  (Array.isArray(svar) ? svar : []).forEach((s) => {
+    if (!s || !gyldigNavn(s.navn)) return;
+    const tekst = stedtekst(kamp, s.hvor, s.sted);
+    if (!tekst) { uten.push(normaliserNavn(s.navn)); return; }
+    // Nokkelen er teksten, ikke stedet: to som skrev «Lincoln Pub» og
+    // «lincoln pub» skal sta i samme gruppe, og gruppa skal hete det den
+    // forste skrev.
+    const nokkel = stedNokkel(tekst);
+    if (!grupper.has(nokkel)) grupper.set(nokkel, { sted: tekst, navn: [] });
+    grupper.get(nokkel).navn.push(normaliserNavn(s.navn));
+  });
+
+  // Flest forst: stedet de fleste skal til er det man leter etter.
+  const liste = Array.from(grupper.values())
+    .sort((a, b) => b.navn.length - a.navn.length);
+  if (uten.length) liste.push({ sted: "", navn: uten });
+  return liste;
+}
+
+// Sma bokstaver, norske tegn foldet, alt annet enn bokstaver og tall
+// vekk. Samme grep som lagnavnene: lista skal ikke fa to rader for det
+// samme stedet fordi noen skrev en apostrof.
+export function stedNokkel(verdi) {
+  return String(verdi == null ? "" : verdi)
+    .toLowerCase()
+    .replace(/æ/g, "ae").replace(/ø/g, "oe").replace(/å/g, "aa")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]/g, "");
 }

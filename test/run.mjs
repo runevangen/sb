@@ -1005,7 +1005,7 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
        truffet === knapper[0], truffet && (truffet.className || truffet.tagName));
     var lagNavn = Array.prototype.map.call(linje0.querySelectorAll(".kamp-lag"), function (l) { return l.textContent; });
     ok("ett tastaturmal per kamp, og det sier hvilken kamp",
-       knapper[0].getAttribute("aria-label") === lagNavn.join(" – ") + ". Hvor ser du kampen?",
+       knapper[0].getAttribute("aria-label") === lagNavn.join(" – ") + ". Hvor skal du se den?",
        knapper[0].getAttribute("aria-label"));
     // Et trykk midt pa lagnavnet skal apne kampen, ikke bare pa pilen.
     ok("ingen egen knapp i hjornet a treffe",
@@ -1029,24 +1029,48 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
     ok("og MET sporres da, en gang", window.__vaerKall === 1, window.__vaerKall);
     ok("ingen andre kamper har fatt vaer",
        document.querySelectorAll(".kamp-vaer").length === 1);
-    ok("del er sperret til et sted er valgt", panel.querySelector(".kamp-send").disabled);
-    ok("stadion har arenaens navn nar vi har det",
-       panel.querySelectorAll(".hvor-valg")[2].textContent === "På Brann Stadion",
-       panel.querySelectorAll(".hvor-valg")[2].textContent);
+    // Kortet er en liste over steder man kan dra, ikke tre valg og et
+    // felt. Overskrifta sier hva lista under er; lagene er overskrifta pa
+    // kampen og star i linja over.
+    ok("kortet sporr etter stedet",
+       panel.querySelector(".kamp-panel-tittel").textContent === "Hvor skal du se den?",
+       panel.querySelector(".kamp-panel-tittel").textContent);
+    ok("hjemme/pub/stadion-valgene er borte",
+       panel.querySelectorAll(".hvor-valg").length === 0 &&
+       panel.textContent.indexOf("Hjemme") === -1, panel.textContent.slice(0, 90));
+    // «Stadion er et valg pa linje med puber. En plass man kan dra.»
+    var steder = function () {
+      return Array.prototype.map.call(panel.querySelectorAll(".sted-chip"),
+        function (c) { return c.querySelector(".sted-navn").textContent; });
+    };
+    ok("stadion star som et sted man kan dra til",
+       steder().indexOf("Brann Stadion") > -1, steder().join("|"));
 
-    panel.querySelectorAll(".hvor-valg")[1].click();   // pa pub
-    ok("pubfeltet kommer fram", !panel.querySelector(".kamp-pub").hidden);
-    ok("del er apnet", !panel.querySelector(".kamp-send").disabled);
+    // Forslagene ligger bak en lenke i kortet: de fleste kamper trenger
+    // dem ikke, og de var storsteparten av stoyen. Ingenting hentes for
+    // den apnes — for kostet et trykk pa «pa pub» to nettkall.
+    var apne = panel.querySelector(".pub-apne");
+    var utvidet = panel.querySelector(".pub-utvidet");
+    ok("pubene som pleier a vise fotball ligger bak en lenke",
+       apne && utvidet.hidden && apne.getAttribute("aria-expanded") === "false",
+       apne && apne.textContent);
+    ok("og ingen puber hentes for lenka apnes",
+       window.__overpassKall === 0 && window.__puberKall === 0,
+       window.__overpassKall + "/" + window.__puberKall);
+
+    apne.click();
+    ok("lenka ekspanderer stedene ut i kortet",
+       !utvidet.hidden && apne.getAttribute("aria-expanded") === "true");
     // Ett sporsmal, ett svar: en rangert liste, ikke seks grupper.
     var forslag = panel.querySelector(".pub-forslag");
-    ok("pubforslagene vises nar pub er valgt", forslag && !forslag.hidden);
+    ok("pubforslagene star der da", forslag && !forslag.hidden);
     var navnene = function () {
       return Array.prototype.map.call(forslag.querySelectorAll(".pub-chip"),
         function (c) { return c.querySelector("span").textContent; });
     };
     // Kampen spilles ofte et annet sted enn der man ser den, sa naer deg
-    // hentes med en gang — trykket som valgte «pa pub» er handlingen
-    // telefonen krever for a sporre om posisjon.
+    // hentes med en gang — trykket som apnet lista er handlingen telefonen
+    // krever for a sporre om posisjon.
     ok("naer deg hentes med en gang, uten et trykk til",
        window.__overpassKall === 1, window.__overpassKall);
     ok("forslagene star i én liste, ikke i grupper",
@@ -1054,7 +1078,6 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
        forslag.querySelectorAll(".pub-gruppe-tittel").length === 0,
        forslag.querySelectorAll(".pub-liste").length);
     ok("dine puber er med", navnene().indexOf("Pub X") > -1, navnene().join("|"));
-    panel.querySelector(".kamp-pub").value = "Pub X";
 
     // Et annet panel apnes: det forste skal lukkes.
     knapper[1].click();
@@ -1068,7 +1091,7 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
        knapper[0].closest(".kamp").querySelectorAll(".kamp-vaer").length === 0);
     knapper[0].click();
     panel = document.querySelector(".kamp-panel");
-    panel.querySelectorAll(".hvor-valg")[1].click();
+    panel.querySelector(".pub-apne").click();
     forslag = panel.querySelector(".pub-forslag");
 
     // Nested tilbakekall ligger utenfor try-en over; hvert far sin egen.
@@ -1099,11 +1122,32 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
       ok("OpenStreetMap krediteres", forslag.textContent.indexOf("© OpenStreetMap-bidragsytere") > -1);
       var chip = Array.prototype.find.call(forslag.querySelectorAll(".pub-chip"), function (c) { return c.textContent.indexOf("Stadionpuben") === 0; });
       ok("chipen viser avstand", chip && chip.textContent.indexOf("240 m") > -1, chip && chip.textContent);
-      if (chip) chip.click();
-      ok("trykk pa en pub fyller feltet", chip && panel.querySelector(".kamp-pub").value === "Stadionpuben" &&
-         chip.getAttribute("aria-pressed") === "true");
 
-      panel.querySelector(".kamp-pub").value = "Pub X";
+      // «Nar jeg trykker pa en pub sa bekrefter jeg at jeg planlegger a se
+      // den der.» Utlogget kan ingen stille seg pa lista — det ma noen ha
+      // sagt — men stedet er valgt, og kampen deles med det i teksten.
+      // Delingen gar til gruppechatten, ikke til oss, og krevde aldri en
+      // konto.
+      // Chipene tegnes pa nytt etter hvert trykk — ett sted bestemmer hva
+      // som star pa skjermen — sa noden ma hentes igjen, ikke gjenbrukes.
+      var finnChip = function (navn) {
+        return Array.prototype.find.call(panel.querySelectorAll(".pub-chip"),
+          function (c) { return c.textContent.indexOf(navn) === 0; });
+      };
+      if (chip) chip.click();
+      var pubX = finnChip("Pub X");
+      if (pubX) pubX.click();
+      var valgtChip = finnChip("Pub X");
+      ok("stedet man trykker pa blir valgt",
+         valgtChip && valgtChip.getAttribute("aria-pressed") === "true",
+         valgtChip && valgtChip.getAttribute("aria-pressed"));
+      ok("og utlogget star det hvorfor man ikke kommer pa lista",
+         panel.querySelector(".kamp-svar").textContent.indexOf("Logg inn") === 0,
+         panel.querySelector(".kamp-svar").textContent);
+      ok("men lista er ikke en port: kortet lover ikke noe annet",
+         panel.querySelector(".kamp-note").textContent.indexOf("virker uansett") > -1,
+         panel.querySelector(".kamp-note").textContent);
+
       panel.querySelector(".kamp-send").click();
       setTimeout(function () { try {
         var lagret = (JSON.parse(localStorage.getItem("sb-visning")) || {}).puber || [];
@@ -1195,7 +1239,7 @@ const SAK_14 = await kjor("pub-feil", FELLES + FOTBALL + `
   window.addEventListener("load", function () { setTimeout(function () { try {
     document.querySelector(".kamp-del").click();
     var panel = document.querySelector(".kamp-panel");
-    panel.querySelectorAll(".hvor-valg")[1].click();
+    panel.querySelector(".pub-apne").click();
     var forslag = panel.querySelector(".pub-forslag");
     setTimeout(function () { try {
       // Uten nettverk i det hele tatt star lista i koden igjen. Det er
@@ -1221,7 +1265,7 @@ const SAK_14 = await kjor("pub-feil", FELLES + FOTBALL + `
       // Naer deg feiler, men sier hvem som sviktet.
       ok("naer deg forklarer hvem som sviktet",
          forslag.textContent.indexOf("overpass-api.de svarte 504") > -1, forslag.textContent);
-      ok("pubfeltet kan fortsatt brukes", !panel.querySelector(".kamp-pub").hidden);
+      ok("pubfeltet kan fortsatt brukes", !!panel.querySelector(".kamp-pub"));
       ferdig();
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
@@ -1536,16 +1580,26 @@ const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
     rader[0].querySelector(".kamp-viser-pub").click();
     var apnet = document.querySelector(".kamp-panel");
     ok("et trykk pa pubnavnet apner delingspanelet", !!apnet);
-    ok("med puben ferdig valgt", apnet.querySelector(".kamp-pub").value === "Lincoln Pub",
-       apnet.querySelector(".kamp-pub").value);
-    ok("og «pa pub» valgt",
-       apnet.querySelectorAll(".hvor-valg")[1].getAttribute("aria-pressed") === "true");
+    // Stedet blir pekt ut, ikke valgt: et trykk pa et sted er svaret «jeg
+    // skal dit», og det svaret skal leseren gi selv. Chipen markeres og
+    // far fokus, sa det fortsatt koster ett trykk — hens eget.
+    var pekt = apnet.querySelector(".sted-chip.pekt");
+    ok("med puben pekt ut i kortet",
+       pekt && pekt.querySelector(".sted-navn").textContent === "Lincoln Pub",
+       pekt ? pekt.textContent : "ingen pekt chip");
+    ok("og den star ikke som valgt: svaret er ikke gitt enda",
+       pekt.getAttribute("aria-pressed") === "false" && document.activeElement === pekt,
+       pekt.getAttribute("aria-pressed"));
+    // Overskrifta sier hva lista er nar noen har meldt inn en pub.
+    ok("kortet sier at disse viser kampen",
+       apnet.querySelector(".kamp-panel-tittel").textContent === "Disse viser kampen:",
+       apnet.querySelector(".kamp-panel-tittel").textContent);
     document.querySelectorAll(".kamp-del")[0].click();
 
     // Forste kamp: Brann – Bodo/Glimt, som Lincoln Pub viser.
     document.querySelectorAll(".kamp-del")[0].click();
     var panel = document.querySelectorAll(".kamp-panel")[0];
-    panel.querySelectorAll(".hvor-valg")[1].click();
+    panel.querySelector(".pub-apne").click();
     var forslag = panel.querySelector(".pub-forslag");
     setTimeout(function () { try {
       var chips = forslag.querySelectorAll(".pub-chip");
@@ -1582,9 +1636,9 @@ const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
          andre.length > 0 && !andre[0].querySelector(".pub-bekreftet"), andre.length);
       chips = forslag.querySelectorAll(".pub-chip");
 
-      // Et trykk velger puben som ellers.
+      // Et trykk velger puben — ett trykk, ett sted, ogsa i forslagslista.
       chips[0].click();
-      ok("et trykk fyller pubfeltet", panel.querySelector(".kamp-pub").value === "Lincoln Pub",
+      ok("et trykk velger puben", panel.querySelector(".kamp-pub").value === "Lincoln Pub",
          panel.querySelector(".kamp-pub").value);
 
       // Andre kamp: en annen pub, og Lincoln skal ikke folge med. Ett
@@ -1593,7 +1647,7 @@ const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
       var panel2 = document.querySelector(".kamp-panel");
       ok("bare ett panel er apent", document.querySelectorAll(".kamp-panel").length === 1,
          document.querySelectorAll(".kamp-panel").length);
-      panel2.querySelectorAll(".hvor-valg")[1].click();
+      panel2.querySelector(".pub-apne").click();
       setTimeout(function () { try {
         var chips2 = panel2.querySelectorAll(".pub-chip");
         ok("neste kamp har sin egen pub forst",
@@ -1665,17 +1719,24 @@ const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
     // Panelet ligger inne i den valgte kampen, innenfor rammen.
     ok("svar apner panelet pa den kampen",
        panel && merket[0].contains(panel) && merket[0].classList.contains("valgt"));
-    ok("med avsenderens sted ferdig valgt",
-       panel.querySelector(".kamp-pub").value === "Pub X" &&
-       panel.querySelectorAll(".hvor-valg")[1].getAttribute("aria-pressed") === "true",
-       panel.querySelector(".kamp-pub").value);
+    // Avsenderens sted star i kortet selv om ingen har meldt inn puben og
+    // ingen kart kjenner den: den som delte skal dit, og da er det stedet
+    // det mest relevante pa hele kortet. Det blir pekt ut, ikke valgt —
+    // svaret skal mottakeren gi selv, med ett trykk.
+    var pekt = panel.querySelector(".sted-chip.pekt");
+    ok("med avsenderens sted pekt ut",
+       pekt && pekt.querySelector(".sted-navn").textContent === "Pub X" &&
+       pekt.getAttribute("aria-pressed") === "false",
+       pekt ? pekt.textContent : "ingen pekt chip");
+    ok("og fokus star pa det, sa svaret koster ett trykk",
+       document.activeElement === pekt,
+       document.activeElement && document.activeElement.className);
     // Den som kommer fra en delt lenke er utlogget. Da skal det sta hva
-    // som mangler — og at delingen virker uansett.
+    // som mangler — og at resten virker uansett.
     ok("utlogget star det hva som skal til for a bli med",
-       panel.querySelector(".kamp-blirmed-valg .kamp-note").textContent
-         .indexOf("Logg inn i menyen") > -1 &&
-       !panel.querySelector(".kamp-blimed"),
-       panel.querySelector(".kamp-blirmed-valg").textContent);
+       panel.querySelector(".kamp-note").textContent.indexOf("Logg inn i menyen") > -1 &&
+       panel.querySelector(".kamp-note").textContent.indexOf("virker uansett") > -1,
+       panel.querySelector(".kamp-note").textContent);
 
     // En lenke til en kamp som ikke star i runden lenger: runden skal sta
     // som for, uten en feilmelding om noe leseren ikke kan gjore noe med.
@@ -1983,43 +2044,36 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
     var rad = document.querySelectorAll(".kamp.delbar")[0];
     rad.querySelector(".kamp-del").click();
     var panel = document.querySelector(".kamp-panel");
-    var knapp = panel.querySelector(".kamp-blimed");
-    // Knappen sier hva den gjor. Uten et sted valgt er svaret «dit».
-    ok("innlogget star knappen der", !!knapp && knapp.textContent === "Jeg skal dit",
-       knapp ? knapp.textContent : "ingen knapp");
-    // Lista leses uten konto, sa navnet leses ogsa av andre enn
-    // vennegruppa. Advarselen skal sta der navnet skrives — i feltet,
-    // ikke som en gralinje panelet blir tyngre av.
-    var navnFelt = panel.querySelector(".kamp-navn");
-    ok("det star i navnefeltet at navnet vises for andre",
-       navnFelt.placeholder.indexOf("vises for andre") > -1 &&
-       navnFelt.getAttribute("aria-label").indexOf("synlig for alle som åpner kampen") > -1,
-       navnFelt.placeholder + " | " + navnFelt.getAttribute("aria-label"));
-    // Fornavnet du logget inn med er alt navnet vennene ser. Det skal sta
-    // ferdig i feltet, sa det ikke skrives to ganger.
-    ok("navnet fra innloggingen star ferdig i feltet", navnFelt.value === "Ola",
-       navnFelt.value);
 
-    // Velger man hjemme, skal knappen slutte a pasta at man skal et sted.
-    panel.querySelectorAll(".hvor-valg")[0].click();
-    ok("knappen folger stedet du velger",
-       knapp.textContent === "Jeg ser den hjemme", knapp.textContent);
-    panel.querySelectorAll(".hvor-valg")[1].click();
+    // Ett trykk, ett sted. Navnefeltet og «Jeg skal dit»-knappen er borte:
+    // navnet kommer fra innloggingen — det er alt det samme fornavnet — og
+    // et felt man matte fylle for trykket virket ville betydd at «ett
+    // trykk» ikke var sant.
+    ok("ingen navnefelt og ingen egen bli-med-knapp",
+       !panel.querySelector(".kamp-navn") && !panel.querySelector(".kamp-blimed"),
+       panel.textContent.slice(0, 80));
+    // Stadion er et sted pa linje med pubene: «en plass man kan dra».
+    var stedChip = function (navn) {
+      return Array.prototype.find.call(panel.querySelectorAll(".sted-chip"),
+        function (c) { return c.querySelector(".sted-navn").textContent === navn; });
+    };
+    var arena = stedChip("Brann Stadion");
+    ok("stadion star som et sted", !!arena && arena.getAttribute("aria-pressed") === "false",
+       arena ? arena.textContent : "ingen arena-chip");
+    ok("og den sier hva et trykk gjor",
+       arena.getAttribute("aria-label") === "Jeg skal til Brann Stadion",
+       arena.getAttribute("aria-label"));
 
-    // Uten navn blir lista uleselig for de andre. Feltet er fortsatt
-    // sannheten: tommer man det, skal det ikke gyldiggjores av at man en
-    // gang logget inn med et navn.
-    navnFelt.value = "";
-    knapp.click();
-    ok("uten navn sier den ifra",
-       panel.querySelector(".kamp-blirmed-valg .kamp-svar").textContent.indexOf("navnet") > -1,
-       panel.querySelector(".kamp-blirmed-valg .kamp-svar").textContent);
-    ok("og ingenting er sendt", window.__svar.filter(function (k) { return !!k.inn; }).length === 0);
-
-    panel.querySelectorAll(".hvor-valg")[1].click();   // pa pub
-    panel.querySelector(".kamp-pub").value = "Pub X";
-    panel.querySelector(".kamp-navn").value = " Ola ";
-    knapp.click();
+    // Et sted man skriver selv: samme svar, bare med et navn vi ikke
+    // hadde pa lista.
+    panel.querySelector(".pub-apne").click();
+    var egen = panel.querySelector(".sted-egen");
+    ok("et tomt felt kan ikke sendes", egen.disabled);
+    var felt = panel.querySelector(".kamp-pub");
+    felt.value = "Pub X";
+    felt.dispatchEvent(new Event("input"));
+    ok("og et utfylt kan", !egen.disabled);
+    egen.click();
     setTimeout(function () { try {
       var skriv = window.__svar.filter(function (k) { return !!k.inn; });
       ok("svaret sendes med okta", skriv.length === 1 && skriv[0].inn.token === "okt-1",
@@ -2028,10 +2082,24 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
          skriv[0].inn.kampId === 3 && skriv[0].inn.navn === "Ola" &&
          skriv[0].inn.hvor === "pub" && skriv[0].inn.sted === "Pub X",
          JSON.stringify(skriv[0].inn));
-      // Navnet skal ikke skrives pa nytt for hver kamp.
-      ok("navnet huskes til neste gang",
+      // Navnet kommer fra innloggingen og lagres med visningsvalgene, sa
+      // det ikke hentes pa nytt for hver kamp.
+      ok("navnet fra innloggingen huskes",
          (JSON.parse(localStorage.getItem("sb-visning")) || {}).svarnavn === "Ola",
          localStorage.getItem("sb-visning"));
+      ok("og det star at du kom pa lista, med stedet",
+         panel.querySelector(".kamp-svar").textContent === "Du står på lista — på Pub X.",
+         panel.querySelector(".kamp-svar").textContent);
+
+      // Stedet du skal til blir en chip i kortet: den er merket, og den
+      // teller hvor mange som skal dit.
+      var pubX = stedChip("Pub X");
+      ok("stedet du valgte star som valgt i kortet",
+         pubX && pubX.getAttribute("aria-pressed") === "true",
+         pubX ? pubX.getAttribute("aria-pressed") : "ingen chip");
+      ok("og chipen sier hvor mange som skal dit",
+         pubX.querySelector(".sted-folk").textContent === "1",
+         pubX.querySelector(".sted-folk").textContent);
 
       var linje = rad.querySelector(".kamp-blirmed");
       ok("lista star under kampen", !!linje && linje.textContent.indexOf("Ola blir med") > -1,
@@ -2055,25 +2123,28 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
          (rad.previousElementSibling.classList.contains("kamp-dag") ||
           rad.previousElementSibling.classList.contains("kamp-bolk")),
          rad.previousElementSibling ? rad.previousElementSibling.className : "ingen");
-      // Og inne i panelet, sa man ser at det virket uten a lukke det.
-      ok("og i panelet man nettopp trykket i",
-         panel.querySelector(".kamp-panel-liste").textContent.indexOf("Ola blir med") > -1,
-         panel.querySelector(".kamp-panel-liste").textContent);
+      // «List opp nederst venner som har planlagt turen dit»: stedet
+      // forst, fordi det er det man leter etter. Et navn uten et sted
+      // sier ikke hvor man moter noen.
+      var nederst = panel.querySelector(".kamp-panel-liste");
+      var stedRad = nederst.querySelector(".sted-rad");
+      ok("vennene star nederst, gruppert etter stedet de skal til",
+         stedRad && stedRad.querySelector(".sted-rad-sted").textContent === "på Pub X" &&
+         stedRad.querySelector(".sted-rad-navn").textContent === "Ola",
+         nederst.textContent);
       // Linja horer til kampen, ikke til panelet: den skal sta over det.
       ok("og over panelet, ikke under",
          linje.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING);
       ok("bare pa den kampen man svarte pa",
          document.querySelectorAll(".kamp-blirmed").length === 1,
          document.querySelectorAll(".kamp-blirmed").length);
-      // To «jeg blir med» er en person, ikke to: knappen blir en angreknapp.
-      ok("knappen blir en angreknapp",
-         knapp.textContent === "Jeg kommer ikke likevel", knapp.textContent);
-      ok("og navnefeltet er ute av veien", panel.querySelector(".kamp-navn").hidden);
 
-      knapp.click();
+      // To «jeg blir med» er en person, ikke to: et nytt trykk pa det
+      // samme stedet er angreknappen.
+      stedChip("Pub X").click();
       setTimeout(function () { try {
         var fjern = window.__svar.filter(function (k) { return k.inn && k.inn.handling === "fjern"; });
-        ok("angre sender en fjerning med okta",
+        ok("et nytt trykk pa stedet sender en fjerning med okta",
            fjern.length === 1 && fjern[0].inn.token === "okt-1" && fjern[0].inn.kampId === 3,
            JSON.stringify(fjern.map(function (k) { return k.inn; })));
         ok("og lista under kampen er borte", !rad.querySelector(".kamp-blirmed"));
@@ -2081,8 +2152,12 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
         ok("bolkene forsvinner nar ingen blir med",
            document.querySelectorAll(".kamp-bolk").length === 0,
            document.querySelectorAll(".kamp-bolk").length);
-        ok("knappen er tilbake til a bli med",
-           knapp.textContent === "Jeg skal dit", knapp.textContent);
+        ok("stedet star ikke lenger som valgt",
+           stedChip("Pub X").getAttribute("aria-pressed") === "false",
+           stedChip("Pub X").getAttribute("aria-pressed"));
+        ok("og lista nederst er tom",
+           panel.querySelector(".kamp-panel-liste").textContent === "",
+           panel.querySelector(".kamp-panel-liste").textContent);
         ferdig();
       } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);

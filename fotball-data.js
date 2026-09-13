@@ -309,8 +309,15 @@ function tsdbTid(rad) {
 
 // Teksten som gar inn i gruppechatten. Ren funksjon, sa den kan testes:
 // den er det leseren faktisk sender, og en feil her er synlig for andre.
+// «hjemme» sto her til kampkortet ble skrevet om. Na er kortet en liste
+// over steder man kan dra — puber og stadion — og a se den hjemme er
+// ikke et sted a mote noen. Det var ogsa det eneste svaret som ikke sa
+// noe om hvor du er: «Ola blir med (hjemme)» ga vennene ingenting.
+//
+// Rader som alt star i basen med hvor='hjemme' faller til null her, sa
+// personen fortsatt star pa lista — bare uten et sted. Det er riktig:
+// hen sa aldri at hen skulle noe sted.
 export const HVOR = {
-  hjemme: "hjemme",
   pub: "på pub",
   stadion: "på stadion",
 };
@@ -397,7 +404,9 @@ export function kamplenke(liga, kamp, hvor, sted) {
   const sok = new URLSearchParams();
   if (kamp && kamp.id != null) sok.set("kamp", String(kamp.id));
   if (HVOR[hvor]) sok.set("hvor", hvor);
-  if (hvor === "pub" && sted) sok.set("sted", String(sted).slice(0, STED_MAKS));
+  // Stedet folger begge svarene na, ikke bare puben: stadion er et sted
+  // pa linje med pubene, og «på Lerkendal» sier mer enn «på stadion».
+  if (HVOR[hvor] && sted) sok.set("sted", String(sted).slice(0, STED_MAKS));
   const hale = sok.toString();
   return fotballHash(liga, "neste") + (hale ? "?" + hale : "");
 }

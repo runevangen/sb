@@ -8,9 +8,10 @@
 // likt her som i resten av appen.
 
 import { LIGAER, DELER, FANER, DEL_NAVN, HVOR, STED_MAKS, delingstekst,
-         kamplenke, invitasjonstekst, normaliserLagnavn } from "./fotball-data.js";
+         kamplenke, invitasjonstekst, stedtekst } from "./fotball-data.js";
 import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
-         loftMedSvar, bareMedSvar, NAVN_MAKS } from "./svar-data.js";
+         loftMedSvar, bareMedSvar, stederFraSvar, perSted,
+         stedNokkel } from "./svar-data.js";
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
          rangerForslag, FORSLAG_MAKS } from "./pub-data.js";
@@ -23,7 +24,7 @@ import { arenaFor } from "./vaer-data.js";
 // tor sta inne for, er verre enn ett forslag faerre.
 const KJENTE = PUBER_OSLO.filter((p) => p.sikkerhet !== "usikker");
 const KJENT_RADIUS = 1500;
-import { timeAgo } from "./lib.js";
+import { timeAgo, listeTekst } from "./lib.js";
 
 let naviger = () => {};
 let sokEtterLag = () => {};
@@ -393,9 +394,9 @@ let apentPanel = null;
 function delKnapp(kamp, rad) {
   const knapp = el("button", "kamp-del");
   knapp.type = "button";
-  knapp.setAttribute("aria-label", kamp.hjemme + " – " + kamp.borte + ". Hvor ser du kampen?");
+  knapp.setAttribute("aria-label", kamp.hjemme + " – " + kamp.borte + ". Hvor skal du se den?");
   knapp.setAttribute("aria-expanded", "false");
-  knapp.title = "Hvor ser du kampen? Del med vennene dine";
+  knapp.title = "Hvor skal du se den? Se hvem som viser kampen";
   knapp.addEventListener("click", () => {
     if (apentPanel && apentPanel.knapp === knapp) { lukkPanel(); return; }
     lukkPanel();
@@ -410,8 +411,15 @@ function delKnapp(kamp, rad) {
     rad.appendChild(panel);
     knapp.setAttribute("aria-expanded", "true");
     apentPanel = { panel, knapp, rad };
+    // Stedene tegnes forst nar panelet henger i raden: et sted fra en
+    // delt lenke ligger pa raden, og den finnes ikke for panelet er
+    // festet. Tegnet vi for, ville det stedet mangle i lista.
+    panel.tegnSteder();
     tegnPanelListe(kamp);
-    panel.querySelector(".hvor-valg").focus();
+    // Fokus pa det forste stedet — det er handlingen. Har kampen ingen
+    // steder enna, star lenka til forslagene der i stedet.
+    const forste = panel.querySelector(".sted-chip") || panel.querySelector(".pub-apne");
+    if (forste) forste.focus();
   });
   return knapp;
 }
@@ -428,112 +436,361 @@ function lukkPanel() {
   apentPanel = null;
 }
 
-// Apner delingspanelet pa en rad med svaret ferdig valgt. To veier inn
-// hit: linja som sier hvem som viser kampen, og invitasjonen fra en delt
-// lenke. Begge har allerede svart «hvor» for leseren, og begge skal lande
-// i det samme panelet — ellers finnes det to mater a dele pa.
+// Apner kortet pa en rad med et sted pekt ut. To veier inn hit: linja som
+// sier hvem som viser kampen, og invitasjonen fra en delt lenke. Begge
+// vet alt hvilket sted det gjelder, og begge skal lande i det samme
+// kortet — ellers finnes det to mater a svare pa.
+//
+// Stedet blir *pekt ut*, ikke valgt: et trykk pa et sted er na svaret
+// «jeg skal dit», og det svaret skal leseren gi selv. Derfor markeres
+// chipen og far fokus, sa det fortsatt koster ett trykk — hens eget.
 function apnePanelMed(rad, hvor, sted) {
   const knapp = rad && rad.querySelector(".kamp-del");
   if (!knapp) return null;
+
+  // Stedet legges pa raden for panelet tegnes: et sted fra en lenke kan
+  // vaere en pub ingen har meldt inn og ingen kart kjenner, og da ma den
+  // med i lista framfor a forsvinne.
+  rad.dataset.pektHvor = HVOR[hvor] ? hvor : "";
+  rad.dataset.pektSted = sted ? String(sted).slice(0, STED_MAKS) : "";
+
   if (knapp.getAttribute("aria-expanded") !== "true") knapp.click();
+  else if (apentPanel && apentPanel.panel.tegnSteder) apentPanel.panel.tegnSteder();
 
   const panel = apentPanel && apentPanel.panel;
   if (!panel) return null;
 
-  const valg = panel.querySelector(".hvor-valg[data-hvor=\"" + hvor + "\"]");
-  if (valg) valg.click();
-  if (hvor === "pub" && sted) {
-    const felt = panel.querySelector(".kamp-pub");
-    felt.value = sted;
-    felt.dispatchEvent(new Event("input"));
-  }
+  const pekt = panel.querySelector(".sted-chip.pekt");
+  if (pekt) pekt.focus();
   return panel;
 }
 
+/* ---------- kampkortet: hvor skal du se den? ---------- */
+
+// Kortet er en liste over steder man kan dra, og et trykk pa et sted er
+// svaret: «jeg planlegger a se den der».
+//
+// For var det tre steg — velg hjemme/pub/stadion, skriv pubnavnet, trykk
+// «Jeg skal dit» — og et navnefelt i tillegg, pa hver eneste kamp. Tre
+// steg for a si én ting. Na er stedet og svaret det samme trykket, og
+// navnet kommer fra innloggingen: det er alt det samme fornavnet.
+//
+// «Hjemme» er borte. Kortet handler om hvor man moter noen, og sofaen er
+// ikke et motested — det var ogsa det eneste svaret som ikke sa noe om
+// hvor du er.
 function delPanel(kamp) {
   const panel = el("div", "kamp-panel");
-  // En erklaering, ikke et sporsmal: det du gjor her er a si at du skal
-  // se den, og hvor. Sporsmalsformen ga to likestilte knapper nederst —
-  // «Del» og «Jeg blir med» — som konkurrerte om a vaere handlingen.
-  panel.appendChild(el("p", "kamp-panel-tittel", "Jeg skal se den"));
+  const bekreftede = bekreftetFor(kamp, VISNINGER, KJENTE);
 
-  let hvor = null;
-  const valg = el("div", "hvor-liste");
+  // Overskrifta i kortet sier hva lista under er. Lagene er overskrifta
+  // pa kampen, og de star i linja over — kortet skal ikke ha en tittel
+  // til som konkurrerer med dem.
+  const tittel = el("p", "kamp-panel-tittel", bekreftede.length
+    ? "Disse viser kampen:" : "Hvor skal du se den?");
+  panel.appendChild(tittel);
+
+  const steder = el("div", "sted-liste");
+  panel.appendChild(steder);
+
+  const melding = el("p", "kamp-svar");
+  melding.setAttribute("aria-live", "polite");
+
+  // Et sted du skriver selv. Feltet og forslagene ligger bak lenka
+  // under: de fleste kamper trenger dem ikke, og de var storsteparten av
+  // stoyen i kortet.
   const pubFelt = el("input", "kamp-pub");
   pubFelt.type = "text";
-  pubFelt.placeholder = "Hvilken pub?";
-  pubFelt.setAttribute("aria-label", "Hvilken pub?");
+  pubFelt.placeholder = "Et annet sted?";
+  pubFelt.setAttribute("aria-label", "Skriv stedet du skal se kampen");
   pubFelt.maxLength = STED_MAKS;
-  pubFelt.hidden = true;
-  const forslag = pubForslag(kamp, pubFelt);
-  forslag.hidden = true;
-  // Delingen er ikke lenger hovedsaken: den sender beskjeden til
-  // gruppechatten, mens lista i appen er det vennene ser nar de apner
-  // kampen. Derfor en tekstknapp under, ikke en fylt knapp ved siden av.
-  const send = el("button", "kamp-send", "Del i chatten");
-  send.type = "button";
-  send.disabled = true;
-  const svar = el("p", "kamp-svar");
-  svar.setAttribute("aria-live", "polite");
 
-  // Stadion far navnet sitt nar vi har det: «på Lerkendal» sier mer enn
-  // «på stadion».
-  const navn = { hjemme: "Hjemme", pub: "På pub",
-                 stadion: kamp.arena ? "På " + kamp.arena : "På stadion" };
-  Object.keys(HVOR).forEach((nokkel) => {
-    const b = el("button", "hvor-valg", navn[nokkel]);
-    b.type = "button";
-    b.dataset.hvor = nokkel;
-    b.setAttribute("aria-pressed", "false");
-    b.addEventListener("click", () => {
-      hvor = nokkel;
-      valg.querySelectorAll(".hvor-valg").forEach((k) =>
-        k.setAttribute("aria-pressed", k === b ? "true" : "false"));
-      pubFelt.hidden = nokkel !== "pub";
-      forslag.hidden = nokkel !== "pub";
-      if (nokkel === "pub") { fyllForslag(forslag, kamp); pubFelt.focus(); }
-      send.disabled = false;
-      svar.textContent = "";
-      const blirMed = panel.querySelector(".kamp-blirmed-valg");
-      if (blirMed && blirMed.tegnKnapp) blirMed.tegnKnapp();
-    });
-    valg.appendChild(b);
+  const forslag = pubForslag(kamp, pubFelt);
+  const egen = el("button", "sted-egen", "Jeg skal hit");
+  egen.type = "button";
+  egen.disabled = true;
+  pubFelt.addEventListener("input", () => {
+    egen.disabled = !pubFelt.value.trim();
   });
 
+  const utvidet = el("div", "pub-utvidet");
+  utvidet.hidden = true;
+  utvidet.appendChild(forslag);
+  utvidet.appendChild(pubFelt);
+  utvidet.appendChild(egen);
+
+  // Lenka ut til pubene som pleier a vise fotball. Har ingen meldt inn
+  // noe pa denne kampen, er det den eneste veien videre — da sier lenka
+  // det, og listen star apen med en gang.
+  const apne = el("button", "pub-apne");
+  apne.type = "button";
+  apne.setAttribute("aria-expanded", "false");
+  const apneTekst = () => (bekreftede.length
+    ? "Et annet sted" : "Puber som pleier å vise fotball");
+  apne.textContent = apneTekst();
+  const vis = (pa) => {
+    utvidet.hidden = !pa;
+    apne.setAttribute("aria-expanded", pa ? "true" : "false");
+    apne.textContent = pa ? "Skjul stedene" : apneTekst();
+    if (pa) fyllForslag(forslag, kamp);
+  };
+  apne.addEventListener("click", () => vis(utvidet.hidden));
+
+  panel.appendChild(melding);
+  panel.appendChild(apne);
+  panel.appendChild(utvidet);
+
+  // Vennene nederst, gruppert etter stedet de skal til: «List opp nederst
+  // venner som har planlagt turen dit». Et navn uten et sted sier ikke
+  // hvor man moter noen.
+  panel.appendChild(el("div", "kamp-panel-liste"));
+
+  // Delingen sender beskjeden til gruppechatten. Lista i kortet er det
+  // vennene ser nar de apner kampen, sa dette er en tekstknapp under,
+  // ikke en handling som konkurrerer med stedene.
+  const send = el("button", "kamp-send", "Del i chatten");
+  send.type = "button";
+  panel.appendChild(send);
+
+  // Stedet leseren har pekt ut uten a vaere logget inn. A dele kampen i
+  // gruppechatten krever ingen konto, og gjorde det aldri — det gar til
+  // vennene, ikke til oss. Men det som skal sta pa lista i appen, ma vaere
+  // sagt av noen. Sa utlogget velger et trykk et sted, logget inn skriver
+  // det ogsa raden.
+  let lokaltSted = null;
+
+  // Ett sted som bestemmer hva som star i chip-rada. Logget inn er det
+  // svaret tjenesten kjenner — ikke en variabel her, sa den samme kampen
+  // i vennefanen viser det samme. Utlogget er det trykket i dette kortet.
+  const mitt = () => {
+    const okt = konto.okt();
+    if (!okt) return lokaltSted;
+    return egetSvar(sisteSvar.filter((s) => s.kampId === String(kamp.id)),
+      okt.bruker);
+  };
+  panel.settLokalt = (verdi) => { lokaltSted = verdi; };
+
+  // Stedene som er trykket pa i dette kortet. De blir staende som chips
+  // sa lenge kortet er apent, ogsa etter at svaret er angret: en chip som
+  // forsvinner under fingeren er verre enn en chip for mye — og angrer du,
+  // skal veien tilbake vaere den samme.
+  const egneSteder = [];
+  panel.husk = (hvor, sted) => {
+    if (!sted || egneSteder.some((s) => stedNokkel(s.navn) === stedNokkel(sted))) return;
+    egneSteder.push({ hvor, navn: sted });
+  };
+
+  panel.tegnSteder = () => {
+    const rad = panel.closest(".kamp");
+    const pekt = rad ? stedNokkel(rad.dataset.pektSted || "") : "";
+    const eget = mitt();
+    const valgt = eget && eget.sted ? stedNokkel(eget.sted) : "";
+
+    steder.replaceChildren();
+    stedKilder(kamp, bekreftede, rad, egneSteder).forEach((sted) => {
+      const nokkel = stedNokkel(sted.navn);
+      steder.appendChild(stedChip(kamp, panel, sted, {
+        valgt: !!valgt && nokkel === valgt,
+        pekt: !!pekt && nokkel === pekt && nokkel !== valgt,
+        melding,
+      }));
+    });
+
+    // Ingen steder a trykke pa: da er forslagene ikke et tillegg, de er
+    // hele svaret, og de skal sta apne.
+    if (!steder.children.length && utvidet.hidden) vis(true);
+
+    // Merkene i forslagslista skal si det samme som chipene over: stedet
+    // du alt har sagt at du skal til, er merket der ogsa.
+    forslag.mittSted = valgt;
+    if (forslag.dataset.fylt) tegnForslag(forslag);
+
+    if (!konto.okt() && !panel.querySelector(".kamp-note")) {
+      // Utlogget star det hva som mangler — og at resten virker uansett.
+      // Innlogging er ikke en port inn i appen, bare veien til a stille
+      // seg pa lista.
+      const note = el("p", "kamp-note",
+        "Logg inn i menyen — et fornavn og en PIN — for å si at du skal dit."
+        + " Å se hvem som blir med, og å dele kampen, virker uansett.");
+      panel.insertBefore(note, melding);
+    }
+  };
+
+  // Et sted du skrev selv. Samme svar som en chip, bare med et navn vi
+  // ikke hadde pa lista.
+  egen.addEventListener("click", () => {
+    const navn = pubFelt.value.trim();
+    if (!navn) return;
+    svarSted(kamp, panel, "pub", navn, melding);
+  });
+
+  // Chipene i forslagslista svarer som chipene over: ett trykk, ett sted.
+  forslag.velg = (pub) => {
+    pubFelt.value = pub.navn;
+    egen.disabled = false;
+    svarSted(kamp, panel, "pub", pub.navn, melding);
+  };
+
   send.addEventListener("click", async () => {
-    if (!hvor) return;
+    const eget = mitt();
+    const hvor = eget && eget.hvor ? eget.hvor : null;
+    const sted = eget && eget.sted ? eget.sted : "";
     // Lenka barer kampen, svaret og stedet: mottakeren skal lande pa
     // kampen det gjelder, ikke i en runde hen ma lete i.
     const url = location.origin + location.pathname +
-      kamplenke(aktivLiga, kamp, hvor, pubFelt.value.trim());
-    // Vaeret er hentet da raden ble apnet, og husket per kamp; er det ikke der,
-    // deles teksten uten. Ingen skal vente pa MET for a sende en melding.
+      kamplenke(aktivLiga, kamp, hvor, sted);
+    // Vaeret er hentet da raden ble apnet, og husket per kamp; er det ikke
+    // der, deles teksten uten. Ingen skal vente pa MET for a sende en
+    // melding.
     const vaer = kamp.arena ? await hentVaer(kamp) : null;
-    const tekst = delingstekst(kamp, hvor, pubFelt.value.trim(), url, vaer && vaer.tekst);
+    const tekst = delingstekst(kamp, hvor, sted, url, vaer && vaer.tekst);
     send.disabled = true;
     const utfall = await deling(tekst, url);
     send.disabled = false;
-    if (utfall === "delt" || utfall === "kopiert") {
+    if ((utfall === "delt" || utfall === "kopiert") && hvor === "pub" && sted) {
       // En delt pub er en pub leseren bruker. Neste gang star den forst.
-      if (hvor === "pub" && pubFelt.value.trim()) puber.noter(pubFelt.value.trim());
+      puber.noter(sted);
     }
     if (utfall === "delt") { lukkPanel(); return; }
-    if (utfall === "kopiert") svar.textContent = "Kopiert. Lim inn i chatten.";
-    else if (utfall !== "avbrutt") svar.textContent = "Fikk ikke delt. Kopier teksten selv: " + tekst;
+    if (utfall === "kopiert") melding.textContent = "Kopiert. Lim inn i chatten.";
+    else if (utfall !== "avbrutt") {
+      melding.textContent = "Fikk ikke delt. Kopier teksten selv: " + tekst;
+    }
   });
 
-  panel.appendChild(valg);
-  panel.appendChild(forslag);
-  panel.appendChild(pubFelt);
-  // Hovedhandlingen: si at du skal dit. Den star rett under stedet du
-  // valgte, ikke nederst etter alle forslagene.
-  panel.appendChild(blirMedDel(kamp, () => hvor, () => pubFelt.value.trim()));
-  // Og her ser du at det virket: de samme navnene vennene dine ser nar
-  // de apner kampen. Uten dette maa man lukke panelet for a se lista.
-  panel.appendChild(el("div", "kamp-panel-liste"));
-  panel.appendChild(send);
-  panel.appendChild(svar);
   return panel;
+}
+
+// Stedene i kortet, i den rekkefolgen de svarer pa kampen:
+//
+//  1. pubene som har meldt inn at de viser nettopp denne kampen,
+//  2. stadion — «en plass man kan dra», pa linje med pubene,
+//  3. stedene vennene alt har sagt at de skal til,
+//  4. stedet en delt lenke pekte pa.
+//
+// Deduplisert pa stedet normalisert, sa en pub som bade er meldt inn og
+// har folk star én gang. Rekkefolgen bestemmer hvem som vinner merkene:
+// den forste utgaven av stedet er den som star.
+function stedKilder(kamp, bekreftede, rad, egne) {
+  const sett = new Map();
+  const legg = (navn, felt) => {
+    if (!navn) return;
+    const nokkel = stedNokkel(navn);
+    if (!nokkel) return;
+    const fra = sett.get(nokkel);
+    if (fra) { Object.assign(fra, felt, { navn: fra.navn }); return; }
+    sett.set(nokkel, Object.assign({ navn: String(navn) }, felt));
+  };
+
+  bekreftede.forEach((p) => legg(p.navn, { hvor: "pub", bekreftet: true }));
+  if (kamp.arena) legg(kamp.arena, { hvor: "stadion", stadion: true });
+  stederFraSvar(sisteSvar.filter((s) => s.kampId === String(kamp.id)))
+    .forEach((s) => legg(s.navn, { hvor: s.hvor, harFolk: true }));
+  (egne || []).forEach((s) => legg(s.navn, { hvor: s.hvor }));
+  if (rad && rad.dataset.pektSted) {
+    legg(rad.dataset.pektSted, { hvor: rad.dataset.pektHvor || "pub" });
+  }
+  return Array.from(sett.values());
+}
+
+// Ett sted, ett trykk. Trykker du pa stedet du alt star pa, gar du av
+// lista igjen: to knapper ville betydd at man kan bli med to ganger.
+function stedChip(kamp, panel, sted, form) {
+  const b = el("button", "sted-chip");
+  b.type = "button";
+  if (sted.bekreftet) b.classList.add("bekreftet");
+  if (form.pekt) b.classList.add("pekt");
+
+  b.appendChild(el("span", "sted-navn", sted.navn));
+
+  // Merkene sier hvorfor stedet star her. Stjerna svarer pa kampen,
+  // arenaen pa hvor den spilles, folka pa hvem du moter.
+  if (sted.bekreftet) {
+    const merke = el("span", "pub-bekreftet", "★");
+    merke.setAttribute("aria-label", "viser denne kampen");
+    b.appendChild(merke);
+    b.title = "Meldt inn til oss.";
+  } else if (sted.stadion) {
+    const merke = el("span", "sted-merke", "🏟");
+    merke.setAttribute("aria-label", "på stadion");
+    b.appendChild(merke);
+  }
+
+  const folk = sisteSvar.filter((s) => s.kampId === String(kamp.id) &&
+    s.sted && stedNokkel(s.sted) === stedNokkel(sted.navn));
+  if (folk.length) {
+    const tall = el("span", "sted-folk", String(folk.length));
+    tall.setAttribute("aria-label", folk.length === 1 ? "én skal hit"
+      : folk.length + " skal hit");
+    b.appendChild(tall);
+  }
+
+  b.setAttribute("aria-pressed", form.valgt ? "true" : "false");
+  b.setAttribute("aria-label", (form.valgt ? "Du skal til " : "Jeg skal til ")
+    + sted.navn);
+  b.addEventListener("click", () =>
+    svarSted(kamp, panel, sted.hvor || "pub", sted.navn, form.melding, form.valgt));
+  return b;
+}
+
+// Svaret. Ett trykk skriver raden, et nytt trykk pa det samme stedet
+// fjerner den.
+//
+// Navnet kommer fra innloggingen, ikke fra et felt i kortet: det er alt
+// det samme fornavnet, og et felt man matte fylle for trykket virket
+// ville betydd at «ett trykk» ikke var sant.
+async function svarSted(kamp, panel, hvor, sted, melding, avmeld) {
+  const okt = konto.okt();
+  if (panel.husk) panel.husk(hvor, sted);
+  if (!okt) {
+    // Utlogget velger trykket stedet uten a skrive noe: da kan kampen
+    // deles med stedet i teksten, som den alltid har kunnet. Lista i
+    // appen krever at noen har sagt det, og det star her.
+    panel.settLokalt(avmeld ? null : { hvor, sted });
+    melding.textContent = avmeld ? ""
+      : "Logg inn i menyen for å stille deg på lista. Å dele kampen virker uansett.";
+    if (panel.tegnSteder) panel.tegnSteder();
+    return;
+  }
+  const navn = normaliserNavn(konto.navn());
+  if (!gyldigNavn(navn)) {
+    melding.textContent = "Logg inn på nytt — vi mangler fornavnet ditt.";
+    return;
+  }
+
+  panel.querySelectorAll(".sted-chip, .pub-chip, .sted-egen")
+    .forEach((k) => { k.disabled = true; });
+  try {
+    if (avmeld) {
+      await svarTjeneste({ handling: "fjern", token: okt.token, kampId: kamp.id });
+      sisteSvar = sisteSvar.filter(
+        (s) => !(s.kampId === String(kamp.id) && s.bruker === okt.bruker));
+      panel.settLokalt(null);
+      melding.textContent = "Du står ikke på lista lenger.";
+    } else {
+      konto.settNavn(navn);
+      const json = await svarTjeneste({
+        token: okt.token, kampId: kamp.id, navn, hvor, sted,
+      });
+      const mine = tolkSvar(json.svar);
+      sisteSvar = sisteSvar.filter(
+        (s) => !(s.kampId === String(kamp.id) && s.bruker === okt.bruker)).concat(mine);
+      panel.settLokalt({ hvor, sted });
+      melding.textContent = "Du står på lista — " + stedtekst(kamp, hvor, sted) + ".";
+    }
+    // Rekkefolgen i runden og linja under kampen skal si det samme som
+    // kortet: ett svar, ett sted som tegner det.
+    tegnSvar(document.getElementById("fotballInnhold"));
+    tegnPanelListe(kamp);
+    if (panel.tegnSteder) panel.tegnSteder();
+  } catch (err) {
+    melding.textContent = err.message;
+  } finally {
+    panel.querySelectorAll(".sted-chip, .pub-chip, .sted-egen")
+      .forEach((k) => { k.disabled = false; });
+    const felt = panel.querySelector(".kamp-pub");
+    const egen = panel.querySelector(".sted-egen");
+    if (felt && egen) egen.disabled = !felt.value.trim();
+  }
 }
 
 /* ---------- pubforslag ---------- */
@@ -623,7 +880,9 @@ function fyllForslag(boks, kamp) {
 
 // Ett sted som bestemmer hva som star pa skjermen.
 function tegnForslag(boks) {
-  const valgt = boks.pubFelt ? normaliserLagnavn(boks.pubFelt.value || "") : "";
+  // Merket folger svaret jeg har gitt, ikke det som star i feltet: et
+  // forslag er merket fordi jeg skal dit, ikke fordi jeg skrev navnet.
+  const valgt = boks.mittSted || "";
   const { topp, resten } = rangerForslag(boks.kilder, boks.alt ? 0 : FORSLAG_MAKS);
   boks.replaceChildren();
 
@@ -699,12 +958,14 @@ function pubChip(pub, boks, valgt) {
   }
 
   b.setAttribute("aria-pressed",
-    valgt && normaliserLagnavn(pub.navn) === valgt ? "true" : "false");
+    valgt && stedNokkel(pub.navn) === valgt ? "true" : "false");
+  // Ett trykk, ett sted — ogsa her. Et forslag oppforer seg som et sted i
+  // kortet over: trykket *er* svaret, ikke en utfylling av et felt man
+  // ma trykke en gang til for a bruke.
   b.addEventListener("click", () => {
+    if (boks.velg) { boks.velg(pub); return; }
     boks.pubFelt.value = pub.navn;
     boks.pubFelt.dispatchEvent(new Event("input"));
-    boks.querySelectorAll(".pub-chip").forEach((k) =>
-      k.setAttribute("aria-pressed", k === b ? "true" : "false"));
   });
   return b;
 }
@@ -1018,23 +1279,35 @@ function tegnBolker(liste, rader, harSvar) {
   if (notis) liste.appendChild(notis);
 }
 
-// Lista inne i det apne panelet: de samme navnene vennene dine ser nar
-// de apner kampen. Den star her sa du ser at det virket, uten a lukke
-// panelet for a lete etter linja under raden.
+// Vennene nederst i kortet, gruppert etter stedet de skal til:
+//
+//     Lincoln Pub   Ola og Kari
+//     Lerkendal     Per
+//
+// Linja under kampen sier hvor mange og hvem — nok nar man blar. Kortet
+// sier hvor man moter dem, og det er sporsmalet man apnet kortet for a
+// svare pa. «3 blir med: Ola, Kari og Per» sa ingenting om det.
 function tegnPanelListe(kamp) {
   const panel = apentPanel && apentPanel.panel;
   const boks = panel && panel.querySelector(".kamp-panel-liste");
   if (!boks) return;
 
   const mine = sisteSvar.filter((s) => s.kampId === String(kamp.id));
-  const tekst = blirMedTekst(mine);
   boks.replaceChildren();
-  if (!tekst) return;
+  const grupper = perSted(mine, kamp);
+  if (!grupper.length) return;
 
-  const merke = el("span", "kamp-blirmed-merke", "✓");
-  merke.setAttribute("aria-hidden", "true");
-  boks.appendChild(merke);
-  boks.appendChild(el("span", null, tekst));
+  grupper.forEach((g) => {
+    const rad = el("div", "sted-rad");
+    const merke = el("span", "kamp-blirmed-merke", "✓");
+    merke.setAttribute("aria-hidden", "true");
+    rad.appendChild(merke);
+    // Star det ingen sted, sa personen bare at hen blir med. Da star
+    // navnet der uten et sted vi ikke har.
+    if (g.sted) rad.appendChild(el("span", "sted-rad-sted", g.sted));
+    rad.appendChild(el("span", "sted-rad-navn", listeTekst(g.navn)));
+    boks.appendChild(rad);
+  });
 }
 
 async function svarTjeneste(kropp) {
@@ -1053,99 +1326,6 @@ async function svarTjeneste(kropp) {
     throw new Error((json && json.feil) || "Tjenesten svarte " + respons.status + ".");
   }
   return json;
-}
-
-// Delen av panelet som svarer for deg selv. Utlogget star det hva som
-// mangler og at resten virker uansett — innlogging er ikke en port inn i
-// appen, bare veien til a stille seg pa lista.
-function blirMedDel(kamp, lesHvor, lesSted) {
-  const boks = el("div", "kamp-blirmed-valg");
-  const okt = konto.okt();
-
-  if (!okt) {
-    // Fornavn og PIN star med: den som leser dette skal vite at det koster
-    // to felt, ikke en e-post og en kode.
-    boks.appendChild(el("p", "kamp-note",
-      "Logg inn i menyen — et fornavn og en PIN — for å si at du blir med."
-      + " Å dele kampen virker uansett."));
-    return boks;
-  }
-
-  const navnFelt = el("input", "kamp-navn");
-  navnFelt.type = "text";
-  // Advarselen star i feltet, ikke som en grastripe under: den hoerer
-  // hjemme der navnet skrives, og den koster da ingen egen linje.
-  navnFelt.placeholder = "Fornavn — vises for andre";
-  navnFelt.setAttribute("aria-label",
-    "Fornavn. Navnet er synlig for alle som åpner kampen.");
-  navnFelt.maxLength = NAVN_MAKS;
-  navnFelt.value = konto.navn();
-
-  const knapp = el("button", "kamp-blimed");
-  knapp.type = "button";
-  const svar = el("p", "kamp-svar");
-  svar.setAttribute("aria-live", "polite");
-
-  // Har du alt svart, er knappen en angreknapp. To knapper ville betydd
-  // at man kan bli med to ganger.
-  // Knappen sier hva den gjor, ikke hva den heter: skal du et sted, skal
-  // du «dit»; ser du den hjemme, gjor du ikke det.
-  const tegnKnapp = () => {
-    const mitt = egetSvar(sisteSvar.filter((s) => s.kampId === String(kamp.id)),
-      okt.bruker);
-    knapp.textContent = mitt
-      ? "Jeg kommer ikke likevel"
-      : (lesHvor() === "hjemme" ? "Jeg ser den hjemme" : "Jeg skal dit");
-    knapp.dataset.med = mitt ? "ja" : "nei";
-    navnFelt.hidden = !!mitt;
-    return mitt;
-  };
-  tegnKnapp();
-
-  knapp.addEventListener("click", async () => {
-    const mitt = knapp.dataset.med === "ja";
-    const navn = normaliserNavn(navnFelt.value);
-    if (!mitt && !gyldigNavn(navn)) {
-      svar.textContent = "Skriv navnet vennene ser deg som.";
-      navnFelt.focus();
-      return;
-    }
-
-    knapp.disabled = true;
-    try {
-      if (mitt) {
-        await svarTjeneste({ handling: "fjern", token: okt.token, kampId: kamp.id });
-        sisteSvar = sisteSvar.filter(
-          (s) => !(s.kampId === String(kamp.id) && s.bruker === okt.bruker));
-        svar.textContent = "Du står ikke på lista lenger.";
-      } else {
-        konto.settNavn(navn);
-        const json = await svarTjeneste({
-          token: okt.token, kampId: kamp.id, navn,
-          hvor: lesHvor(), sted: lesSted(),
-        });
-        const mine = tolkSvar(json.svar);
-        sisteSvar = sisteSvar.filter(
-          (s) => !(s.kampId === String(kamp.id) && s.bruker === okt.bruker)).concat(mine);
-        svar.textContent = "Du står på lista.";
-      }
-      tegnKnapp();
-      tegnSvar(document.getElementById("fotballInnhold"));
-      tegnPanelListe(kamp);
-    } catch (err) {
-      svar.textContent = err.message;
-    } finally {
-      knapp.disabled = false;
-    }
-  });
-
-  boks.appendChild(navnFelt);
-  boks.appendChild(knapp);
-  boks.appendChild(svar);
-  // Knappeteksten folger stedet du velger, sa panelet ma tegne den pa
-  // nytt nar valget endres.
-  boks.tegnKnapp = tegnKnapp;
-  return boks;
 }
 
 /* ---------- invitasjonen fra en delt lenke ---------- */
