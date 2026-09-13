@@ -552,6 +552,19 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   dialogboks; den ville blitt et hinder å klikke bort framfor en setning
   å lese. En utlogging nullstiller bekreftelsen, så den ikke står klar
   neste gang noen logger inn.
+- **Sett virke i prod 13. september 2026**: fornavn og PIN, konto laget
+  hos Supabase i samme kall som innloggingen, økten lagret lokalt. Fire
+  ting sto i veien, og ingen av dem var i koden:
+  - **Hemmelighetsskanningen stoppet deployen.** `PIN_PEPPER` var satt
+    til noe som finnes som tekst i repoet. `netlify.toml` holder nå
+    `docs/` og `test/` utenfor skanningen, men fiksen er en lang
+    tilfeldig verdi.
+  - **Scope på miljøvariablene.** En variabel som bare gjelder «Builds»
+    ser ikke funksjonen ved kjøring. Den må ha Functions med.
+  - **Supabase lagrer ikke provider-innstillinger på bryteren.** «Confirm
+    email» ble slått av uten Save, og sto tilbake som før.
+  - **Settings er delt opp hos Supabase.** Nøklene ligger under *API
+    Keys*, ikke på den gamle `/settings/api`, som nå lander på *General*.
 
 #### Parkert: engangskoden på e-post
 
