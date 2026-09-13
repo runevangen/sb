@@ -895,16 +895,82 @@ body {
    selger stoy. */
 .ad-ledig {
   margin: 14px 0;
-  padding: 14px;
   border: 1px dashed var(--accent);
   border-radius: 12px;
   background: none;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
+  overflow: hidden;
 }
 
 .ad-ledig .ad-label { color: var(--accent); }
+
+.ad-ledig-kropp {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ad-ledig-bilde { display: block; object-fit: cover; }
+
+/* 1. Portrettet: den kompakte formen. Et rundt bilde ved siden av
+      teksten, som en person i en kontaktliste — for det er det den er.
+      Bildet krymper ikke nar setningen er lang. */
+.ad-ledig-portrett {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px;
+}
+
+.ad-ledig-portrett .ad-ledig-bilde {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* 2. Den brede: bildet som et band over teksten, med sola i. Formatet
+      til bannerannonsene er 120 px hoyt, og et ansikt far ikke plass der
+      — kuttet ville gatt gjennom haka. Var egen plass trenger ikke
+      folge deres mal. */
+.ad-ledig-bred .ad-ledig-bilde {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+}
+
+.ad-ledig-bred .ad-ledig-kropp { padding: 12px 13px 14px; }
+
+/* 3. Det hoye kortet: bildet er flata, og teksten ligger oppa
+      gradienten nederst — samme grep som toppsaken i feeden. Derfor
+      --on-overlay og ikke temaets tekstfarge: gradienten er mork i
+      begge temaer. */
+.ad-ledig-hoy {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  max-height: 420px;
+}
+
+.ad-ledig-hoy .ad-ledig-bilde {
+  width: 100%;
+  height: 100%;
+}
+
+.ad-ledig-overlegg {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16px;
+  background: linear-gradient(transparent, var(--overlay-hero));
+}
+
+.ad-ledig-hoy .ad-headline { color: var(--on-overlay); }
+
+/* Merket og knappen ligger ogsa oppa gradienten. Aksentfargen er lys nok
+   i begge temaer, men merket skal leses mot morkt her, ikke mot kortet. */
+.ad-ledig-hoy .ad-label { color: var(--on-overlay-dim); }
 
 /* Lenka til Messenger. Samme form som en ad-cta, men den er en ekte
    lenke — den gar et sted. */

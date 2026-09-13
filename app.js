@@ -432,10 +432,22 @@ const MESSENGER = "premern";
 // plassen den står i. Derfor sier den «Ledig plass» og ikke «Reklame».
 // Å merke vår egen tekst som reklame fra en annonsør ville vært å lyve i
 // akkurat den merkingen appen ellers er nøye på.
+//
+// Den ledige plassen står i tre former — `form` — og de er spredt utover
+// lista med vilje: annonseplassene kommer etter hver fjerde sak, så to av
+// dem kan stå på samme skjerm. Tre like bokser etter hverandre leses som
+// støy; tre ulike leses som tre plasser.
+//
+// Ansiktet er poenget. Det er en person man skal sende en melding til,
+// ikke et skjema — og da skal man se hvem.
 const ADS = [
   {
     format: "ledig",
+    form: "portrett",
     brand: "LEDIG PLASS",
+    bilde: "/bilder/prem-portrett.jpg",
+    bredde: 400,
+    hoyde: 400,
     headline: "Her kunne det stått noe om deg.",
     cta: "Ta en prat med Prem"
   },
@@ -452,6 +464,16 @@ const ADS = [
     sub: "Book time · padelhuset.no"
   },
   {
+    format: "ledig",
+    form: "bred",
+    brand: "LEDIG PLASS",
+    bilde: "/bilder/prem-bred.jpg",
+    bredde: 1000,
+    hoyde: 562,
+    headline: "Vil du nå folk som leser om norsk fotball?",
+    cta: "Snakk med Prem"
+  },
+  {
     format: "banner",
     brand: "SPRINTA",
     headline: "Nye Sprinta Terreng. Bygget for norsk høst.",
@@ -462,6 +484,16 @@ const ADS = [
     brand: "TRIBUNE",
     headline: "Billetter til høstens toppkamper",
     sub: "tribune.no"
+  },
+  {
+    format: "ledig",
+    form: "hoy",
+    brand: "LEDIG PLASS",
+    bilde: "/bilder/prem-hoy.jpg",
+    bredde: 800,
+    hoyde: 1000,
+    headline: "Se for deg merket ditt her.",
+    cta: "Send Prem en melding"
   }
 ];
 
@@ -473,13 +505,7 @@ function buildAd(ad, slot) {
   box.setAttribute("aria-label", ad.format === "ledig"
     ? "Ledig annonseplass" : "Reklame fra " + ad.brand);
 
-  if (ad.format === "ledig") {
-    box.appendChild(el("span", "ad-label", "Ledig plass"));
-    box.appendChild(el("p", "ad-headline", ad.headline));
-    box.appendChild(messengerKnapp(ad.cta));
-    track("Annonse vist", { annonsor: ad.brand, plass: String(slot) });
-    return box;
-  }
+  if (ad.format === "ledig") return ledigPlass(ad, slot);
 
   if (ad.format === "stripe") {
     const top = el("div", "ad-top");
@@ -500,6 +526,48 @@ function buildAd(ad, slot) {
 
   track("Annonse vist", { annonsor: ad.brand, plass: String(slot) });
   return box;
+}
+
+// Vår egen plass, i tre former. Innholdet er det samme og står i samme
+// rekkefølge i lesingen — merket, setningen, knappen — så de tre er én
+// annonse i tre fasonger, ikke tre ulike annonser.
+//
+// I det høye kortet ligger teksten oppå bildet; i de to andre ved siden
+// av eller under det.
+function ledigPlass(ad, slot) {
+  const boks = el("div", "ad-ledig ad-ledig-" + ad.form);
+  boks.setAttribute("role", "group");
+  boks.setAttribute("aria-label", "Ledig annonseplass");
+  boks.appendChild(premBilde(ad));
+
+  const kropp = el("div", "ad-ledig-kropp");
+  if (ad.form === "hoy") kropp.classList.add("ad-ledig-overlegg");
+  kropp.appendChild(el("span", "ad-label", "Ledig plass"));
+  kropp.appendChild(el("p", "ad-headline", ad.headline));
+  kropp.appendChild(messengerKnapp(ad.cta));
+  boks.appendChild(kropp);
+
+  track("Annonse vist", { annonsor: ad.brand, plass: String(slot) });
+  return boks;
+}
+
+// Bildet av Prem. Bredden og høyden står på taggen, så plassen er satt av
+// før bildet er lastet: uten dem vokser annonsen og dytter saken man
+// holder på å lese nedover. Samme grunn som at været hentes først når en
+// kamp åpnes.
+//
+// `alt` er navnet hans, ikke en beskrivelse av bildet: den som ikke ser
+// det, skal vite at det er en person her — det er hele poenget med å
+// spørre om en prat.
+function premBilde(ad) {
+  const bilde = el("img", "ad-ledig-bilde");
+  bilde.src = ad.bilde;
+  bilde.width = ad.bredde;
+  bilde.height = ad.hoyde;
+  bilde.alt = "Prem";
+  bilde.loading = "lazy";
+  bilde.decoding = "async";
+  return bilde;
 }
 
 // Messengers direktelenke er m.me/<brukernavn>. Den åpner appen om den

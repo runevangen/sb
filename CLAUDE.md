@@ -10,6 +10,9 @@ prosjektet `mvp-sb`.
     sw.js         service worker: cacher bare skallet, aldri /api/
     netlify.toml  proxy mot WordPress
 
+    bilder/       annonsebilder. prem-{portrett,bred,hoy}.jpg er samme
+                  bilde i tre utsnitt, ett per form pa den ledige plassen
+
     BACKLOGG.md   peker til issues, som er den ekte backloggen
     docs/         dypdykk og notater som ikke er kode
                   nokler-og-tokens.md: alle hemmeligheter, hvor de settes,
@@ -98,6 +101,27 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   står etter `facebook.com/` i profilen. Står det tomt, blir knappen ren
   tekst framfor en død lenke. Lenka åpner i en ny fane med `noopener`, så
   den nye fanen ikke kan røre appen bak.
+- **Plassen står i tre former, og ansiktet er poenget.** Det er en person
+  man skal sende en melding til, ikke et skjema, så man skal se hvem.
+  `form` i annonsen velger fasongen, og de tre står spredt utover `ADS`
+  med vilje: plassene kommer etter hver fjerde sak, så to av dem kan stå
+  på samme skjerm — tre like bokser leses som støy, tre ulike som tre
+  plasser.
+  - `portrett`: rundt bilde ved siden av teksten, som en person i en
+    kontaktliste.
+  - `bred`: bildet som et 16:9-band over teksten, med solnedgangen i.
+    Bannerannonsenes egen flate er 120 px høy, og et ansikt får ikke plass
+    der — kuttet ville gått gjennom haka. Vår egen plass trenger ikke
+    følge deres mål.
+  - `hoy`: bildet er flata, og teksten ligger oppå gradienten nederst,
+    som toppsaken i feeden. Derfor `--on-overlay`, ikke temaets
+    tekstfarge: gradienten er mørk i begge temaer.
+  Utsnittene ligger ferdig beskåret i `bilder/` — ingen byggesteg, så
+  nettleseren skal ikke skalere et kvadratisk bilde ned til et band.
+  Bredde og høyde står på hver `<img>`: uten dem vokser annonsen når
+  bildet lastes, og dytter saken man holder på å lese nedover. `alt` er
+  navnet hans, ikke en beskrivelse av bildet — den som ikke ser det, skal
+  vite at det er en person her.
 - Ingen statistikk i det hele tatt, med vilje. Appen har null
   sporingsskript, ingen informasjonskapsler og ingen samtykkebanner.
   Bruken leses av Usage-grafen i Netlify — båndbredde og forespørsler —
@@ -816,7 +840,7 @@ er i seg selv noe om adressen.
 
     node test/unit.mjs      420 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  219 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       333 tester, ~200 s, headless Chromium
+    node test/run.mjs       341 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

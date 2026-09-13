@@ -32,7 +32,7 @@ const tmp = mkdtempSync(join(tmpdir(), "sb-test-"));
 // «fÃ¸les». HTTP-headeren vinner over gjetting.
 const MIME = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8", ".png": "image/png",
+  ".css": "text/css; charset=utf-8", ".png": "image/png", ".jpg": "image/jpeg",
   ".json": "application/json; charset=utf-8", ".webmanifest": "application/manifest+json",
 };
 
@@ -88,7 +88,9 @@ const HARNESS = `
       if (n.classList.contains("row")) return "sak";
       if (n.classList.contains("ad-banner")) return "banner";
       if (n.classList.contains("ad-stripe")) return "stripe";
-      if (n.classList.contains("ad-ledig")) return "ledig";
+      if (n.classList.contains("ad-ledig-portrett")) return "ledig-portrett";
+      if (n.classList.contains("ad-ledig-bred")) return "ledig-bred";
+      if (n.classList.contains("ad-ledig-hoy")) return "ledig-hoy";
       if (n.classList.contains("vis-flere")) return "mer";
       return "?";
     }).join(" ");
@@ -209,7 +211,8 @@ const SAK_1 = await kjor("feed", FELLES + `
     ok("tidsstempel bruker date_gmt", tid.textContent === "2t siden", tid.textContent);
 
     ok("annonse etter hver fjerde sak",
-       sekvens() === "topp sak sak sak ledig sak sak sak sak banner sak sak sak sak mer", sekvens());
+       sekvens() === "topp sak sak sak ledig-portrett sak sak sak sak banner sak sak sak sak mer",
+       sekvens());
 
     // Den ledige plassen er var egen, ikke en annonsors. A merke den som
     // «Reklame» ville vaert a lyve i nettopp den merkingen appen ellers er
@@ -234,6 +237,19 @@ const SAK_1 = await kjor("feed", FELLES + `
        kall.target === "_blank" && kall.rel.indexOf("noopener") > -1,
        kall.target + " " + kall.rel);
 
+    // Ansiktet er poenget: det er en person man skal sende en melding til.
+    // Bredden og hoyden star pa taggen, sa plassen er satt av for bildet er
+    // lastet — uten dem vokser annonsen og dytter saken man leser nedover.
+    var portrett = ledig.querySelector(".ad-ledig-bilde");
+    ok("bildet av Prem star i annonsen",
+       portrett && portrett.getAttribute("src").indexOf("/bilder/prem-") === 0,
+       portrett && portrett.getAttribute("src"));
+    ok("og det tar plassen sin for det er lastet",
+       portrett.getAttribute("width") === "400" && portrett.getAttribute("height") === "400",
+       portrett.getAttribute("width") + "x" + portrett.getAttribute("height"));
+    ok("den som ikke ser bildet far vite hvem det er",
+       portrett.getAttribute("alt") === "Prem", portrett.getAttribute("alt"));
+
     // Intensjonen er at feeden ikke skal avsluttes med reklame. "Vis flere"
     // er en knapp, ikke innhold, sa den ser vi bort fra her.
     var innhold = sekvens().split(" ").filter(function (n) { return n !== "mer"; });
@@ -241,6 +257,94 @@ const SAK_1 = await kjor("feed", FELLES + `
        innhold[innhold.length - 1] === "sak", innhold[innhold.length - 1]);
     ferdig();
   }, 900); });
+`);
+
+/* ---------------- 1b. de tre formene pa den ledige plassen ---------------- */
+
+// Annonseplassene kommer etter hver fjerde sak, sa to av dem kan sta pa
+// samme skjerm. Tre like bokser leses som stoy; tre ulike leses som tre
+// plasser. Testen blar gjennom feeden til alle tre har vaert innom.
+const SAK_1B = await kjor("annonse-varianter", FELLES + `
+  // Hver side gir tolv nye saker, sa «Vis flere» kan trykkes sa mange
+  // ganger vi trenger for a komme forbi alle annonseplassene.
+  var side = 0;
+  window.fetch = function (u) {
+    u = String(u);
+    var svar;
+    if (u.indexOf("/wp-api/categories") === 0) svar = KATEGORIER;
+    else if (u.indexOf("_fields=") > -1) svar = [];
+    else {
+      side += 1;
+      svar = lagSaker(12).map(function (p, i) {
+        p.id = side * 100 + i; p.slug = "s" + side + "-" + i; return p;
+      });
+    }
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+
+  function blaVidere(igjen, ferdigMed) {
+    var knapp = document.querySelector(".vis-flere");
+    if (!igjen || !knapp) { ferdigMed(); return; }
+    knapp.click();
+    setTimeout(function () { blaVidere(igjen - 1, ferdigMed); }, 250);
+  }
+
+  window.addEventListener("load", function () { setTimeout(function () {
+    blaVidere(4, function () { try {
+      var former = ["portrett", "bred", "hoy"];
+      var funnet = former.filter(function (f) {
+        return !!document.querySelector(".ad-ledig-" + f);
+      });
+      ok("alle tre formene dukker opp nar man blar",
+         funnet.length === 3, funnet.join(",") + " av " + former.join(","));
+
+      // Formene skal vaere ulike fasonger, ikke tre like bokser: de tre
+      // bruker tre ulike bildefiler.
+      var bilder = former.map(function (f) {
+        var b = document.querySelector(".ad-ledig-" + f + " .ad-ledig-bilde");
+        return b ? b.getAttribute("src") : "";
+      });
+      ok("hver form har sitt eget bilde",
+         bilder[0] !== bilder[1] && bilder[1] !== bilder[2] && bilder[0] !== bilder[2],
+         bilder.join(" | "));
+
+      // Det som ma stemme pa alle tre, uansett fasong.
+      var alle = document.querySelectorAll(".ad-ledig");
+      var feil = [];
+      Array.prototype.forEach.call(alle, function (a) {
+        var bilde = a.querySelector(".ad-ledig-bilde");
+        var kall = a.querySelector(".ad-cta");
+        if (a.getAttribute("aria-label") !== "Ledig annonseplass") feil.push("aria");
+        if (a.textContent.indexOf("Reklame") > -1) feil.push("reklame");
+        if (a.querySelector(".ad-label").textContent !== "Ledig plass") feil.push("merke");
+        if (!bilde || bilde.getAttribute("alt") !== "Prem") feil.push("alt");
+        // Uten bredde og hoyde pa taggen vokser annonsen nar bildet lastes,
+        // og dytter saken man holder pa a lese nedover.
+        if (!bilde.getAttribute("width") || !bilde.getAttribute("height")) feil.push("mal");
+        if (bilde.getAttribute("loading") !== "lazy") feil.push("lazy");
+        if (!kall || kall.tagName !== "A") feil.push("lenke");
+        else if (kall.href.indexOf("https://m.me/") !== 0) feil.push("m.me");
+        else if (kall.target !== "_blank" || kall.rel.indexOf("noopener") === -1) feil.push("rel");
+      });
+      ok("og alle tre er merket, bemannet og lenket likt",
+         alle.length >= 3 && feil.length === 0,
+         alle.length + " plasser, feil: " + (feil.join(",") || "ingen"));
+
+      // Det hoye kortet legger teksten oppa bildet. Da ma den bruke
+      // --on-overlay: gradienten er mork i begge temaer, sa temaets egen
+      // tekstfarge ville forsvunnet i den pa lyst tema.
+      var hoy = document.querySelector(".ad-ledig-hoy .ad-headline");
+      var over = document.querySelector(".ad-ledig-overlegg");
+      ok("teksten i det hoye kortet ligger oppa en gradient",
+         !!over && getComputedStyle(over).backgroundImage.indexOf("gradient") > -1,
+         over ? getComputedStyle(over).backgroundImage.slice(0, 40) : "ingen overlegg");
+      ok("og den er lys nok til a leses mot den",
+         getComputedStyle(hoy).color === "rgb(255, 255, 255)",
+         getComputedStyle(hoy).color);
+      ferdig();
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } });
+  }, 700); });
 `);
 
 /* ---------------- 2. rensing av artikkel-HTML ---------------- */
@@ -2274,7 +2378,7 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
 
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_19, ...SAK_20];
+const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_19, ...SAK_20];
 let feilet = 0;
 
 for (const t of alle) {
