@@ -84,7 +84,7 @@ configuration → Environment variables**.
 Bare én av dem dør av seg selv. Det er `GITHUB_TOKEN`, og avsnittet om
 hva som skjer den dagen står lenger nede.
 
-## De fire fellene som allerede har kostet tid
+## De fem fellene som allerede har kostet tid
 
 **1. Funksjonene leser miljøet ved utrulling.** En variabel du setter nå,
 finnes ikke for funksjonen som kjører nå. Etter *hver* endring i
@@ -106,7 +106,17 @@ Fotballfunksjonen godtar begge skrivemåtene med vilje (`NOKKELNAVN` i
 `netlify/functions/fotball.mjs`), fordi akkurat denne feilen har skjedd.
 De andre godtar bare formen som står i tabellen over.
 
-**4. `PIN_PEPPER` kan ikke endres etter at den første kontoen er laget.**
+**4. Hemmelighetsskanningen stopper deployen hvis en verdi finnes i
+repoet.** Netlify leter etter *verdiene* av miljøvariablene i det som
+rulles ut. Hele repoet publiseres, så `docs/` og `test/` skannes også — og
+de er fulle av ord som ligner: «hemmelig», «hemmelig-pepper»,
+«riktig-passord». Setter du `PIN_PEPPER` eller `ADMIN_PASSORD` til noe
+som finnes som tekst i prosjektet, feiler bygget med «Secrets scanning
+found secrets in build». `netlify.toml` holder `docs/` og `test/` utenfor
+skanningen, men **fiksen er å bruke en lang tilfeldig verdi**, ikke et ord.
+Skjedde 13. september 2026, med `PIN_PEPPER`.
+
+**5. `PIN_PEPPER` kan ikke endres etter at den første kontoen er laget.**
 Passordet hos Supabase er avledet av pepperet, så et nytt pepper låser
 alle ut på én gang — og det ser ut som om alle plutselig husker PIN-en
 feil. Det finnes ingen vei tilbake annet enn å slette kontoene. Sett den
@@ -220,8 +230,10 @@ ikke kode, men det hører til denne nøkkelen.
 - **Brukes til:** passordet hos Supabase er PIN-en pluss dette pepperet
   (`pinPassord()` i `pin-data.js`)
 - **Uten den:** `503`, og panelet sier at den mangler når det åpnes
-- **Lages av:** deg. En lang, tilfeldig streng — `openssl rand -base64 32`
-  eller hva som helst du ikke skal huske.
+- **Lages av:** deg. Den hentes ikke fra Supabase eller noe annet sted.
+  En lang, tilfeldig streng — `openssl rand -base64 32` eller hva som
+  helst du ikke skal huske. **Ikke et ord**, og ikke noe som finnes som
+  tekst i repoet: da stopper hemmelighetsskanningen deployen (felle 4).
 
 **Den kan ikke endres etter at den første kontoen er laget.** Passordet
 hos tjenesten er avledet av pepperet, så et nytt pepper låser alle ut, og

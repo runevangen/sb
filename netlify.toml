@@ -1,3 +1,19 @@
+# Hemmelighetsskanningen leser de utrullede filene og leter etter
+# *verdiene* av miljovariablene. Hele repoet publiseres (ingen
+# byggemappe), sa `docs/` og `test/` blir skannet ogsa — og de to er fulle
+# av ord om nokler: «hemmelig-pepper», «riktig-passord»,
+# «hemmelig-testnokkel», og nokkelboka som forklarer hver variabel.
+#
+# Settes en ekte hemmelighet til noe som likner et av de ordene, stopper
+# deployen. Det skjedde 13. september 2026, med PIN_PEPPER.
+#
+# Dette er ikke en lisens til a legge nokler i repoet. Regelen star:
+# ingen ekte verdi skal inn her, og skanningen gjelder fortsatt for all
+# kode og alt markup — det er bare dokumentasjonen og testdataene som
+# slipper unna, og de inneholder oppdiktede verdier med vilje.
+[build.environment]
+  SECRETS_SCAN_OMIT_PATHS = "docs/**,test/**"
+
 # Proxy WordPress REST API via samme domene som frontenden.
 # Fjerner behovet for CORS-headere på sportsbibelen.no og for en offentlig
 # tredjepartsproxy.

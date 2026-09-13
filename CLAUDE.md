@@ -447,8 +447,12 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   Supabase krever minst seks tegn i et passord, så en PIN på fire ville
   blitt avvist ved første innlogging, med en melding om passordlengde som
   ingen ville koblet til PIN-feltet. Pepperet må settes før den første
-  kontoen og kan ikke endres etterpå: et nytt pepper låser alle ut. Det
-  står i nøkkelboka.
+  kontoen og kan ikke endres etterpå: et nytt pepper låser alle ut. Og det
+  må være en lang tilfeldig streng, ikke et ord: Netlifys
+  hemmelighetsskanning leter etter verdien i det som rulles ut, og hele
+  repoet publiseres — et ord som finnes i `test/` eller `docs/` stopper
+  deployen. `netlify.toml` holder de to mappene utenfor skanningen, men
+  det er verdien som er fiksen. Begge deler står i nøkkelboka.
 - Dette gjør ikke en PIN på fire siffer til et passord, og appen later
   ikke som. Ingenting er låst bak innloggingen, så det verste den som
   kommer seg inn kan gjøre, er å skrive «jeg blir med» i en annens navn.
