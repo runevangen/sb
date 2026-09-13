@@ -14,6 +14,26 @@ rekkefølge i [`oppsett.sql`](oppsett.sql) — lim hele fila inn i Supabase →
 *SQL Editor* → *Run*. Den kan kjøres flere ganger. Forklaringen på hvorfor
 hver bit finnes står her.
 
+## Direktelenker til panelene
+
+Å navigere Supabase og Netlify på mobil er tungt. Disse går rett dit.
+`_` i Supabase-adressene betyr «prosjektet du sist var i», så de virker
+uten at prosjekt-ID-en står i repoet — der hører den ikke hjemme.
+
+| Dit du skal | Lenke |
+| --- | --- |
+| SQL-en, klar til å limes inn | https://raw.githubusercontent.com/runevangen/sb/main/docs/oppsett.sql |
+| Supabase → SQL Editor, nytt spørsmål | https://supabase.com/dashboard/project/_/sql/new |
+| Supabase → slå av «Confirm email» | https://supabase.com/dashboard/project/_/auth/providers |
+| Supabase → nøklene (`anon` og `service_role`) | https://supabase.com/dashboard/project/_/settings/api |
+| Supabase → brukerne, som de ser ut der | https://supabase.com/dashboard/project/_/auth/users |
+| Netlify → miljøvariabler | https://app.netlify.com/projects/mvp-sb/configuration/env |
+| Netlify → Trigger deploy | https://app.netlify.com/projects/mvp-sb/deploys |
+| Vår egen adminportal | https://mvp-sb.netlify.app/admin.html |
+
+Treffer ikke Netlify-lenkene, bytt `projects` med `sites` i adressen:
+Netlify døpte om den delen av panelet, og begge formene har vært i bruk.
+
 ## Kortversjonen
 
 | Variabel | Trengs for | Uten den | Utløper? |
