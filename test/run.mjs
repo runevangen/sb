@@ -2778,8 +2778,21 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
   var PL = [{ id: 901, hjemme: "Arsenal", borte: "Liverpool",
-              dato: "2026-09-19T14:00:00+00:00", arena: "Emirates Stadium" }];
+              dato: "2026-09-19T14:00:00+00:00", arena: "Emirates Stadium",
+              runde: "Runde 5" }];
+  // Funksjonen gir hele vinduet av kommende kamper — tjue — sa
+  // adminportalen kan planlegge lenger fram enn til neste helg. Her er
+  // det tre runder a atte, som i en ekte serie.
+  var VINDU = [];
+  for (var vr = 5; vr <= 7; vr++) {
+    for (var vk = 0; vk < 8; vk++) {
+      VINDU.push({ id: 1000 + vr * 10 + vk, hjemme: "Lag " + vk, borte: "Lag " + (vk + 8),
+        dato: "2026-09-" + (14 + (vr - 5) * 7) + "T17:00:00+00:00",
+        runde: "Runde " + vr, arena: "Brann Stadion" });
+    }
+  }
   window.__svarKall = 0;
+  window.__svarUrl = "";
   window.__ligaer = [];
   window.__harSvar = true;
 
@@ -2791,6 +2804,7 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
     u = String(u);
     if (u.indexOf("/api/svar") === 0) {
       window.__svarKall++;
+      window.__svarUrl = u;
       // Svaret ligger pa Premier League-kampen, ikke i eliteserien: det
       // er nettopp den en fane per liga ikke ville vist.
       return svarMed({ svar: window.__harSvar
@@ -2802,7 +2816,7 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
       window.__ligaer.push(pl ? "premier" : "eliteserien");
       return svarMed({ liga: pl ? "Premier League" : "Eliteserien", sesong: 2026,
         sisteSesong: true, kilde: "TheSportsDB", runde: "Runde 5",
-        kamper: pl ? PL : ARETS });
+        kamper: pl ? PL : VINDU });
     }
     if (u.indexOf("/api/fotball") === 0) return svarMed({ kamper: [] });
     if (u.indexOf("/api/vaer") === 0) return svarMed({ timer: [] });
@@ -2826,6 +2840,14 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
        window.__ligaer.indexOf("premier") > -1, window.__ligaer.join(","));
     // Ti kamper skal ikke bli ti kall.
     ok("hvem som blir med hentes i ett kall", window.__svarKall === 1, window.__svarKall);
+    // Fanen slar sammen alle ligaene i ett kall, og tjenesten kapper ved
+    // tjue id-er. Sporr vi om hele vinduet per liga, faller den andre
+    // ligaen stille ut — og det er nettopp den fanen finnes for.
+    var spurte = decodeURIComponent(window.__svarUrl).split("kamper=")[1] || "";
+    ok("Premier League-kampen er med i sporringen",
+       spurte.split(",").indexOf("901") > -1, spurte);
+    ok("og sporringen holder seg under taket pa tjue",
+       spurte.split(",").length <= 20, spurte.split(",").length + ": " + spurte);
 
     var rader = rot.querySelectorAll(".kamp");
     ok("bare kampen noen blir med pa star der", rader.length === 1, rader.length);

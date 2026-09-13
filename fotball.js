@@ -308,9 +308,15 @@ async function visVenner(rot) {
   }
   if (aktivDel !== "venner") return;
 
+  // Én runde per liga, ikke hele vinduet: fanen henter svarene for alle
+  // ligaene i ett kall, og tjenesten kapper ved tjue id-er. To ligaer med
+  // tjue kamper hver ville gjort at den andre ligaen falt stille ut —
+  // og det er nettopp den fanen finnes for.
   const kamper = [];
   runder.forEach((data) => {
-    if (data && Array.isArray(data.kamper)) data.kamper.forEach((k) => kamper.push(k));
+    if (data && Array.isArray(data.kamper)) {
+      nesteRunde(data.kamper).forEach((k) => kamper.push(k));
+    }
   });
 
   if (!kamper.length) {
@@ -1254,7 +1260,12 @@ let sisteSvar = [];
 async function hentSvar(rot, del, data) {
   if ((del !== "neste" && del !== "venner") || !data || !Array.isArray(data.kamper)) return;
 
-  const ider = data.kamper.map((k) => k.id).filter((id) => id != null);
+  // Spor om de kampene som faktisk star pa skjermen. Funksjonen gir hele
+  // vinduet av kommende kamper sa adminportalen kan planlegge lenger fram,
+  // men leseren ser én runde — og tjenesten kapper spørringen ved tjue
+  // id-er, sa et vindu som vokser ville stilt spor om kamper ingen ser.
+  const viste = del === "neste" ? nesteRunde(data.kamper) : data.kamper;
+  const ider = viste.map((k) => k.id).filter((id) => id != null);
   if (!ider.length) return;
 
   try {

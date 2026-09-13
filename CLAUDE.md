@@ -863,6 +863,15 @@ er i seg selv noe om adressen.
   ikke en feil i den fila skrive i en annens navn.
 - Hele runden hentes i ett kall (`/api/svar?kamper=3,4,5`). Ti kamper
   skal ikke bli ti kall.
+- **Spør bare om de kampene som faktisk står på skjermen.** `/api/fotball/neste`
+  gir hele vinduet av kommende kamper så adminportalen kan planlegge
+  lenger fram, men leseren ser én runde — og `/api/svar` kapper
+  spørringen ved `KAMPER_MAKS` (tjue) id-er. `hentSvar()` og `visVenner()`
+  kaller derfor `nesteRunde()` før de spør. Vennefanen er den som ville
+  blitt rammet: den slår sammen alle ligaene i ett kall, så to ligaer med
+  tjue kamper hver ga 40 id-er, og den andre ligaen falt stille ut — og
+  det er nettopp den fanen finnes for. Testen gir hver liga tre runder à
+  åtte og sjekker at spørringen holder seg under taket.
 - **Kampene noen blir med på løftes øverst**, i to merkede bolker: «2
   kamper noen blir med på» og «Resten av runden». Ikke som en flat
   omstokking — lista har dagskiller, og en søndagskamp løftet over
@@ -983,8 +992,8 @@ er i seg selv noe om adressen.
 ## Testing
 
     node test/unit.mjs      438 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  236 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       378 tester, ~200 s, headless Chromium
+    node test/funksjon.mjs  238 tester, ~250 ms, ingen nettleser
+    node test/run.mjs       384 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
