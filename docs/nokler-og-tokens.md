@@ -25,7 +25,7 @@ uten at prosjekt-ID-en står i repoet — der hører den ikke hjemme.
 | SQL-en, klar til å limes inn | https://raw.githubusercontent.com/runevangen/sb/main/docs/oppsett.sql |
 | Supabase → SQL Editor, nytt spørsmål | https://supabase.com/dashboard/project/_/sql/new |
 | Supabase → slå av «Confirm email» | https://supabase.com/dashboard/project/_/auth/providers |
-| Supabase → nøklene (`anon` og `service_role`) | https://supabase.com/dashboard/project/_/settings/api |
+| Supabase → nøklene (`anon` og `service_role`) | https://supabase.com/dashboard/project/_/settings/api-keys |
 | Supabase → brukerne, som de ser ut der | https://supabase.com/dashboard/project/_/auth/users |
 | Netlify → miljøvariabler | https://app.netlify.com/projects/mvp-sb/configuration/env |
 | Netlify → Trigger deploy | https://app.netlify.com/projects/mvp-sb/deploys |
@@ -33,6 +33,25 @@ uten at prosjekt-ID-en står i repoet — der hører den ikke hjemme.
 
 Treffer ikke Netlify-lenkene, bytt `projects` med `sites` i adressen:
 Netlify døpte om den delen av panelet, og begge formene har vært i bruk.
+
+**Supabase har delt Settings opp**, og den gamle `/settings/api` lander nå
+på *General*. Nøklene ligger under *API Keys* i menyen til venstre
+(*JWT Keys* er noe annet — ikke den). Sett i panelet 13. september 2026.
+
+**To generasjoner nøkler ligger side om side.** Supabase er i ferd med å
+bytte dem ut, og begge virker:
+
+| Miljøvariabelen vår | Gammelt navn | Nytt navn |
+| --- | --- | --- |
+| `SUPABASE_ANON_KEY` | `anon` `public` | Publishable key (`sb_publishable_…`) |
+| `SUPABASE_SERVICE_KEY` | `service_role` `secret` | Secret key (`sb_secret_…`) |
+
+De nye skal virke likt: koden sender dem som `apikey` og
+`Authorization: Bearer`, og det er det begge generasjoner forventer. Men
+det er de gamle koden er skrevet og testet mot, så får du 401 fra
+`/api/brukere` eller `/api/konto` etter et nøkkelbytte, er «Legacy API
+keys» det trygge valget — og funksjonen sier selv fra at nøkkelen ble
+avvist.
 
 ## Kortversjonen
 
