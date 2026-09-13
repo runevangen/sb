@@ -205,6 +205,40 @@ function sesongmerke(data) {
 
 /* ---------- tabell ---------- */
 
+// Lagmerket ved navnet. Bildet ligger hos kilden, som fontene gjor —
+// ingen sporing, ingen informasjonskapsel, og referrerpolicy holder
+// adressen var for oss selv. alt er tomt med vilje: navnet star like ved,
+// og en skjermleser skal ikke lese laget to ganger.
+//
+// Malene star pa taggen, ikke bare i CSS: uten dem har raden ingen hoyde
+// for bildet er lastet, og tabellen hopper mens den leses. Svikter
+// adressen, fjernes bildet — et knust ikon sier ingenting om ligaen.
+// Adressen godtas bare som https fra kilden, eller som et innebygd
+// bilde. https holder blandet innhold ute: en http-adresse ville blitt
+// blokkert av nettleseren uansett, og da er det bedre a la vaere.
+// data:image finnes med fordi testene bruker det — et bilde som ma
+// hentes over nettet fryser den virtuelle tida i testrammen, og da
+// rapporterer siden aldri. Et data:image i en <img> kjorer ingenting.
+function godtattMerke(verdi) {
+  const a = String(verdi || "");
+  return a.indexOf("https://") === 0 || a.indexOf("data:image/") === 0 ? a : null;
+}
+
+function lagmerke(rad) {
+  const adresse = godtattMerke(rad.merke);
+  if (!adresse) return null;
+  const bilde = el("img", "lag-merke");
+  bilde.src = adresse;
+  bilde.alt = "";
+  bilde.width = 18;
+  bilde.height = 18;
+  bilde.loading = "lazy";
+  bilde.decoding = "async";
+  bilde.referrerPolicy = "no-referrer";
+  bilde.addEventListener("error", () => bilde.remove());
+  return bilde;
+}
+
 const KOLONNER = [
   ["#", "plass"], ["Lag", "lag"], ["K", "kamper"], ["V", "seier"],
   ["U", "uavgjort"], ["T", "tap"], ["MF", "differanse"], ["P", "poeng"],
@@ -239,9 +273,15 @@ function tabell(rader) {
         // En knapp, ikke en klikkbar rad: den nas med tastatur, leses opp
         // som noe man kan trykke pa, og lar resten av raden markeres som
         // vanlig tekst.
-        const knapp = el("button", "lag-knapp", rad.lag);
+        const knapp = el("button", "lag-knapp");
         knapp.type = "button";
         knapp.title = "Søk i nyhetene etter " + rad.lag;
+        // Merket kostet ingenting a fa tak i: begge kildene bærer det i
+        // tabellsvaret, og begge parserne har plukket det ut hele tiden —
+        // det var bare aldri tegnet. Ingen nye kall, ingen ny fil.
+        const merke = lagmerke(rad);
+        if (merke) knapp.appendChild(merke);
+        knapp.appendChild(el("span", "lag-navn", rad.lag));
         knapp.addEventListener("click", () => sokEtterLag(rad.lag));
         const celle = el("div", "lag-celle");
         celle.appendChild(knapp);

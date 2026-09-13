@@ -212,6 +212,20 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   (små bokstaver, norske tegn foldet, tegnsetting fjernet), så lista
   tåler at API-et endrer skrivemåte. Ukjente navn går uendret gjennom —
   bare lag der API-ets form faktisk avviker står i lista.
+- **Lagmerket kostet ingen kall** (#33). Både API-Football og
+  TheSportsDB bærer merket i tabellsvaret (`team.logo` / `strBadge`), og
+  begge parserne har plukket det ut hele tiden — det var bare aldri
+  tegnet. Ingen ny fil, ingen ny cache-nøkkel, ingenting på døgnkvoten.
+  Bildet ligger hos kilden, som fontene gjør: `referrerpolicy` holder
+  adressen vår for oss selv, `alt` er tom (navnet står like ved, og en
+  skjermleser skal ikke lese laget to ganger), og målene står på taggen
+  så raden ikke hopper mens bildet lastes. Svikter adressen, fjernes
+  bildet — et knust ikon sier ingenting om ligaen. `godtattMerke()`
+  godtar `https://` og `data:image/`: http ville blitt blokkert som
+  blandet innhold uansett, og `data:image/` er med fordi **et bilde som
+  må hentes over nettet fryser den virtuelle tida i testrammen** — samme
+  felle som posisjonsoppslaget, og testsiden rapporterer da ingenting i
+  det hele tatt.
 - Lagnavnet i tabellen er en knapp, ikke en klikkbar rad: den nås med
   tastatur og leses opp som noe man kan trykke på. Den kaller samme
   `startSok` som søkefeltet, så et lagsøk oppfører seg nøyaktig som et
@@ -993,7 +1007,7 @@ er i seg selv noe om adressen.
 
     node test/unit.mjs      438 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  238 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       384 tester, ~200 s, headless Chromium
+    node test/run.mjs       391 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
