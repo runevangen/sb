@@ -418,10 +418,26 @@ async function loadFeed(options) {
 // første. Feeden henter tolv saker, så det gir to plasser per lasting.
 const ADS_EVERY = 4;
 
-// Plassholdere. Annonsørene her er oppdiktede. Når ekte annonser skal inn,
-// erstattes denne listen av data fra annonsesystemet — formatet er det
-// samme, og rekkefølgen i listen bestemmer blandingen av de to formatene.
+// Messenger-brukernavnet til den som selger annonsene — det som står
+// etter m.me/. Står det tomt, blir knappen ren tekst framfor en død
+// lenke: en knapp som ikke går noe sted er verre enn ingen knapp.
+const MESSENGER = "";
+
+// Plassholdere. Annonsørene her er oppdiktede (#25). Når ekte annonser
+// skal inn, erstattes denne listen av data fra annonsesystemet — formatet
+// er det samme, og rekkefølgen i listen bestemmer blandingen.
+//
+// «ledig» er ikke reklame fra noen andre — den er vår egen, og selger
+// plassen den står i. Derfor sier den «Ledig plass» og ikke «Reklame».
+// Å merke vår egen tekst som reklame fra en annonsør ville vært å lyve i
+// akkurat den merkingen appen ellers er nøye på.
 const ADS = [
+  {
+    format: "ledig",
+    brand: "LEDIG PLASS",
+    headline: "Her kunne det stått noe om deg.",
+    cta: "Ta en prat med Prem"
+  },
   {
     format: "banner",
     brand: "NORDBANE",
@@ -451,8 +467,18 @@ const ADS = [
 function buildAd(ad, slot) {
   const box = el("div", "ad-" + ad.format);
   box.setAttribute("role", "group");
-  // Merkingen må også nå skjermlesere, ikke bare øyet.
-  box.setAttribute("aria-label", "Reklame fra " + ad.brand);
+  // Merkingen må også nå skjermlesere, ikke bare øyet — og den må si
+  // sant: «ledig» er vår egen plass, ikke en annonsørs.
+  box.setAttribute("aria-label", ad.format === "ledig"
+    ? "Ledig annonseplass" : "Reklame fra " + ad.brand);
+
+  if (ad.format === "ledig") {
+    box.appendChild(el("span", "ad-label", "Ledig plass"));
+    box.appendChild(el("p", "ad-headline", ad.headline));
+    box.appendChild(messengerKnapp(ad.cta));
+    track("Annonse vist", { annonsor: ad.brand, plass: String(slot) });
+    return box;
+  }
 
   if (ad.format === "stripe") {
     const top = el("div", "ad-top");
@@ -473,6 +499,25 @@ function buildAd(ad, slot) {
 
   track("Annonse vist", { annonsor: ad.brand, plass: String(slot) });
   return box;
+}
+
+// Messengers direktelenke er m.me/<brukernavn>. Den åpner appen om den
+// er installert, og nettutgaven om ikke — ingen mellomside, ingen
+// innlogging først.
+//
+// Uten brukernavn blir den ren tekst. En knapp som ser ut som en knapp og
+// ikke går noe sted, er verre enn en setning som bare står der.
+function messengerKnapp(tekst) {
+  if (!MESSENGER) return el("span", "ad-cta", tekst);
+
+  const lenke = el("a", "ad-cta", tekst + " →");
+  lenke.href = "https://m.me/" + encodeURIComponent(MESSENGER);
+  // Meldingen skrives i Messenger, ikke her: appen blir stående bak, og
+  // rel-en hindrer at den nye fanen kan røre den.
+  lenke.target = "_blank";
+  lenke.rel = "noopener noreferrer";
+  lenke.addEventListener("click", () => track("Annonseplass klikket"));
+  return lenke;
 }
 
 /* ---------- relaterte saker ---------- */
