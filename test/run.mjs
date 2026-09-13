@@ -653,12 +653,19 @@ const SAK_5 = await kjor("visning", FELLES + `
 // Fotballdata, i den formen Netlify-funksjonen leverer dem.
 const FOTBALL = `
   var TABELL = [
+    // Merket kommer fra kilden, ikke fra oss. Radene her dekker de tre
+    // tilfellene: et merke vi stoler pa, ingenting, og en adresse som
+    // ikke er https — den siste skal ikke tegnes i det hele tatt.
+    // Bildet er innebygd, ikke en adresse: et bilde som ma hentes over
+    // nettet fryser den virtuelle tida, og testsiden rapporterer aldri.
     { plass: 1, lag: "Bodo/Glimt", kamper: 30, seier: 21, uavgjort: 5, tap: 4,
-      scoret: 74, sluppet: 33, differanse: 41, poeng: 68 },
+      scoret: 74, sluppet: 33, differanse: 41, poeng: 68,
+      merke: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" },
     { plass: 2, lag: "Brann", kamper: 30, seier: 18, uavgjort: 6, tap: 6,
-      scoret: 55, sluppet: 33, differanse: 22, poeng: 60 },
+      scoret: 55, sluppet: 33, differanse: 22, poeng: 60, merke: null },
     { plass: 3, lag: "Kristiansund Ballklubb Elite", kamper: 30, seier: 9, uavgjort: 8, tap: 13,
-      scoret: 40, sluppet: 48, differanse: -8, poeng: 35 }
+      scoret: 40, sluppet: 48, differanse: -8, poeng: 35,
+      merke: "http://eksempel.test/kbk.png" }
   ];
   var RESULTATER = [
     { id: 1, dato: "2026-09-08T17:00:00+00:00", runde: "Runde 20", hjemme: "Molde",
@@ -740,6 +747,32 @@ const SAK_6 = await kjor("fotball", FELLES + FOTBALL + `
       ok("lagnavnet star i raden",
          rader[0].querySelector(".kol-lag").textContent === "Bodo/Glimt",
          rader[0].querySelector(".kol-lag").textContent);
+      // Lagmerket (#33). Det laa i dataene hele tiden — begge parserne
+      // plukket det ut — men ble aldri tegnet. Ingen nye kall.
+      var merke0 = rader[0].querySelector(".lag-merke");
+      ok("laget med merke far merket ved navnet",
+         !!merke0 && String(merke0.getAttribute("src")).indexOf("data:image/gif") === 0,
+         merke0 && merke0.getAttribute("src"));
+      ok("merket star inne i lagknappen, sa det folger navnet",
+         !!merke0 && merke0.closest(".lag-knapp") !== null);
+      // Navnet star like ved: leses merket opp i tillegg, sier
+      // skjermleseren laget to ganger.
+      ok("merket er stumt for skjermlesere", !!merke0 && merke0.getAttribute("alt") === "");
+      // Uten mal har raden ingen hoyde for bildet er lastet, og tabellen
+      // hopper mens den leses.
+      ok("merket har mal pa taggen",
+         !!merke0 && merke0.getAttribute("width") === "18" &&
+         merke0.getAttribute("height") === "18");
+      ok("og laster ikke for det trengs",
+         !!merke0 && merke0.getAttribute("loading") === "lazy" &&
+         merke0.getAttribute("referrerpolicy") === "no-referrer");
+      ok("laget uten merke star med navnet sitt likevel",
+         !rader[1].querySelector(".lag-merke") &&
+         rader[1].querySelector(".kol-lag").textContent === "Brann",
+         rader[1].querySelector(".kol-lag").textContent);
+      // En adresse som ikke er https skal ikke lastes fra appen.
+      ok("et merke uten https tegnes ikke", !rader[2].querySelector(".lag-merke"));
+
       ok("poengsummen star sist",
          rader[0].querySelector(".kol-poeng").textContent === "68",
          rader[0].querySelector(".kol-poeng").textContent);

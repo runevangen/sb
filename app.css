@@ -1500,7 +1500,13 @@ a.ad-cta:focus-visible {
 /* Lagnavnet er en knapp inn i nyhetene om laget. Den skal se ut som
    teksten den er, ikke som en knapp — understreket forst ved bruk, slik
    lenker i artikkelteksten oppforer seg. */
+/* Knappen baerer et merke og et navn. Teksten skal fortsatt kunne brytes
+   over to linjer nar navnet er langt — det er det som holder tabellen
+   smalere enn telefonen. */
 .lag-knapp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 0;
   border: 0;
   background: none;
@@ -1520,6 +1526,18 @@ a.ad-cta:focus-visible {
 
 /* Navn til venstre, stjerne til hoyre. Cellen har width: 100 %, sa
    stjernen far plass uten a presse tallkolonnene. */
+/* Merket ved lagnavnet. Fast storrelse i piksler, ikke skalert av --fs:
+   det er et bilde, ikke tekst, og et merke som vokser med skriften ville
+   skjovet tabellen bredere nettopp nar den alt er trang. */
+.lag-merke {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.lag-navn { min-width: 0; }
+
 .lag-celle {
   display: flex;
   align-items: center;
