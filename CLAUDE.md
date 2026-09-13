@@ -904,6 +904,12 @@ er i seg selv noe om adressen.
   kampen — det er prisen for at lista kan leses uten konto. Det lagres
   med visningsvalgene (`sb-visning`, feltet `svarnavn`) ved hvert svar, så
   det ikke hentes på nytt for hver kamp.
+- **Men navnet hører til kontoen, ikke til telefonen.** `svarnavnFor`
+  holder bruker-id-en det ble skrevet av, og `loggUt()` tømmer begge.
+  Uten det ble navnet stående etter en utlogging, og neste som logget inn
+  i samme nettleser skrev raden sin med forrige persons navn — to kontoer,
+  to rader, ett navn. Meldt fra prod 13. september 2026, under testing med
+  en egen testbruker: «de ser ikke hverandre».
 - Tabellen og reglene står som SQL i `docs/nokler-og-tokens.md`. Finnes
   den ikke, svarer funksjonen 503 og sier nøyaktig det, framfor å sende
   en PostgREST-feil videre til leseren.
@@ -932,7 +938,7 @@ er i seg selv noe om adressen.
 
     node test/unit.mjs      437 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  229 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       369 tester, ~200 s, headless Chromium
+    node test/run.mjs       373 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

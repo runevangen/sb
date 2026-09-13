@@ -1062,13 +1062,28 @@ function noterDinPub(navn) {
 // navnet sitt to ganger. Skriver hen noe annet, vinner det — det er
 // lagret med vilje, og feltet er fortsatt sannheten.
 function svarNavn() {
-  const lagret = normaliserNavn(prefs.svarnavn || "");
+  const bruker = (kontoOkt && kontoOkt.bruker) || "";
+  // Navnet hoerer til kontoen, ikke til telefonen. Uten `svarnavnFor` ble
+  // det staende igjen etter en utlogging, og neste som logget inn i samme
+  // nettleser skrev raden sin med forrige persons navn — to kontoer, to
+  // rader, ett navn. Det ser ut som at ingen ser hverandre.
+  const lagret = prefs.svarnavnFor && prefs.svarnavnFor === bruker
+    ? normaliserNavn(prefs.svarnavn || "") : "";
   if (lagret) return lagret;
   return normaliserNavn((kontoOkt && kontoOkt.navn) || "");
 }
 
 function settSvarNavn(navn) {
   prefs.svarnavn = normaliserNavn(navn);
+  // Hvem navnet ble skrevet av. Er det en annen som er logget inn na,
+  // gjelder det ikke lenger.
+  prefs.svarnavnFor = (kontoOkt && kontoOkt.bruker) || "";
+  savePrefs(prefs);
+}
+
+function glemSvarNavn() {
+  delete prefs.svarnavn;
+  delete prefs.svarnavnFor;
   savePrefs(prefs);
 }
 
@@ -1864,6 +1879,9 @@ async function kontoPinSteget() {
 
 function loggUt() {
   lagreKonto(null);
+  // Navnet vennene ser folger kontoen. Blir det staende, skriver neste
+  // som logger inn i samme nettleser raden sin med forrige persons navn.
+  glemSvarNavn();
   kontoSteg = "navn";
   kontoNavnet = "";
   document.getElementById("kontoPin").value = "";
@@ -1929,6 +1947,7 @@ document.getElementById("kontoSlett").addEventListener("click", async () => {
   try {
     await kontoKall({ handling: "slett", token: kontoOkt && kontoOkt.token });
     lagreKonto(null);
+    glemSvarNavn();
     kontoSteg = "navn";
     kontoNavnet = "";
     document.getElementById("kontoNavn").value = "";

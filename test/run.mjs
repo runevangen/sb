@@ -2429,6 +2429,102 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
 `);
 
+/* ---------------- 18b. navnet folger kontoen, ikke telefonen ---------------- */
+
+// Meldt fra prod 13. september 2026: «Har opprettet testbruker og satt
+// begge pa samme kamp og pub. Men de ser ikke hverandre.»
+//
+// «Navnet vennene ser» la i nettleseren og ble ikke tomt ved utlogging.
+// Logget man inn som en annen i samme nettleser, skrev den nye kontoen
+// raden sin med forrige persons navn: to kontoer, to rader, ett navn.
+const SAK_18B = await kjor("navn-per-konto", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
+  // Ola er logget inn og har svart fra for — navnet ligger i nettleseren.
+  localStorage.setItem("sb-konto", JSON.stringify({ token: "okt-ola", navn: "Ola",
+    bruker: "u-ola", fornyer: "f-ola",
+    utloper: new Date(Date.now() + 3600000).toISOString() }));
+  localStorage.setItem("sb-visning", JSON.stringify({ svarnavn: "Ola", svarnavnFor: "u-ola" }));
+
+  window.__skrevet = [];
+  function svarMed(kropp, status) {
+    return Promise.resolve({ ok: !status || status < 400, status: status || 200,
+      statusText: "OK", text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, o) {
+    u = String(u);
+    var inn = o && o.body ? JSON.parse(o.body) : null;
+    if (u.indexOf("/api/konto") === 0) {
+      if (!inn) return svarMed({ klar: true, mangler: [] });
+      if (inn.handling === "finnes") return svarMed({ navn: inn.navn, finnes: true });
+      if (inn.handling === "logg-inn") {
+        // Kari er en annen konto: en annen bruker-id.
+        return svarMed({ token: "okt-kari", navn: inn.navn, bruker: "u-kari",
+          fornyer: "f-kari", utloper: new Date(Date.now() + 3600000).toISOString() });
+      }
+      return svarMed({ feil: "Ukjent handling" }, 400);
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      if (inn) { window.__skrevet.push(inn); return svarMed({ svar: [] }); }
+      return svarMed({ svar: [] });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 || u.indexOf("overpass") > -1) {
+      return svarMed({}, 502);
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return svarMed(kropp);
+    }
+    return svarMed(u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker);
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    // Ola logger ut. Navnet skal ikke bli staende i telefonen.
+    document.getElementById("menuBtn").click();
+    document.getElementById("kontoBtn").click();
+    document.getElementById("kontoUt").click();
+    var visning = JSON.parse(localStorage.getItem("sb-visning") || "{}");
+    ok("navnet forsvinner ved utlogging",
+       !visning.svarnavn && !visning.svarnavnFor, JSON.stringify(visning));
+
+    // Kari logger inn i samme nettleser.
+    document.getElementById("kontoNavn").value = "Kari";
+    document.getElementById("kontoSend").click();
+    setTimeout(function () { try {
+      document.getElementById("kontoPin").value = "1234";
+      document.getElementById("kontoSend").click();
+      setTimeout(function () { try {
+        ok("Kari er logget inn",
+           document.getElementById("hvemTag").textContent === "Kari",
+           document.getElementById("hvemTag").textContent);
+
+        // Og svarer pa en kamp.
+        var rad = document.querySelectorAll(".kamp.delbar")[0];
+        rad.querySelector(".kamp-del").click();
+        var panel = document.querySelector(".kamp-panel");
+        var arena = Array.prototype.find.call(panel.querySelectorAll(".sted-chip"),
+          function (c) { return c.querySelector(".sted-navn").textContent === "Brann Stadion"; });
+        arena.click();
+        setTimeout(function () { try {
+          var skriv = window.__skrevet.filter(function (k) { return !k.handling; });
+          // Dette var feilen: raden ble skrevet med «Ola».
+          ok("Karis rad skrives med Karis navn",
+             skriv.length === 1 && skriv[0].navn === "Kari",
+             JSON.stringify(skriv.map(function (k) { return k.navn; })));
+          ok("og med Karis egen okt",
+             skriv[0].token === "okt-kari", skriv[0].token);
+          ferdig();
+        } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
+`);
+
 /* ---------------- 19a. kortet apnet for svarene landet ---------------- */
 
 // Meldt fra prod 13. september 2026: «Jeg markerte pub tidligere i dag.
@@ -2692,7 +2788,7 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
 
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_19, ...SAK_19A, ...SAK_19B, ...SAK_19C, ...SAK_20];
+const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_18B, ...SAK_19, ...SAK_19A, ...SAK_19B, ...SAK_19C, ...SAK_20];
 let feilet = 0;
 
 for (const t of alle) {
