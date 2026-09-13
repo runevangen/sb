@@ -309,8 +309,9 @@ const SAK_1B = await kjor("annonse-varianter", FELLES + `
          bilder[0] !== bilder[1] && bilder[1] !== bilder[2] && bilder[0] !== bilder[2],
          bilder.join(" | "));
 
-      // Det som ma stemme pa alle tre, uansett fasong.
-      var alle = document.querySelectorAll(".ad-ledig");
+      // Det som ma stemme pa alle tre, uansett fasong. Spokene er egne
+      // kort med sitt eget merke, og telles for seg under.
+      var alle = document.querySelectorAll(".ad-ledig:not(.ad-spok)");
       var feil = [];
       Array.prototype.forEach.call(alle, function (a) {
         var bilde = a.querySelector(".ad-ledig-bilde");
@@ -342,6 +343,36 @@ const SAK_1B = await kjor("annonse-varianter", FELLES + `
       ok("og den er lys nok til a leses mot den",
          getComputedStyle(hoy).color === "rgb(255, 255, 255)",
          getComputedStyle(hoy).color);
+
+      // Spokene. Ullevalseter er et ekte sted, og en tulleannonse merket
+      // «Reklame» ville pastatt at de har kjopt plassen — nøyaktig lognen
+      // appen ellers er noye pa a ikke fortelle. Vitsen blir ikke darligere
+      // av at det star hva den er.
+      var spok = document.querySelectorAll(".ad-spok");
+      ok("spokene star i feeden", spok.length >= 1, spok.length);
+      var spokFeil = [];
+      Array.prototype.forEach.call(spok, function (a) {
+        if (a.querySelector(".ad-label").textContent !== "Spøk") spokFeil.push("merke");
+        if (a.getAttribute("aria-label") !== "Spøk, ikke en ekte annonse") spokFeil.push("aria");
+        // Det viktigste: den skal aldri kalle seg reklame, verken for oyet
+        // eller for skjermlesere.
+        if (a.textContent.indexOf("Reklame") > -1) spokFeil.push("reklame");
+        if ((a.getAttribute("aria-label") || "").indexOf("Reklame") > -1) spokFeil.push("aria-reklame");
+        // Og den skal ikke pasta at plassen er ledig: det er to ulike ting.
+        if (a.textContent.indexOf("Ledig plass") > -1) spokFeil.push("ledig");
+      });
+      ok("en spok sier at den er en spok, aldri at den er reklame",
+         spokFeil.length === 0, spokFeil.join(",") || "ingen");
+
+      // Ullevalseter-vitsen er delt i oppsett og poeng. I én setning er
+      // den en opplysning.
+      var ulle = Array.prototype.find.call(spok, function (a) {
+        return a.textContent.indexOf("Ullevålseter") > -1;
+      });
+      ok("vitsen star med oppsett og poeng pa hver sin linje",
+         !!ulle && ulle.querySelector(".ad-headline").textContent === "Opplev Ullevålseter." &&
+         ulle.querySelector(".ad-sub").textContent.indexOf("travbanen") > -1,
+         ulle ? ulle.textContent.slice(0, 70) : "fant den ikke");
       ferdig();
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } });
   }, 700); });

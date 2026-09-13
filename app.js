@@ -494,6 +494,31 @@ const ADS = [
     hoyde: 1000,
     headline: "Se for deg merket ditt her.",
     cta: "Send Prem en melding"
+  },
+  // Spøkene. Samme ansikt, samme fasonger — men merket «Spøk», fordi
+  // Ullevålseter er et ekte sted og ikke har kjøpt noe som helst.
+  // Knappen går til Prem, som er den som må svare for påstanden.
+  {
+    format: "spok",
+    form: "bred",
+    brand: "SPØK",
+    bilde: "/bilder/prem-bred.jpg",
+    bredde: 1000,
+    hoyde: 562,
+    headline: "Opplev Ullevålseter.",
+    sub: "Mye bedre enn øl og vin på travbanen.",
+    cta: "Si imot"
+  },
+  {
+    format: "spok",
+    form: "hoy",
+    brand: "SPØK",
+    bilde: "/bilder/prem-hoy.jpg",
+    bredde: 800,
+    hoyde: 1000,
+    headline: "Det finnes ikke dårlig vær.",
+    sub: "Det finnes bare Bjerke.",
+    cta: "Ta det med Prem"
   }
 ];
 
@@ -505,7 +530,7 @@ function buildAd(ad, slot) {
   box.setAttribute("aria-label", ad.format === "ledig"
     ? "Ledig annonseplass" : "Reklame fra " + ad.brand);
 
-  if (ad.format === "ledig") return ledigPlass(ad, slot);
+  if (EGNE_MERKER[ad.format]) return egenPlass(ad, slot);
 
   if (ad.format === "stripe") {
     const top = el("div", "ad-top");
@@ -534,16 +559,35 @@ function buildAd(ad, slot) {
 //
 // I det høye kortet ligger teksten oppå bildet; i de to andre ved siden
 // av eller under det.
-function ledigPlass(ad, slot) {
+// De to plassene som er våre egne, og hva de kaller seg. Merket står som
+// data framfor som if-er inne i tegningen: legger vi til en tredje, er
+// det én linje her — og da er det umulig å legge til en plass uten å ta
+// stilling til hva den sier at den er.
+//
+// «Spøk» er ikke pedanteri. Ullevålseter er et ekte sted, og en tulle-
+// annonse merket «Reklame» ville påstått at de har kjøpt plassen. Det er
+// nøyaktig løgnen appen ellers er nøye på å ikke fortelle — og vitsen
+// blir ikke dårligere av at det står hva den er.
+const EGNE_MERKER = {
+  ledig: { merke: "Ledig plass", lest: "Ledig annonseplass" },
+  spok: { merke: "Spøk", lest: "Spøk, ikke en ekte annonse" }
+};
+
+function egenPlass(ad, slot) {
+  const merking = EGNE_MERKER[ad.format];
   const boks = el("div", "ad-ledig ad-ledig-" + ad.form);
+  if (ad.format === "spok") boks.classList.add("ad-spok");
   boks.setAttribute("role", "group");
-  boks.setAttribute("aria-label", "Ledig annonseplass");
+  boks.setAttribute("aria-label", merking.lest);
   boks.appendChild(premBilde(ad));
 
   const kropp = el("div", "ad-ledig-kropp");
   if (ad.form === "hoy") kropp.classList.add("ad-ledig-overlegg");
-  kropp.appendChild(el("span", "ad-label", "Ledig plass"));
+  kropp.appendChild(el("span", "ad-label", merking.merke));
   kropp.appendChild(el("p", "ad-headline", ad.headline));
+  // Oppsettet står i overskriften, poenget på linja under. Delt i to er
+  // vitsen en vits; i én setning er den en opplysning.
+  if (ad.sub) kropp.appendChild(el("span", "ad-sub", ad.sub));
   kropp.appendChild(messengerKnapp(ad.cta));
   boks.appendChild(kropp);
 

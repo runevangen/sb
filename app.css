@@ -972,6 +972,25 @@ body {
    i begge temaer, men merket skal leses mot morkt her, ikke mot kortet. */
 .ad-ledig-hoy .ad-label { color: var(--on-overlay-dim); }
 
+/* Oppsettet star i overskriften, poenget pa linja under. Delt i to er
+   vitsen en vits; i én setning er den en opplysning. */
+.ad-ledig .ad-sub { margin-top: -2px; }
+.ad-ledig-hoy .ad-sub { color: var(--on-overlay-dim); }
+
+/* Spoken. Samme fasonger som den ledige plassen, men ikke aksentfargens
+   stiplede ramme: den sier «her er det plass», og det gjor ikke denne.
+   En heltrukken, dempet ramme sier «dette er et kort», og merket sier
+   hva slags kort. */
+.ad-spok {
+  border-style: solid;
+  border-color: var(--border);
+}
+
+/* Merket skal vaere lett a se uten a rope. Det er ikke en advarsel — det
+   er halve vitsen at den star der og innrommer hva den er. */
+.ad-spok .ad-label { color: var(--text-dimmer); }
+.ad-spok.ad-ledig-hoy .ad-label { color: var(--on-overlay-dim); }
+
 /* Lenka til Messenger. Samme form som en ad-cta, men den er en ekte
    lenke — den gar et sted. */
 a.ad-cta {

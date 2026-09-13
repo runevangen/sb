@@ -122,6 +122,19 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   bildet lastes, og dytter saken man holder på å lese nedover. `alt` er
   navnet hans, ikke en beskrivelse av bildet — den som ikke ser det, skal
   vite at det er en person her.
+- **Spøkene er merket «Spøk», ikke «Reklame».** De bruker de samme
+  fasongene og det samme ansiktet, men Ullevålseter er et ekte sted, og en
+  tulleannonse merket «Reklame» ville påstått at de har kjøpt plassen. Det
+  er nøyaktig løgnen appen ellers er nøye på å ikke fortelle — og vitsen
+  blir ikke dårligere av at det står hva den er. Skjermleseren får «Spøk,
+  ikke en ekte annonse». En nettlesertest slår ut hvis en spøk noen gang
+  kaller seg reklame, for øyet eller for skjermleseren.
+- `EGNE_MERKER` i `app.js` er de to plassene som er våre egne, og hva de
+  kaller seg. Merket ligger som data framfor som `if`-er inne i tegningen:
+  legger vi til en tredje, er det én linje der — og da er det umulig å
+  legge til en plass uten å ta stilling til hva den sier at den er.
+- Oppsettet står i overskriften og poenget på `sub`-linja under. Delt i to
+  er vitsen en vits; i én setning er den en opplysning.
 - Ingen statistikk i det hele tatt, med vilje. Appen har null
   sporingsskript, ingen informasjonskapsler og ingen samtykkebanner.
   Bruken leses av Usage-grafen i Netlify — båndbredde og forespørsler —
@@ -840,7 +853,7 @@ er i seg selv noe om adressen.
 
     node test/unit.mjs      420 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  219 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       341 tester, ~200 s, headless Chromium
+    node test/run.mjs       344 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
