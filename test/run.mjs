@@ -1037,17 +1037,23 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
     panel.querySelectorAll(".hvor-valg")[1].click();   // pa pub
     ok("pubfeltet kommer fram", !panel.querySelector(".kamp-pub").hidden);
     ok("del er apnet", !panel.querySelector(".kamp-send").disabled);
-    // Forslagene: dine puber forst, knapp for naer deg, og etter hvert
-    // ved stadion og ved holdeplassen fra funksjonen.
+    // Ett sporsmal, ett svar: en rangert liste, ikke seks grupper.
     var forslag = panel.querySelector(".pub-forslag");
     ok("pubforslagene vises nar pub er valgt", forslag && !forslag.hidden);
-    var titler = function () { return Array.prototype.map.call(forslag.querySelectorAll(".pub-gruppe-tittel"), function (t) { return t.textContent; }); };
+    var navnene = function () {
+      return Array.prototype.map.call(forslag.querySelectorAll(".pub-chip"),
+        function (c) { return c.querySelector("span").textContent; });
+    };
     // Kampen spilles ofte et annet sted enn der man ser den, sa naer deg
     // hentes med en gang — trykket som valgte «pa pub» er handlingen
     // telefonen krever for a sporre om posisjon.
     ok("naer deg hentes med en gang, uten et trykk til",
        window.__overpassKall === 1, window.__overpassKall);
-    ok("dine puber er med", titler().indexOf("Dine puber") > -1, titler().join("|"));
+    ok("forslagene star i én liste, ikke i grupper",
+       forslag.querySelectorAll(".pub-liste").length === 1 &&
+       forslag.querySelectorAll(".pub-gruppe-tittel").length === 0,
+       forslag.querySelectorAll(".pub-liste").length);
+    ok("dine puber er med", navnene().indexOf("Pub X") > -1, navnene().join("|"));
     panel.querySelector(".kamp-pub").value = "Pub X";
 
     // Et annet panel apnes: det forste skal lukkes.
@@ -1076,13 +1082,19 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
       ok("og den star inne i rammen",
          vaerNa[0].closest(".kamp").classList.contains("valgt"));
 
-      var titlerNa = Array.prototype.map.call(forslag.querySelectorAll(".pub-gruppe-tittel"), function (t) { return t.textContent; });
-      ok("naer deg star forst", titlerNa[0] === "Nær deg", titlerNa.join("|"));
+      var na = Array.prototype.map.call(forslag.querySelectorAll(".pub-chip"),
+        function (c) { return c.querySelector("span").textContent; });
       ok("naer deg sporr Overpass fra nettleseren med rundet posisjon",
          window.__overpassKall === 1 && window.__overpassBody.indexOf("around:800,63.431,10.395") > -1, window.__overpassBody);
-      ok("puber naer deg vises", forslag.textContent.indexOf("Torgpuben") > -1);
+      ok("puber naer deg vises", na.indexOf("Torgpuben") > -1, na.join("|"));
       ok("puber ved stadion og ved holdeplassen kommer fra funksjonen",
-         titlerNa.indexOf("Ved Brann Stadion") > -1 && titlerNa.indexOf("Ved Brann stadion holdeplass") > -1, titlerNa.join("|"));
+         na.indexOf("Stadionpuben") > -1, na.join("|"));
+      // Taket finnes for at lista skal kunne leses pa en telefon.
+      ok("hoyst seks forslag star framme", na.length <= 6, na.length);
+      // Det var dette som gjorde panelet uleselig: samme pub i flere lister.
+      ok("ingen pub star der to ganger",
+         na.length === na.filter(function (n, i) { return na.indexOf(n) === i; }).length,
+         na.join("|"));
       ok("funksjonen spores en gang per arena", window.__puberKall === 1, window.__puberKall);
       ok("OpenStreetMap krediteres", forslag.textContent.indexOf("© OpenStreetMap-bidragsytere") > -1);
       var chip = Array.prototype.find.call(forslag.querySelectorAll(".pub-chip"), function (c) { return c.textContent.indexOf("Stadionpuben") === 0; });
@@ -1186,24 +1198,26 @@ const SAK_14 = await kjor("pub-feil", FELLES + FOTBALL + `
     panel.querySelectorAll(".hvor-valg")[1].click();
     var forslag = panel.querySelector(".pub-forslag");
     setTimeout(function () { try {
-      // Uten nettverk i det hele tatt star lista i koden igjen.
-      var titler = Array.prototype.map.call(forslag.querySelectorAll(".pub-gruppe-tittel"), function (t) { return t.textContent; });
-      ok("kjente fotballpuber vises uten nettverk",
-         titler[0] === "Kjent for å vise fotball", titler.join("|"));
+      // Uten nettverk i det hele tatt star lista i koden igjen. Det er
+      // verdt mye her, der Overpass har vaert det skjoreste leddet.
       var chips = forslag.querySelectorAll(".pub-chip");
-      ok("og de er ekte steder fra lista",
+      ok("kjente fotballpuber vises uten nettverk",
          chips.length > 2 && forslag.textContent.indexOf("O'Learys Oslo Sentralstasjon") > -1,
          chips.length + " " + forslag.textContent.slice(0, 120));
       ok("de er merket som kjent for fotball", !!forslag.querySelector(".pub-merke"));
       ok("naermest star forst",
          chips[0].textContent.indexOf("O'Learys Oslo Sentralstasjon") === 0, chips[0].textContent);
+      ok("og det er fortsatt én liste",
+         forslag.querySelectorAll(".pub-gruppe-tittel").length === 0);
 
       ok("svikter funksjonen, star det hvorfor",
-         forslag.textContent.indexOf("Fikk ikke hentet puber ved Brann Stadion") > -1, forslag.textContent);
+         forslag.textContent.indexOf("Fikk ikke puber ved Brann Stadion") > -1, forslag.textContent);
       // Hvem som sviktet, sa det kan meldes videre uten a grave i logger.
       ok("og hvem som sviktet",
          forslag.textContent.indexOf("overpass-api.de svarte 406") > -1, forslag.textContent);
-      ok("naer deg-knappen star der uansett", !!forslag.querySelector(".pub-naer"));
+      // Knappen star ikke for alltid lenger — men den star nar posisjonen
+      // eller kartet sviktet, sa det gar an a prove igjen.
+      ok("naer deg-knappen star der nar den trengs", !!forslag.querySelector(".pub-naer"));
       // Naer deg feiler, men sier hvem som sviktet.
       ok("naer deg forklarer hvem som sviktet",
          forslag.textContent.indexOf("overpass-api.de svarte 504") > -1, forslag.textContent);
@@ -1534,39 +1548,42 @@ const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
     panel.querySelectorAll(".hvor-valg")[1].click();
     var forslag = panel.querySelector(".pub-forslag");
     setTimeout(function () { try {
-      var titler = Array.prototype.map.call(forslag.querySelectorAll(".pub-gruppe-tittel"),
-        function (t) { return t.textContent; });
-      ok("bekreftede puber star aller forst", titler[0] === "Viser denne kampen", titler.join("|"));
-      var bekGruppe = forslag.querySelector(".pub-gruppe-bekreftet");
-      var bekChips = bekGruppe.querySelectorAll(".pub-chip");
-      ok("bare puben som viser denne kampen star der",
-         bekChips.length === 1 && bekChips[0].textContent.indexOf("Lincoln Pub") === 0,
-         bekChips.length + " " + bekChips[0].textContent);
+      var chips = forslag.querySelectorAll(".pub-chip");
+      // Den eneste kilden som svarer pa *kampen* framfor pa stedet —
+      // derfor forst i rangeringen.
+      ok("puben som viser denne kampen star aller forst",
+         chips[0].textContent.indexOf("Lincoln Pub") === 0, chips[0].textContent);
       ok("den er merket med stjerne",
-         !!bekChips[0].querySelector(".pub-bekreftet")
-         && bekChips[0].querySelector(".pub-bekreftet").textContent === "\u2605",
-         bekChips[0].textContent);
+         !!chips[0].querySelector(".pub-bekreftet")
+         && chips[0].querySelector(".pub-bekreftet").textContent === "\u2605",
+         chips[0].textContent);
       ok("og stjerna sier hva den betyr",
-         bekChips[0].querySelector(".pub-bekreftet").getAttribute("aria-label") === "viser denne kampen");
-      ok("det star hvor opplysningen kommer fra",
-         bekGruppe.textContent.indexOf("Meldt inn til oss") > -1, bekGruppe.textContent);
-      // En annen pubs kamp skal ikke lekke inn her.
-      ok("en annen kamps pub star ikke her",
-         bekGruppe.textContent.indexOf("Carls") === -1, bekGruppe.textContent);
+         chips[0].querySelector(".pub-bekreftet").getAttribute("aria-label") === "viser denne kampen");
+      // En annen pubs kamp skal ikke lekke inn.
+      ok("en annen kamps pub star ikke merket her",
+         !Array.prototype.some.call(chips, function (c) {
+           return c.textContent.indexOf("Carls") === 0 && !!c.querySelector(".pub-bekreftet");
+         }), forslag.textContent.slice(0, 120));
 
-      // Samme pub dukker opp naer deg, og skal se lik ut der.
-      var naerChips = Array.prototype.filter.call(forslag.querySelectorAll(".pub-chip"),
+      // Samme pub kommer fra flere kilder, men skal sta ett sted.
+      var lincoln = Array.prototype.filter.call(chips,
         function (c) { return c.textContent.indexOf("Lincoln Pub") === 0; });
-      ok("puben dukker opp i flere grupper", naerChips.length > 1, naerChips.length);
-      ok("og er merket bekreftet i alle",
-         naerChips.every(function (c) { return !!c.querySelector(".pub-bekreftet"); }));
-      var andre = Array.prototype.filter.call(forslag.querySelectorAll(".pub-chip"),
+      ok("puben star ett sted, ikke i flere lister", lincoln.length === 1, lincoln.length);
+      // Ingenting forsvinner: resten ligger ett trykk unna.
+      var mer = forslag.querySelector(".pub-mer");
+      ok("resten ligger bak «Flere forslag»", !!mer, forslag.textContent.slice(0, 80));
+      if (mer) mer.click();
+      var alle = forslag.querySelectorAll(".pub-chip");
+      ok("og trykket henter dem fram", alle.length > chips.length,
+         chips.length + " → " + alle.length);
+      var andre = Array.prototype.filter.call(alle,
         function (c) { return c.textContent.indexOf("Tilfeldig Bar") === 0; });
       ok("en pub uten visning er ikke merket",
          andre.length > 0 && !andre[0].querySelector(".pub-bekreftet"), andre.length);
+      chips = forslag.querySelectorAll(".pub-chip");
 
       // Et trykk velger puben som ellers.
-      bekChips[0].click();
+      chips[0].click();
       ok("et trykk fyller pubfeltet", panel.querySelector(".kamp-pub").value === "Lincoln Pub",
          panel.querySelector(".kamp-pub").value);
 
@@ -1578,11 +1595,17 @@ const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
          document.querySelectorAll(".kamp-panel").length);
       panel2.querySelectorAll(".hvor-valg")[1].click();
       setTimeout(function () { try {
-        var bek2 = panel2.querySelector(".pub-gruppe-bekreftet");
-        ok("neste kamp har sin egen pub",
-           bek2 && bek2.textContent.indexOf("Carls") > -1, bek2 ? bek2.textContent : "ingen gruppe");
+        var chips2 = panel2.querySelectorAll(".pub-chip");
+        ok("neste kamp har sin egen pub forst",
+           chips2.length > 0 && chips2[0].textContent.indexOf("Carls") > -1 &&
+           !!chips2[0].querySelector(".pub-bekreftet"),
+           chips2.length ? chips2[0].textContent : "ingen chips");
+        // Forrige kamps pub skal ikke folge med som bekreftet hit.
+        var merket2 = Array.prototype.filter.call(chips2,
+          function (c) { return !!c.querySelector(".pub-bekreftet"); });
         ok("og ikke den forriges",
-           bek2.querySelectorAll(".pub-chip").length === 1, bek2.textContent);
+           merket2.length === 1 && merket2[0].textContent.indexOf("Lincoln") === -1,
+           merket2.map(function (c) { return c.textContent; }).join("|"));
         ferdig();
       } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);

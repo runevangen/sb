@@ -262,7 +262,35 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   kamp. Sett virke i prod 11. september 2026. Feiler kallet, bærer
   feilsvaret `forsok` med status og METs egen melding, som
   fotballfunksjonen.
-- «Hvilken pub?» får fire svar som chips over feltet, og feltet er
+- **«Hvilken pub?» får ett svar, ikke seks.** Forslagene sto i en gruppe
+  per kilde, med hver sin overskrift: «Viser denne kampen», «Kjent for å
+  vise fotball», «Nær deg», «Dine puber», «Fotballpuber ved <arena>»,
+  «Ved stadion», «Ved holdeplassen». Det var ikke åpenhet, det var støy —
+  samme pub sto i tre av dem, og den ene gruppa som faktisk svarte på
+  kampen druknet. Meldt fra faktisk bruk 13. september 2026.
+  Nå er det én rangert liste på høyst `FORSLAG_MAKS` (seks) chips.
+  `rangerForslag()` i `pub-data.js` er rekkefølgen, og rekkefølgen *er*
+  svaret: det som gjelder denne kampen først, så dine egne, så kjente
+  fotballpuber nær deg, så ved arenaen, så resten fra kartet. Hver pub
+  havner ett sted — dedupliseres på `normaliserLagnavn`, samme nøkkel som
+  ellers — og merkene slås sammen, så et treff fra kartet ikke skjuler at
+  stedet alt har meldt at det viser kampen. Merkene ★ og ⚽ bærer det
+  overskriftene sa, og koster ingen linje. Resten ligger bak «Flere
+  forslag»; ingenting forsvinner.
+- Kildene lander til ulik tid, så hver legger seg i `boks.kilder` og ber
+  om en ny tegning. Ett sted bestemmer hva som står på skjermen. Før
+  oppdaterte fem grupper seg selv, hver for seg, og det var derfor ingen
+  kunne se hvor mange linjer panelet ville ende med.
+- `boks.feil` er en **liste**, ikke én streng. Første forsøk på å rydde
+  gjorde den til én, og da forsvant den andre feilen når både arenaen og
+  «nær deg» sviktet — nøyaktig den diagnostikken som gjør at en feil kan
+  meldes videre uten å grave i funksjonsloggen. Nettlesertesten fanget
+  det. Begge navngis nå, i samme avsnitt.
+- «Puber nær deg»-knappen står bare når den har noe å gjøre: avslått
+  posisjon, eller et kart som sviktet. Den sto der alltid før, og var en
+  av de seks tingene som fylte panelet — men uten den finnes ingen vei
+  tilbake om man ombestemmer seg.
+- De fire kildene bak rangeringen, og hvorfor de finnes: feltet er
   fortsatt sannheten. *Nær deg* står først og hentes med en gang:
   kampen spilles ofte et annet sted enn der man ser den. Trykket som
   valgte «på pub» er handlingen telefonen krever for å spørre om
@@ -701,9 +729,9 @@ er i seg selv noe om adressen.
 
 ## Testing
 
-    node test/unit.mjs      393 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      402 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  219 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       307 tester, ~190 s, headless Chromium
+    node test/run.mjs       308 tester, ~190 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

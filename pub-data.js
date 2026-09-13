@@ -208,6 +208,62 @@ export function merkKuraterte(puber, liste) {
   });
 }
 
+/* ---------- ett sporsmal, ett svar ---------- */
+
+// Hvor mange forslag som star framme. Resten ligger bak «Flere forslag»,
+// sa ingenting forsvinner — men seks er sa mange som lar seg lese pa en
+// telefon uten a rulle.
+export const FORSLAG_MAKS = 6;
+
+// Rekkefolgen kildene rangeres i. Den er svaret: det som gjelder *denne
+// kampen* forst, sa det du selv har brukt, sa steder vi vet viser
+// fotball, sa resten fra kartet.
+export const FORSLAG_KILDER = [
+  "bekreftede", "dine", "kjenteNaer", "kjenteVedArena", "naerDeg", "vedArena",
+];
+
+// Én liste, ikke seks grupper.
+//
+// For sto forslagene i en gruppe per kilde, med hver sin overskrift:
+// «Viser denne kampen», «Kjent for a vise fotball», «Naer deg», «Dine
+// puber», «Fotballpuber ved <arena>», «Ved stadion», «Ved holdeplassen».
+// Det var ikke apenhet, det var stoy — samme pub sto i tre av dem, og
+// den ene gruppa som faktisk svarte pa kampen druknet i de andre.
+//
+// Na havner hver pub ett sted, der den rangerer hoyest, og merkene barer
+// det overskriftene sa: ★ for «viser denne kampen», ⚽ for «kjent for a
+// vise fotball». De koster ingen linje.
+export function rangerForslag(kilder, maks = FORSLAG_MAKS) {
+  const sett = new Map();
+
+  FORSLAG_KILDER.forEach((navn) => {
+    const liste = (kilder && kilder[navn]) || [];
+    (Array.isArray(liste) ? liste : []).forEach((p) => {
+      if (!p || !p.navn) return;
+      const nokkel = normaliserLagnavn(p.navn);
+      if (!nokkel) return;
+
+      const eks = sett.get(nokkel);
+      if (!eks) { sett.set(nokkel, Object.assign({}, p)); return; }
+
+      // Samme pub fra flere kilder beholder plassen sin, men samler
+      // merkene: et treff fra kartet skal ikke skjule at stedet alt har
+      // sagt at det viser kampen. Korteste avstand vinner.
+      if (p.bekreftet) eks.bekreftet = true;
+      if (p.viserFotball) eks.viserFotball = true;
+      if (p.lag && p.lag.length && !(eks.lag && eks.lag.length)) eks.lag = p.lag;
+      if (Number.isFinite(p.avstand) &&
+          (!Number.isFinite(eks.avstand) || p.avstand < eks.avstand)) {
+        eks.avstand = p.avstand;
+      }
+    });
+  });
+
+  const alle = Array.from(sett.values());
+  const tak = Number.isFinite(maks) && maks > 0 ? maks : alle.length;
+  return { topp: alle.slice(0, tak), resten: alle.slice(tak) };
+}
+
 /* ---------- dine puber ---------- */
 
 // Lagres lokalt som [{ navn, antall }]. Den som er brukt oftest star

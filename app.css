@@ -1763,26 +1763,17 @@ body {
   outline-offset: 2px;
 }
 
-/* Pubforslagene: grupper med chips, over feltet. Feltet er fortsatt
-   sannheten; chipene bare fyller det. */
+/* Pubforslagene: én rangert liste med chips, over feltet. Feltet er
+   fortsatt sannheten; chipene bare fyller det.
+
+   Ingen gruppeoverskrifter lenger. Seks grupper med hver sin tittel var
+   stoy — rekkefolgen og merkene barer det de sa. */
 .pub-forslag { display: flex; flex-direction: column; gap: 8px; }
 .pub-forslag[hidden] { display: none; }
-.pub-gruppe { display: flex; flex-direction: column; gap: 5px; }
-.pub-rundt { display: flex; flex-direction: column; gap: 8px; }
-.pub-rundt:empty { display: none; }
-
-.pub-gruppe-tittel {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
 
 .pub-liste { display: flex; gap: 6px; flex-wrap: wrap; }
 
-.pub-chip, .pub-naer {
+.pub-chip, .pub-mer, .pub-naer {
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
@@ -1797,8 +1788,13 @@ body {
   cursor: pointer;
 }
 
-.pub-naer { align-self: flex-start; border-style: dashed; }
-.pub-naer:disabled { opacity: 0.6; cursor: default; }
+/* Veien til resten, og veien tilbake nar posisjonen ble avslatt. Stiplet,
+   sa de ikke ser ut som enda et forslag. */
+.pub-mer, .pub-naer {
+  align-self: flex-start;
+  border-style: dashed;
+  color: var(--text-dim);
+}
 
 .pub-chip[aria-pressed="true"] {
   background: var(--accent);
@@ -1808,7 +1804,7 @@ body {
 
 .pub-chip[aria-pressed="true"] .pub-avstand { color: var(--accent-ink); opacity: 0.8; }
 
-.pub-chip:focus-visible, .pub-naer:focus-visible {
+.pub-chip:focus-visible, .pub-mer:focus-visible, .pub-naer:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -1822,7 +1818,6 @@ body {
 .pub-bekreftet { font-size: 11px; line-height: 1; color: var(--bekreftet); font-weight: 700; }
 .pub-chip.bekreftet { border-color: var(--bekreftet); }
 .pub-chip.bekreftet[aria-pressed="true"] .pub-bekreftet { color: var(--accent-ink); }
-.pub-gruppe-bekreftet .pub-gruppe-tittel { color: var(--bekreftet); }
 
 .pub-note {
   margin: 0;

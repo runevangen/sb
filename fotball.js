@@ -8,11 +8,12 @@
 // likt her som i resten av appen.
 
 import { LIGAER, DELER, DEL_NAVN, HVOR, STED_MAKS, delingstekst,
-         kamplenke, invitasjonstekst } from "./fotball-data.js";
+         kamplenke, invitasjonstekst, normaliserLagnavn } from "./fotball-data.js";
 import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn, NAVN_MAKS }
   from "./svar-data.js";
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
-         OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte } from "./pub-data.js";
+         OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
+         rangerForslag, FORSLAG_MAKS } from "./pub-data.js";
 import { PUBER_OSLO } from "./puber-oslo.js";
 import { VISNINGER } from "./visninger.js";
 import { bekreftetFor, merkBekreftet } from "./visning-data.js";
@@ -460,111 +461,175 @@ function delPanel(kamp) {
 
 /* ---------- pubforslag ---------- */
 
-// Fire svar pa «hvilken pub?»: dine, naer deg, ved stadion, ved
-// holdeplassen. Alle er knapper som fyller feltet — feltet er fortsatt
-// sannheten, sa en pub som ikke star i lista kan skrives.
+// Ett sporsmal — «hvilken pub?» — og ett svar: en rangert liste.
+//
+// For sto forslagene i seks grupper med hver sin overskrift: «Viser
+// denne kampen», «Kjent for a vise fotball», «Naer deg», «Dine puber»,
+// «Fotballpuber ved <arena>», «Ved stadion», «Ved holdeplassen». Det var
+// ikke apenhet, det var stoy — samme pub sto i tre av dem, og den ene
+// gruppa som faktisk svarte pa kampen druknet i resten. Rangeringen
+// ligger na i `rangerForslag()` i pub-data.js, og merkene ★ og ⚽ barer
+// det overskriftene sa, uten a koste en linje.
+//
+// Kildene lander til ulik tid — posisjon, kart, arena. Hver legger seg i
+// `boks.kilder` og ber om en ny tegning, sa det er ett sted som
+// bestemmer hva som star pa skjermen. For oppdaterte fem grupper seg
+// selv, hver for seg.
 const puberHusket = new Map();
 
 function pubForslag(kamp, pubFelt) {
   const boks = el("div", "pub-forslag");
   boks.dataset.arena = kamp.arena || "";
   boks.pubFelt = pubFelt;
+  boks.kilder = {};
+  // Hvor mange kilder som fortsatt er underveis. Venter noe, er det for
+  // tidlig a si at ingenting finnes.
+  boks.venter = 0;
+  boks.alt = false;
+  // Flere kilder kan svikte hver for seg, og de sviktet av ulik grunn.
+  // Én linje, men den navngir begge: det er dette som gjor at en feil kan
+  // meldes videre uten a grave i funksjonsloggen.
+  boks.feil = [];
+  boks.kart = false;
+  boks.proveNaer = false;
   return boks;
 }
 
 function fyllForslag(boks, kamp) {
   if (boks.dataset.fylt) return;
   boks.dataset.fylt = "1";
-  boks.replaceChildren();
 
-  // Naer deg forst, og hentet med en gang: kampen spilles ofte et annet
-  // sted enn der man ser den. Posisjonen gar rett til OpenStreetMap og
-  // aldri innom oss, og den rundes til rundt hundre meter forst.
-  // Trykket som valgte «pa pub» er handlingen telefonen krever for a
-  // sporre om posisjon, sa den kan hentes na framfor etter et trykk til.
-  // Kjente fotballpuber star over de andre og trenger ingenting fra
-  // nettet: lista ligger i koden. Nar Overpass er nede, er dette det
-  // eneste som fortsatt virker.
-  // Aller forst: pubene som har sagt at de viser nettopp denne kampen.
-  // Det er den eneste gruppa som svarer pa sporsmalet direkte — resten
-  // er steder som pleier a vise fotball. Lista ligger i koden, sa den
-  // star der uten et eneste nettkall.
+  // Pubene som har meldt at de viser nettopp denne kampen. Den eneste
+  // kilden som svarer pa kampen framfor pa stedet — derfor forst.
   const bekreftede = bekreftetFor(kamp, VISNINGER, KJENTE);
-  if (bekreftede.length) {
-    const bek = pubGruppe("Viser denne kampen", bekreftede, boks.pubFelt);
-    bek.classList.add("pub-gruppe-bekreftet");
-    bek.appendChild(el("p", "pub-note", "Meldt inn til oss."));
-    boks.appendChild(bek);
-  }
+  boks.kilder.bekreftede = bekreftede;
+  // Huskes sa et nytt forsok pa posisjon kan merke treffene likt.
+  boks.bekreftede = bekreftede;
 
-  const kjent = el("div", "pub-gruppe");
-  boks.appendChild(kjent);
+  // Dine puber og de kjente ved arenaen ligger i koden: de star der uten
+  // et eneste nettkall, ogsa nar Overpass er nede.
+  boks.kilder.dine = merkBekreftet(
+    puber.liste().map((p) => ({ navn: p.navn })), bekreftede);
 
-  const naer = el("div", "pub-gruppe");
-  const knapp = el("button", "pub-naer", "Puber nær deg");
-  knapp.type = "button";
-  knapp.addEventListener("click", () => hentNaerDeg(naer, knapp, boks.pubFelt, kjent, bekreftede));
-  naer.appendChild(knapp);
-  boks.appendChild(naer);
-  hentNaerDeg(naer, knapp, boks.pubFelt, kjent, bekreftede);
-
-  const dine = puber.liste();
-  if (dine.length) {
-    boks.appendChild(pubGruppe("Dine puber",
-      merkBekreftet(dine.map((p) => ({ navn: p.navn })), bekreftede), boks.pubFelt));
-  }
-
-  // Ved arenaen: ogsa uten nettverk, for de arenaene lista dekker.
   const arena = arenaFor(kamp.arena);
   if (arena) {
-    const vedArena = kuraterteNaer(KJENTE, arena, KJENT_RADIUS);
-    if (vedArena.length) {
-      boks.appendChild(pubGruppe("Fotballpuber ved " + arena.navn,
-        merkBekreftet(vedArena.slice(0, 5), bekreftede), boks.pubFelt));
-    }
+    boks.kilder.kjenteVedArena = merkBekreftet(
+      kuraterteNaer(KJENTE, arena, KJENT_RADIUS), bekreftede);
   }
 
-  const rundt = el("div", "pub-rundt");
-  boks.appendChild(rundt);
+  tegnForslag(boks);
+
+  // Naer deg hentes med en gang: kampen spilles ofte et annet sted enn
+  // der man ser den. Trykket som valgte «pa pub» er handlingen telefonen
+  // krever for a sporre om posisjon, sa den kan hentes na framfor etter
+  // et trykk til.
+  hentNaerDeg(boks, bekreftede);
+
   if (kamp.arena) {
-    // Aldri stille: star det ingenting her, skal det sta hvorfor — og
-    // hvem som sviktet, sa det kan meldes videre uten a grave i logger.
-    rundt.appendChild(el("p", "pub-note pub-venter", "Finner puber ved " + kamp.arena + " …"));
+    boks.venter += 1;
     hentPuberRundt(kamp.arena).then((data) => {
-      rundt.replaceChildren();
+      boks.venter -= 1;
       if (!data || data.feil) {
-        rundt.appendChild(el("p", "pub-note pub-feil",
-          "Fikk ikke hentet puber ved " + kamp.arena + hvemSviktet(data) + ". Skriv puben selv."));
-        return;
+        // Aldri stille: star det ingenting, skal det sta hvem som
+        // sviktet, sa det kan meldes videre uten a grave i logger.
+        boks.feil.push("Fikk ikke puber ved " + kamp.arena + hvemSviktet(data) + ".");
+      } else {
+        const flate = [];
+        (data.grupper || []).forEach((g) => (g.puber || []).forEach((pub) => flate.push(pub)));
+        boks.kilder.vedArena = merkBekreftet(merkKuraterte(flate, KJENTE), bekreftede);
+        if (flate.length) boks.kart = true;
       }
-      (data.grupper || []).forEach((g) =>
-        rundt.appendChild(pubGruppe(g.tittel,
-          merkBekreftet(merkKuraterte(g.puber, KJENTE), bekreftede), boks.pubFelt)));
-      // Ingen treff er ingen nyhet. Fant vi noe annet sted, sier vi
-      // ingenting her — tre «fant ingen»-linjer i et panel med fire
-      // grupper er stoy, ikke apenhet. Er alt tomt, star det en linje,
-      // og den star nederst, der man ellers ville lurt.
-      if (data.grupper && data.grupper.length) {
-        rundt.appendChild(el("p", "pub-note", "© OpenStreetMap-bidragsytere"));
-      }
-      meldTomt(boks);
+      tegnForslag(boks);
     });
   }
 }
 
-// Ett svar pa «fant dere noe?», ikke ett per kilde. Kom det forslag fra
-// en av dem, sier vi ingenting; kom det ingen fra noen, star det en
-// linje nederst. Tre tomme grupper som hver sier fra er stoy, og de
-// druknet det ene stedet som faktisk hadde et forslag.
-function meldTomt(boks) {
-  if (!boks) return;
-  const gammel = boks.querySelector(".pub-tomt");
-  if (gammel) gammel.remove();
-  // Venter noe fortsatt, er det for tidlig a si at ingenting finnes.
-  if (boks.querySelector(".pub-venter")) return;
-  if (boks.querySelector(".pub-chip")) return;
-  boks.appendChild(el("p", "pub-note pub-tomt",
-    "Fant ingen puber i nærheten. Skriv navnet selv."));
+// Ett sted som bestemmer hva som star pa skjermen.
+function tegnForslag(boks) {
+  const valgt = boks.pubFelt ? normaliserLagnavn(boks.pubFelt.value || "") : "";
+  const { topp, resten } = rangerForslag(boks.kilder, boks.alt ? 0 : FORSLAG_MAKS);
+  boks.replaceChildren();
+
+  if (topp.length) {
+    const rad = el("div", "pub-liste");
+    topp.forEach((pub) => rad.appendChild(pubChip(pub, boks, valgt)));
+    boks.appendChild(rad);
+  }
+
+  boks.appendChild(el("p", "pub-note", notetekst(boks, topp)));
+
+  // Veien tilbake nar posisjonen ble avslatt eller kartet sviktet. Den
+  // sto for alltid der; na star den bare nar den har noe a gjore — det
+  // var en av de seks tingene som fylte panelet.
+  if (boks.proveNaer) {
+    const igjen = el("button", "pub-naer", "Puber nær deg");
+    igjen.type = "button";
+    igjen.addEventListener("click", () => {
+      boks.proveNaer = false;
+      hentNaerDeg(boks, boks.bekreftede || []);
+      tegnForslag(boks);
+    });
+    boks.appendChild(igjen);
+  }
+
+  // Ingenting forsvinner: resten ligger ett trykk unna.
+  if (resten.length) {
+    const mer = el("button", "pub-mer", "Flere forslag (" + resten.length + ")");
+    mer.type = "button";
+    mer.addEventListener("click", () => { boks.alt = true; tegnForslag(boks); });
+    boks.appendChild(mer);
+  }
+}
+
+// Én linje, aldri flere. Venter en kilde fortsatt, er det for tidlig a
+// si at ingenting finnes; er alt tomt og ingenting venter, star det
+// hvorfor. Tre «fant ingen»-linjer, en per kilde, var det som gjorde
+// panelet uleselig.
+function notetekst(boks, topp) {
+  const feil = boks.feil.join(" ");
+  if (!topp.length) {
+    if (boks.venter > 0) return "Finner puber …";
+    return feil || "Fant ingen puber i nærheten. Skriv navnet selv.";
+  }
+  // Lisensen (ODbL) krever kreditering der treff fra kartet vises.
+  const kreditt = boks.kart ? "© OpenStreetMap-bidragsytere. " : "";
+  return kreditt + (feil || "Står ikke puben her, skriv den selv.");
+}
+
+function pubChip(pub, boks, valgt) {
+  const b = el("button", "pub-chip");
+  b.type = "button";
+  b.appendChild(el("span", null, pub.navn));
+
+  // Bekreftet star forst av merkene: det svarer pa kampen, ikke bare pa
+  // stedet. Stjerna er «denne kampen vises her», ballen «stedet pleier a
+  // vise fotball».
+  if (pub.bekreftet) {
+    b.classList.add("bekreftet");
+    const stjerne = el("span", "pub-bekreftet", "★");
+    stjerne.setAttribute("aria-label", "viser denne kampen");
+    b.appendChild(stjerne);
+  }
+  if (pub.viserFotball || pub.sikkerhet) {
+    const merke = el("span", "pub-merke", "⚽");
+    merke.setAttribute("aria-label", "kjent for å vise fotball");
+    b.appendChild(merke);
+    const lag = (pub.lag || []).join(", ");
+    b.title = lag ? "Kjent for å vise fotball. Stampub for " + lag + "." : "Kjent for å vise fotball.";
+  }
+  if (Number.isFinite(pub.avstand)) {
+    b.appendChild(el("span", "pub-avstand", avstandtekst(pub.avstand)));
+  }
+
+  b.setAttribute("aria-pressed",
+    valgt && normaliserLagnavn(pub.navn) === valgt ? "true" : "false");
+  b.addEventListener("click", () => {
+    boks.pubFelt.value = pub.navn;
+    boks.pubFelt.dispatchEvent(new Event("input"));
+    boks.querySelectorAll(".pub-chip").forEach((k) =>
+      k.setAttribute("aria-pressed", k === b ? "true" : "false"));
+  });
+  return b;
 }
 
 // «(overpass-api.de svarte 406)» — nok til a se hva som feiler, uten a
@@ -575,46 +640,6 @@ function hvemSviktet(data) {
   if (!sist) return "";
   const navn = String(sist.kilde || "").replace(/^Overpass /, "");
   return " (" + navn + (sist.status ? " svarte " + sist.status : ": " + sist.utfall) + ")";
-}
-
-function pubGruppe(tittel, liste, pubFelt) {
-  const gruppe = el("div", "pub-gruppe");
-  gruppe.appendChild(el("p", "pub-gruppe-tittel", tittel));
-  const rad = el("div", "pub-liste");
-  liste.forEach((p) => {
-    const b = el("button", "pub-chip");
-    b.type = "button";
-    b.appendChild(el("span", null, p.navn));
-    // Bekreftet star forst av merkene: det svarer pa kampen, ikke bare
-    // pa stedet. Stjerna er merket for «denne kampen vises her», ballen
-    // for «stedet pleier a vise fotball».
-    if (p.bekreftet) {
-      b.classList.add("bekreftet");
-      const stjerne = el("span", "pub-bekreftet", "★");
-      stjerne.setAttribute("aria-label", "viser denne kampen");
-      b.appendChild(stjerne);
-    }
-    // Et sted vi vet viser fotball, blant treff vi bare vet er puber.
-    if (p.viserFotball || p.sikkerhet) {
-      const merke = el("span", "pub-merke", "⚽");
-      merke.setAttribute("aria-label", "kjent for å vise fotball");
-      b.appendChild(merke);
-      const lag = (p.lag || []).join(", ");
-      b.title = lag ? "Kjent for å vise fotball. Stampub for " + lag + "." : "Kjent for å vise fotball.";
-    }
-    if (Number.isFinite(p.avstand)) b.appendChild(el("span", "pub-avstand", avstandtekst(p.avstand)));
-    b.addEventListener("click", () => {
-      pubFelt.value = p.navn;
-      pubFelt.dispatchEvent(new Event("input"));
-      // Markerer valget der det ble gjort, og bare der.
-      gruppe.closest(".pub-forslag").querySelectorAll(".pub-chip").forEach((k) =>
-        k.setAttribute("aria-pressed", k === b ? "true" : "false"));
-    });
-    b.setAttribute("aria-pressed", "false");
-    rad.appendChild(b);
-  });
-  gruppe.appendChild(rad);
-  return gruppe;
 }
 
 // Svarer alltid med det funksjonen sa, ogsa nar det er en feil: da star
@@ -642,47 +667,46 @@ async function hentPuberRundt(arena) {
   return lofte;
 }
 
-// Overpass rett fra nettleseren, med posisjonen rundet. Svaret husket per
-// posisjon sa et nytt trykk ikke koster et nytt kall.
+// Overpass rett fra nettleseren, med posisjonen rundet til rundt hundre
+// meter. Posisjonen gar aldri innom oss. Svaret huskes per posisjon, sa
+// et nytt trykk ikke koster et nytt kall.
 const naerHusket = new Map();
 
-function hentNaerDeg(gruppe, knapp, pubFelt, kjentBoks, bekreftede) {
-  if (!navigator.geolocation) { visPubFeil(gruppe, "Ingen posisjon tilgjengelig."); return; }
-  knapp.disabled = true;
-  knapp.textContent = "Finner puber …";
+function hentNaerDeg(boks, bekreftede) {
+  if (!navigator.geolocation) return;
+  boks.venter += 1;
+
   navigator.geolocation.getCurrentPosition(async (pos) => {
     const p = rundPosisjon(pos.coords.latitude, pos.coords.longitude);
-    // Kjente fotballpuber forst, og med en gang: lista ligger i koden,
-    // sa denne star der ogsa nar Overpass ikke svarer.
-    if (kjentBoks) {
-      const naere = kuraterteNaer(KJENTE, p, KJENT_RADIUS);
-      if (naere.length) {
-        kjentBoks.replaceChildren();
-        kjentBoks.appendChild(pubGruppe("Kjent for å vise fotball",
-          merkBekreftet(naere.slice(0, 6), bekreftede), pubFelt));
-      }
-    }
+
+    // Kjente fotballpuber naer deg star der med en gang: lista ligger i
+    // koden, sa den virker ogsa nar Overpass ikke svarer. Det er verdt
+    // mye her, der Overpass har vaert det skjoreste leddet.
+    boks.kilder.kjenteNaer = merkBekreftet(
+      kuraterteNaer(KJENTE, p, KJENT_RADIUS), bekreftede);
+    tegnForslag(boks);
+
     const nokkel = p.lat + "," + p.lon;
     try {
       if (!naerHusket.has(nokkel)) naerHusket.set(nokkel, naerePuber(p));
-      const liste = (await naerHusket.get(nokkel)).slice(0, 6);
-      knapp.remove();
-      if (!liste.length) { gruppe.replaceChildren(); meldTomt(gruppe.closest(".pub-forslag")); return; }
-      gruppe.replaceChildren();
-      gruppe.appendChild(pubGruppe("Nær deg", merkBekreftet(liste, bekreftede), pubFelt));
-      gruppe.appendChild(el("p", "pub-note", "© OpenStreetMap-bidragsytere"));
-      meldTomt(gruppe.closest(".pub-forslag"));
+      const liste = await naerHusket.get(nokkel);
+      boks.kilder.naerDeg = merkBekreftet(merkKuraterte(liste, KJENTE), bekreftede);
+      if (liste.length) boks.kart = true;
     } catch (err) {
       naerHusket.delete(nokkel);
-      knapp.disabled = false;
-      knapp.textContent = "Puber nær deg";
-      visPubFeil(gruppe, "Fikk ikke svar fra OpenStreetMap (" +
-        String(err && err.message || err).slice(0, 40) + "). Prøv igjen.");
+      boks.feil.push("Fikk ikke puber nær deg (" +
+        String((err && err.message) || err).slice(0, 60) + ").");
+      boks.proveNaer = true;
     }
+    boks.venter -= 1;
+    tegnForslag(boks);
   }, () => {
-    knapp.disabled = false;
-    knapp.textContent = "Puber nær deg";
-    visPubFeil(gruppe, "Fikk ikke posisjonen. Skriv puben selv.");
+    // Avslatt posisjon er ikke en feil verdt en linje: resten av lista
+    // star der fortsatt, og leseren vet hva hen nettopp sa nei til. Men
+    // knappen skal sta der, sa det gar an a ombestemme seg.
+    boks.venter -= 1;
+    boks.proveNaer = true;
+    tegnForslag(boks);
   }, { maximumAge: 300000, timeout: 10000 });
 }
 
@@ -716,11 +740,6 @@ async function naerePuber(p) {
   }
 }
 
-function visPubFeil(gruppe, tekst) {
-  let note = gruppe.querySelector(".pub-feil");
-  if (!note) { note = el("p", "pub-note pub-feil"); gruppe.appendChild(note); }
-  note.textContent = tekst;
-}
 
 // En ferdigspilt sesong har ingen neste runde, og det er noe annet enn at
 // oppsettet ikke er klart. Sier vi det siste, ser det ut som en feil.

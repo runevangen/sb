@@ -31,6 +31,7 @@ import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
 
 import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, enturNaermest,
          tolkHoldeplasser, grupperPuber, ofteBrukt, noterPub,
+         rangerForslag, FORSLAG_MAKS,
          OVERPASS_SPEIL, overpassHeadere, restTid,
          sjekkPubliste, kuraterteNaer, merkKuraterte,
          sjekkKontaktliste, kontaktFor, finnKontakt, KONTAKT_FELT } from "../pub-data.js";
@@ -1082,6 +1083,48 @@ ok("en okt uten navn kastes ogsa",
 ok("uten levetid far ogsa PIN-okta en kort en",
    tolkPinOkt({ access_token: "t" }, "Ola", KONTO_NAA).utloper ===
    "2026-09-11T13:00:00.000Z");
+
+/* ---------------- ett sporsmal, ett svar ---------------- */
+
+// Rekkefolgen er svaret. Det som gjelder denne kampen forst, sa det du
+// selv har brukt, sa steder vi vet viser fotball, sa resten fra kartet.
+const RANG = rangerForslag({
+  bekreftede: [{ navn: "Lincoln Pub", bekreftet: true }],
+  dine: [{ navn: "Andys Pub" }],
+  kjenteNaer: [{ navn: "lincoln pub", viserFotball: true, avstand: 120, lag: ["Brann"] },
+               { navn: "Sofa & Bar", viserFotball: true, avstand: 300 }],
+  naerDeg: [{ navn: "Bar X", avstand: 50 }, { navn: "Bar Y", avstand: 80 },
+            { navn: "Bar Z", avstand: 90 }, { navn: "Bar Q", avstand: 95 }],
+}, 6);
+
+ok("den som svarer pa kampen star forst", RANG.topp[0].navn === "Lincoln Pub",
+   RANG.topp.map((p) => p.navn).join(","));
+ok("sa dine, sa de kjente, sa kartet",
+   RANG.topp.map((p) => p.navn).join(",") ===
+   "Lincoln Pub,Andys Pub,Sofa & Bar,Bar X,Bar Y,Bar Z",
+   RANG.topp.map((p) => p.navn).join(","));
+// Det var dette som gjorde panelet uleselig: samme pub i tre grupper.
+ok("samme pub star ett sted, ikke tre",
+   RANG.topp.filter((p) => /lincoln/i.test(p.navn)).length === 1,
+   RANG.topp.map((p) => p.navn).join(","));
+// Et treff fra kartet skal ikke skjule at stedet alt har sagt at det
+// viser kampen — merkene slas sammen.
+ok("merkene folger med fra alle kildene",
+   RANG.topp[0].bekreftet === true && RANG.topp[0].viserFotball === true &&
+   RANG.topp[0].avstand === 120 && RANG.topp[0].lag.join(",") === "Brann",
+   JSON.stringify(RANG.topp[0]));
+ok("resten ligger igjen, ikke kastet",
+   RANG.resten.length === 1 && RANG.resten[0].navn === "Bar Q",
+   JSON.stringify(RANG.resten));
+ok("seks er taket", FORSLAG_MAKS === 6 && RANG.topp.length === 6, RANG.topp.length);
+// «Flere forslag» ber om alt.
+ok("uten tak kommer alle med",
+   rangerForslag({ naerDeg: [{ navn: "a" }, { navn: "b" }, { navn: "c" }] }, 0).topp.length === 3);
+ok("tomt inn gir tomt ut",
+   rangerForslag(null).topp.length === 0 && rangerForslag({}).resten.length === 0);
+// En pub uten navn er ingen pub, og ville blitt en tom knapp.
+ok("rader uten navn faller bort",
+   rangerForslag({ dine: [{ navn: "" }, { navn: "Ekte pub" }, null] }).topp.length === 1);
 
 /* ---------------- brukerlista i adminportalen ---------------- */
 
