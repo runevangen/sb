@@ -662,6 +662,17 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   ikke etter to timer med skjermen av, og det er nettopp da man tar den
   opp for å trykke på noe. Ett forsøk om gangen: to samtidige ville brukt
   den samme fornyeren, og den andre fått den avvist.
+- **Identiteten overlever en fornying.** Supabase trenger ikke sende
+  brukerobjektet med på `grant_type=refresh_token`, og uten `user.id` ble
+  `bruker` tom i økten. Da vet ikke appen hvilken rad i «blir med»-lista
+  som er din: `egetSvar()` finner ingenting, stedet ditt står umerket,
+  kortet sier ingenting om hvor du skal, delingsteksten mister stedet —
+  og et nytt trykk melder deg på igjen framfor å angre. Appen beholder
+  derfor `bruker` og `navn` fra den forrige økten når svaret ikke bærer
+  dem, og `maaFornyes()` melder en økt uten `bruker` som moden uansett
+  hvor fersk den er: fornyingen er veien til å få id-en tilbake.
+  Meldt fra prod 13. september 2026, og delingsteksten var beviset —
+  den manglet «Jeg ser den på …», og lenka hadde `kamp=` uten `hvor=`.
 - **Bare en avvist fornyer logger deg ut, aldri et nettverksblaff.** De to
   ser like ut fra en `fetch` som kaster, så fornyingen gjør sitt eget kall
   framfor å gå gjennom `kontoKall` — den kaster på feil, og da forsvinner
@@ -936,9 +947,9 @@ er i seg selv noe om adressen.
 
 ## Testing
 
-    node test/unit.mjs      437 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      438 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  229 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       373 tester, ~200 s, headless Chromium
+    node test/run.mjs       374 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

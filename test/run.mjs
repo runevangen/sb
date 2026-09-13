@@ -2646,9 +2646,12 @@ function fornySide(fornyerSvar) {
 }
 
 const SAK_19B = await kjor("fornying", fornySide(`function () {
+  // Uten bruker-id i svaret: Supabase trenger ikke sende brukerobjektet
+  // med pa en fornying, og da ma appen beholde den den hadde.
+  // (Ingen bakflutt her: den avslutter template-literalen rundt.)
   return Promise.resolve({ ok: true, status: 200, statusText: "OK",
     text: function () { return Promise.resolve(JSON.stringify({
-      token: "ferskt", navn: "Rune", bruker: "u-1", fornyer: "forny-2",
+      token: "ferskt", navn: "Rune", bruker: "", fornyer: "forny-2",
       utloper: new Date(Date.now() + 3600000).toISOString() })); } });
 }`) + `
   window.addEventListener("load", function () { setTimeout(function () { try {
@@ -2668,6 +2671,12 @@ const SAK_19B = await kjor("fornying", fornySide(`function () {
     // avvist og man er like langt.
     ok("og den nye fornyeren erstatter den brukte",
        lagret && lagret.fornyer === "forny-2", lagret && lagret.fornyer);
+    // Identiteten endrer seg ikke av en fornying. Mistes bruker-id-en,
+    // vet ikke appen hvilken rad i «blir med»-lista som er din: stedet
+    // star umerket, kortet sier ingenting om hvor du skal, og
+    // delingsteksten mister stedet.
+    ok("bruker-id-en overlever en fornying som ikke barer den",
+       lagret && lagret.bruker === "u-1", lagret && lagret.bruker);
     // Det synlige beviset: du er fortsatt logget inn.
     var merke = document.getElementById("hvemTag");
     ok("du star fortsatt som innlogget",

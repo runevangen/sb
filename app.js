@@ -1613,9 +1613,18 @@ async function fornyOkt() {
 
     // Tjenesten svarer med okta flatt, ikke pakket inn.
     if (data && data.token) {
-      lagreKonto(data);
+      // Identiteten endrer seg ikke av en fornying. Barer ikke svaret
+      // bruker-id-en — den star i `user` hos Supabase, og den trenger
+      // ikke folge med pa en fornying — beholdes den vi hadde. Uten den
+      // vet ikke appen hvilken rad i «blir med»-lista som er din: stedet
+      // star umerket, kortet sier ingenting om hvor du skal, og
+      // delingsteksten mister stedet. Det var nettopp det som skjedde.
+      const fornyet = Object.assign({}, data);
+      if (!fornyet.bruker && kontoOkt.bruker) fornyet.bruker = kontoOkt.bruker;
+      if (!fornyet.navn && kontoOkt.navn) fornyet.navn = kontoOkt.navn;
+      lagreKonto(fornyet);
       planleggFornying();
-      return data;
+      return fornyet;
     }
     // Bare en avvist fornyer betyr utlogget: den er brukt, trukket
     // tilbake eller utlopt, og da hjelper det ikke a prove igjen.

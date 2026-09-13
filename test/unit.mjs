@@ -1102,7 +1102,7 @@ ok("uten levetid far ogsa PIN-okta en kort en",
 
 // Et utlopt tilgangstoken er ikke det samme som a vaere logget ut. Var
 // de det samme, ble man logget ut hver time — og det var de.
-const MED_FORNYER = { token: "t", navn: "Ola", fornyer: "f-1",
+const MED_FORNYER = { token: "t", navn: "Ola", fornyer: "f-1", bruker: "u-1",
                       utloper: new Date(KONTO_NAA + 3600000).toISOString() };
 ok("en okt med fornyer kan fornyes", kanFornyes(MED_FORNYER));
 ok("en okt uten fornyer kan ikke",
@@ -1121,7 +1121,15 @@ ok("en okt uten fornyer fornyes ikke, uansett hvor gammel",
 // En okt vi ikke kjenner levetiden pa er ikke en okt a stole pa — men
 // har den en fornyer, er veien ut a fornye, ikke a logge ut.
 ok("ugyldig utlopstid ber om fornying framfor a gjettes pa",
-   maaFornyes({ token: "t", navn: "Ola", fornyer: "f-1", utloper: "tull" }, KONTO_NAA));
+   maaFornyes({ token: "t", navn: "Ola", fornyer: "f-1", bruker: "u-1",
+     utloper: "tull" }, KONTO_NAA));
+
+// Uten bruker-id vet ikke appen hvilken rad i «blir med»-lista som er
+// din: stedet star umerket, kortet sier ingenting om hvor du skal, og
+// delingsteksten mister stedet. Fornyingen er veien til a fa id-en
+// tilbake, sa en slik okt er moden uansett hvor fersk den er.
+ok("en okt uten bruker-id ma fornyes selv om den er fersk",
+   maaFornyes(Object.assign({}, MED_FORNYER, { bruker: "" }), KONTO_NAA));
 
 /* ---------------- kampene noen blir med pa ---------------- */
 

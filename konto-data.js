@@ -97,6 +97,12 @@ export function kanFornyes(okt) {
 // rekke a ryke underveis.
 export function maaFornyes(okt, naa = Date.now(), margin = FORNY_MARGIN) {
   if (!kanFornyes(okt)) return false;
+  // En okt uten bruker-id er ogsa moden for fornying, uansett hvor fersk
+  // den er: uten den vet ikke appen hvilken rad i «blir med»-lista som er
+  // din. Stedet ditt star umerket, kortet sier ingenting om hvor du skal,
+  // delingsteksten mister stedet, og et nytt trykk melder deg pa igjen
+  // framfor a angre. Fornyingen er veien til a fa id-en tilbake.
+  if (!okt.bruker) return true;
   const utloper = Date.parse(okt.utloper);
   if (Number.isNaN(utloper)) return true;
   return utloper - margin <= naa;
