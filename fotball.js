@@ -721,6 +721,15 @@ function stedChip(kamp, panel, sted, form) {
   if (sted.bekreftet) b.classList.add("bekreftet");
   if (form.pekt) b.classList.add("pekt");
 
+  // Haken staar forst paa stedet du skal til. Fargen alene var ikke nok:
+  // «ser lite forskjell paa en pub som er markert eller ikke» — og da
+  // trykker man en gang til for aa sjekke, og melder seg av uten aa se
+  // det. Et glyf leses ogsa av den som ikke skiller fargene.
+  if (form.valgt && form.paaLista) {
+    const hake = el("span", "sted-hake", "✓");
+    hake.setAttribute("aria-hidden", "true");
+    b.appendChild(hake);
+  }
   b.appendChild(el("span", "sted-navn", sted.navn));
 
   // Merkene sier hvorfor stedet star her. Stjerna svarer pa kampen,
@@ -749,9 +758,14 @@ function stedChip(kamp, panel, sted, form) {
   // Valgt uten a vaere logget inn er et delingsvalg: det skal se ut som
   // et merke, ikke som den gronne bekreftelsen pa at du star pa lista.
   if (form.valgt && !form.paaLista) b.classList.add("kun-deling");
+  // Et trykk paa stedet du alt star paa melder deg av. Det ma staa, ikke
+  // gjettes: et sted som ser ut som et valg blant flere innbyr til aa
+  // trykke igjen, og da forsvinner du fra lista uten aa ha ment det.
   b.setAttribute("aria-label", form.valgt
-    ? (form.paaLista ? "Du skal til " : "Deles: ") + sted.navn
+    ? (form.paaLista ? "Du skal til " + sted.navn + ". Trykk for å melde deg av."
+                     : "Deles: " + sted.navn)
     : "Jeg skal til " + sted.navn);
+  if (form.valgt && form.paaLista) b.title = "Du skal hit. Trykk for å melde deg av.";
   b.addEventListener("click", () =>
     svarSted(kamp, panel, sted.hvor || "pub", sted.navn, form.melding, form.valgt));
   return b;

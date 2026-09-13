@@ -1890,6 +1890,11 @@ a.ad-cta:focus-visible {
 .sted-chip[aria-pressed="true"] .pub-bekreftet,
 .sted-chip[aria-pressed="true"] .sted-folk { color: #fff; }
 
+/* Haken paa stedet du skal til. Fargen alene var ikke nok til aa se at
+   noe var valgt — og da trykker man en gang til for aa sjekke, og melder
+   seg av uten aa se det. */
+.sted-hake { font-weight: 700; line-height: 1; }
+
 /* Valgt uten a vaere logget inn: stedet blir med nar kampen deles, men
    ingen er meldt pa noe. Aksentfargen framfor den gronne, sa det ikke ser
    ut som bekreftelsen pa at du star pa lista — et sted som ser valgt ut

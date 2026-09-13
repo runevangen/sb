@@ -2315,6 +2315,14 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
       ok("stedet du valgte star som valgt i kortet",
          pubX && pubX.getAttribute("aria-pressed") === "true",
          pubX ? pubX.getAttribute("aria-pressed") : "ingen chip");
+      // Fargen alene var ikke nok: «ser lite forskjell pa en pub som er
+      // markert eller ikke» — og da trykker man en gang til for a sjekke,
+      // og melder seg av uten a se det.
+      ok("og den barer en hake, ikke bare en farge",
+         !!pubX.querySelector(".sted-hake"), pubX.textContent);
+      ok("og den sier at et trykk melder deg av",
+         pubX.getAttribute("aria-label").indexOf("melde deg av") > -1,
+         pubX.getAttribute("aria-label"));
       ok("og chipen sier hvor mange som skal dit",
          pubX.querySelector(".sted-folk").textContent === "1",
          pubX.querySelector(".sted-folk").textContent);

@@ -873,6 +873,12 @@ er i seg selv noe om adressen.
 - Svarer du to ganger, endrer du svaret ditt: skrivingen er en upsert
   mot `unique (kamp_id, bruker)`. Trykker du på et annet sted, flytter
   svaret ditt dit; trykker du på det samme igjen, går du av lista.
+- **Og at et nytt trykk melder deg av, må stå — ikke gjettes.** Stedet du
+  skal til bærer en hake, og både `aria-label` og `title` sier «Trykk for
+  å melde deg av». Fargen alene holdt ikke: «ser lite forskjell på en pub
+  som er markert eller ikke», meldt fra prod 13. september 2026 — og da
+  trykker man en gang til for å sjekke at det tok, og melder seg av uten
+  å se det. Det så ut som at ingenting ble lagret.
 - **En skriving som svarer 200 er ikke bevis på at raden ligger der.**
   `settSvar` leser derfor kampen tilbake to ganger — som deg, og som hvem
   som helst — og forskjellen mellom de to er diagnosen:
@@ -968,7 +974,7 @@ er i seg selv noe om adressen.
 
     node test/unit.mjs      438 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  236 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       376 tester, ~200 s, headless Chromium
+    node test/run.mjs       378 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
