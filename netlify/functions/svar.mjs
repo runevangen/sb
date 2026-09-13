@@ -87,7 +87,51 @@ async function settSvar(inn) {
     "Prefer": "resolution=merge-duplicates,return=representation",
   });
   if (!r.ok) return feilSvar(r);
-  return svar({ svar: tolkSvar(r.json) }, 200);
+
+  // Skrivingen sa ja. Det er ikke det samme som at raden ligger der og
+  // kan leses — og appen sa «Du har planlagt å dra til …» på noe som
+  // aldri kom fram. Derfor leses det tilbake, to ganger: som deg, og som
+  // hvem som helst.
+  const [dine, alles] = await Promise.all([
+    lesKamp(kampId, token),
+    lesKamp(kampId, null),
+  ]);
+
+  const mine = dine.ok ? tolkSvar(dine.json) : [];
+  const apent = alles.ok ? tolkSvar(alles.json) : [];
+
+  // Du finner den ikke selv heller: da ble den ikke skrevet, uansett hva
+  // statuskoden sa. Å melde det som vellykket er verre enn en feil.
+  if (!mine.length) {
+    return svar({
+      feil: "Svaret ble ikke lagret. Skrivingen svarte " + r.status
+        + ", men raden finnes ikke etterpå.",
+      forsok: r.forsok.concat(dine.forsok),
+    }, 502);
+  }
+
+  // Du ser den, men ingen andre gjør det. Da er det lesereglene som
+  // mangler, ikke skrivingen — og uten denne beskjeden ser det ut som at
+  // ingen blir med på noe, i all evighet.
+  if (!apent.length) {
+    return svar({
+      svar: mine,
+      advarsel: "Andre kan ikke se svaret ditt. Lesereglen på «" + TABELL
+        + "» mangler — kjør docs/oppsett.sql i Supabase på nytt.",
+      forsok: alles.forsok,
+    }, 200);
+  }
+
+  return svar({ svar: apent }, 200);
+}
+
+// Kampens rader. Med okt leser du som deg selv, uten leser du som alle
+// andre — og forskjellen mellom de to er det som skiller «ikke skrevet»
+// fra «ikke lesbar for andre».
+function lesKamp(kampId, token) {
+  return hosSupabase("GET", "/rest/v1/" + TABELL + "?select=" + FELT +
+    "&kamp_id=eq." + encodeURIComponent(kampId) + "&limit=" + SVAR_MAKS,
+    null, token);
 }
 
 // Angre. Reglene i databasen sorger for at det bare er din egen rad som

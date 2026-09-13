@@ -826,6 +826,10 @@ async function svarSted(kamp, panel, hvor, sted, melding, avmeld) {
       leggInnSvar(kamp.id, okt.bruker, tolkSvar(json.svar));
       panel.settLokalt({ hvor, sted });
       melding.textContent = "Du har planlagt å dra til " + (sted || stedtekst(kamp, hvor, sted)) + ".";
+      // Tjenesten sier fra nar raden er skrevet, men ingen andre kan lese
+      // den. Da er alt riktig fra din side og likevel usynlig for alle —
+      // og det er verre a la det sta som en vellykket lagring.
+      if (json.advarsel) melding.textContent += " " + json.advarsel;
     }
     // Hent kampens svar pa nytt. Vi kan ikke bygge lista pa det skrivingen
     // ga tilbake alene: en upsert som ikke endret noe kan svare med en tom

@@ -1279,10 +1279,19 @@ ok("en kamp-id som ikke er et tall stoppes her",
 kall = stubSupabase(SVAR_RADER);
 r = await svarfunksjon(svarBe({ token: "okt-1", kampId: 7, navn: " Ola ", hvor: "pub",
   sted: "Andy's Pub" }));
-ok("svaret skrives", r.status === 200 && kall.length === 1, r.status + " " + kall.length);
+// Skrivingen, og sa to lesinger: som deg, og som hvem som helst.
+// Statuskoden alene er ikke bevis pa at raden ligger der og kan leses —
+// og appen sa «Du har planlagt a dra til …» pa noe som aldri kom fram.
+ok("svaret skrives, og leses tilbake to ganger",
+   r.status === 200 && kall.length === 3, r.status + " " + kall.length);
 ok("med leserens egen okt",
    kall[0].opsjoner.headers.Authorization === "Bearer okt-1",
    JSON.stringify(kall[0].opsjoner.headers));
+ok("den ene lesingen er som deg, den andre som alle andre",
+   kall[1].opsjoner.headers.Authorization === "Bearer okt-1" &&
+   !kall[2].opsjoner.headers.Authorization,
+   JSON.stringify([kall[1].opsjoner.headers.Authorization,
+                   kall[2].opsjoner.headers.Authorization]));
 ok("og uten a si hvem brukeren er — det gjor databasen",
    JSON.parse(kall[0].opsjoner.body).bruker === undefined, kall[0].opsjoner.body);
 // To «jeg blir med» pa samme kamp er en person, ikke to.
@@ -1290,6 +1299,47 @@ ok("skrivingen er en upsert",
    kall[0].url.indexOf("on_conflict=kamp_id,bruker") > -1 &&
    String(kall[0].opsjoner.headers.Prefer).indexOf("merge-duplicates") > -1,
    kall[0].url + " " + kall[0].opsjoner.headers.Prefer);
+
+// Meldt fra prod 13. september 2026: appen sa «Du har planlagt a dra til
+// Gronland Boulebar & Spiseri», og /api/svar svarte {"svar":[]}. Skrivingen
+// meldte suksess pa noe som ikke lag der. Det skal den aldri gjore igjen.
+kall = stubSupabase([]);
+r = await svarfunksjon(svarBe({ token: "okt-1", kampId: 7, navn: "Ola", hvor: "pub",
+  sted: "Andy's Pub" }));
+const borte = await r.json();
+ok("en skriving som ikke kan leses tilbake meldes som feil, ikke som ok",
+   r.status === 502, r.status + " " + JSON.stringify(borte));
+ok("og den sier at raden ikke finnes etterpa",
+   borte.feil.indexOf("finnes ikke etterpå") > -1, borte.feil);
+
+// Du ser den, men ingen andre gjor det: da er det lesereglen som mangler,
+// ikke skrivingen. Uten denne beskjeden ser det ut som at ingen blir med
+// pa noe, i all evighet.
+let leseKall = 0;
+kall = [];
+global.fetch = async (url, opsjoner) => {
+  kall.push({ url: String(url), opsjoner: opsjoner || {} });
+  const somDeg = !!(opsjoner && opsjoner.headers && opsjoner.headers.Authorization);
+  const lesing = (opsjoner && opsjoner.method) === "GET";
+  if (lesing) leseKall += 1;
+  // Skrivingen og din egen lesing ser raden. Den anonyme ser ingenting.
+  const kropp = (!lesing || somDeg) ? SVAR_RADER : [];
+  return new Response(JSON.stringify(kropp), {
+    status: 200, headers: { "Content-Type": "application/json" },
+  });
+};
+r = await svarfunksjon(svarBe({ token: "okt-1", kampId: 7, navn: "Ola", hvor: "pub",
+  sted: "Andy's Pub" }));
+const bareDeg = await r.json();
+ok("ser du den selv, men ingen andre, sies det fra",
+   r.status === 200 && !!bareDeg.advarsel, r.status + " " + JSON.stringify(bareDeg));
+ok("og advarselen navngir bade tabellen og fiksen",
+   bareDeg.advarsel.indexOf("kampsvar") > -1 &&
+   bareDeg.advarsel.indexOf("oppsett.sql") > -1, bareDeg.advarsel);
+ok("svaret ditt kommer likevel tilbake",
+   Array.isArray(bareDeg.svar) && bareDeg.svar.length > 0,
+   JSON.stringify(bareDeg.svar));
+ok("begge lesingene ble gjort", leseKall === 2, leseKall);
 
 kall = stubSupabase({});
 r = await svarfunksjon(svarBe({ handling: "fjern", token: "okt-1", kampId: 7 }));

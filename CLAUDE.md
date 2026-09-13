@@ -873,6 +873,20 @@ er i seg selv noe om adressen.
 - Svarer du to ganger, endrer du svaret ditt: skrivingen er en upsert
   mot `unique (kamp_id, bruker)`. Trykker du på et annet sted, flytter
   svaret ditt dit; trykker du på det samme igjen, går du av lista.
+- **En skriving som svarer 200 er ikke bevis på at raden ligger der.**
+  `settSvar` leser derfor kampen tilbake to ganger — som deg, og som hvem
+  som helst — og forskjellen mellom de to er diagnosen:
+  - finner du den ikke selv heller, ble den ikke skrevet, og funksjonen
+    svarer 502 med `forsok` framfor å melde suksess;
+  - ser du den, men ingen andre, mangler lesereglen på `kampsvar`, og
+    svaret bærer en `advarsel` som navngir tabellen og `docs/oppsett.sql`.
+    Appen setter den inn i meldinga.
+  Uten dette sa appen «Du har planlagt å dra til Grønland Boulebar &
+  Spiseri» mens `/api/svar` svarte `{"svar":[]}` — meldt fra prod
+  13. september 2026. En RLS-regel som mangler gir null rader, ikke en
+  feil, så en stille tom liste er ikke til å skille fra «ingen har svart».
+  To ekstra kall per skriving er prisen, og skrivinger er sjeldne og
+  utløst av leseren selv.
 - **Etter en skriving hentes kampens svar på nytt** (`friskeOppSvar`), og
   lista bygges aldri på det upserten ga tilbake alene. En upsert som ikke
   endret noe kan svare med tom representasjon — raden finnes, svaret sier
@@ -948,7 +962,7 @@ er i seg selv noe om adressen.
 ## Testing
 
     node test/unit.mjs      438 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  229 tester, ~250 ms, ingen nettleser
+    node test/funksjon.mjs  236 tester, ~250 ms, ingen nettleser
     node test/run.mjs       374 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
