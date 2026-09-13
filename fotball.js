@@ -584,12 +584,17 @@ function delPanel(kamp) {
     const pekt = rad ? stedNokkel(rad.dataset.pektSted || "") : "";
     const eget = mitt();
     const valgt = eget && eget.sted ? stedNokkel(eget.sted) : "";
+    // Utlogget er valget et delingsvalg, ikke en plass pa lista. De to
+    // skal ikke se like ut: et sted som ser valgt ut nar ingenting er
+    // lagret, sier at det virket.
+    const paaLista = !!konto.okt();
 
     steder.replaceChildren();
     stedKilder(kamp, bekreftede, rad, egneSteder).forEach((sted) => {
       const nokkel = stedNokkel(sted.navn);
       steder.appendChild(stedChip(kamp, panel, sted, {
         valgt: !!valgt && nokkel === valgt,
+        paaLista,
         pekt: !!pekt && nokkel === pekt && nokkel !== valgt,
         melding,
       }));
@@ -725,11 +730,41 @@ function stedChip(kamp, panel, sted, form) {
   }
 
   b.setAttribute("aria-pressed", form.valgt ? "true" : "false");
-  b.setAttribute("aria-label", (form.valgt ? "Du skal til " : "Jeg skal til ")
-    + sted.navn);
+  // Valgt uten a vaere logget inn er et delingsvalg: det skal se ut som
+  // et merke, ikke som den gronne bekreftelsen pa at du star pa lista.
+  if (form.valgt && !form.paaLista) b.classList.add("kun-deling");
+  b.setAttribute("aria-label", form.valgt
+    ? (form.paaLista ? "Du skal til " : "Deles: ") + sted.navn
+    : "Jeg skal til " + sted.navn);
   b.addEventListener("click", () =>
     svarSted(kamp, panel, sted.hvor || "pub", sted.navn, form.melding, form.valgt));
   return b;
+}
+
+// Din egen rad, byttet ut med den tjenesten nettopp bekreftet. Er
+// representasjonen tom, beholdes den vi hadde: en tom liste fra en
+// upsert betyr «ingenting endret», ikke «raden finnes ikke».
+function leggInnSvar(kampId, bruker, ferske) {
+  if (!ferske.length) return;
+  sisteSvar = sisteSvar.filter(
+    (s) => !(s.kampId === String(kampId) && s.bruker === bruker)).concat(ferske);
+}
+
+// Kampens svar, hentet pa nytt. Ett kall for én kamp, og bare etter noe
+// leseren selv gjorde — runden hentes fortsatt i ett kall.
+async function friskeOppSvar(kampId) {
+  try {
+    const respons = await fetch("/api/svar?kamper=" + encodeURIComponent(kampId),
+      { headers: { "Accept": "application/json" } });
+    const json = JSON.parse(await respons.text());
+    if (!respons.ok || json.feil) return;
+    // Bare denne kampens rader byttes ut. Resten av runden star som den var.
+    sisteSvar = sisteSvar.filter((s) => s.kampId !== String(kampId))
+      .concat(tolkSvar(json.svar).filter((s) => s.kampId === String(kampId)));
+  } catch (err) {
+    // Stille: skrivingen gikk bra, og det er det meldinga sier. En
+    // feilmelding om en oppfriskning ville sagt at noe gikk galt.
+  }
 }
 
 // Svaret. Ett trykk skriver raden, et nytt trykk pa det samme stedet
@@ -747,7 +782,8 @@ async function svarSted(kamp, panel, hvor, sted, melding, avmeld) {
     // appen krever at noen har sagt det, og det star her.
     panel.settLokalt(avmeld ? null : { hvor, sted });
     melding.textContent = avmeld ? ""
-      : "Logg inn i menyen for å stille deg på lista. Å dele kampen virker uansett.";
+      : "Logg inn i menyen — et fornavn og en PIN — for å si at du skal hit."
+        + " Stedet blir med når du deler kampen.";
     if (panel.tegnSteder) panel.tegnSteder();
     return;
   }
@@ -765,18 +801,25 @@ async function svarSted(kamp, panel, hvor, sted, melding, avmeld) {
       sisteSvar = sisteSvar.filter(
         (s) => !(s.kampId === String(kamp.id) && s.bruker === okt.bruker));
       panel.settLokalt(null);
-      melding.textContent = "Du står ikke på lista lenger.";
+      melding.textContent = "Du skal ikke dit likevel.";
     } else {
       konto.settNavn(navn);
       const json = await svarTjeneste({
         token: okt.token, kampId: kamp.id, navn, hvor, sted,
       });
-      const mine = tolkSvar(json.svar);
-      sisteSvar = sisteSvar.filter(
-        (s) => !(s.kampId === String(kamp.id) && s.bruker === okt.bruker)).concat(mine);
+      leggInnSvar(kamp.id, okt.bruker, tolkSvar(json.svar));
       panel.settLokalt({ hvor, sted });
-      melding.textContent = "Du står på lista — " + stedtekst(kamp, hvor, sted) + ".";
+      melding.textContent = "Du har planlagt å dra til " + (sted || stedtekst(kamp, hvor, sted)) + ".";
     }
+    // Hent kampens svar pa nytt. Vi kan ikke bygge lista pa det skrivingen
+    // ga tilbake alene: en upsert som ikke endret noe kan svare med en tom
+    // representasjon, og da forsvant din egen rad lokalt selv om
+    // skrivingen gikk bra — uten linja under kampen, uten tellingen pa
+    // stedet og uten deg i lista nederst.
+    //
+    // Og det er her vennene kommer inn: har noen svart siden runden ble
+    // hentet, star de i kortet med det samme framfor ved neste lasting.
+    await friskeOppSvar(kamp.id);
     // Rekkefolgen i runden og linja under kampen skal si det samme som
     // kortet: ett svar, ett sted som tegner det.
     tegnSvar(document.getElementById("fotballInnhold"));

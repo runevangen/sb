@@ -1876,6 +1876,20 @@ a.ad-cta:focus-visible {
 .sted-chip[aria-pressed="true"] .pub-bekreftet,
 .sted-chip[aria-pressed="true"] .sted-folk { color: #fff; }
 
+/* Valgt uten a vaere logget inn: stedet blir med nar kampen deles, men
+   ingen er meldt pa noe. Aksentfargen framfor den gronne, sa det ikke ser
+   ut som bekreftelsen pa at du star pa lista — et sted som ser valgt ut
+   nar ingenting er lagret, sier at det virket. */
+.sted-chip.kun-deling[aria-pressed="true"] {
+  background: none;
+  border-color: var(--accent);
+  border-style: dashed;
+  color: var(--accent);
+}
+
+.sted-chip.kun-deling[aria-pressed="true"] .pub-bekreftet,
+.sted-chip.kun-deling[aria-pressed="true"] .sted-folk { color: var(--accent); }
+
 /* Stedet en delt lenke pekte pa. Det blir pekt ut, ikke valgt: svaret
    skal leseren gi selv, sa chipen markeres og far fokus. */
 .sted-chip.pekt {

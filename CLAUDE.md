@@ -834,6 +834,25 @@ er i seg selv noe om adressen.
 - Svarer du to ganger, endrer du svaret ditt: skrivingen er en upsert
   mot `unique (kamp_id, bruker)`. Trykker du på et annet sted, flytter
   svaret ditt dit; trykker du på det samme igjen, går du av lista.
+- **Etter en skriving hentes kampens svar på nytt** (`friskeOppSvar`), og
+  lista bygges aldri på det upserten ga tilbake alene. En upsert som ikke
+  endret noe kan svare med tom representasjon — raden finnes, svaret sier
+  bare ingenting om den — og da forsvant din egen rad *lokalt* selv om
+  skrivingen gikk bra: uten linja under kampen, uten tellingen på stedet
+  og uten deg i lista nederst. Meldt fra prod 13. september 2026, og
+  testen lar stubben svare tomt med vilje.
+  Oppfriskningen er også det som gjør at **venner som har svart siden
+  runden ble hentet dukker opp i kortet** med det samme, framfor ved neste
+  lasting. Ett kall for én kamp, og bare etter noe leseren selv gjorde.
+- Meldinga sier hva du nettopp gjorde, ikke hvilken liste du havnet i:
+  «Du har planlagt å dra til Grønland Boulebar & Spiseri.» «Du står på
+  lista» beskrev vår datamodell, ikke leserens handling.
+- **Utlogget er et trykk på et sted et delingsvalg, ikke en påmelding**, og
+  de to skal ikke se like ut. Chipen får aksentfargen og stiplet ramme
+  (`.kun-deling`), aldri den grønne bekreftelsen, og skjermleseren får
+  «Deles: …» framfor «Du skal til …». Meldinga sier hva som mangler og hva
+  stedet da er godt for. Et sted som ser valgt ut når ingenting er lagret,
+  sier at det virket.
 - Navnet er «navnet vennene ser», og det er synlig for alle som åpner
   kampen — det er prisen for at lista kan leses uten konto. Det lagres
   med visningsvalgene (`sb-visning`, feltet `svarnavn`) ved hvert svar, så
@@ -866,7 +885,7 @@ er i seg selv noe om adressen.
 
     node test/unit.mjs      420 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  219 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       342 tester, ~200 s, headless Chromium
+    node test/run.mjs       353 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

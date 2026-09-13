@@ -1920,6 +1920,32 @@ const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
        panel.querySelector(".kamp-note").textContent.indexOf("virker uansett") > -1,
        panel.querySelector(".kamp-note").textContent);
 
+    // Trykker du pa et sted uten a vaere logget inn, skal du fa vite det
+    // der og da — og stedet skal ikke se ut som den gronne bekreftelsen pa
+    // at du star pa lista. Et sted som ser valgt ut nar ingenting er
+    // lagret, sier at det virket.
+    pekt.click();
+    var etterTrykk = panel.querySelector(".sted-chip.pekt") ||
+      panel.querySelector(".sted-chip");
+    ok("et trykk utlogget sier at det krever innlogging",
+       panel.querySelector(".kamp-svar").textContent.indexOf("Logg inn i menyen") === 0,
+       panel.querySelector(".kamp-svar").textContent);
+    ok("og det sier hva stedet da er godt for",
+       panel.querySelector(".kamp-svar").textContent.indexOf("deler kampen") > -1,
+       panel.querySelector(".kamp-svar").textContent);
+    // Ingen bakstreker her: i en template-literal spises de, og selektoren
+    // blir ugyldig og stopper hele testsiden. Enkeltfnutter inni.
+    var delevalg = panel.querySelector(".sted-chip[aria-pressed='true']");
+    ok("stedet er merket som et delingsvalg, ikke som en plass pa lista",
+       delevalg && delevalg.classList.contains("kun-deling"),
+       delevalg ? delevalg.className : "ingen valgt chip");
+    ok("og det ser ikke ut som den gronne bekreftelsen",
+       getComputedStyle(delevalg).backgroundColor !== "rgb(31, 122, 77)",
+       getComputedStyle(delevalg).backgroundColor);
+    ok("skjermleseren far ogsa vite at det bare deles",
+       delevalg.getAttribute("aria-label").indexOf("Deles:") === 0,
+       delevalg.getAttribute("aria-label"));
+
     // En lenke til en kamp som ikke star i runden lenger: runden skal sta
     // som for, uten en feilmelding om noe leseren ikke kan gjore noe med.
     location.hash = "#/fotball/eliteserien/neste?kamp=999&hvor=hjemme";
@@ -2193,12 +2219,17 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
       window.__svar.push({ url: u, inn: inn, headere: (o && o.headers) || null });
       if (!inn) return svarMed({ svar: window.__lagret });
       if (inn.handling === "fjern") {
-        window.__lagret = [];
+        // Reglene i databasen slipper bare gjennom din egen rad, sa en
+        // fjerning kan ikke rore andres. Stubben ma speile det, ellers
+        // tester vi noe tjenesten aldri gjor.
+        window.__lagret = window.__lagret.filter(function (r) { return r.bruker !== "u-1"; });
         return svarMed({ fjernet: true });
       }
       window.__lagret = [{ kamp_id: String(inn.kampId), navn: inn.navn, hvor: inn.hvor,
         sted: inn.sted, bruker: "u-1" }];
-      return svarMed({ svar: window.__lagret });
+      // PostgREST kan svare med tom representasjon pa en upsert som ikke
+      // endret noe. Raden finnes — svaret sier bare ingenting om den.
+      return svarMed({ svar: window.__tomRepresentasjon ? [] : window.__lagret });
     }
     if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 || u.indexOf("overpass") > -1) {
       return svarMed({}, 502);
@@ -2269,8 +2300,8 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
       ok("navnet fra innloggingen huskes",
          (JSON.parse(localStorage.getItem("sb-visning")) || {}).svarnavn === "Ola",
          localStorage.getItem("sb-visning"));
-      ok("og det star at du kom pa lista, med stedet",
-         panel.querySelector(".kamp-svar").textContent === "Du står på lista — på Pub X.",
+      ok("og det star hva du nettopp planla",
+         panel.querySelector(".kamp-svar").textContent === "Du har planlagt å dra til Pub X.",
          panel.querySelector(".kamp-svar").textContent);
 
       // Stedet du skal til blir en chip i kortet: den er merket, og den
@@ -2334,13 +2365,52 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
         ok("bolkene forsvinner nar ingen blir med",
            document.querySelectorAll(".kamp-bolk").length === 0,
            document.querySelectorAll(".kamp-bolk").length);
+        ok("og det star at du ikke skal dit likevel",
+           panel.querySelector(".kamp-svar").textContent === "Du skal ikke dit likevel.",
+           panel.querySelector(".kamp-svar").textContent);
         ok("stedet star ikke lenger som valgt",
            stedChip("Pub X").getAttribute("aria-pressed") === "false",
            stedChip("Pub X").getAttribute("aria-pressed"));
         ok("og lista nederst er tom",
            panel.querySelector(".kamp-panel-liste").textContent === "",
            panel.querySelector(".kamp-panel-liste").textContent);
-        ferdig();
+
+        // Og sa den som kostet en runde i prod: en upsert som ikke endret
+        // noe kan svare med tom representasjon. Bygger vi lista pa det
+        // svaret alene, forsvinner din egen rad lokalt selv om skrivingen
+        // gikk bra — uten linja under kampen, uten tellingen pa stedet og
+        // uten deg i lista nederst. Derfor hentes kampens svar pa nytt.
+        window.__tomRepresentasjon = true;
+        stedChip("Pub X").click();
+        setTimeout(function () { try {
+          ok("et tomt svar pa skrivingen mister deg ikke",
+             !!rad.querySelector(".kamp-blirmed") &&
+             rad.querySelector(".kamp-blirmed").textContent.indexOf("Ola blir med") > -1,
+             rad.querySelector(".kamp-blirmed")
+               ? rad.querySelector(".kamp-blirmed").textContent : "ingen linje");
+          ok("stedet star fortsatt som valgt",
+             stedChip("Pub X").getAttribute("aria-pressed") === "true",
+             stedChip("Pub X").getAttribute("aria-pressed"));
+          ok("og du star i lista nederst, med stedet",
+             panel.querySelector(".kamp-panel-liste").textContent.indexOf("på Pub X") > -1,
+             panel.querySelector(".kamp-panel-liste").textContent);
+          // Vennene som har svart siden runden ble hentet kommer med i
+          // samme oppfriskning — det er derfor den finnes.
+          window.__lagret = window.__lagret.concat([{ kamp_id: "3", navn: "Kari",
+            hvor: "pub", sted: "Pub X", bruker: "u-2" }]);
+          stedChip("Pub X").click();
+          setTimeout(function () { try {
+            ok("venner som svarte etterpa dukker opp i kortet",
+               panel.querySelector(".kamp-panel-liste").textContent.indexOf("Kari") > -1,
+               panel.querySelector(".kamp-panel-liste").textContent);
+            // Og din egen fjerning tok bare din egen rad.
+            ok("og din egen fjerning rorte ikke hennes",
+               panel.querySelector(".kamp-panel-liste").textContent.indexOf("Ola") === -1,
+               panel.querySelector(".kamp-panel-liste").textContent);
+            ferdig();
+          } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+        } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+        return;
       } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
