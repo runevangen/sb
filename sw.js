@@ -5,7 +5,7 @@
 // ferskhetslogikk, og en cache oppa den ville gitt to sannheter om hva som
 // er nyeste sak.
 
-const CACHE = "sb-skall-v7";
+const CACHE = "sb-skall-v8";
 const SKALL = [
   "/",
   "/index.html",
@@ -17,6 +17,7 @@ const SKALL = [
   "/vaer-data.js",
   "/pub-data.js",
   "/puber-oslo.js",
+  "/kanaler.js",
   // Modulene appen importerer ma alle ligge her. Mangler en, feiler hele
   // app.js uten nett — ikke bare den ene visningen.
   "/konto-data.js",

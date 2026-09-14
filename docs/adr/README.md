@@ -28,3 +28,4 @@ flyttes. Resten finner du i koden.
 | [0013](0013-pubforslag-og-vaer.md) | Pubforslag og vær rundt kampen |
 | [0014](0014-feed-og-favoritter.md) | Feeden, søket og favorittlagene |
 | [0015](0015-svarene-i-appen.md) | Hvem blir med: lesing, skriving, tegning |
+| [0016](0016-kanalen-som-sender.md) | Kanalen som sender ligaen |

@@ -1899,6 +1899,29 @@ a.ad-cta:focus-visible {
   color: var(--text-strong);
 }
 
+/* Kanalen som sender kampen. En opplysning, ikke en handling: ingen
+   ramme, ingen flate, ingen knapp — den skal ikke se ut som stedene
+   under, som er det man kan trykke paa. */
+.kamp-kanal {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-size: calc(12px * var(--fs));
+  color: var(--text-dim);
+}
+
+.kamp-kanal-merke {
+  flex: none;
+  /* Dekor. Navnet ved siden av sier det samme, og en skjermleser skal
+     ikke lese «fjernsyn» for et ord den alt far. */
+  speak: none;
+}
+
+.kamp-kanal-navn {
+  min-width: 0;
+}
+
 /* Stedene: kortets ene handling, én rad per sted.
    Raden baerer navnet, folka som skal dit, og én knapp som sier hva den
    gjor. Fer var den en chip, og trykket paa chipen var hele svaret — det

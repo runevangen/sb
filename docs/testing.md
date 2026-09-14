@@ -1,8 +1,8 @@
 # Testing
 
-    node test/unit.mjs      484 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      501 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  238 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       413 tester, ~200 s, headless Chromium
+    node test/run.mjs       423 tester, ~200 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
@@ -30,7 +30,7 @@ igjen som basen.
 
 **`unit.mjs`** — `lib.js`, `fotball-data.js`, `vaer-data.js`,
 `pub-data.js`, `konto-data.js`, `pin-data.js`, `svar-data.js`,
-`visning-data.js`. URL-validering, videovertslisten, tidsstempler,
+`visning-data.js`, `kanaler.js`. URL-validering, videovertslisten, tidsstempler,
 endringssignaturen, interne lenker, rangering av søketreff og
 favorittlag, sesongvinduet per liga, tolkning av API-svarene, hvilken
 runde som er «neste», at døgnkvoten holder per sport, at begge parserne
@@ -38,7 +38,7 @@ gir samme `nokkel` men ulik `id`, at `tolkSvar` tåler å kjøres to ganger,
 at en økt vi ikke kjenner levetiden på regnes som utløpt, at ditt eget
 svar finnes på id og ikke på navn, at «Ola» og «ola» blir samme konto
 mens «Bjorn» og «Bjørn» ikke blir det, og at ingenting i
-`puber-kontakt.js` slipper ut før noen har datert det.
+`puber-kontakt.js` eller `kanaler.js` slipper ut før noen har datert det.
 
 **`funksjon.mjs`** — kaller Netlify-funksjonene direkte med et stubbet
 `fetch`. Statuskoder, cache-headere, at API-nøkkelen, Supabase-nøkkelen
