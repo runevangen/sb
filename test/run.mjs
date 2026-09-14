@@ -978,6 +978,40 @@ const SAK_6 = await kjor("fotball", FELLES + FOTBALL + `
         var ligaKnapper = document.querySelectorAll("#ligaVelger .segment-del");
         ok("ligaene byttes i fotballvisningen, ikke i menyen",
            ligaKnapper.length === 5, ligaKnapper.length);
+
+        // Fem ligaer far ikke plass pa én linje pa en telefon, og en
+        // kapsel med overflow:hidden kappet den siste — «Serie A» sto
+        // halvt utenfor kanten. Testen kjorer i 390 px med vilje: i et
+        // bredt vindu ville alle fem fatt plass, og assertionene under
+        // hadde statt gronne uansett hva CSS-en sa.
+        var velger = document.getElementById("ligaVelger");
+        var rammeH = velger.getBoundingClientRect();
+        var utenfor = Array.prototype.filter.call(ligaKnapper, function (k) {
+          var r = k.getBoundingClientRect();
+          return r.right > rammeH.right + 1 || r.left < rammeH.left - 1;
+        });
+        ok("ingen liga blir kuttet av kanten",
+           utenfor.length === 0,
+           Array.prototype.map.call(utenfor, function (k) {
+             return k.textContent; }).join(","));
+        // Og de ligger faktisk pa flere linjer, ikke bare presset sammen.
+        var linjer = [];
+        Array.prototype.forEach.call(ligaKnapper, function (k) {
+          if (linjer.indexOf(k.offsetTop) === -1) linjer.push(k.offsetTop);
+        });
+        ok("de brytes over flere linjer nar de ma",
+           linjer.length > 1, linjer.join(","));
+        // Og de blases ikke opp. .fotball-topp gir segmentknapper flex:1,
+        // som er riktig pa én linje — men nar lista bryter, far den siste
+        // linja ofte ett navn, og da ble «Serie A» en pille pa hele
+        // bredden. Det leses som en feil, ikke som en liga.
+        var bredest = 0;
+        Array.prototype.forEach.call(ligaKnapper, function (k) {
+          bredest = Math.max(bredest, k.getBoundingClientRect().width);
+        });
+        ok("en liga alene pa siste linje fyller ikke bredden",
+           bredest < rammeH.width * 0.6,
+           Math.round(bredest) + " av " + Math.round(rammeH.width));
         // Tallet alene ville statt gront om en liga byttet plass med en
         // annen, sa en av de nye navngis.
         ok("og de nye ligaene star i velgeren",

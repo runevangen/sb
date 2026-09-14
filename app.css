@@ -319,6 +319,30 @@ body {
 /* A+ skal lese som storre skrift, ikke som en annen bokstav. */
 .segment-stor { font-size: 13px; }
 
+/* Et segment som vokser. Ligavelgeren har fem ligaer i dag og er ment a
+   ta imot flere; pa én linje kappet kapselen den siste, og «Serie A» sto
+   halvt utenfor kanten. Et kuttet valg leses som et valg du ikke har —
+   samme regel som «Premier League» og «Kommende» over.
+
+   Radiusen mykner fra kapsel til avrundet boks, og det er ikke smak: en
+   999px-radius rundt to linjer blir to store halvsirkler i endene, og da
+   klipper kanten den forste og siste knappen pa hver linje. Knappene
+   beholder kapselformen hver for seg, sa den valgte fortsatt leses som en
+   fylt pille.
+
+   Formen skiller de to velgerne fra hverandre, og det stemmer med hva de
+   er: ligaene er en liste som vokser, fanene er fire og blir vaerende. */
+.segment-flerlinje {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 14px;
+  overflow: visible;
+}
+
+.segment-flerlinje .segment-del { border-radius: 999px; }
+
 .menu-list {
   list-style: none;
   margin: 0;
@@ -1484,6 +1508,17 @@ a.ad-cta:focus-visible {
 }
 
 .fotball-topp .segment-del { flex: 1; text-align: center; }
+
+/* Unntaket: et segment som bryter over flere linjer. Knappene tar da
+   bredden navnet trenger, ikke en like stor del hver. Med flex:1 far den
+   siste linja — som ofte har ett navn — hele bredden, og «Serie A» som en
+   pille pa 354 px under fire vanlige leses som en feil, ikke som en liga.
+   Sentreringen i .segment-flerlinje gjor at en kort siste linje ser
+   villet ut.
+
+   Regelen star her og ikke oppe ved .segment-flerlinje fordi den
+   overstyrer linja over: like mange klasser, og da vinner den siste. */
+.fotball-topp .segment-flerlinje .segment-del { flex: 0 0 auto; }
 
 .fotball-innhold {
   flex: 1;

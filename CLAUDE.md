@@ -110,7 +110,7 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 
     node test/unit.mjs      504 tester
     node test/funksjon.mjs  238 tester
-    node test/run.mjs       429 tester, ~200 s, headless Chromium
+    node test/run.mjs       432 tester, ~200 s, headless Chromium
 
 Tre regler, og de har alle kostet noe:
 
