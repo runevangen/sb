@@ -13,7 +13,7 @@ import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          SPORTER, sportFor, tolkDatasett, kommendeKamper, kallPerSport, DOGNKVOTE,
          ligaForKategori,
-         apiSti, tolkKamper, nesteRunde, tolkFotballHash, fotballHash,
+         apiSti, tolkKamper, kampeneFramover, tolkFotballHash, fotballHash,
          tilgjengeligSesong, SESONGVINDU, redaksjonsnavn, normaliserLagnavn,
          tsdbSti, tsdbHeadere, tolkKamperTsdb, tolkTabellTsdb, tsdbSesong, delingstekst, tidstekst, HVOR,
          FANER, DELER, DEL_NAVN,
@@ -1092,19 +1092,32 @@ ok("kamp uten lag faller ut",
 ok("feil i kroppen kaster ogsa for kamper",
    kaster(() => tolkKamper({ errors: { token: "Missing application key." } })));
 
-// Neste runde er runden til forste kommende kamp, ikke de N neste
-// kampene: ellers ville en utsatt kamp fra forrige runde blandet seg inn.
+// Fanen viste én runde til 14. september 2026, og da runden var nesten
+// ferdigspilt sto det én kamp igjen. Hele vinduet vises na — kildene
+// sendte de tjue kampene uansett.
 const KOMMENDE = tolkKamper(kampsvar([
   lagKamp(4, "2026-09-20T17:00:00+00:00", "Runde 21", "Brann", "Bodo/Glimt"),
   lagKamp(5, "2026-09-21T17:00:00+00:00", "Runde 21", "Molde", "Rosenborg"),
   lagKamp(6, "2026-09-28T17:00:00+00:00", "Runde 22", "Viking", "Sarpsborg"),
 ]));
-const NESTE = nesteRunde(KOMMENDE);
-ok("neste runde tar bare den forste runden", NESTE.length === 2, NESTE.length);
-ok("neste runde er den som kommer forst", NESTE[0].runde === "Runde 21", NESTE[0].runde);
+const FRAMOVER = kampeneFramover(KOMMENDE);
+ok("kampene framover er hele vinduet, ikke forste runde",
+   FRAMOVER.length === 3, FRAMOVER.length);
+ok("og runden etter er med",
+   FRAMOVER[FRAMOVER.length - 1].runde === "Runde 22",
+   FRAMOVER[FRAMOVER.length - 1].runde);
+// Rekkefolgen er tidsrekka: overskriftene i visningen tegnes nar runden
+// skifter, sa en usortert liste ville gitt «Runde 21» to ganger.
+ok("eldste forst", FRAMOVER.map((k) => k.dato).join(",") ===
+   KOMMENDE.map((k) => k.dato).slice().sort().join(","),
+   FRAMOVER.map((k) => k.dato).join(","));
+// Kilden eies ikke av oss: en usortert liste skal komme sortert ut.
+const USORTERT = kampeneFramover([{ dato: "2026-09-28" }, { dato: "2026-09-20" }]);
+ok("en usortert kilde sorteres her", USORTERT[0].dato === "2026-09-20", USORTERT[0].dato);
 // Kampene oversettes ogsa, sa hjemme- og bortelag matcher tabellen.
 ok("lagnavn i kamper oversettes", KOMMENDE[0].borte === "Bodø/Glimt", KOMMENDE[0].borte);
-ok("tom liste gir tom runde", nesteRunde([]).length === 0);
+ok("tom liste gir tom liste", kampeneFramover([]).length === 0);
+ok("ingenting gir tom liste, ikke unntak", kampeneFramover().length === 0);
 
 // Kampens nokkel, ikke kildens id.
 //

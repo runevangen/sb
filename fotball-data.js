@@ -55,9 +55,10 @@ export function tolkDatasett(sport, del, json) {
   return kommendeKamper(s.tolkKamper(json));
 }
 
-// Hele vinduet av kommende kamper, ikke bare forste runde: adminportalen
-// skal kunne fore inn en kamp som spilles om to uker. Visningen henter
-// en runde med nesteRunde().
+// Hele vinduet av kommende kamper, ikke bare forste runde: bade
+// adminportalen og leseren skal kunne se lenger fram enn til neste helg.
+// «runde» er den forste, som for, sa en eldre utrullet app fortsatt viser
+// noe riktig; «runder» er alle, i rekkefolge.
 export function kommendeKamper(alle) {
   const kamper = (alle || []).slice().sort(
     (a, b) => String(a.dato).localeCompare(String(b.dato)));
@@ -244,7 +245,7 @@ export const FANER = DELER.concat(["venner"]);
 export const DEL_NAVN = {
   tabell: "Tabell",
   resultater: "Resultater",
-  neste: "Neste runde",
+  neste: "Kommende",
   venner: "Venner",
 };
 
@@ -494,15 +495,19 @@ export function tidstekst(iso) {
   return dag + " kl. " + kl;
 }
 
-// "Neste runde" er runden til den forste kampen som kommer, ikke de ti
-// neste kampene: ellers ville halve neste runde blitt blandet med de siste
-// utsatte kampene fra denne.
-export function nesteRunde(kamper) {
-  if (!kamper.length) return [];
-  const sortert = kamper.slice().sort(
+// Kampene framover, eldste forst — hele vinduet, ikke bare forste runde.
+//
+// Visningen viste én runde til 14. september 2026. Det var riktig helt til
+// runden var nesten ferdigspilt: da sto det én kamp igjen i fanen, og
+// ingenting om helgen etter. Meldt fra faktisk bruk med de ordene — «dumt
+// at man ser kun en kamp naar det er slutten av en runde».
+//
+// Kildene gir tjue kamper uansett (`next=20`, TheSportsDBs `schedule/next`),
+// sa dette koster ingenting pa dognkvoten: det er det samme svaret, bare
+// uten at halvparten kastes i nettleseren.
+export function kampeneFramover(kamper) {
+  return (kamper || []).slice().sort(
     (a, b) => String(a.dato).localeCompare(String(b.dato)));
-  const runde = sortert[0].runde;
-  return runde ? sortert.filter((k) => k.runde === runde) : sortert;
 }
 
 // Ruting for modulen: #/fotball/<liga>/<del>, begge valgfrie. Ukjente ledd

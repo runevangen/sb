@@ -8,7 +8,7 @@
 // likt her som i resten av appen.
 
 import { LIGAER, DELER, FANER, DEL_NAVN, HVOR, STED_MAKS, delingstekst,
-         kamplenke, invitasjonstekst, stedtekst, nesteRunde,
+         kamplenke, invitasjonstekst, stedtekst, kampeneFramover,
          kampNokkel, kanalFor } from "./fotball-data.js";
 import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
          loftMedSvar, bareMedSvar, stederFraSvar, perSted, KAMPER_MAKS,
@@ -177,10 +177,10 @@ function tegn(rot, del, data) {
   const sesong = sesongmerke(data);
   if (sesong) deler.push(sesong);
   if (del === "tabell") deler.push(tabell(data.tabell || []));
-  // Funksjonen gir hele vinduet av kommende kamper, sa adminportalen kan
-  // planlegge lenger fram enn til neste helg. Leseren vil ha en runde om
-  // gangen — den utvelgelsen hoerer hjemme her, ikke i tjenesten.
-  else if (del === "neste") deler.push(kampliste(nesteRunde(data.kamper || []), del, data));
+  // Hele vinduet, ikke forste runde. Var runden nesten ferdigspilt, sto
+  // det én kamp i fanen og ingenting om helgen etter — og kildene sendte
+  // de tjue kampene uansett.
+  else if (del === "neste") deler.push(kampliste(kampeneFramover(data.kamper || []), del, data));
   else deler.push(kampliste(data.kamper || [], del, data));
   deler.push(stempel(data));
   rot.replaceChildren(...deler);
@@ -345,7 +345,7 @@ function kampNokkelFor(kamp) {
 
 // Kampene noen har sagt at de blir med pa, pa tvers av ligaer.
 //
-// Loftingen i Neste runde svarer innenfor én liga. Star Ola pa en
+// Loftingen i Kommende svarer innenfor én liga. Star Ola pa en
 // Premier League-kamp og Kari pa en eliteseriekamp, ser du dem bare ved
 // a bytte fane — og det er nettopp det denne fanen finnes for.
 //
@@ -368,14 +368,13 @@ async function visVenner(rot) {
   }
   if (aktivDel !== "venner") return;
 
-  // Én runde per liga, ikke hele vinduet: fanen henter svarene for alle
-  // ligaene i ett kall, og tjenesten kapper ved tjue id-er. To ligaer med
-  // tjue kamper hver ville gjort at den andre ligaen falt stille ut —
-  // og det er nettopp den fanen finnes for.
+  // Hele vinduet per liga, som i Kommende. Buntingen i hentSvarFor() er
+  // det som holder tjenestens tak pa tjue id-er, sa en liga faller ikke
+  // stille ut — og det er nettopp det fanen finnes for.
   const kamper = [];
   runder.forEach((data) => {
     if (data && Array.isArray(data.kamper)) {
-      nesteRunde(data.kamper).forEach((k) => kamper.push(k));
+      (data.kamper || []).forEach((k) => kamper.push(k));
     }
   });
 
@@ -405,7 +404,7 @@ async function visVenner(rot) {
     // Tom til noen svarer — og da er nettopp den lista hele poenget. Da
     // skal det sta hva som skal til, ikke bare at det er tomt.
     rot.replaceChildren(tilstand(
-      "Ingen har sagt at de blir med ennå. Åpne en kamp under Neste runde"
+      "Ingen har sagt at de blir med ennå. Åpne en kamp under Kommende"
       + " og si hvor du ser den, så står den her."));
     return;
   }
@@ -429,8 +428,19 @@ function kampliste(kamper, del, data) {
 
   const liste = el("ul", "kamper");
   let forrigeDag = null;
+  let forrigeRunde = null;
 
   kamper.forEach((kamp) => {
+    // Runden over dagene: lista rekker na flere helger, og uten den er
+    // «lordag 27. sep» det eneste som skiller neste runde fra den etter.
+    // Kilder som ikke sender rundetall gir ingen overskrift — en tom
+    // «Runde » ville vaert verre enn ingen.
+    const runde = del === "neste" ? String(kamp.runde || "") : "";
+    if (runde && runde !== forrigeRunde) {
+      forrigeRunde = runde;
+      forrigeDag = null;
+      liste.appendChild(el("li", "kamp-runde", runde));
+    }
     const dag = dagtekst(kamp.dato);
     if (dag !== forrigeDag) {
       forrigeDag = dag;
@@ -438,9 +448,10 @@ function kampliste(kamper, del, data) {
       liste.appendChild(skille);
     }
     const rad = kamprad(kamp, del, delbar);
-    // Dagen huskes pa raden: blir lista delt i to bolker senere, ma
-    // dagskillene kunne tegnes pa nytt uten a regne dem ut igjen.
+    // Dagen og runden huskes pa raden: blir lista delt i to bolker senere,
+    // ma skillene kunne tegnes pa nytt uten a regnes ut igjen.
     rad.dataset.dag = dag;
+    rad.dataset.runde = runde;
     liste.appendChild(rad);
   });
 
@@ -1370,12 +1381,11 @@ let sisteSvar = [];
 async function hentSvar(rot, del, data) {
   if ((del !== "neste" && del !== "venner") || !data || !Array.isArray(data.kamper)) return;
 
-  // Spor om de kampene som faktisk star pa skjermen. Funksjonen gir hele
-  // vinduet av kommende kamper sa adminportalen kan planlegge lenger fram,
-  // men leseren ser én runde — og tjenesten kapper spørringen ved tjue
-  // id-er, sa et vindu som vokser ville stilt spor om kamper ingen ser.
-  const viste = del === "neste" ? nesteRunde(data.kamper) : data.kamper;
-  const ider = viste.map(kampNokkelFor).filter(Boolean);
+  // Spor om de kampene som faktisk star pa skjermen — og na er det hele
+  // vinduet, ikke forste runde. Taket pa tjue id-er holdes av buntingen i
+  // hentSvarFor(), ikke av at lista kappes i forkant: en kamp man kan se
+  // skal ha lista si.
+  const ider = (data.kamper || []).map(kampNokkelFor).filter(Boolean);
   if (!ider.length) return;
 
   const hentet = await hentSvarFor(ider);
@@ -1392,14 +1402,15 @@ async function hentSvar(rot, del, data) {
 //
 // Tjenesten kapper spørringen ved KAMPER_MAKS id-er, og kappingen er
 // stille: id-ene etter den tjuende gir ingen feil, de gir ingen rader.
-// nesteRunde() holder rundevisningen godt under taket — men bare nar
-// kampene baerer et rundetall. TheSportsDBs kommende kamper gjor ikke
-// alltid det, og uten det er «neste runde» hele vinduet: tre ligaer i
-// vennefanen blir seksti id-er, og de to siste ligaene faller ut. Det er
-// nettopp de fanen finnes for.
+// Buntingen er det eneste som holder taket na. Rundevisningen kappet lista
+// til forste runde for, og det holdt den under tjue av seg selv — men bare
+// nar kampene baerer et rundetall, som TheSportsDBs kommende kamper ikke
+// alltid gjor. Den beskyttelsen var uansett en bivirkning av at halve
+// vinduet ble kastet, og vinduet vises i sin helhet fra 14. september 2026.
 //
-// Derfor deles spørringen opp framfor a kappes. Tre kall for tre ligaer,
-// ikke ett per kamp — og bare i den ene fanen som spor om sa mange.
+// Sa: spørringen deles opp framfor a kappes. Fem ligaer i vennefanen blir
+// fem-seks kall, ikke ett per kamp — og fortsatt ett kall for en vanlig
+// runde.
 async function hentSvarFor(ider) {
   const bunter = [];
   for (let i = 0; i < ider.length; i += KAMPER_MAKS) {
@@ -1494,8 +1505,11 @@ function loftKamper(rot, kart) {
   const { loftet } = loftMedSvar(
     rader.map((r) => ({ id: r.dataset.kamp })), kart);
 
-  // Ingen blir med enda: lista skal sta som runden, uten overskrifter.
-  liste.querySelectorAll(".kamp-bolk").forEach((b) => b.remove());
+  // Ingen blir med enda: lista skal sta som en tidsrekke, uten bolker.
+  // Overskriftene ryddes ikke bort her — tegnBolker() bygger lista pa nytt
+  // og tegner bade runde- og dagskiller selv. En rydding her traff ogsa
+  // stien under, der ingenting tegnes pa nytt, og strippet rundeskillene
+  // fra en liste som sto helt riktig.
   if (!loftet) {
     if (liste.dataset.loftet) {
       liste.dataset.loftet = "";
@@ -1517,14 +1531,26 @@ function tegnBolker(liste, rader, harSvar) {
 
   liste.replaceChildren();
 
-  const bolk = (tittel, gruppe) => {
+  // medRunder: skal rundeskillene tegnes inni bolken? I den loftede
+  // bolken er svaret nei — den er plukket pa tvers av runder, sa «Runde
+  // 22» over to kamper som tilfeldigvis er fra samme runde ville sagt at
+  // bolken var runden. I resten er rekkefolgen fortsatt tidsrekka, og da
+  // hoerer skillene hjemme.
+  const bolk = (tittel, gruppe, medRunder) => {
     if (!gruppe.length) return;
     if (tittel) {
       const h = el("li", "kamp-bolk", tittel);
       liste.appendChild(h);
     }
     let forrigeDag = null;
+    let forrigeRunde = null;
     gruppe.forEach((rad) => {
+      const runde = medRunder ? (rad.dataset.runde || "") : "";
+      if (runde && runde !== forrigeRunde) {
+        forrigeRunde = runde;
+        forrigeDag = null;
+        liste.appendChild(el("li", "kamp-runde", runde));
+      }
       const dag = rad.dataset.dag || "";
       if (dag && dag !== forrigeDag) {
         forrigeDag = dag;
@@ -1536,10 +1562,10 @@ function tegnBolker(liste, rader, harSvar) {
 
   if (med.length) {
     bolk(med.length === 1 ? "Én kamp noen blir med på" :
-      med.length + " kamper noen blir med på", med);
-    bolk("Resten av runden", uten);
+      med.length + " kamper noen blir med på", med, false);
+    bolk("Resten av kampene", uten, true);
   } else {
-    bolk(null, uten);
+    bolk(null, uten, true);
   }
 
   if (notis) liste.appendChild(notis);

@@ -29,6 +29,9 @@ Denne fila finnes bare for å peke dit, og for å si hvorfor.
   går gjennom **[#79](https://github.com/runevangen/sb/issues/79)**:
   pubene kan ikke skrive til repoet, så visningene må flyttes til
   Supabase først.
+- **[#80](https://github.com/runevangen/sb/issues/80)** — og steget før
+  #65: at leseren kan sende inn et sted som mangler i lista. #65 er
+  puben som bekrefter en kamp; #80 er stedet som i det hele tatt finnes.
 
 Denne lista pekte en stund til #26, som ble lukket samme dag den ble
 skrevet — Netlify Analytics ble valgt framfor Plausible. Akkurat den

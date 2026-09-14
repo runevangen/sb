@@ -1649,6 +1649,29 @@ a.ad-cta:focus-visible {
 
 .kamp-bolk:first-child { margin-top: 0; }
 
+/* Runden over dagene. Lista rekker flere helger fram na, og uten denne
+   er «lordag 27. sep» det eneste som skiller neste runde fra den etter.
+   Hairline over og ikke aksentfarge: det er et skille i en tidsrekke, ikke
+   en pastand om at noe er endret — den rollen har .kamp-bolk. */
+.kamp-runde {
+  list-style: none;
+  margin: 18px 0 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-faint);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: calc(15px * var(--fs));
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.kamper > .kamp-runde:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
 .kamp-dag {
   margin: 14px 0 6px;
   color: var(--text-faint);
@@ -1659,6 +1682,10 @@ a.ad-cta:focus-visible {
 }
 
 .kamper > .kamp-dag:first-child { margin-top: 0; }
+
+/* Rett under runden trenger dagen ingen luft av egen: to overskrifter med
+   full avstand mellom seg leses som to seksjoner, ikke som én. */
+.kamp-runde + .kamp-dag { margin-top: 6px; }
 
 /* Raden er beholderen: rammen rundt den valgte kampen tegnes her, sa
    den omslutter vaeret, puben og panelet — alt som horer til kampen.

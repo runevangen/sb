@@ -961,7 +961,7 @@ const SAK_6 = await kjor("fotball", FELLES + FOTBALL + `
           document.querySelector("#fotballFaner .segment-del[data-verdi='neste']").click();
           setTimeout(function () {
             var neste = document.querySelectorAll(".kamp");
-            ok("neste runde listes", neste.length === 2, neste.length);
+            ok("kampene framover listes", neste.length === 3, neste.length);
             // En kamp som ikke er spilt har klokkeslett, ikke resultat.
             ok("kommende kamp viser klokkeslett",
                /^\\d{2}[:.]\\d{2}$/.test(neste[0].querySelector(".kamp-tall").textContent),
@@ -1266,13 +1266,25 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
 
   window.addEventListener("load", function () { setTimeout(function () { try {
     var knapper = document.querySelectorAll(".kamp-del");
-    ok("hver kamp i arets runde kan deles", knapper.length === 2, knapper.length);
-    // Tjenesten gir hele vinduet — tre kamper over to runder. Leseren skal
-    // bare se den forste: utvelgelsen skjer i visningen, ikke i tjenesten.
+    ok("hver kommende kamp kan deles", knapper.length === 3, knapper.length);
+    // Tjenesten gir hele vinduet — tre kamper over to runder — og leseren
+    // ser hele. Var runden nesten ferdigspilt, sto det én kamp i fanen og
+    // ingenting om helgen etter.
     var tekstNa = document.getElementById("fotballInnhold").textContent;
-    ok("neste runde viser bare den ene runden",
+    ok("runden etter er ogsa med",
        tekstNa.indexOf("Brann") > -1 && tekstNa.indexOf("Molde") > -1 &&
-       tekstNa.indexOf("Viking") === -1, tekstNa.slice(0, 200));
+       tekstNa.indexOf("Viking") > -1, tekstNa.slice(0, 200));
+    // Uten den er «lordag 27. sep» det eneste som skiller de to rundene.
+    var runder = Array.prototype.map.call(document.querySelectorAll(".kamp-runde"),
+      function (r) { return r.textContent; });
+    ok("og hver runde har sin egen overskrift",
+       runder.length === 2 && runder[0] === "Runde 21" && runder[1] === "Runde 22",
+       runder.join("|"));
+    // Overskriften star over kampene sine, ikke nederst i lista.
+    var forsteBarn = document.querySelector(".kamper").firstElementChild;
+    ok("runden star over sin egen dag",
+       !!forsteBarn && forsteBarn.classList.contains("kamp-runde"),
+       forsteBarn ? forsteBarn.className : "tom");
     ok("kilden star i stempelet",
        document.querySelector(".fotball-kilde").textContent === "TheSportsDB",
        document.querySelector(".fotball-kilde").textContent);
@@ -2133,7 +2145,7 @@ const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
     setTimeout(function () { try {
       ok("en kamp som ikke finnes merker ingenting",
          document.querySelectorAll(".kamp-invitert").length === 0 &&
-         document.querySelectorAll(".kamp.delbar").length === 2,
+         document.querySelectorAll(".kamp.delbar").length === 3,
          document.querySelectorAll(".kamp-invitert").length + "/" +
          document.querySelectorAll(".kamp.delbar").length);
       ferdig();
@@ -2535,7 +2547,7 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
         function (b) { return b.textContent; });
       ok("kampen med folk far en egen bolk overst",
          bolker.length === 2 && bolker[0].indexOf("blir med på") > -1 &&
-         bolker[1] === "Resten av runden", bolker.join("|"));
+         bolker[1] === "Resten av kampene", bolker.join("|"));
       var forste = document.querySelector(".kamper").querySelector(".kamp-bolk, .kamp");
       ok("og bolken star forst i lista",
          forste && forste.classList.contains("kamp-bolk"),
@@ -2934,7 +2946,7 @@ const SAK_19C = await kjor("fornying-avvist", fornySide(`function () {
 
 /* ---------------- 20. vennefanen ---------------- */
 
-// Kampene noen blir med pa, pa tvers av ligaer. Loftingen i Neste runde
+// Kampene noen blir med pa, pa tvers av ligaer. Loftingen i Kommende
 // svarer innenfor én liga; denne fanen finnes for det som ligger i en
 // annen.
 const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
@@ -2955,7 +2967,7 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
     }
   }
   window.__svarKall = 0;
-  window.__svarUrl = "";
+  window.__spurte = [];
   window.__ligaer = [];
   window.__harSvar = true;
 
@@ -2967,10 +2979,16 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
     u = String(u);
     if (u.indexOf("/api/svar") === 0) {
       window.__svarKall++;
-      window.__svarUrl = u;
+      // Tjenesten svarer bare om kampene den faktisk ble spurt om.
+      // Svarte stubben likt uansett, ville buntingen gitt Karis rad én
+      // gang per bunt — «Kari og Kari» i lista, og en test som beviste
+      // noe annet enn den trodde.
+      var bedt = decodeURIComponent(u.split("kamper=")[1] || "").split(",");
+      window.__spurte = window.__spurte.concat(bedt);
       // Svaret ligger pa Premier League-kampen, ikke i eliteserien: det
       // er nettopp den en fane per liga ikke ville vist.
-      return svarMed({ svar: window.__harSvar
+      return svarMed({ svar: window.__harSvar &&
+        bedt.indexOf("2026-09-19-arsenal-liverpool") > -1
         ? [{ kampId: "2026-09-19-arsenal-liverpool", navn: "Kari", hvor: "pub",
             sted: "Andys", bruker: "u-2" }]
         : [] });
@@ -3001,20 +3019,22 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
        faner[3].getAttribute("aria-current"));
 
     var rot = document.getElementById("fotballInnhold");
-    // Begge ligaene sporres, ellers er fanen bare Neste runde om igjen.
+    // Begge ligaene sporres, ellers er fanen bare Kommende om igjen.
     ok("begge ligaenes runder hentes",
        window.__ligaer.indexOf("eliteserien") > -1 &&
        window.__ligaer.indexOf("premier") > -1, window.__ligaer.join(","));
-    // Ti kamper skal ikke bli ti kall.
-    ok("hvem som blir med hentes i ett kall", window.__svarKall === 1, window.__svarKall);
-    // Fanen slar sammen alle ligaene i ett kall, og tjenesten kapper ved
-    // tjue id-er. Sporr vi om hele vinduet per liga, faller den andre
-    // ligaen stille ut — og det er nettopp den fanen finnes for.
-    var spurte = decodeURIComponent(window.__svarUrl).split("kamper=")[1] || "";
+    // 25 kamper — 24 i eliteserien, én i Premier League. Tjue id-er er
+    // taket per kall, sa dette er to bunter. Poenget er at det ikke blir
+    // ett kall per kamp.
+    ok("hvem som blir med buntes, ikke ett kall per kamp",
+       window.__svarKall === 2, window.__svarKall);
+    ok("alle kampene pa skjermen er sport om",
+       window.__spurte.length === 25, window.__spurte.length);
+    // Fanen slar sammen ligaene. Kappes spørringen framfor a deles, faller
+    // den siste ligaen stille ut — og det er nettopp den fanen finnes for.
     ok("Premier League-kampen er med i sporringen",
-       spurte.split(",").indexOf("2026-09-19-arsenal-liverpool") > -1, spurte);
-    ok("og sporringen holder seg under taket pa tjue",
-       spurte.split(",").length <= 20, spurte.split(",").length + ": " + spurte);
+       window.__spurte.indexOf("2026-09-19-arsenal-liverpool") > -1,
+       window.__spurte.length + " id-er, siste: " + window.__spurte.slice(-3).join(","));
 
     var rader = rot.querySelectorAll(".kamp");
     ok("bare kampen noen blir med pa star der", rader.length === 1, rader.length);
@@ -3034,7 +3054,7 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
       document.querySelector("#fotballFaner .segment-del[data-verdi='venner']").click();
       setTimeout(function () { try {
         ok("tom liste sier hva som skal til",
-           rot.textContent.indexOf("Åpne en kamp under Neste runde") > -1,
+           rot.textContent.indexOf("Åpne en kamp under Kommende") > -1,
            rot.textContent.slice(0, 160));
         ferdig();
       } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
