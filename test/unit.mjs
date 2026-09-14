@@ -30,7 +30,8 @@ import { normaliserPinNavn, pinSlug, gyldigPinNavn, pinEpost, normaliserPin, gyl
 
 import { normaliserNavn, gyldigNavn, svarRad, tolkSvar, perKamp, blirMedTekst,
          svartekst, egetSvar, loftMedSvar, bareMedSvar, stederFraSvar, perSted,
-         stedNokkel, blirMedLinje, mittSted, NAVN_MAKS } from "../svar-data.js";
+         stedNokkel, blirMedLinje, mittSted, NAVN_MAKS,
+         navnIRad, NAVN_I_RAD } from "../svar-data.js";
 
 import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
   from "../vaer-data.js";
@@ -768,6 +769,34 @@ ok("en kamp i gar beholdes", utenGamle(
 const PUBNAVN = PUBER_OSLO.map((p) => p.navn);
 ok("gyldige visninger gir ingen feil", sjekkVisninger(SATT, PUBNAVN).length === 0,
    sjekkVisninger(SATT, PUBNAVN).join(" | "));
+// Navnene i raden til stedet. Kortet svarer pa «hvor skal jeg?», sa det
+// er deg selv man leter etter i lista — derfor staar du forst, og heter
+// «Du».
+function nrad(navn, bruker) {
+  return { kampId: "k", navn, bruker, hvor: "pub", sted: "Pub X" };
+}
+const NR_FOLK = [nrad("Per", "u2"), nrad("Line", "u3"), nrad("Ida", "u4"),
+                 nrad("Kari", "u5"), nrad("Mats", "u6"), nrad("Anna", "u7"),
+                 nrad("Rune", "u1")];
+const NR_MEG = navnIRad(NR_FOLK, "u1");
+ok("du staar forst i raden, og heter «Du»", NR_MEG.navn[0] === "Du", NR_MEG.navn.join(","));
+ok("ditt eget navn staar ikke ogsa",
+   NR_MEG.navn.indexOf("Rune") === -1, NR_MEG.navn.join(","));
+// Er det flere enn det er plass til, vises én faerre enn taket: ellers
+// tar «+1 andre» like mye plass som navnet den skjulte.
+ok("de som ikke far plass telles",
+   NR_MEG.navn.length === NAVN_I_RAD - 1 && NR_MEG.flere === 3,
+   NR_MEG.navn.length + " + " + NR_MEG.flere);
+const NR_FAA = navnIRad(NR_FOLK.slice(0, 3), "u9");
+ok("er det faa nok, telles ingen",
+   NR_FAA.navn.length === 3 && NR_FAA.flere === 0, JSON.stringify(NR_FAA));
+ok("er du ikke der selv, staar bare navnene",
+   NR_FAA.navn.indexOf("Du") === -1, NR_FAA.navn.join(","));
+// Et navn som ikke er et navn skal ikke fylle en plass i raden.
+ok("rader uten et gyldig navn faller ut",
+   navnIRad([nrad("•••", "u2"), nrad("Per", "u3")], "u1").navn.join(",") === "Per");
+ok("ingen svar gir ingen navn", navnIRad([], "u1").navn.length === 0);
+
 ok("den ekte lista holder formen", sjekkVisninger(VISNINGER_EKTE, PUBNAVN).length === 0,
    sjekkVisninger(VISNINGER_EKTE, PUBNAVN).join(" | "));
 function vrad(endring) {

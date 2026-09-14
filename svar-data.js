@@ -131,6 +131,27 @@ export function bareMedSvar(kamper, kart) {
     .sort((a, b) => String(a.dato || "").localeCompare(String(b.dato || "")));
 }
 
+// Navnene som star under stedet i kampkortet, og hvor mange som ikke
+// fikk plass.
+//
+// Du staar forst, og heter «Du»: kortet svarer paa «hvor skal jeg?», og
+// da er det deg selv man leter etter i lista. Ditt eget navn blant sju
+// andre er noe man maa lese seg gjennom.
+//
+// Er det flere enn det er plass til, vises én faerre enn taket og
+// resten telles — ellers ville «+1 andre» tatt like mye plass som navnet
+// den skjulte.
+export const NAVN_I_RAD = 5;
+
+export function navnIRad(svar, bruker, maks = NAVN_I_RAD) {
+  const liste = (svar || []).filter((s) => gyldigNavn(s.navn));
+  const meg = liste.filter((s) => bruker && s.bruker === bruker);
+  const andre = liste.filter((s) => !(bruker && s.bruker === bruker));
+  const alle = meg.map(() => "Du").concat(andre.map((s) => s.navn));
+  if (alle.length <= maks) return { navn: alle, flere: 0 };
+  return { navn: alle.slice(0, maks - 1), flere: alle.length - (maks - 1) };
+}
+
 // Ditt eget svar, om du har gitt et. Brukeren er id-en fra okta — to
 // personer kan hete det samme, og navnet er ikke identitet.
 export function egetSvar(svar, bruker) {

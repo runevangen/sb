@@ -383,16 +383,29 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   samme igjen koster ingenting, og delingsteksten henter fra samme minne.
   Linja fjernes når raden lukkes.
 - **Kampkortet er en liste over steder man kan dra, og ett trykk på et
-  sted er svaret.** Overskriften i kortet er «Disse viser kampen:» når en
-  pub har meldt inn, ellers «Hvor skal du se den?» — lagene er
-  overskriften på selve kampen og står i linja over, så kortet skal ikke
-  ha en tittel til som konkurrerer med dem.
+  sted er svaret.** Overskriften i kortet er alltid «Hvor skal du se
+  den?» — lagene er overskriften på selve kampen og står i linja over, så
+  kortet skal ikke ha en tittel til som konkurrerer med dem. **Den spør,
+  den påstår ingenting.** «Disse viser kampen» over hele lista ville sagt
+  at arenaen og en pub ingen har meldt inn viser den, og det er nøyaktig
+  den merkingen appen ellers holder ren. Stjerna bærer forskjellen, rad
+  for rad, som i forslagslista.
   Stedene er pubene som har meldt inn *denne* kampen, arenaen («en plass
   man kan dra», på linje med pubene), stedene vennene alt har sagt at de
   skal til, og stedet en delt lenke pekte på — deduplisert på
   `stedNokkel()`, så en pub som både er meldt inn og har folk står én
   gang. Trykker du på stedet du alt står på, går du av lista igjen: to
   knapper ville betydd at man kan bli med to ganger.
+  **Hvert sted er en rad, ikke en chip** (`stedRad()` i `fotball.js`):
+  navnet, folka som skal dit, og én knapp som sier hva den gjør. Radene
+  ligger i en kolonne framfor å flyte som chips — navnene under stedet
+  gjør hver rad ulikt høy, og en rad bred nok til navnene er lettere å
+  treffe. Raden er ingen knapp: den har en inni seg, og en knapp i en
+  knapp finnes ikke — samme regel som `.kamp-del` i kamplinja, bare løst
+  motsatt vei. Et sted pekt ut av en delt lenke gir fokus til *knappen* i
+  raden, ikke til raden. «Et annet sted» ser ut som en rad, men er ingen
+  `.sted-rad-kort`: den har verken stedsnavn eller folk, og alt som leter
+  etter stedene i kortet ville fått den med på kjøpet.
   Før var det tre steg — velg hjemme/pub/stadion, skriv pubnavnet, trykk
   «Jeg skal dit» — og et navnefelt i tillegg, på hver eneste kamp. Tre
   steg for å si én ting.
@@ -943,12 +956,20 @@ er i seg selv noe om adressen.
   fylle før trykket virket ville betydd at «ett trykk» ikke var sant — og
   feltet sto på hver eneste kamp. Har noen skrevet et annet navn før,
   ligger det fortsatt i `sb-visning.svarnavn` og vinner som før.
-- **Vennene står nederst i kortet, gruppert etter stedet de skal til**
-  («Lincoln Pub — Ola og Kari»), av `perSted()` i `svar-data.js`. Flest
-  først, og den som ikke sa hvor, sist og uten sted. Linja under kampen
-  sier hvor mange og hvem — nok når man blar; kortet sier hvor man møter
-  dem, og det er spørsmålet man åpnet kortet for å svare på. «3 blir med:
-  Ola, Kari og Per» sa ingenting om det.
+- **Vennene står i raden til stedet de skal til**, ikke i en egen liste
+  nederst: stedet og hvem som er der er én ting, og det er hele
+  spørsmålet man åpnet kortet for å svare på. `navnIRad()` i
+  `svar-data.js` former linja. **Du står først, og heter «Du»** — kortet
+  svarer på «hvor skal jeg?», og da er det deg selv man leter etter; ditt
+  eget navn blant sju andre er noe man må lese seg gjennom. Er det flere
+  enn `NAVN_I_RAD` (fem), vises én færre enn taket og resten telles
+  («+3 andre»): ellers tar «+1 andre» like mye plass som navnet den
+  skjulte.
+  Nederst står bare de som sa at de blir med **uten å si hvor** — de har
+  ingen rad å stå i, og skal ikke falle ut av kortet. (Radene som alt
+  ligger i basen med `hvor='hjemme'` er slike.) Linja under kampen sier
+  fortsatt hvor mange og hvem, med `perSted()` som før — nok når man
+  blar.
 - **Ingen treff er ingen nyhet.** `meldTomt()` gir ett svar på «fant dere
   noe?» for hele panelet, ikke ett per kilde. Før sa fire grupper fra
   hver for seg, og de tre tomme druknet den ene som hadde et forslag.
@@ -1011,12 +1032,13 @@ er i seg selv noe om adressen.
 - Svarer du to ganger, endrer du svaret ditt: skrivingen er en upsert
   mot `unique (kamp_id, bruker)`. Trykker du på et annet sted, flytter
   svaret ditt dit; trykker du på det samme igjen, går du av lista.
-- **Og at et nytt trykk melder deg av, må stå — ikke gjettes.** Stedet du
-  skal til bærer en hake, og både `aria-label` og `title` sier «Trykk for
-  å melde deg av». Fargen alene holdt ikke: «ser lite forskjell på en pub
-  som er markert eller ikke», meldt fra prod 13. september 2026 — og da
-  trykker man en gang til for å sjekke at det tok, og melder seg av uten
-  å se det. Det så ut som at ingenting ble lagret.
+- **Og at et nytt trykk melder deg av, må stå — ikke gjettes.** Knappen i
+  raden sier det med ord: «Jeg skal hit» blir «Meld deg av». Fargen alene
+  holdt ikke: «ser lite forskjell på en pub som er markert eller ikke»,
+  meldt fra prod 13. september 2026 — og da trykker man en gang til for å
+  sjekke at det tok, og melder seg av uten å se det. Det så ut som at
+  ingenting ble lagret. En hake var første forsøk, og den viste at noe var
+  valgt uten å si hva neste trykk ville gjøre. Det er det knappen gjør.
 - **En skriving som svarer 200 er ikke bevis på at raden ligger der.**
   `settSvar` leser derfor kampen tilbake to ganger — som deg, og som hvem
   som helst — og forskjellen mellom de to er diagnosen:
@@ -1049,11 +1071,16 @@ er i seg selv noe om adressen.
 - Meldinga sier hva du nettopp gjorde, ikke hvilken liste du havnet i:
   «Du har planlagt å dra til Grønland Boulebar & Spiseri.» «Du står på
   lista» beskrev vår datamodell, ikke leserens handling.
-- **Kortet sier med ord hvor du skal, ikke bare med en merket chip.**
-  Meldinga over er flyktig — den står rett etter et trykk og er borte ved
-  neste lasting — så uten `.kamp-mitt` sa kortet ingenting om hvor du
-  skulle når du kom tilbake til appen. Meldt fra prod 13. september 2026:
-  «Jeg markerte pub tidligere i dag. Ser ikke nå hvor jeg skal gå.»
+- **Kortet må si hvor du skal også når meldinga er borte.** Meldinga over
+  er flyktig — den står rett etter et trykk og er borte ved neste lasting
+  — og uten noe annet sa kortet ingenting om hvor du skulle når du kom
+  tilbake til appen. Meldt fra prod 13. september 2026: «Jeg markerte pub
+  tidligere i dag. Ser ikke nå hvor jeg skal gå.» Første svar var en egen
+  linje (`.kamp-mitt`, «Du skal til Pub X»). Den er borte nå, fordi raden
+  sier det tydeligere enn en setning under lista gjorde: raden er merket,
+  «Du» står først blant navnene, og knappen sier «Meld deg av». Og linja
+  under kampraden sier det fortsatt med ord for den som blar uten å åpne
+  kortet.
 - **Linja under kampen sier hvor du skal, ikke bare hvem som blir med.**
   «Rune blir med» svarer på hvem; hvor er det man åpner kortet for å
   finne ut. `blirMedLinje()` i `svar-data.js` leser stedet ditt først —
@@ -1069,11 +1096,12 @@ er i seg selv noe om adressen.
   Kampen huskes derfor på `rad.kamp` og `panel.kamp`, så en tegning
   utenfra vet hvilken kamp den gjelder.
 - **Utlogget er et trykk på et sted et delingsvalg, ikke en påmelding**, og
-  de to skal ikke se like ut. Chipen får aksentfargen og stiplet ramme
-  (`.kun-deling`), aldri den grønne bekreftelsen, og skjermleseren får
-  «Deles: …» framfor «Du skal til …». Meldinga sier hva som mangler og hva
-  stedet da er godt for. Et sted som ser valgt ut når ingenting er lagret,
-  sier at det virket.
+  de to skal ikke se like ut. Raden får aksentfargen og stiplet ramme
+  (`.kun-deling`), aldri den grønne bekreftelsen, og knappen sier **«Valgt
+  for deling»** framfor «Meld deg av» — det er ingenting å melde seg av
+  fra. Skjermleseren får «Deles: …» framfor «Du skal til …». Meldinga sier
+  hva som mangler og hva stedet da er godt for. Et sted som ser lagret ut
+  når ingenting er lagret, sier at det virket.
 - Navnet er «navnet vennene ser», og det er synlig for alle som åpner
   kampen — det er prisen for at lista kan leses uten konto. Det lagres
   med visningsvalgene (`sb-visning`, feltet `svarnavn`) ved hvert svar, så
@@ -1110,9 +1138,9 @@ er i seg selv noe om adressen.
 
 ## Testing
 
-    node test/unit.mjs      473 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      480 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  238 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       409 tester, ~200 s, headless Chromium
+    node test/run.mjs       412 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

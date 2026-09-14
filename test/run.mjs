@@ -1345,8 +1345,9 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
        panel.textContent.indexOf("Hjemme") === -1, panel.textContent.slice(0, 90));
     // «Stadion er et valg pa linje med puber. En plass man kan dra.»
     var steder = function () {
-      return Array.prototype.map.call(panel.querySelectorAll(".sted-chip"),
-        function (c) { return c.querySelector(".sted-navn").textContent; });
+      return Array.prototype.map.call(panel.querySelectorAll(".sted-rad-kort"),
+        function (c) { return c.querySelector(".sted-navn")
+          ? c.querySelector(".sted-navn").textContent : ""; });
     };
     ok("stadion star som et sted man kan dra til",
        steder().indexOf("Brann Stadion") > -1, steder().join("|"));
@@ -1909,17 +1910,28 @@ const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
     // Stedet blir pekt ut, ikke valgt: et trykk pa et sted er svaret «jeg
     // skal dit», og det svaret skal leseren gi selv. Chipen markeres og
     // far fokus, sa det fortsatt koster ett trykk — hens eget.
-    var pekt = apnet.querySelector(".sted-chip.pekt");
+    var pekt = apnet.querySelector(".sted-rad-kort.pekt");
     ok("med puben pekt ut i kortet",
        pekt && pekt.querySelector(".sted-navn").textContent === "Lincoln Pub",
-       pekt ? pekt.textContent : "ingen pekt chip");
+       pekt ? pekt.textContent : "ingen pekt rad");
+    // Fokus staar paa knappen i raden, ikke paa raden: raden er ingen
+    // knapp — den har en inni seg.
     ok("og den star ikke som valgt: svaret er ikke gitt enda",
-       pekt.getAttribute("aria-pressed") === "false" && document.activeElement === pekt,
+       pekt.querySelector(".sted-knapp").getAttribute("aria-pressed") === "false" &&
+       document.activeElement === pekt.querySelector(".sted-knapp"),
        pekt.getAttribute("aria-pressed"));
-    // Overskrifta sier hva lista er nar noen har meldt inn en pub.
-    ok("kortet sier at disse viser kampen",
-       apnet.querySelector(".kamp-panel-tittel").textContent === "Disse viser kampen:",
+    // Én liste, og den spor. «Disse viser kampen» over hele lista ville
+    // pastatt at arenaen og en pub ingen har meldt inn viser den — og det
+    // er nettopp den merkingen appen ellers holder ren.
+    ok("overskrifta spor, den pastar ingenting",
+       apnet.querySelector(".kamp-panel-tittel").textContent === "Hvor skal du se den?",
        apnet.querySelector(".kamp-panel-tittel").textContent);
+    // Stjerna baerer forskjellen, rad for rad.
+    ok("og stjerna sier hvem som faktisk har meldt inn kampen",
+       !!pekt.querySelector(".pub-bekreftet") &&
+       pekt.querySelector(".pub-bekreftet").getAttribute("aria-label") ===
+         "viser denne kampen",
+       pekt.textContent);
     document.querySelectorAll(".kamp-del")[0].click();
 
     // Forste kamp: Brann – Bodo/Glimt, som Lincoln Pub viser.
@@ -2052,13 +2064,13 @@ const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
     // ingen kart kjenner den: den som delte skal dit, og da er det stedet
     // det mest relevante pa hele kortet. Det blir pekt ut, ikke valgt —
     // svaret skal mottakeren gi selv, med ett trykk.
-    var pekt = panel.querySelector(".sted-chip.pekt");
+    var pekt = panel.querySelector(".sted-rad-kort.pekt");
     ok("med avsenderens sted pekt ut",
        pekt && pekt.querySelector(".sted-navn").textContent === "Pub X" &&
-       pekt.getAttribute("aria-pressed") === "false",
-       pekt ? pekt.textContent : "ingen pekt chip");
-    ok("og fokus star pa det, sa svaret koster ett trykk",
-       document.activeElement === pekt,
+       pekt.querySelector(".sted-knapp").getAttribute("aria-pressed") === "false",
+       pekt ? pekt.textContent : "ingen pekt rad");
+    ok("og fokus star pa knappen i den, sa svaret koster ett trykk",
+       document.activeElement === pekt.querySelector(".sted-knapp"),
        document.activeElement && document.activeElement.className);
     // Den som kommer fra en delt lenke er utlogget. Da skal det sta hva
     // som mangler — og at resten virker uansett.
@@ -2071,9 +2083,7 @@ const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
     // der og da — og stedet skal ikke se ut som den gronne bekreftelsen pa
     // at du star pa lista. Et sted som ser valgt ut nar ingenting er
     // lagret, sier at det virket.
-    pekt.click();
-    var etterTrykk = panel.querySelector(".sted-chip.pekt") ||
-      panel.querySelector(".sted-chip");
+    pekt.querySelector(".sted-knapp").click();
     ok("et trykk utlogget sier at det krever innlogging",
        panel.querySelector(".kamp-svar").textContent.indexOf("Logg inn i menyen") === 0,
        panel.querySelector(".kamp-svar").textContent);
@@ -2082,16 +2092,21 @@ const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
        panel.querySelector(".kamp-svar").textContent);
     // Ingen bakstreker her: i en template-literal spises de, og selektoren
     // blir ugyldig og stopper hele testsiden. Enkeltfnutter inni.
-    var delevalg = panel.querySelector(".sted-chip[aria-pressed='true']");
+    var delevalg = panel.querySelector(".sted-rad-kort.valgt");
     ok("stedet er merket som et delingsvalg, ikke som en plass pa lista",
        delevalg && delevalg.classList.contains("kun-deling"),
-       delevalg ? delevalg.className : "ingen valgt chip");
+       delevalg ? delevalg.className : "ingen valgt rad");
+    // Knappen lover ikke at du staar paa lista, for det gjor du ikke.
+    ok("og knappen sier at det bare er valgt for deling",
+       delevalg.querySelector(".sted-knapp").textContent === "Valgt for deling",
+       delevalg.querySelector(".sted-knapp").textContent);
     ok("og det ser ikke ut som den gronne bekreftelsen",
        getComputedStyle(delevalg).backgroundColor !== "rgb(31, 122, 77)",
        getComputedStyle(delevalg).backgroundColor);
     ok("skjermleseren far ogsa vite at det bare deles",
-       delevalg.getAttribute("aria-label").indexOf("Deles:") === 0,
-       delevalg.getAttribute("aria-label"));
+       delevalg.querySelector(".sted-knapp").getAttribute("aria-label")
+         .indexOf("Deles:") === 0,
+       delevalg.querySelector(".sted-knapp").getAttribute("aria-label"));
 
     // En lenke til en kamp som ikke star i runden lenger: runden skal sta
     // som for, uten en feilmelding om noe leseren ikke kan gjore noe med.
@@ -2421,15 +2436,19 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
        panel.textContent.slice(0, 80));
     // Stadion er et sted pa linje med pubene: «en plass man kan dra».
     var stedChip = function (navn) {
-      return Array.prototype.find.call(panel.querySelectorAll(".sted-chip"),
-        function (c) { return c.querySelector(".sted-navn").textContent === navn; });
+      return Array.prototype.find.call(panel.querySelectorAll(".sted-rad-kort"),
+        function (c) { return c.querySelector(".sted-navn") &&
+          c.querySelector(".sted-navn").textContent === navn; });
     };
     var arena = stedChip("Brann Stadion");
-    ok("stadion star som et sted", !!arena && arena.getAttribute("aria-pressed") === "false",
-       arena ? arena.textContent : "ingen arena-chip");
-    ok("og den sier hva et trykk gjor",
-       arena.getAttribute("aria-label") === "Jeg skal til Brann Stadion",
-       arena.getAttribute("aria-label"));
+    ok("stadion star som et sted",
+       !!arena && arena.querySelector(".sted-knapp").getAttribute("aria-pressed") === "false",
+       arena ? arena.textContent : "ingen arena-rad");
+    ok("og knappen sier hva et trykk gjor",
+       arena.querySelector(".sted-knapp").textContent === "Jeg skal hit" &&
+       arena.querySelector(".sted-knapp").getAttribute("aria-label") ===
+         "Jeg skal til Brann Stadion",
+       arena.querySelector(".sted-knapp").getAttribute("aria-label"));
 
     // Et sted man skriver selv: samme svar, bare med et navn vi ikke
     // hadde pa lista.
@@ -2458,23 +2477,26 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
          panel.querySelector(".kamp-svar").textContent === "Du har planlagt å dra til Pub X.",
          panel.querySelector(".kamp-svar").textContent);
 
-      // Stedet du skal til blir en chip i kortet: den er merket, og den
-      // teller hvor mange som skal dit.
+      // Stedet du skal til er raden som er merket, og folka star i den.
       var pubX = stedChip("Pub X");
       ok("stedet du valgte star som valgt i kortet",
-         pubX && pubX.getAttribute("aria-pressed") === "true",
-         pubX ? pubX.getAttribute("aria-pressed") : "ingen chip");
+         pubX && pubX.classList.contains("valgt"),
+         pubX ? pubX.className : "ingen rad");
       // Fargen alene var ikke nok: «ser lite forskjell pa en pub som er
       // markert eller ikke» — og da trykker man en gang til for a sjekke,
-      // og melder seg av uten a se det.
-      ok("og den barer en hake, ikke bare en farge",
-         !!pubX.querySelector(".sted-hake"), pubX.textContent);
-      ok("og den sier at et trykk melder deg av",
-         pubX.getAttribute("aria-label").indexOf("melde deg av") > -1,
-         pubX.getAttribute("aria-label"));
-      ok("og chipen sier hvor mange som skal dit",
-         pubX.querySelector(".sted-folk").textContent === "1",
-         pubX.querySelector(".sted-folk").textContent);
+      // og melder seg av uten a se det. Na staar det pa knappen.
+      ok("og knappen sier med ord at et trykk melder deg av",
+         pubX.querySelector(".sted-knapp").textContent === "Meld deg av",
+         pubX.querySelector(".sted-knapp").textContent);
+      ok("skjermleseren far det samme",
+         pubX.querySelector(".sted-knapp").getAttribute("aria-label")
+           .indexOf("melde deg av") > -1,
+         pubX.querySelector(".sted-knapp").getAttribute("aria-label"));
+      // Folka staar i raden til stedet, ikke i en egen liste nederst:
+      // stedet og hvem som er der er én ting.
+      ok("og raden sier hvem som skal dit — du forst",
+         pubX.querySelector(".sted-rad-folk").textContent.indexOf("Du") === 0,
+         pubX.querySelector(".sted-rad-folk").textContent);
 
       // «Ola blir med» sier hvem, ikke hvor — og hvor er det man apner
       // kortet for a finne ut. Star du selv pa lista, leses stedet ditt
@@ -2483,10 +2505,10 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
       ok("linja under kampen sier hvor du skal",
          !!linje && linje.textContent.indexOf("Du skal til Pub X.") > -1,
          linje ? linje.textContent : "ingen linje");
-      // Og i kortet, med ord — ikke bare som en merket chip.
-      ok("og kortet sier det ogsa, med ord",
-         panel.querySelector(".kamp-mitt").textContent === "Du skal til Pub X.",
-         panel.querySelector(".kamp-mitt").textContent);
+      // Kortet trenger ingen egen «Du skal til X»-linje lenger: raden sier
+      // det selv, og den sier det tydeligere enn en setning under lista.
+      ok("og kortet trenger ingen egen linje til a si det",
+         !panel.querySelector(".kamp-mitt"));
       // Star det folk pa to av ti kamper, er det de to man leter etter.
       // Runden deles i to merkede bolker framfor a stokkes om flatt:
       // dagskillene ville ellers havnet pa feil kamper.
@@ -2506,15 +2528,17 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
          (rad.previousElementSibling.classList.contains("kamp-dag") ||
           rad.previousElementSibling.classList.contains("kamp-bolk")),
          rad.previousElementSibling ? rad.previousElementSibling.className : "ingen");
-      // «List opp nederst venner som har planlagt turen dit»: stedet
-      // forst, fordi det er det man leter etter. Et navn uten et sted
-      // sier ikke hvor man moter noen.
-      var nederst = panel.querySelector(".kamp-panel-liste");
-      var stedRad = nederst.querySelector(".sted-rad");
-      ok("vennene star nederst, gruppert etter stedet de skal til",
-         stedRad && stedRad.querySelector(".sted-rad-sted").textContent === "på Pub X" &&
-         stedRad.querySelector(".sted-rad-navn").textContent === "Ola",
-         nederst.textContent);
+      // Vennene staar i raden til stedet sitt, ikke i en egen liste
+      // nederst: stedet og hvem som er der er én ting, og det er hele
+      // sporsmalet man aapnet kortet for aa faa svar paa.
+      var minRad = stedChip("Pub X");
+      ok("vennene star i raden til stedet de skal til",
+         minRad && minRad.querySelector(".sted-rad-folk").textContent === "Du",
+         minRad ? minRad.textContent : "ingen rad");
+      // Og lista nederst staar tom: ingen har svart uten aa si hvor.
+      ok("og lista nederst er tom nar alle sa hvor",
+         panel.querySelector(".kamp-panel-liste").textContent === "",
+         panel.querySelector(".kamp-panel-liste").textContent);
       // Linja horer til kampen, ikke til panelet: den skal sta over det.
       ok("og over panelet, ikke under",
          linje.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING);
@@ -2524,7 +2548,7 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
 
       // To «jeg blir med» er en person, ikke to: et nytt trykk pa det
       // samme stedet er angreknappen.
-      stedChip("Pub X").click();
+      stedChip("Pub X").querySelector(".sted-knapp").click();
       setTimeout(function () { try {
         var fjern = window.__svar.filter(function (k) { return k.inn && k.inn.handling === "fjern"; });
         ok("et nytt trykk pa stedet sender en fjerning med okta",
@@ -2540,11 +2564,11 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
            panel.querySelector(".kamp-svar").textContent === "Du skal ikke dit likevel.",
            panel.querySelector(".kamp-svar").textContent);
         ok("stedet star ikke lenger som valgt",
-           stedChip("Pub X").getAttribute("aria-pressed") === "false",
-           stedChip("Pub X").getAttribute("aria-pressed"));
-        ok("og lista nederst er tom",
-           panel.querySelector(".kamp-panel-liste").textContent === "",
-           panel.querySelector(".kamp-panel-liste").textContent);
+           stedChip("Pub X").querySelector(".sted-knapp").getAttribute("aria-pressed") === "false",
+           stedChip("Pub X").querySelector(".sted-knapp").getAttribute("aria-pressed"));
+        ok("og ingen staar lenger i raden",
+           !stedChip("Pub X").querySelector(".sted-rad-folk"),
+           stedChip("Pub X").textContent);
 
         // Og sa den som kostet en runde i prod: en upsert som ikke endret
         // noe kan svare med tom representasjon. Bygger vi lista pa det
@@ -2552,7 +2576,7 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
         // gikk bra — uten linja under kampen, uten tellingen pa stedet og
         // uten deg i lista nederst. Derfor hentes kampens svar pa nytt.
         window.__tomRepresentasjon = true;
-        stedChip("Pub X").click();
+        stedChip("Pub X").querySelector(".sted-knapp").click();
         setTimeout(function () { try {
           ok("et tomt svar pa skrivingen mister deg ikke",
              !!rad.querySelector(".kamp-blirmed") &&
@@ -2560,40 +2584,42 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
              rad.querySelector(".kamp-blirmed")
                ? rad.querySelector(".kamp-blirmed").textContent : "ingen linje");
           ok("stedet star fortsatt som valgt",
-             stedChip("Pub X").getAttribute("aria-pressed") === "true",
-             stedChip("Pub X").getAttribute("aria-pressed"));
-          ok("og du star i lista nederst, med stedet",
-             panel.querySelector(".kamp-panel-liste").textContent.indexOf("på Pub X") > -1,
-             panel.querySelector(".kamp-panel-liste").textContent);
+             stedChip("Pub X").querySelector(".sted-knapp").getAttribute("aria-pressed") === "true",
+             stedChip("Pub X").querySelector(".sted-knapp").getAttribute("aria-pressed"));
+          ok("og du star i raden til stedet",
+             stedChip("Pub X").querySelector(".sted-rad-folk").textContent.indexOf("Du") > -1,
+             stedChip("Pub X").textContent);
           // Vennene som har svart siden runden ble hentet kommer med i
           // samme oppfriskning — det er derfor den finnes.
           window.__lagret = window.__lagret.concat([{ kamp_id: "2026-09-20-brann-bodoglimt", navn: "Kari",
             hvor: "pub", sted: "Pub X", bruker: "u-2" }]);
-          stedChip("Pub X").click();
+          stedChip("Pub X").querySelector(".sted-knapp").click();
           setTimeout(function () { try {
             // Du gikk av lista, sa linja i kortet skal ikke lenger pasta
             // at du skal noe sted.
-            ok("og nar du gar av lista, star det ikke lenger hvor du skal",
-               panel.querySelector(".kamp-mitt").textContent === "",
-               panel.querySelector(".kamp-mitt").textContent);
+            ok("og nar du gar av lista, star ikke raden lenger som valgt",
+               !stedChip("Pub X").classList.contains("valgt"),
+               stedChip("Pub X").className);
             ok("venner som svarte etterpa dukker opp i kortet",
-               panel.querySelector(".kamp-panel-liste").textContent.indexOf("Kari") > -1,
-               panel.querySelector(".kamp-panel-liste").textContent);
+               stedChip("Pub X").querySelector(".sted-rad-folk")
+                 .textContent.indexOf("Kari") > -1,
+               stedChip("Pub X").textContent);
             // Og din egen fjerning tok bare din egen rad.
             ok("og din egen fjerning rorte ikke hennes",
-               panel.querySelector(".kamp-panel-liste").textContent.indexOf("Ola") === -1,
-               panel.querySelector(".kamp-panel-liste").textContent);
+               stedChip("Pub X").querySelector(".sted-rad-folk")
+                 .textContent.indexOf("Du") === -1,
+               stedChip("Pub X").textContent);
 
             // Skrivingen leser hele kampen tilbake for a bevise at din rad
             // landet, og de andre folger med. Byttes bare din ut, blir de
             // andre lagt oppa dem som alt la der.
-            stedChip("Pub X").click();
+            stedChip("Pub X").querySelector(".sted-knapp").click();
             setTimeout(function () { try {
-              var tekst = panel.querySelector(".kamp-panel-liste").textContent;
+              var tekst = stedChip("Pub X").querySelector(".sted-rad-folk").textContent;
               var antall = tekst.split("Kari").length - 1;
               ok("vennene star én gang, ikke to, etter en skriving",
                  antall === 1, antall + " ganger: " + tekst);
-              ok("og du star der selv", tekst.indexOf("Ola") > -1, tekst);
+              ok("og du star der selv", tekst.indexOf("Du") > -1, tekst);
               ferdig();
             } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
             return;
@@ -2683,9 +2709,9 @@ const SAK_18B = await kjor("navn-per-konto", FELLES + FOTBALL + `
         var rad = document.querySelectorAll(".kamp.delbar")[0];
         rad.querySelector(".kamp-del").click();
         var panel = document.querySelector(".kamp-panel");
-        var arena = Array.prototype.find.call(panel.querySelectorAll(".sted-chip"),
+        var arena = Array.prototype.find.call(panel.querySelectorAll(".sted-rad-kort"),
           function (c) { return c.querySelector(".sted-navn").textContent === "Brann Stadion"; });
-        arena.click();
+        arena.querySelector(".sted-knapp").click();
         setTimeout(function () { try {
           var skriv = window.__skrevet.filter(function (k) { return !k.handling; });
           // Dette var feilen: raden ble skrevet med «Ola».
@@ -2756,7 +2782,7 @@ const SAK_19A = await kjor("kort-for-svar", FELLES + FOTBALL + `
     rad.querySelector(".kamp-del").click();
     var panel = document.querySelector(".kamp-panel");
     var stedChip = function (navn) {
-      return Array.prototype.find.call(panel.querySelectorAll(".sted-chip"),
+      return Array.prototype.find.call(panel.querySelectorAll(".sted-rad-kort"),
         function (c) { return c.querySelector(".sted-navn").textContent === navn; });
     };
     ok("kortet star apent for svarene har landet",
@@ -2767,15 +2793,15 @@ const SAK_19A = await kjor("kort-for-svar", FELLES + FOTBALL + `
       // Dette var feilen: kortet ble aldri tegnet pa nytt.
       var min = stedChip("Pub X");
       ok("stedet du skal til blir merket nar svarene lander",
-         min && min.getAttribute("aria-pressed") === "true",
-         min ? min.getAttribute("aria-pressed") : "ingen chip");
-      ok("og kortet sier hvor du skal, med ord",
-         panel.querySelector(".kamp-mitt").textContent === "Du skal til Pub X.",
-         panel.querySelector(".kamp-mitt").textContent);
-      // Vennene nederst skal ogsa komme, ikke bare chipen.
-      ok("og vennene star nederst i kortet",
-         panel.querySelector(".kamp-panel-liste").textContent.indexOf("Kari") > -1,
-         panel.querySelector(".kamp-panel-liste").textContent);
+         min && min.classList.contains("valgt"), min ? min.className : "ingen rad");
+      ok("og knappen sier at du kan melde deg av",
+         min.querySelector(".sted-knapp").textContent === "Meld deg av",
+         min.querySelector(".sted-knapp").textContent);
+      // Vennene skal ogsa komme, ikke bare merkingen av raden.
+      ok("og vennene star i raden sammen med deg",
+         min.querySelector(".sted-rad-folk").textContent.indexOf("Kari") > -1 &&
+         min.querySelector(".sted-rad-folk").textContent.indexOf("Du") === 0,
+         min.querySelector(".sted-rad-folk").textContent);
       // Og linja under kampen, som er den man ser mens man blar.
       ok("linja under kampen sier hvor du skal, ikke bare hvem",
          rad.querySelector(".kamp-blirmed").textContent.indexOf("Du skal til Pub X.") > -1,
