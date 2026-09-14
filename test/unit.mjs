@@ -10,6 +10,7 @@
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
          foldTekst, treffScore, rangerTreff, listeTekst } from "../lib.js";
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
+         SPORTER, sportFor, tolkDatasett, kommendeKamper, kallPerSport, DOGNKVOTE,
          apiSti, tolkKamper, nesteRunde, tolkFotballHash, fotballHash,
          tilgjengeligSesong, SESONGVINDU, redaksjonsnavn, normaliserLagnavn,
          tsdbSti, tsdbHeadere, tolkKamperTsdb, tolkTabellTsdb, tsdbSesong, delingstekst, tidstekst, HVOR,
@@ -882,6 +883,82 @@ ok("neste spor om de kommende",
    apiSti("neste", LIGAER.premier, 2026).indexOf("status=NS&next=") > -1,
    apiSti("neste", LIGAER.premier, 2026));
 ok("ukjent datasett gir null", apiSti("toppscorere", LIGAER.premier, 2026) === null);
+
+/* ---------------- sporten bak ligaen ---------------- */
+
+// Forberedt for sport nummer to: alt som er fotballspesifikt i hentingen
+// star i SPORTER, og funksjonen leser det derfra. Testene her er
+// sommen — de skal slaa ut hvis noen tar fotball tilbake inn i det
+// generiske.
+ok("ligaene vare peker pa en sport vi kjenner",
+   Object.keys(LIGAER).every((n) => !!sportFor(LIGAER[n])),
+   Object.keys(LIGAER).join(","));
+ok("sporten baerer adressen, nokkelnavnet og vinduet",
+   sportFor(LIGAER.premier).api.indexOf("https://") === 0 &&
+   sportFor(LIGAER.premier).nokkelnavn.length > 0 &&
+   sportFor(LIGAER.premier).sesongvindu.fra > 2000,
+   JSON.stringify(sportFor(LIGAER.premier).nokkelnavn));
+// En liga uten sport er fotball: feltet kom til etterpa, og en manglende
+// verdi skal ikke bli en feil i en funksjon som kjorer i prod.
+ok("liga uten sport faller til fotball",
+   sportFor({ id: 1 }) === SPORTER.fotball && sportFor(null) === SPORTER.fotball);
+ok("ukjent sport faller til fotball ogsa",
+   sportFor({ sport: "curling" }) === SPORTER.fotball);
+// Stien og parserne hentes fra sporten, ikke fra en fast import.
+ok("sporten bygger sin egen sti",
+   sportFor(LIGAER.premier).sti("tabell", LIGAER.premier, 2026) ===
+   apiSti("tabell", LIGAER.premier, 2026));
+
+/* ---------------- datasettet, uansett sport ---------------- */
+
+const SVAR_TABELL = { errors: [], response: [{ league: { standings: [[
+  { rank: 1, team: { name: "Brann", logo: "https://x.test/b.png" },
+    all: { played: 3, win: 2, draw: 1, lose: 0, goals: { for: 5, against: 2 } },
+    goalsDiff: 3, points: 7 },
+]] } }] };
+ok("tabell tolkes gjennom sporten",
+   tolkDatasett(sportFor(LIGAER.premier), "tabell", SVAR_TABELL).tabell[0].lag === "Brann");
+ok("uten sport brukes fotball, sa en gammel kaller ikke velter",
+   tolkDatasett(null, "tabell", SVAR_TABELL).tabell.length === 1);
+
+const SVAR_KAMPER = { errors: [], response: [
+  { fixture: { id: 2, date: "2026-09-27T16:00:00+00:00", status: { short: "NS" } },
+    league: { round: "Runde 22" }, teams: { home: { name: "Viking" }, away: { name: "Molde" } },
+    goals: { home: null, away: null } },
+  { fixture: { id: 1, date: "2026-09-20T17:00:00+00:00", status: { short: "NS" } },
+    league: { round: "Runde 21" }, teams: { home: { name: "Brann" }, away: { name: "Rosenborg" } },
+    goals: { home: null, away: null } },
+] };
+const nesteSvar = tolkDatasett(sportFor(LIGAER.premier), "neste", SVAR_KAMPER);
+ok("neste gir hele vinduet i tidsrekkefolge",
+   nesteSvar.kamper.length === 2 && nesteSvar.kamper[0].hjemme === "Brann",
+   nesteSvar.kamper.map((k) => k.hjemme).join(","));
+ok("og runde er den forste, med runder i rekkefolge",
+   nesteSvar.runde === "Runde 21" && nesteSvar.runder.join("|") === "Runde 21|Runde 22",
+   JSON.stringify(nesteSvar.runder));
+// Resultater skal nyeste forst; kommende skal eldste forst. De to gar
+// hver sin vei, og et fortegn pa feil sted bytter dem om.
+const resSvar = tolkDatasett(sportFor(LIGAER.premier), "resultater", SVAR_KAMPER);
+ok("resultater gar andre veien enn kommende",
+   resSvar.kamper[0].hjemme === "Viking", resSvar.kamper.map((k) => k.hjemme).join(","));
+ok("kommendeKamper taler en tom liste",
+   kommendeKamper([]).kamper.length === 0 && kommendeKamper().runde === "");
+ok("en kamp uten runde gir ingen tom rundeoppforing",
+   kommendeKamper([{ dato: "2026-01-01" }]).runder.length === 0);
+
+/* ---------------- dognkvoten, per sport ---------------- */
+
+// Kvoten er per sport hos API-Sports: hver tjeneste har sin egen konto og
+// sin egen bote. Teller vi alle ligaer i en bote, ville en handballiga
+// sett ut som om den sprengte fotballens kvote.
+const perSport = kallPerSport();
+ok("hver sport holder seg under sin egen dognkvote",
+   Object.keys(perSport).every((s) => perSport[s] <= DOGNKVOTE), JSON.stringify(perSport));
+ok("og fotballen teller det den faktisk bruker",
+   perSport.fotball === kallPerDogn(Object.keys(LIGAER).length), JSON.stringify(perSport));
+ok("en sport til deler ikke fotballens bote",
+   kallPerSport({ a: { sport: "fotball" }, b: { sport: "handball" } }).fotball ===
+   kallPerDogn(1), JSON.stringify(kallPerSport({ a: {}, b: { sport: "handball" } })));
 
 /* ---------------- fotball: kamper ---------------- */
 

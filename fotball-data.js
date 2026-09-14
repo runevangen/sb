@@ -5,6 +5,79 @@
 // Netlify-funksjonen og av nettleserkoden, slik at formen pa dataene er
 // definert ett sted og ikke kan gli fra hverandre.
 
+// ---------------------------------------------------------------------
+// Sporten en liga hoerer til.
+//
+// Alt som er fotballspesifikt i hentingen samles her, sa den generiske
+// maskineriet — funksjonen, cachen, sesongvinduet, kvoteregningen — ikke
+// kjenner fotball i det hele tatt. Skal handball inn en dag, er det en
+// oppforing til her og ingenting i netlify/functions/fotball.mjs:
+// API-Sports har en egen tjeneste per sport, pa samme konto, med samme
+// header og sin egen dognkvote pa hundre.
+//
+// Filene heter fortsatt fotball-*. Den dagen sport nummer to kommer,
+// flyttes denne tabellen og de generiske funksjonene til sport-data.js —
+// a dope om fem filer na, for en sport ingen har bedt om, ville vaert a
+// betale for noe vi ikke vet at vi vil ha.
+export const SPORTER = {
+  fotball: {
+    navn: "Fotball",
+    tjeneste: "API-Football",
+    api: "https://v3.football.api-sports.io",
+    // Miljovariabler er versalfolsomme pa Linux, og navnet er lett a
+    // taste i feil skrivemate. Begge godtas, sa en riktig satt nokkel
+    // ikke leses som en manglende nokkel.
+    nokkelnavn: ["API_FOOTBALL_KEY", "api_football_key"],
+    // Gratisnivaet dekker bare disse sesongene, og svarer «season, try
+    // from 2022 to 2024» pa alt utenfor. Hver sport har sitt eget vindu.
+    sesongvindu: { fra: 2022, til: 2024 },
+    // Adressen og formen pa svaret er det som faktisk skiller en sport
+    // fra en annen hos API-Sports. Begge er funksjonsdeklarasjoner
+    // lenger nede i fila; de heises, sa referansen her er trygg.
+    sti: apiSti,
+    tolkTabell,
+    tolkKamper,
+  },
+};
+
+// Datasettet slik visningen vil ha det, uansett sport. Ren funksjon, sa
+// den kan testes uten a kalle noe: det var den ene biten av formingen
+// som bare fantes inne i Netlify-funksjonen.
+export function tolkDatasett(sport, del, json) {
+  const s = sport || SPORTER.fotball;
+  if (del === "tabell") return { tabell: s.tolkTabell(json) };
+  if (del === "resultater") {
+    // Nyeste forst: API-et gir de siste kampene i stigende rekkefolge.
+    const kamper = s.tolkKamper(json).slice().sort(
+      (a, b) => String(b.dato).localeCompare(String(a.dato)));
+    return { kamper };
+  }
+  return kommendeKamper(s.tolkKamper(json));
+}
+
+// Hele vinduet av kommende kamper, ikke bare forste runde: adminportalen
+// skal kunne fore inn en kamp som spilles om to uker. Visningen henter
+// en runde med nesteRunde().
+export function kommendeKamper(alle) {
+  const kamper = (alle || []).slice().sort(
+    (a, b) => String(a.dato).localeCompare(String(b.dato)));
+  const runder = [];
+  kamper.forEach((k) => {
+    if (k.runde && runder.indexOf(k.runde) === -1) runder.push(k.runde);
+  });
+  // runde er forste runde, som for: en eldre utgave av appen leser den
+  // og skal fortsatt vise noe riktig.
+  return { kamper, runde: runder[0] || "", runder };
+}
+
+// Sporten ligaen hoerer til. Ligaer uten sport er fotball: det var det
+// eneste som fantes da feltet ble innfort, og en manglende verdi skal
+// ikke bli en feil i en funksjon som kjorer i prod.
+export function sportFor(liga) {
+  const nokkel = (liga && liga.sport) || "fotball";
+  return SPORTER[nokkel] || SPORTER.fotball;
+}
+
 export const LIGAER = {
   // sesong: "kalender" for ligaer som spilles innenfor ett ar,
   // "host-var" for dem som krysser nyttar. API-Football vil ha aret
@@ -31,13 +104,17 @@ export function sesongFor(liga, naa) {
   return dato.getUTCMonth() >= 6 ? ar : ar - 1;
 }
 
-// Gratisnivaet hos API-Football dekker bare et vindu av sesonger, og
-// svarer "season, try from 2022 to 2024" pa alt utenfor. Vi ber derfor om
-// den nyeste sesongen abonnementet faktisk gir, framfor a vise en
-// feilmelding leseren ikke kan gjore noe med.
+// Gratisnivaet dekker bare et vindu av sesonger, og svarer "season, try
+// from 2022 to 2024" pa alt utenfor. Vi ber derfor om den nyeste
+// sesongen abonnementet faktisk gir, framfor a vise en feilmelding
+// leseren ikke kan gjore noe med.
 //
-// Utvides abonnementet, er dette det eneste stedet tallene star.
-export const SESONGVINDU = { fra: 2022, til: 2024 };
+// Tallene eies na av sporten: utvides abonnementet, star de i SPORTER.
+// Navnet her star igjen fordi det er det testene og resten av koden
+// kjenner, og fordi et fotballtall som het noe annet ville vaert en
+// omdoping uten gevinst. sportFor(liga).sesongvindu er veien for den som
+// ikke vet hvilken sport det gjelder.
+export const SESONGVINDU = SPORTER.fotball.sesongvindu;
 
 // Den ekte sesongen om abonnementet dekker den, ellers naermeste kant av
 // vinduet. Skille mellom de to hoerer hjemme i visningen, ikke her: den
@@ -60,12 +137,31 @@ export const LEVETID = {
   neste: 6 * 3600,
 };
 
+// Gratisnivaet gir hundre kall i dognet — **per sport**. Hver tjeneste
+// hos API-Sports har sin egen konto-nokkel og sin egen bote, sa en
+// handballiga stjeler ingenting fra fotballen.
+export const DOGNKVOTE = 100;
+
 // Verste tilfelle: cachen tommes akkurat nar levetiden lopet ut, hele
 // dognet. Brukes av testen som vokter kvoten nar en liga legges til.
 export function kallPerDogn(antallLigaer) {
   const perLiga = Object.keys(LEVETID)
     .reduce((sum, del) => sum + Math.ceil(86400 / LEVETID[del]), 0);
   return perLiga * antallLigaer;
+}
+
+// Det samme, men fordelt pa sport — som kvoten faktisk er. En liste som
+// teller alle ligaer i en bote ville sagt at en handballiga sprengte
+// fotballens kvote, og det gjor den ikke.
+export function kallPerSport(ligaer) {
+  const alle = ligaer || LIGAER;
+  const ut = {};
+  Object.keys(alle).forEach((navn) => {
+    const sport = (alle[navn] && alle[navn].sport) || "fotball";
+    ut[sport] = (ut[sport] || 0) + 1;
+  });
+  Object.keys(ut).forEach((sport) => { ut[sport] = kallPerDogn(ut[sport]); });
+  return ut;
 }
 
 // API-Football svarer 200 ogsa nar noe er galt, og legger feilen i

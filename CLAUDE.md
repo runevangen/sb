@@ -191,6 +191,29 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 
 ### Fotball (beta)
 
+- **Sporten ligger i `SPORTER` i `fotball-data.js`, ikke i funksjonen.**
+  Alt som skiller én sport fra en annen hos API-Sports — adressen,
+  navnene på miljøvariabelen, sesongvinduet, stien og parserne — står som
+  én oppføring der, og ligaen peker på sin sport (`sport`, som mangler i
+  dag og da betyr fotball). `netlify/functions/fotball.mjs` kjenner
+  ingen sport lenger: den slår opp `sportFor(liga)` og bruker det den
+  finner. En ny sport er dermed én oppføring i `SPORTER` og én i
+  `LIGAER`, ikke en endring i funksjonen.
+  Filene heter fortsatt `fotball-*`. Den dagen sport nummer to kommer,
+  flyttes tabellen og de generiske funksjonene til `sport-data.js` — å
+  døpe om fem filer nå, for en sport ingen har bedt om, ville vært å
+  betale for noe vi ikke vet at vi vil ha.
+- **Døgnkvoten er per sport.** Hver tjeneste hos API-Sports har sin egen
+  kontonøkkel og sin egen bøtte på hundre, så en håndballiga stjeler
+  ingenting fra fotballen. `kallPerSport()` fordeler derfor på sport, og
+  enhetstesten sjekker hver bøtte for seg. `kallPerDogn(n)` står igjen
+  som regnestykket for én sport.
+- `tolkDatasett()` og `kommendeKamper()` er rene funksjoner i
+  `fotball-data.js`, ikke inne i Netlify-funksjonen. Det var den siste
+  biten av formingen som bare fantes der, og som derfor bare kunne testes
+  med et stubbet `fetch` — nå er den dekket av enhetstester på
+  millisekunder, inkludert at resultater går nyeste først mens kommende
+  går eldste først.
 - Data hentes fra API-Football via en Netlify Function, ikke via en
   redirect: en redirect kan ikke sette en hemmelig header, og nøkkelen
   skal aldri nå nettleseren. Den ligger i `api_football_key` i
@@ -1023,7 +1046,7 @@ er i seg selv noe om adressen.
 
 ## Testing
 
-    node test/unit.mjs      438 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      453 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  238 tester, ~250 ms, ingen nettleser
     node test/run.mjs       397 tester, ~200 s, headless Chromium
 

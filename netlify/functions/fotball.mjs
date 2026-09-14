@@ -1,7 +1,11 @@
-// Henter fotballdata fra API-Football og legger Netlifys varige cache
+// Henter sportsdata fra API-Sports og legger Netlifys varige cache
 // foran.
 //
-// Nokkelen ligger i miljovariabelen API_FOOTBALL_KEY og forlater aldri
+// Funksjonen kjenner ingen sport. Adressen, nokkelnavnet, sesongvinduet
+// og parserne star i SPORTER i fotball-data.js, og ligaen peker pa sin
+// sport — sa en ny sport er en oppforing der, ikke en endring her.
+//
+// Nokkelen ligger i miljoet og forlater aldri
 // denne funksjonen: nettleseren snakker bare med oss, aldri med API-et.
 // Det er ogsa derfor dette er en funksjon og ikke en redirect slik
 // WordPress-proxyen i netlify.toml er — en redirect kan ikke sette en
@@ -11,20 +15,17 @@
 // netlify.toml. Da holder redirect-reglene seg like smale som for.
 
 import {
-  ligaFor, sesongFor, tilgjengeligSesong, apiSti, tolkTabell, tolkKamper,
-  LEVETID, DELER, tsdbSti, tsdbHeadere, tolkKamperTsdb, tolkTabellTsdb, TSDB_MINST,
+  ligaFor, sesongFor, tilgjengeligSesong, sportFor, tolkDatasett,
+  kommendeKamper, LEVETID, DELER, tsdbSti, tsdbHeadere, tolkKamperTsdb,
+  tolkTabellTsdb, TSDB_MINST,
 } from "../../fotball-data.js";
 
-const API = "https://v3.football.api-sports.io";
 const TSDB = "https://www.thesportsdb.com";
 
-// Miljovariabler er versalfolsomme pa Linux, og navnet er lett a taste i
-// feil skrivemate. Begge godtas, sa en riktig satt nokkel ikke leses som
-// en manglende nokkel.
-const NOKKELNAVN = ["API_FOOTBALL_KEY", "api_football_key"];
-
-function apiNokkel() {
-  for (const navn of NOKKELNAVN) {
+// Navnene star i sporten, ikke her: hver sport hos API-Sports har sin
+// egen nokkel og sin egen dognkvote.
+function apiNokkel(sport) {
+  for (const navn of sport.nokkelnavn) {
     if (process.env[navn]) return process.env[navn];
   }
   return null;
@@ -39,12 +40,14 @@ export default async (req) => {
   const liga = ligaFor(ligaNokkel);
   if (!liga) return svar({ feil: "Ukjent liga" }, 400, 0);
 
-  const nokkel = apiNokkel();
+  const sport = sportFor(liga);
+  const nokkel = apiNokkel(sport);
   if (!nokkel) return svar({ feil: "Tjenesten mangler API-nokkel" }, 503, 0);
 
   // Abonnementet dekker ikke alle sesonger. Vi ber om den nyeste det gir,
-  // og sier fra i svaret nar det ikke er den vi star i.
-  const sesong = tilgjengeligSesong(liga);
+  // og sier fra i svaret nar det ikke er den vi star i. Vinduet er
+  // sportens eget — planene hos API-Sports folger ikke hverandre.
+  const sesong = tilgjengeligSesong(liga, undefined, sport.sesongvindu);
   const naSesong = sesongFor(liga);
 
   // En sesong abonnementet ikke dekker: prov TheSportsDB forst, som gir
@@ -67,7 +70,7 @@ export default async (req) => {
 
   let json;
   try {
-    const respons = await fetch(API + apiSti(del, liga, sesong), {
+    const respons = await fetch(sport.api + sport.sti(del, liga, sesong), {
       headers: { "x-apisports-key": nokkel, "Accept": "application/json" },
     });
     if (!respons.ok) throw new Error("HTTP " + respons.status);
@@ -76,12 +79,12 @@ export default async (req) => {
     // Detaljen logges, men sendes ikke ut: den kan inneholde adressen vi
     // kaller, og den trenger ikke leseren a vite.
     console.error("[fotball] henting feilet:", err);
-    return svar({ feil: "Fikk ikke svar fra API-Football" }, 502, 0);
+    return svar({ feil: "Fikk ikke svar fra " + sport.tjeneste }, 502, 0);
   }
 
   let innhold;
   try {
-    innhold = tolk(del, json);
+    innhold = tolkDatasett(sport, del, json);
   } catch (err) {
     console.error("[fotball] uventet svar:", err);
     return svar({ feil: err.message }, 502, 0);
@@ -94,7 +97,7 @@ export default async (req) => {
     sesong,
     sisteSesong: sesong === naSesong,
     del,
-    kilde: "API-Football",
+    kilde: sport.tjeneste,
     forsok,
     oppdatert: new Date().toISOString(),
   }, innhold), 200, LEVETID[del]);
@@ -165,40 +168,6 @@ function avkortet(notat, del) {
     " — trolig gratisnivaet. Bruker neste kilde.");
   notat.utfall = "avkortet";
   return notat;
-}
-
-function tolk(del, json) {
-  if (del === "tabell") return { tabell: tolkTabell(json) };
-  if (del === "resultater") {
-    // Nyeste forst: API-et gir de siste kampene i stigende rekkefolge.
-    const kamper = tolkKamper(json).slice().sort(
-      (a, b) => String(b.dato).localeCompare(String(a.dato)));
-    return { kamper };
-  }
-  return kommendeKamper(tolkKamper(json));
-}
-
-// Hele vinduet, ikke bare forste runde.
-//
-// Vi henter tjue kommende kamper uansett (next=20, og TheSportsDBs
-// «schedule/next»), og kastet alt utenom den forste runden her. Da fikk
-// adminportalen aldri se lenger fram enn til neste helg, og kunne ikke
-// fore inn en kamp som spilles om to uker.
-//
-// Filtreringen hoerer hjemme i visningen, som er den som vil ha en runde
-// om gangen: nesteRunde() i fotball-data.js gjor det der. Da deler
-// leseren og admin ett svar og en cache-nokkel, og dognkvoten star
-// urort — det er samme kall som for.
-function kommendeKamper(alle) {
-  const kamper = alle.slice().sort(
-    (a, b) => String(a.dato).localeCompare(String(b.dato)));
-  const runder = [];
-  kamper.forEach((k) => {
-    if (k.runde && runder.indexOf(k.runde) === -1) runder.push(k.runde);
-  });
-  // runde er forste runde, som for: en eldre utgave av appen leser den og
-  // skal fortsatt vise noe riktig.
-  return { kamper, runde: runder[0] || "", runder };
 }
 
 function svar(kropp, status, levetid) {
