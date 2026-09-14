@@ -26,6 +26,13 @@ før. Svaret sier hvor det kom fra (`kilde`), og stempelet under viser det.
   for dem som krysser nyttår (`tsdbSesong`).
 - **Kilden byttes uten at leseren gjør noe.** Det er premisset bak
   [0008](0008-kampnokkel.md).
+- **`tsdb`-id-en i `LIGAER` er TheSportsDBs egen, og en feil id gir ingen
+  feilmelding** — den gir en annen ligas tabell under riktig navn, som er
+  verre. Sjekken er `/api/fotball/tabell?liga=<nøkkel>` i nettleseren:
+  står det riktige lag der, er id-en riktig. Alle fem er sett i prod
+  14. september 2026 — 4358 Eliteserien, 4328 Premier League, 4335 La
+  Liga, 4331 Bundesliga, 4332 Serie A. La Liga var den som måtte sees
+  etter: 4334 er franske Ligue 1, og de to ligger ved siden av hverandre.
 - Funksjonene leser miljøet ved utrulling, og kant-cachen holder i inntil
   tre timer: etter at en nøkkel er satt må det deployes på nytt. En
   deploy tømmer også cachen.

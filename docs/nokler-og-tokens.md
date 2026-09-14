@@ -140,15 +140,22 @@ døgnet**. Nøkkelen forlater aldri funksjonen, så det er vår egen cache som
 avgjør forbruket. Levetidene står i `LEVETID` i `fotball-data.js`:
 
 ```
-tabell      3 timer   →  8 kall/døgn
-resultater  1 time    → 24 kall/døgn
+tabell      6 timer   →  4 kall/døgn
+resultater  3 timer   →  8 kall/døgn
 neste       6 timer   →  4 kall/døgn
-                        36 kall/døgn per liga
+                        16 kall/døgn per liga
 ```
 
-To ligaer = 72 kall. En tredje sprenger kvoten, og `unit.mjs` slår ut på
-det (`kallPerDogn`) før du rekker å deploye. Skal du legge til en liga, må
-en levetid opp først.
+Fem ligaer = 80 kall. En sjette får plass (96); en sjuende sprenger
+kvoten, og `unit.mjs` slår ut på det (`kallPerDogn`, regnet mot `LIGAER`
+slik den faktisk står) før du rekker å deploye. Skal du legge til flere,
+må en levetid opp først.
+
+Tallene sto lenger nede — tabell hver tredje time, resultater hver time,
+36 kall per liga — og da var **to** ligaer taket. Det var prisen for La
+Liga, Bundesliga og Serie A. Enhetstesten vokter begge veier: kvoten kan
+alltid holdes ved å la alt bli gammelt, så ingen levetid får være lengre
+enn et halvt døgn.
 
 Gratisnivået dekker dessuten bare sesongene i `SESONGVINDU` (nå 2022–2024)
 og svarer «season, try from 2022 to 2024» på alt utenfor. Det er hele
