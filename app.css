@@ -1817,23 +1817,9 @@ a.ad-cta:focus-visible {
 
 .kamp-panel-liste:empty { display: none; }
 
-/* Hvor du skal, med ord. Meldinga under kortet er flyktig — den star rett
-   etter et trykk — sa uten denne sa kortet ingenting om hvor du skulle
-   nar du kom tilbake til appen. Gronn som resten av «bekreftet»-familien:
-   det er en avtale, ikke en beskjed. */
-.kamp-mitt {
-  margin: 0;
-  font-size: calc(13px * var(--fs));
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--bekreftet);
-}
-
-.kamp-mitt:empty { display: none; }
-
-/* Vennene nederst i kortet, gruppert etter stedet de skal til. Stedet
-   forst pa linja, fordi det er det man leter etter: et navn uten et sted
-   sier ikke hvor man moter noen. */
+/* Igjen nederst i kortet: bare de som sa at de blir med uten aa si hvor.
+   Alle andre staar i raden til stedet sitt — stedet og folka er én ting,
+   og det var hele poenget med aa flytte dem opp. */
 .sted-rad {
   display: flex;
   flex-wrap: wrap;
@@ -1842,8 +1828,8 @@ a.ad-cta:focus-visible {
   margin-top: 2px;
 }
 
-.sted-rad-sted { color: var(--text-strong); font-weight: 600; }
 .sted-rad-navn { color: var(--text-dim); }
+.sted-rad-uten { color: var(--text-faint); }
 
 /* Star det ingenting a trykke pa, skal det sta hvorfor. */
 .kamp-note {
@@ -1869,79 +1855,133 @@ a.ad-cta:focus-visible {
   color: var(--text-strong);
 }
 
-/* Stedene: kortets ene handling. Ett trykk pa et sted er svaret «jeg
-   skal dit», sa chipene er storre enn forslagene under — de er ikke
-   forslag, de er knapper man trykker.
+/* Stedene: kortets ene handling, én rad per sted.
+   Raden baerer navnet, folka som skal dit, og én knapp som sier hva den
+   gjor. Fer var den en chip, og trykket paa chipen var hele svaret — det
+   var for lite aa se, sa man trykket en gang til for aa sjekke og meldte
+   seg av uten aa merke det.
 
-   For sto det tre valg her (hjemme / pa pub / pa stadion), og stedet
-   matte skrives i et felt etterpa. Tre steg for a si én ting. */
+   Radene ligger i en kolonne, ikke som chips som flyter: navnene under
+   stedet gjor hver rad ulik hoy, og en rad som er bred nok til navnene er
+   lettere aa treffe enn en chip. */
 .sted-liste {
   display: flex;
+  flex-direction: column;
   gap: 6px;
-  flex-wrap: wrap;
 }
 
-.sted-chip {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 9px 13px;
+.sted-rad-kort, .sted-rad-annet {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
   border: 1px solid var(--border-btn);
-  border-radius: 999px;
+  border-radius: 12px;
   background: var(--bg-raised);
   color: var(--text);
-  font-family: inherit;
-  font-size: calc(13.5px * var(--fs));
+}
+
+.sted-rad-venstre { flex: 1; min-width: 0; }
+
+.sted-rad-topp {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.sted-navn {
+  font-size: calc(14px * var(--fs));
   font-weight: 600;
+  color: var(--text-strong);
+}
+
+/* Navnene under stedet. De bryter over flere linjer framfor aa gjore
+   raden bredere enn telefonen — som lagnavnene i tabellen. */
+.sted-rad-folk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin-top: 3px;
+  font-size: calc(12px * var(--fs));
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.sted-rad-flere { color: var(--text-faint); }
+
+/* Knappen sier hva trykket gjor. Den er det eneste maalet i raden:
+   raden kan ikke selv vaere en knapp naar den har en inni seg. */
+.sted-knapp {
+  flex: none;
+  padding: 8px 12px;
+  border: 1px solid var(--border-btn);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: calc(12.5px * var(--fs));
+  font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
 }
 
 /* Stedet du sa du skal til. Gront som resten av «bekreftet»-familien:
-   det er en avtale, ikke et valg i et skjema. Trykker du en gang til,
-   gar du av lista — derfor er den fortsatt en knapp, ikke en tilstand. */
-.sted-chip[aria-pressed="true"] {
+   det er en avtale, ikke et valg i et skjema. */
+.sted-rad-kort.valgt {
+  border-color: var(--bekreftet);
+  box-shadow: 0 0 0 1px var(--bekreftet);
+}
+
+.sted-rad-kort.valgt .sted-knapp {
   background: var(--bekreftet);
   border-color: var(--bekreftet);
   color: #fff;
 }
 
-.sted-chip[aria-pressed="true"] .pub-bekreftet,
-.sted-chip[aria-pressed="true"] .sted-folk { color: #fff; }
+/* Valgt uten aa vaere logget inn: stedet blir med naar kampen deles, men
+   ingen er meldt paa noe. Aksentfargen og stiplet, sa det ikke ser ut som
+   bekreftelsen paa at du staar paa lista — et sted som ser lagret ut naar
+   ingenting er lagret, sier at det virket. */
+.sted-rad-kort.valgt.kun-deling {
+  border-color: var(--accent);
+  border-style: dashed;
+  box-shadow: none;
+}
 
-/* Haken paa stedet du skal til. Fargen alene var ikke nok til aa se at
-   noe var valgt — og da trykker man en gang til for aa sjekke, og melder
-   seg av uten aa se det. */
-.sted-hake { font-weight: 700; line-height: 1; }
-
-/* Valgt uten a vaere logget inn: stedet blir med nar kampen deles, men
-   ingen er meldt pa noe. Aksentfargen framfor den gronne, sa det ikke ser
-   ut som bekreftelsen pa at du star pa lista — et sted som ser valgt ut
-   nar ingenting er lagret, sier at det virket. */
-.sted-chip.kun-deling[aria-pressed="true"] {
+.sted-rad-kort.valgt.kun-deling .sted-knapp {
   background: none;
   border-color: var(--accent);
   border-style: dashed;
   color: var(--accent);
 }
 
-.sted-chip.kun-deling[aria-pressed="true"] .pub-bekreftet,
-.sted-chip.kun-deling[aria-pressed="true"] .sted-folk { color: var(--accent); }
-
-/* Stedet en delt lenke pekte pa. Det blir pekt ut, ikke valgt: svaret
-   skal leseren gi selv, sa chipen markeres og far fokus. */
-.sted-chip.pekt {
+/* Stedet en delt lenke pekte paa. Det blir pekt ut, ikke valgt: svaret
+   skal leseren gi selv. */
+.sted-rad-kort.pekt {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
 }
 
-.sted-chip.bekreftet:not([aria-pressed="true"]) { border-color: var(--bekreftet); }
+.sted-rad-kort.bekreftet:not(.valgt) { border-color: var(--bekreftet); }
 
-.sted-chip:disabled { opacity: 0.5; cursor: default; }
+.sted-knapp:disabled { opacity: 0.5; cursor: default; }
 
 .sted-merke { font-size: 11px; line-height: 1; }
-.sted-folk { font-size: 11px; color: var(--text-faint); font-weight: 600; }
 
-.sted-chip:focus-visible, .pub-apne:focus-visible, .sted-egen:focus-visible,
+/* «Et annet sted» staar som en rad i lista, ikke som en tekstlenke under:
+   det er et sted til, bare et vi ikke kjenner navnet paa enda. Men den er
+   ingen .sted-rad-kort: den har verken et stedsnavn eller folk, og alt som
+   leter etter stedene i kortet ville faatt den med paa kjopet. */
+.sted-rad-annet {
+  justify-content: center;
+  font-family: inherit;
+  font-size: calc(13px * var(--fs));
+  font-weight: 600;
+  cursor: pointer;
+  border-style: dashed;
+}
+
+.sted-knapp:focus-visible, .pub-apne:focus-visible, .sted-egen:focus-visible,
 .kamp-send:focus-visible, .kamp-pub:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;

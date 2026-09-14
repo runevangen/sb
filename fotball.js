@@ -12,7 +12,7 @@ import { LIGAER, DELER, FANER, DEL_NAVN, HVOR, STED_MAKS, delingstekst,
          kampNokkel } from "./fotball-data.js";
 import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
          loftMedSvar, bareMedSvar, stederFraSvar, perSted, KAMPER_MAKS,
-         stedNokkel, blirMedLinje, mittSted } from "./svar-data.js";
+         stedNokkel, blirMedLinje, mittSted, navnIRad } from "./svar-data.js";
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
          rangerForslag, FORSLAG_MAKS } from "./pub-data.js";
@@ -521,7 +521,10 @@ function apnePanelMed(rad, hvor, sted) {
   const panel = apentPanel && apentPanel.panel;
   if (!panel) return null;
 
-  const pekt = panel.querySelector(".sted-chip.pekt");
+  // Fokus paa knappen i raden, ikke paa raden: raden er ingen knapp
+  // lenger — den har en inni seg — og svaret skal fortsatt koste ett
+  // trykk, leserens eget.
+  const pekt = panel.querySelector(".sted-rad-kort.pekt .sted-knapp");
   if (pekt) pekt.focus();
   return panel;
 }
@@ -549,17 +552,15 @@ function delPanel(kamp) {
   // Overskrifta i kortet sier hva lista under er. Lagene er overskrifta
   // pa kampen, og de star i linja over — kortet skal ikke ha en tittel
   // til som konkurrerer med dem.
-  const tittel = el("p", "kamp-panel-tittel", bekreftede.length
-    ? "Disse viser kampen:" : "Hvor skal du se den?");
-  panel.appendChild(tittel);
+  //
+  // Én liste, og den spor. «Disse viser kampen» over hele lista ville
+  // pastatt at arenaen og en pub ingen har meldt inn viser den — og det
+  // er nettopp den merkingen appen ellers holder ren. Stjerna sier hvem
+  // som faktisk har meldt inn, rad for rad, som i forslagslista.
+  panel.appendChild(el("p", "kamp-panel-tittel", "Hvor skal du se den?"));
 
   const steder = el("div", "sted-liste");
   panel.appendChild(steder);
-
-  // Hvor du skal, med ord. Star rett under stedene, som en kvittering pa
-  // den merkede chipen.
-  const mitt_linje = el("p", "kamp-mitt");
-  panel.appendChild(mitt_linje);
 
   const melding = el("p", "kamp-svar");
   melding.setAttribute("aria-live", "polite");
@@ -590,7 +591,7 @@ function delPanel(kamp) {
   // Lenka ut til pubene som pleier a vise fotball. Har ingen meldt inn
   // noe pa denne kampen, er det den eneste veien videre — da sier lenka
   // det, og listen star apen med en gang.
-  const apne = el("button", "pub-apne");
+  const apne = el("button", "pub-apne sted-rad-annet");
   apne.type = "button";
   apne.setAttribute("aria-expanded", "false");
   const apneTekst = () => (bekreftede.length
@@ -661,7 +662,7 @@ function delPanel(kamp) {
     steder.replaceChildren();
     stedKilder(kamp, bekreftede, rad, egneSteder).forEach((sted) => {
       const nokkel = stedNokkel(sted.navn);
-      steder.appendChild(stedChip(kamp, panel, sted, {
+      steder.appendChild(stedRad(kamp, panel, sted, {
         valgt: !!valgt && nokkel === valgt,
         paaLista,
         pekt: !!pekt && nokkel === pekt && nokkel !== valgt,
@@ -673,13 +674,11 @@ function delPanel(kamp) {
     // hele svaret, og de skal sta apne.
     if (!steder.children.length && utvidet.hidden) vis(true);
 
-    // Og sagt med ord, ikke bare som en merket chip. Meldinga under er
-    // flyktig — den star rett etter et trykk og er borte ved neste
-    // lasting — sa uten denne sa kortet ingenting om hvor du skulle.
-    const okt = konto.okt();
-    const ditt = okt ? mittSted(sisteSvar.filter((s) => s.kampId === kampNokkelFor(kamp)),
-      okt.bruker, kamp) : "";
-    mitt_linje.textContent = ditt ? "Du skal til " + ditt + "." : "";
+    // Egen linje med «Du skal til X» trengs ikke lenger: raden du staar
+    // paa sier det tydeligere enn en setning under lista gjorde. «Du» staar
+    // forst blant navnene, knappen sier «Meld deg av», og raden er merket.
+    // Linja under kampraden (blirMedLinje) sier det fortsatt med ord for
+    // den som blar uten aa aapne kortet.
 
     // Merkene i forslagslista skal si det samme som chipene over: stedet
     // du alt har sagt at du skal til, er merket der ogsa.
@@ -774,62 +773,83 @@ function stedKilder(kamp, bekreftede, rad, egne) {
   return Array.from(sett.values());
 }
 
-// Ett sted, ett trykk. Trykker du pa stedet du alt star pa, gar du av
-// lista igjen: to knapper ville betydd at man kan bli med to ganger.
-function stedChip(kamp, panel, sted, form) {
-  const b = el("button", "sted-chip");
-  b.type = "button";
-  if (sted.bekreftet) b.classList.add("bekreftet");
-  if (form.pekt) b.classList.add("pekt");
-
-  // Haken staar forst paa stedet du skal til. Fargen alene var ikke nok:
-  // «ser lite forskjell paa en pub som er markert eller ikke» — og da
-  // trykker man en gang til for aa sjekke, og melder seg av uten aa se
-  // det. Et glyf leses ogsa av den som ikke skiller fargene.
-  if (form.valgt && form.paaLista) {
-    const hake = el("span", "sted-hake", "✓");
-    hake.setAttribute("aria-hidden", "true");
-    b.appendChild(hake);
+// Ett sted, én rad: navnet, folka som skal dit, og én knapp som sier hva
+// den gjor.
+//
+// Fer var stedet en chip, og trykket paa chipen var hele svaret. Det var
+// for lite aa se: «ser lite forskjell paa en pub som er markert eller
+// ikke» — og da trykker man en gang til for aa sjekke at det tok, og
+// melder seg av uten aa se det. En hake hjalp, men den forklarte ikke hva
+// et nytt trykk ville gjore. Knappen sier det med ord.
+//
+// Og folka staar i raden, ikke i en egen liste nederst. Stedet og hvem
+// som er der er én ting — det er hele sporsmalet man aapnet kortet for aa
+// faa svar paa.
+//
+// Raden er derfor ingen knapp. Den har en inni seg, og en knapp i en
+// knapp finnes ikke — samme grunn som at kamplinja loser trykkflata med
+// en utstrakt knapp framfor aa vaere en selv.
+function stedRad(kamp, panel, sted, form) {
+  const rad = el("div", "sted-rad-kort");
+  if (sted.bekreftet) rad.classList.add("bekreftet");
+  if (form.pekt) rad.classList.add("pekt");
+  if (form.valgt) {
+    rad.classList.add("valgt");
+    // Valgt uten aa vaere logget inn er et delingsvalg, ikke en plass paa
+    // lista. Et sted som ser lagret ut naar ingenting er lagret, sier at
+    // det virket.
+    if (!form.paaLista) rad.classList.add("kun-deling");
   }
-  b.appendChild(el("span", "sted-navn", sted.navn));
 
-  // Merkene sier hvorfor stedet star her. Stjerna svarer pa kampen,
-  // arenaen pa hvor den spilles, folka pa hvem du moter.
+  const venstre = el("div", "sted-rad-venstre");
+  const topp = el("div", "sted-rad-topp");
+
+  // Merkene sier hvorfor stedet staar her. Stjerna svarer paa kampen,
+  // arenaen paa hvor den spilles.
   if (sted.bekreftet) {
     const merke = el("span", "pub-bekreftet", "★");
     merke.setAttribute("aria-label", "viser denne kampen");
-    b.appendChild(merke);
-    b.title = "Meldt inn til oss.";
+    merke.title = "Meldt inn til oss.";
+    topp.appendChild(merke);
   } else if (sted.stadion) {
     const merke = el("span", "sted-merke", "🏟");
     merke.setAttribute("aria-label", "på stadion");
-    b.appendChild(merke);
+    topp.appendChild(merke);
   }
+  topp.appendChild(el("span", "sted-navn", sted.navn));
+  venstre.appendChild(topp);
 
   const folk = sisteSvar.filter((s) => s.kampId === kampNokkelFor(kamp) &&
     s.sted && stedNokkel(s.sted) === stedNokkel(sted.navn));
-  if (folk.length) {
-    const tall = el("span", "sted-folk", String(folk.length));
-    tall.setAttribute("aria-label", folk.length === 1 ? "én skal hit"
+  const okt = konto.okt();
+  const { navn, flere } = navnIRad(folk, okt && okt.bruker);
+  if (navn.length) {
+    const linje = el("div", "sted-rad-folk");
+    navn.forEach((n) => linje.appendChild(el("span", "sted-rad-navn", n)));
+    if (flere) linje.appendChild(el("span", "sted-rad-flere", "+" + flere + " andre"));
+    linje.setAttribute("aria-label", folk.length === 1 ? "én skal hit"
       : folk.length + " skal hit");
-    b.appendChild(tall);
+    venstre.appendChild(linje);
   }
+  rad.appendChild(venstre);
 
+  // Knappen sier hva trykket gjor, ikke hva stedet er. «Meld deg av» er
+  // det som manglet: at et nytt trykk tar deg av lista maa staa, ikke
+  // gjettes.
+  const b = el("button", "sted-knapp");
+  b.type = "button";
+  b.textContent = form.valgt
+    ? (form.paaLista ? "Meld deg av" : "Valgt for deling")
+    : "Jeg skal hit";
   b.setAttribute("aria-pressed", form.valgt ? "true" : "false");
-  // Valgt uten a vaere logget inn er et delingsvalg: det skal se ut som
-  // et merke, ikke som den gronne bekreftelsen pa at du star pa lista.
-  if (form.valgt && !form.paaLista) b.classList.add("kun-deling");
-  // Et trykk paa stedet du alt star paa melder deg av. Det ma staa, ikke
-  // gjettes: et sted som ser ut som et valg blant flere innbyr til aa
-  // trykke igjen, og da forsvinner du fra lista uten aa ha ment det.
   b.setAttribute("aria-label", form.valgt
     ? (form.paaLista ? "Du skal til " + sted.navn + ". Trykk for å melde deg av."
-                     : "Deles: " + sted.navn)
+                     : "Deles: " + sted.navn + ". Trykk for å velge bort.")
     : "Jeg skal til " + sted.navn);
-  if (form.valgt && form.paaLista) b.title = "Du skal hit. Trykk for å melde deg av.";
   b.addEventListener("click", () =>
     svarSted(kamp, panel, sted.hvor || "pub", sted.navn, form.melding, form.valgt));
-  return b;
+  rad.appendChild(b);
+  return rad;
 }
 
 // Kampens rader, byttet ut med dem tjenesten nettopp leste tilbake.
@@ -1499,20 +1519,23 @@ function tegnPanelListe(kamp) {
   const boks = panel && panel.querySelector(".kamp-panel-liste");
   if (!boks) return;
 
-  const mine = sisteSvar.filter((s) => s.kampId === kampNokkelFor(kamp));
   boks.replaceChildren();
-  const grupper = perSted(mine, kamp);
-  if (!grupper.length) return;
+  const mine = sisteSvar.filter((s) => s.kampId === kampNokkelFor(kamp));
 
-  grupper.forEach((g) => {
+  // Vennene staar naa i raden til stedet de skal til — stedet og folka er
+  // én ting. Igjen her staar bare de som sa at de blir med uten aa si
+  // hvor: de har ingen rad aa staa i, og skal ikke falle ut av kortet.
+  // (Radene som alt ligger i basen med hvor='hjemme' er slike.)
+  const uten = perSted(mine, kamp).filter((g) => !g.sted);
+  if (!uten.length) return;
+
+  uten.forEach((g) => {
     const rad = el("div", "sted-rad");
     const merke = el("span", "kamp-blirmed-merke", "✓");
     merke.setAttribute("aria-hidden", "true");
     rad.appendChild(merke);
-    // Star det ingen sted, sa personen bare at hen blir med. Da star
-    // navnet der uten et sted vi ikke har.
-    if (g.sted) rad.appendChild(el("span", "sted-rad-sted", g.sted));
     rad.appendChild(el("span", "sted-rad-navn", listeTekst(g.navn)));
+    rad.appendChild(el("span", "sted-rad-uten", "sa ikke hvor"));
     boks.appendChild(rad);
   });
 }
