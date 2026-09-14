@@ -1,12 +1,18 @@
 # Testing
 
-    node test/unit.mjs      501 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      504 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  238 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       423 tester, ~200 s, headless Chromium
+    node test/run.mjs       432 tester, ~200 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
 hele tatt starter.
+
+**De ~200 sekundene er en treg maskin, ikke et fast tall.** På
+GitHub-runneren tar hele jobben rundt 35 sekunder. Et grønt CI-resultat på
+under et minutt er altså normalt — det betyr *ikke* at nettlesertestene
+ble hoppet over. Sjekk antallet i loggen framfor å lese klokka; det er
+tallet som sier at de kjørte.
 
 ## De tre reglene
 

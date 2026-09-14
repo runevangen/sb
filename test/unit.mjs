@@ -1738,8 +1738,21 @@ const KANAL_OK = { kanal: "TV 2 Play", kilde: "https://www.tv2.no/", sjekket: "2
 
 ok("en verifisert rad gir kanalen",
    kanalFor("eliteserien", { eliteserien: KANAL_OK }).kanal === "TV 2 Play");
-ok("radene i den ekte fila star tomme til noen har sett etter",
-   Object.keys(KANALER).every((liga) => kanalFor(liga, KANALER) === null));
+// Denne het en gang «radene i den ekte fila star tomme til noen har sett
+// etter», og den passerte fordi fila var tom den dagen den ble skrevet.
+// Det var en TILSTAND kodet som en regel, og den brakk i det oyeblikket
+// noen gjorde det fila finnes for: fem rader fort inn, og main ble rod.
+//
+// Regelen som faktisk gjelder er den samme uansett hvor mange rader som
+// er fylt ut: en rad slipper gjennom nar ALLE tre star, og ikke ellers.
+ok("den ekte fila slipper gjennom noyaktig de radene som er komplette",
+   Object.keys(KANALER).every((liga) => {
+     const rad = KANALER[liga];
+     const komplett = !!(rad.kanal && rad.kilde && rad.sjekket);
+     return (kanalFor(liga, KANALER) !== null) === komplett;
+   }),
+   Object.keys(KANALER).map((l) =>
+     l + "=" + (kanalFor(l, KANALER) ? "vises" : "skjult")).join(" "));
 
 // Hver av de tre manglene for seg. Uten dette kunne vokteren fange to av
 // dem og slippe den tredje gjennom.
