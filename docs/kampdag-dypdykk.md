@@ -262,7 +262,7 @@ vokter døgnkvoten hos API-Football kan få søsken for hver ny kilde.
 **Arkitektur i én setning.** En ny funksjon
 `netlify/functions/kampdag.mjs` tar en stadion-nøkkel, slår sammen vær,
 sol, puber og bysykler til ett svar, cacher det på kanten i en time, og
-visningen viser det under «Neste runde» i fotballfanen. Rene funksjoner
+visningen viser det under «Kommende» i fotballfanen. Rene funksjoner
 for følt temperatur og kleråd hører hjemme i `fotball-data.js`, der de
 kan testes på millisekunder.
 

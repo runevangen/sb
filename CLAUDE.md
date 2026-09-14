@@ -88,6 +88,10 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 ### Data
 - **Kamp-id er `kampNokkel()`**, ikke kildens id. Alt som lagres, slås opp
   eller deles går på `nokkel`. [ADR 0008](docs/adr/0008-kampnokkel.md)
+- **«Kommende» viser hele vinduet**, ikke én runde, med en overskrift per
+  runde. Taket på tjue id-er mot `/api/svar` holdes av buntingen i
+  `hentSvarFor()`, ikke av at lista kappes i forkant.
+  [ADR 0017](docs/adr/0017-kampene-framover.md)
 - **`tolkSvar` må tåle å kjøres to ganger.** Den deles mellom tjenesten og
   appen, og begge kjører den.
 - **En skriving som svarer 200 er ikke bevis på at raden ligger der.**
@@ -100,9 +104,9 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 
 ## Testing
 
-    node test/unit.mjs      501 tester
+    node test/unit.mjs      504 tester
     node test/funksjon.mjs  238 tester
-    node test/run.mjs       423 tester, ~200 s, headless Chromium
+    node test/run.mjs       425 tester, ~200 s, headless Chromium
 
 Tre regler, og de har alle kostet noe:
 

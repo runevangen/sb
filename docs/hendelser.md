@@ -9,6 +9,32 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 14. september 2026 — én kamp igjen i fanen
+
+**Meldt som:** «dumt at man ser kun en kamp når det er slutten av en
+runde. Jeg er nysgjerrig på kampene framover.»
+
+**Årsak:** ingen feil. Fanen het «Neste runde» og gjorde nøyaktig det den
+sa — `nesteRunde()` plukket runden til den første kampen som kom. Var
+runden nesten ferdigspilt, var det én kamp igjen å plukke, og helgen etter
+lå i svaret uten å bli tegnet.
+
+**Fanget av:** en leser. Ingen test kunne fange dette: hver eneste test ga
+fanen en full runde, som er akkurat den tilstanden der oppførselen ser
+riktig ut. Testene sa noe sant om koden og ingenting om uka.
+
+**Rettet:** hele vinduet vises, med en overskrift per runde
+([ADR 0017](adr/0017-kampene-framover.md)). Kildene sendte de tjue kampene
+hele tiden, så det kostet ingenting på døgnkvoten.
+
+**Og stubben i vennetesten svarte likt uansett hvilke id-er den ble spurt
+om.** Med et vindu stort nok til å buntes ga det den samme raden én gang
+per bunt — «Kari og Kari» i lista. Samme lærdom som `somTjenesten()` under:
+en stubb som er enig med koden i stedet for med tjenesten beviser
+ingenting.
+
+---
+
 ## 14. september 2026 — «blir med»-lista hadde aldri virket
 
 **Meldt som:** «ser i base at bob og rune skal på andys pub, men de ser

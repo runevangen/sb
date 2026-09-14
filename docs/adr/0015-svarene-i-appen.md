@@ -11,16 +11,24 @@ ditt eget navn. Se [ADR 0012](0012-kampkortet.md) for formen på kortet.
 ## Konsekvens
 
 ### Å spørre
-- Hele runden hentes i **ett kall** (`/api/svar?kamper=…`). Ti kamper skal
-  ikke bli ti kall.
-- **Spør bare om de kampene som står på skjermen.** `/api/fotball/neste`
-  gir hele vinduet så adminportalen kan planlegge lenger fram, men leseren
-  ser én runde: `hentSvar()` og `visVenner()` kaller `nesteRunde()` først.
-- **`nesteRunde()` holder bare taket når kampene bærer et rundetall.**
-  TheSportsDBs kommende kamper gjør ikke alltid det (`intRound` mangler),
-  og uten det er «neste runde» hele vinduet. `hentSvarFor()` deler derfor
-  spørringen i bunter på `KAMPER_MAKS` framfor å la tjenesten kappe den
-  stille. Taket står i `svar-data.js`, delt mellom appen og funksjonen.
+- Kampene på skjermen hentes i **så få kall som mulig** (`/api/svar?kamper=…`).
+  Ti kamper skal ikke bli ti kall.
+- **Spør om alle kampene som står på skjermen**, og det er hele vinduet
+  (se [ADR 0017](0017-kampene-framover.md)). En kamp man kan se skal ha
+  lista si.
+- **Buntingen er det eneste som holder taket.** `/api/svar` kapper
+  spørringen ved `KAMPER_MAKS` (tjue) id-er, og kappingen er stille — id-ene
+  etter den tjuende gir ingen feil, de gir ingen rader. `hentSvar()` kalte
+  `nesteRunde()` først for å holde seg under, men det virket bare når
+  kampene bar et rundetall (TheSportsDBs kommende kamper mangler ofte
+  `intRound`), og var uansett en bivirkning av at halve vinduet ble kastet.
+  `hentSvarFor()` deler derfor spørringen i bunter på `KAMPER_MAKS`: 25
+  kamper blir to kall, ikke ett per kamp og ikke ett som kappes. Taket står
+  i `svar-data.js`, delt mellom appen og funksjonen.
+- **Og stubben må svare bare om det den ble spurt om.** Svarte
+  vennetestens stubb likt uansett id-er, ga buntingen den samme raden én
+  gang per bunt — «Kari og Kari» i lista, og en test som beviste noe annet
+  enn den trodde.
 - **Feiler `/api/svar`, sier vennefanen det.** I rundevisningen er
   tausheten riktig — lista er et tillegg til kampen. I vennefanen *er*
   lista hele visningen, og «Ingen har sagt at de blir med ennå» er da en
@@ -66,8 +74,8 @@ ditt eget navn. Se [ADR 0012](0012-kampkortet.md) for formen på kortet.
 - Meldinga sier hva du nettopp gjorde, ikke hvilken liste du havnet i.
 
 ### Vennefanen
-`#/fotball/venner` (#71) slår sammen ligaenes neste runder og viser bare
-kampene noen blir med på (`bareMedSvar()`). Løftingen i Neste runde
+`#/fotball/venner` (#71) slår sammen ligaenes kommende kamper og viser bare
+kampene noen blir med på (`bareMedSvar()`). Løftingen i Kommende
 gjelder én liga — står Ola på en Premier League-kamp og Kari på en
 eliteseriekamp, ser du dem bare ved å bytte fane.
 
