@@ -16,7 +16,7 @@ deployer på push til `main`.
 git clone https://github.com/runevangen/sb.git && cd sb
 node test/unit.mjs        # 504 tester, ~90 ms
 node test/funksjon.mjs    # 238 tester, ~250 ms
-node test/run.mjs         # 432 tester, krever Chromium
+node test/run.mjs         # 435 tester, krever Chromium
 ```
 
 Node 20 (som CI). Ingen `npm install` — det finnes ingenting å installere.

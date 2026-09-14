@@ -2,7 +2,7 @@
 
     node test/unit.mjs      504 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  238 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       432 tester, ~200 s, headless Chromium
+    node test/run.mjs       435 tester, ~200 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
