@@ -102,6 +102,19 @@ const HARNESS = `
   }
   window.plausible = function () {};
 
+  // Fra basens form til tjenestens form. /api/svar tolker radene fra
+  // PostgREST for den svarer, sa svaret barer kampId — ikke kamp_id.
+  // Stubbene holdt lenge pa basens form, og da testet vi noe tjenesten
+  // aldri sender: feilen som gjorde «blir med»-lista usynlig i prod lot
+  // seg ikke se herfra. En stubb som er enig med feilen din beviser
+  // ingenting.
+  function somTjenesten(rader) {
+    return (rader || []).map(function (r) {
+      return { kampId: String(r.kamp_id == null ? r.kampId : r.kamp_id),
+        navn: r.navn, hvor: r.hvor, sted: r.sted, bruker: r.bruker };
+    });
+  }
+
   // Ingen test skal sporre telefonen om ekte posisjon. Uten dette henger
   // headless Chromium pa CI: posisjonsoppslaget venter pa et nettkall som
   // aldri kommer, og virtuell tid star stille sa lenge det star pa.
@@ -2379,7 +2392,7 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
     if (u.indexOf("/api/svar") === 0) {
       var inn = o && o.body ? JSON.parse(o.body) : null;
       window.__svar.push({ url: u, inn: inn, headere: (o && o.headers) || null });
-      if (!inn) return svarMed({ svar: window.__lagret });
+      if (!inn) return svarMed({ svar: somTjenesten(window.__lagret) });
       if (inn.handling === "fjern") {
         // Reglene i databasen slipper bare gjennom din egen rad, sa en
         // fjerning kan ikke rore andres. Stubben ma speile det, ellers
@@ -2396,7 +2409,7 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
       // Skrivingen leser hele kampen tilbake, sa svaret barer alle radene.
       // Det tomme svaret finnes fordi tjenesten en gang stolte pa
       // representasjonen fra upserten.
-      return svarMed({ svar: window.__tomRepresentasjon ? [] : window.__lagret });
+      return svarMed({ svar: window.__tomRepresentasjon ? [] : somTjenesten(window.__lagret) });
     }
     if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 || u.indexOf("overpass") > -1) {
       return svarMed({}, 502);
@@ -2757,7 +2770,7 @@ const SAK_19A = await kjor("kort-for-svar", FELLES + FOTBALL + `
       // Svaret holdes tilbake til testen slipper det: sa apner vi kampen
       // imens, nettopp slik en leser gjor.
       return new Promise(function (slipp) {
-        window.__slippSvar = function () { slipp(svarMed({ svar: LAGRET })); };
+        window.__slippSvar = function () { slipp(svarMed({ svar: somTjenesten(LAGRET) })); };
       });
     }
     if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 || u.indexOf("overpass") > -1) {
@@ -2952,7 +2965,7 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
       // Svaret ligger pa Premier League-kampen, ikke i eliteserien: det
       // er nettopp den en fane per liga ikke ville vist.
       return svarMed({ svar: window.__harSvar
-        ? [{ kamp_id: "2026-09-19-arsenal-liverpool", navn: "Kari", hvor: "pub",
+        ? [{ kampId: "2026-09-19-arsenal-liverpool", navn: "Kari", hvor: "pub",
             sted: "Andys", bruker: "u-2" }]
         : [] });
     }
@@ -3068,7 +3081,7 @@ const SAK_20B = await kjor("venner-tak", FELLES + FOTBALL + `
       var bedt = decodeURIComponent(u.split("kamper=")[1] || "").split(",").slice(0, 20);
       window.__spurte = window.__spurte.concat(bedt);
       return svarMed({ svar: bedt.indexOf("2026-09-19-arsenal-liverpool") > -1
-        ? [{ kamp_id: "2026-09-19-arsenal-liverpool", navn: "Kari", hvor: "pub",
+        ? [{ kampId: "2026-09-19-arsenal-liverpool", navn: "Kari", hvor: "pub",
             sted: "Andys", bruker: "u-2" }]
         : [] });
     }

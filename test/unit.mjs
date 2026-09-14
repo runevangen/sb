@@ -772,6 +772,30 @@ ok("gyldige visninger gir ingen feil", sjekkVisninger(SATT, PUBNAVN).length === 
 // Navnene i raden til stedet. Kortet svarer pa «hvor skal jeg?», sa det
 // er deg selv man leter etter i lista — derfor staar du forst, og heter
 // «Du».
+// tolkSvar ma tale a kjores to ganger.
+//
+// Dette er testen som manglet, og den manglet fra dag én. Funksjonen
+// deles mellom tjenesten og appen, og begge kjorer den: svar.mjs tolker
+// PostgREST-radene (kamp_id) for den svarer, og fotball.js tolker svaret
+// én gang til. Andre gang fantes ikke kamp_id — feltet het kampId — sa
+// kamp-id-en ble tom, hver rad ble noklet under «», og «blir med»-lista
+// var usynlig for alle, bestandig.
+const FRA_BASEN = [{ kamp_id: "2026-09-14-bodoglimt-sandefjord", navn: "Rune",
+  hvor: "pub", sted: "Andy's Pub", bruker: "u-1" }];
+const EN_GANG = tolkSvar(FRA_BASEN);
+const TO_GANGER = tolkSvar(EN_GANG);
+ok("tjenesten tolker basens rad", EN_GANG[0].kampId === "2026-09-14-bodoglimt-sandefjord",
+   JSON.stringify(EN_GANG[0]));
+ok("og appen kan tolke svaret én gang til uten a miste kampen",
+   TO_GANGER[0].kampId === "2026-09-14-bodoglimt-sandefjord", JSON.stringify(TO_GANGER[0]));
+ok("to ganger gir noyaktig det samme som én",
+   JSON.stringify(TO_GANGER) === JSON.stringify(EN_GANG),
+   JSON.stringify(EN_GANG) + " vs " + JSON.stringify(TO_GANGER));
+// En rad uten kamp i det hele tatt skal fortsatt bli tom, ikke
+// «undefined»: den skal falle utenfor ethvert oppslag.
+ok("en rad uten kamp gir tom id",
+   tolkSvar([{ navn: "Rune", bruker: "u-1" }])[0].kampId === "");
+
 function nrad(navn, bruker) {
   return { kampId: "k", navn, bruker, hvor: "pub", sted: "Pub X" };
 }

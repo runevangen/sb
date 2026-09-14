@@ -1039,6 +1039,30 @@ er i seg selv noe om adressen.
   sjekke at det tok, og melder seg av uten å se det. Det så ut som at
   ingenting ble lagret. En hake var første forsøk, og den viste at noe var
   valgt uten å si hva neste trykk ville gjøre. Det er det knappen gjør.
+- **`tolkSvar` må tåle å kjøres to ganger, og det er ikke pedanteri.**
+  Funksjonen deles mellom tjenesten og appen, og *begge* kjørte den:
+  `svar.mjs` tolker PostgREST-radene (`kamp_id`) før den svarer, og
+  `fotball.js` tolket svaret én gang til. Andre gang fantes ikke
+  `kamp_id` — feltet het `kampId` — så kamp-id-en ble tom. Da ble hver
+  eneste rad nøklet under «», `perKamp` fant aldri noe, og **«blir
+  med»-lista var usynlig for alle, siden den ble bygget** (`599b4ea`).
+  Den har aldri virket i prod.
+  Funksjonen leser derfor begge formene nå, og en enhetstest krever at
+  to kjøringer gir nøyaktig det samme som én.
+  Alt annet var friskt hele tiden: riktig nøkkel ut av appen, begge
+  radene tilbake fra `/api/svar`, komplett RLS. Det tok tre dager fordi
+  hvert lag så riktig ut for seg selv — og fordi feilen lå i skjøten
+  mellom to lag som begge var «ferdige».
+- **Og stubben var grunnen til at 412 tester ikke så det.** Nettlesertestene
+  svarte på `/api/svar` med `kamp_id` — formen i *basen* — mens tjenesten
+  svarer med `kampId`. Stubben var skrevet ut fra samme tankefeil som
+  koden, så den bekreftet feilen framfor å avsløre den. `somTjenesten()`
+  i testrammen gjør nå omformingen tjenesten gjør, og `__lagret` står
+  igjen som basen. Med den retningen slår tolv nettlesertester ut på den
+  opprinnelige feilen.
+  **En stubb som er enig med feilen din beviser ingenting.** Modellér det
+  endepunktet faktisk sender, ikke det du tror det sender — og skriv
+  stubben fra svaret, ikke fra koden som lager det.
 - **En skriving som svarer 200 er ikke bevis på at raden ligger der.**
   `settSvar` leser derfor kampen tilbake to ganger — som deg, og som hvem
   som helst — og forskjellen mellom de to er diagnosen:
@@ -1138,7 +1162,7 @@ er i seg selv noe om adressen.
 
 ## Testing
 
-    node test/unit.mjs      480 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      484 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  238 tester, ~250 ms, ingen nettleser
     node test/run.mjs       412 tester, ~200 s, headless Chromium
 
