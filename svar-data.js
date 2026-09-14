@@ -7,7 +7,15 @@
 // tilbake til appen. Na har det det, for den som er logget inn.
 
 import { listeTekst } from "./lib.js";
-import { HVOR, stedtekst } from "./fotball-data.js";
+import { HVOR, stedtekst, gyldigKampId, kampNokkel } from "./fotball-data.js";
+
+// Kampens identitet, som i fotball.js og visning-data.js: nokkelen, ikke
+// kildens id. Loftingen og vennefanen slar opp svarene pa den, sa en
+// kamp servert av den andre kilden ikke ser tom ut.
+function nokkelFor(kamp) {
+  if (!kamp) return "";
+  return String(kamp.nokkel || kampNokkel(kamp) || (kamp.id == null ? "" : kamp.id));
+}
 
 // Navnet vennene ser. Ikke e-postadressen: den er var, ikke deres.
 export const NAVN_MAKS = 24;
@@ -22,6 +30,8 @@ export const SVAR_MAKS = 60;
 // stille ut av svaret. Derfor star den her, delt mellom appen og
 // tjenesten, som navnereglene og PIN-reglene.
 export const KAMPER_MAKS = 20;
+
+export { gyldigKampId };
 
 export function normaliserNavn(verdi) {
   return String(verdi == null ? "" : verdi).replace(/\s+/g, " ").trim().slice(0, NAVN_MAKS);
@@ -105,7 +115,7 @@ export function loftMedSvar(kamper, kart) {
   const med = [];
   const uten = [];
   liste.forEach((k) => {
-    const svar = (kart && kart.get(String(k.id))) || [];
+    const svar = (kart && kart.get(nokkelFor(k))) || [];
     (svar.length ? med : uten).push(k);
   });
   return { kamper: med.concat(uten), loftet: med.length };
@@ -116,7 +126,7 @@ export function loftMedSvar(kamper, kart) {
 // den lista hele poenget.
 export function bareMedSvar(kamper, kart) {
   return (Array.isArray(kamper) ? kamper : [])
-    .filter((k) => ((kart && kart.get(String(k.id))) || []).length > 0)
+    .filter((k) => ((kart && kart.get(nokkelFor(k))) || []).length > 0)
     .slice()
     .sort((a, b) => String(a.dato || "").localeCompare(String(b.dato || "")));
 }

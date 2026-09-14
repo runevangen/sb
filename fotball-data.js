@@ -142,7 +142,7 @@ function kamp(rad) {
   const lag = (rad && rad.teams) || {};
   const mal = (rad && rad.goals) || {};
   const kode = (info.status && info.status.short) || "";
-  return {
+  const ut = {
     id: tall(info.id),
     dato: info.date || null,
     runde: tekst(rad && rad.league && rad.league.round),
@@ -155,6 +155,8 @@ function kamp(rad) {
     // etter ekstraomganger sett ut som at den ikke var spilt.
     spilt: kode === "FT" || kode === "AET" || kode === "PEN",
   };
+  ut.nokkel = kampNokkel(ut);
+  return ut;
 }
 
 function maal(verdi) {
@@ -282,7 +284,7 @@ function tsdbKamp(e, naa) {
   // etter klokka, er ogsa en spilt kamp.
   const harResultat = malHjemme !== null && malBorte !== null &&
     dato !== null && Date.parse(dato) < (naa || Date.now());
-  return {
+  const ut = {
     id: tall(rad.idEvent),
     dato,
     runde: rad.intRound ? "Runde " + tekst(rad.intRound) : "",
@@ -293,6 +295,8 @@ function tsdbKamp(e, naa) {
     malBorte,
     spilt: status === "Match Finished" || status === "FT" || harResultat,
   };
+  ut.nokkel = kampNokkel(ut);
+  return ut;
 }
 
 // strTimestamp er UTC uten sone («2026-09-13T15:00:00»). Uten Z ville
@@ -402,7 +406,10 @@ export function fotballHash(liga, del) {
 // som for, sa en lenke som allerede er sendt fortsetter a virke.
 export function kamplenke(liga, kamp, hvor, sted) {
   const sok = new URLSearchParams();
-  if (kamp && kamp.id != null) sok.set("kamp", String(kamp.id));
+  // Nokkelen, ikke kildens id: lenka skal apne den samme kampen ogsa hos
+  // en mottaker som far runden fra den andre kilden.
+  const id = kamp ? (kamp.nokkel || kampNokkel(kamp) || (kamp.id == null ? "" : kamp.id)) : "";
+  if (id) sok.set("kamp", String(id));
   if (HVOR[hvor]) sok.set("hvor", hvor);
   // Stedet folger begge svarene na, ikke bare puben: stadion er et sted
   // pa linje med pubene, og «på Lerkendal» sier mer enn «på stadion».
@@ -470,6 +477,53 @@ export function normaliserLagnavn(navn) {
     .toLowerCase()
     .replace(/ø/g, "o").replace(/å/g, "a").replace(/æ/g, "ae")
     .replace(/[^a-z0-9]/g, "");
+}
+
+// Kampens egen nokkel, ikke kildens id.
+//
+// id-en pa en kamp er info.id fra API-Football eller idEvent fra
+// TheSportsDB — to helt ulike tallrekker skrevet inn i samme kolonne. Og
+// kilden byttes av seg selv: TheSportsDB sporres forst og faller tilbake
+// til API-Football nar den svikter eller svarer for kort (TSDB_MINST),
+// kant-cachen holder i tre timer, og en utrulling tommer den. Ingen av
+// delene er noe leseren gjor.
+//
+// Nar kilden byttet, ble hver eneste lagrede rad usynlig: kampen fantes,
+// raden fantes, men id-en den ble skrevet under stemte ikke med id-en
+// runden viste. Meldt fra prod 14. september 2026 — og beviset sto i
+// basen. Samme person, samme pub, to rader fem timer fra hverandre:
+// skrivingen er en upsert mot (kamp_id, bruker), sa to rader er to
+// id-er, ikke to kamper.
+//
+// Nokkelen er derfor noe ved kampen selv: dagen og de to lagene.
+// Lagnavnene er alt forent pa tvers av kildene av redaksjonsnavn() og
+// normaliserLagnavn() — de finnes nettopp fordi de to skriver
+// «Bodo/Glimt» ulikt — sa mekanismen var der hele tiden, den var bare
+// aldri brukt pa identiteten.
+//
+// Dagen regnes i UTC fra det samme tidspunktet begge kildene oppgir.
+// TheSportsDB mangler av og til klokkeslettet og faller til midnatt;
+// det holder seg innenfor samme dag for kamper i disse ligaene. Ligaen
+// star ikke i nokkelen: to lag moter ikke hverandre to ganger pa én dag,
+// og et liganavn de to skriver ulikt ville bare flyttet problemet.
+export function kampNokkel(kamp) {
+  if (!kamp) return "";
+  const hjemme = normaliserLagnavn(redaksjonsnavn(String(kamp.hjemme || "")));
+  const borte = normaliserLagnavn(redaksjonsnavn(String(kamp.borte || "")));
+  const tid = Date.parse(kamp.dato);
+  if (!hjemme || !borte || Number.isNaN(tid)) return "";
+  return new Date(tid).toISOString().slice(0, 10) + "-" + hjemme + "-" + borte;
+}
+
+// En gyldig kamp-id. Nye er nokler («2026-09-14-bodoglimt-sandefjord»),
+// gamle er tall — og begge slipper gjennom, for en delt lenke som alt er
+// sendt baerer den gamle formen og skal fortsatt apne kampen.
+//
+// Tegnsettet er smalt med vilje: verdien gar inn i en PostgREST-liste
+// (`kamp_id=in.(...)`), der komma og parentes ville betydd noe annet enn
+// tegn i et navn.
+export function gyldigKampId(verdi) {
+  return /^[a-z0-9-]{1,64}$/.test(String(verdi == null ? "" : verdi));
 }
 
 export function redaksjonsnavn(navn) {

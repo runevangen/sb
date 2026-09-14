@@ -8,7 +8,8 @@
 // likt her som i resten av appen.
 
 import { LIGAER, DELER, FANER, DEL_NAVN, HVOR, STED_MAKS, delingstekst,
-         kamplenke, invitasjonstekst, stedtekst, nesteRunde } from "./fotball-data.js";
+         kamplenke, invitasjonstekst, stedtekst, nesteRunde,
+         kampNokkel } from "./fotball-data.js";
 import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
          loftMedSvar, bareMedSvar, stederFraSvar, perSted, KAMPER_MAKS,
          stedNokkel, blirMedLinje, mittSted } from "./svar-data.js";
@@ -321,6 +322,15 @@ function merkStjerne(knapp, lag, valgt) {
   knapp.title = valgt ? "Favorittlag — trykk for å fjerne" : "Sett som favorittlag";
 }
 
+// Kampens identitet, overalt der noe lagres, slas opp eller deles:
+// nokkelen, ikke kildens id. Se kampNokkel() i fotball-data.js for
+// hvorfor — kort sagt fordi de to kildene nummererer hver sin vei, og
+// kilden byttes uten at leseren gjor noe.
+function kampNokkelFor(kamp) {
+  if (!kamp) return "";
+  return String(kamp.nokkel || kampNokkel(kamp) || (kamp.id == null ? "" : kamp.id));
+}
+
 /* ---------- vennene ---------- */
 
 // Kampene noen har sagt at de blir med pa, pa tvers av ligaer.
@@ -365,7 +375,7 @@ async function visVenner(rot) {
   }
 
   // Hvem som blir med, for alle ligaene samlet.
-  const hentet = await hentSvarFor(kamper.map((k) => k.id).filter((id) => id != null));
+  const hentet = await hentSvarFor(kamper.map(kampNokkelFor).filter(Boolean));
   if (aktivDel !== "venner") return;
 
   // Her er lista hele visningen, ikke et tillegg til kampen. Feiler
@@ -623,7 +633,7 @@ function delPanel(kamp) {
   const mitt = () => {
     const okt = konto.okt();
     if (!okt) return lokaltSted;
-    return egetSvar(sisteSvar.filter((s) => s.kampId === String(kamp.id)),
+    return egetSvar(sisteSvar.filter((s) => s.kampId === kampNokkelFor(kamp)),
       okt.bruker);
   };
   panel.settLokalt = (verdi) => { lokaltSted = verdi; };
@@ -667,7 +677,7 @@ function delPanel(kamp) {
     // flyktig — den star rett etter et trykk og er borte ved neste
     // lasting — sa uten denne sa kortet ingenting om hvor du skulle.
     const okt = konto.okt();
-    const ditt = okt ? mittSted(sisteSvar.filter((s) => s.kampId === String(kamp.id)),
+    const ditt = okt ? mittSted(sisteSvar.filter((s) => s.kampId === kampNokkelFor(kamp)),
       okt.bruker, kamp) : "";
     mitt_linje.textContent = ditt ? "Du skal til " + ditt + "." : "";
 
@@ -755,7 +765,7 @@ function stedKilder(kamp, bekreftede, rad, egne) {
 
   bekreftede.forEach((p) => legg(p.navn, { hvor: "pub", bekreftet: true }));
   if (kamp.arena) legg(kamp.arena, { hvor: "stadion", stadion: true });
-  stederFraSvar(sisteSvar.filter((s) => s.kampId === String(kamp.id)))
+  stederFraSvar(sisteSvar.filter((s) => s.kampId === kampNokkelFor(kamp)))
     .forEach((s) => legg(s.navn, { hvor: s.hvor, harFolk: true }));
   (egne || []).forEach((s) => legg(s.navn, { hvor: s.hvor }));
   if (rad && rad.dataset.pektSted) {
@@ -796,7 +806,7 @@ function stedChip(kamp, panel, sted, form) {
     b.appendChild(merke);
   }
 
-  const folk = sisteSvar.filter((s) => s.kampId === String(kamp.id) &&
+  const folk = sisteSvar.filter((s) => s.kampId === kampNokkelFor(kamp) &&
     s.sted && stedNokkel(s.sted) === stedNokkel(sted.navn));
   if (folk.length) {
     const tall = el("span", "sted-folk", String(folk.length));
@@ -888,17 +898,17 @@ async function svarSted(kamp, panel, hvor, sted, melding, avmeld) {
   let ferdigLest = false;
   try {
     if (avmeld) {
-      await svarTjeneste({ handling: "fjern", token: okt.token, kampId: kamp.id });
+      await svarTjeneste({ handling: "fjern", token: okt.token, kampId: kampNokkelFor(kamp) });
       sisteSvar = sisteSvar.filter(
-        (s) => !(s.kampId === String(kamp.id) && s.bruker === okt.bruker));
+        (s) => !(s.kampId === kampNokkelFor(kamp) && s.bruker === okt.bruker));
       panel.settLokalt(null);
       melding.textContent = "Du skal ikke dit likevel.";
     } else {
       konto.settNavn(navn);
       const json = await svarTjeneste({
-        token: okt.token, kampId: kamp.id, navn, hvor, sted,
+        token: okt.token, kampId: kampNokkelFor(kamp), navn, hvor, sted,
       });
-      ferdigLest = leggInnSvar(kamp.id, tolkSvar(json.svar));
+      ferdigLest = leggInnSvar(kampNokkelFor(kamp), tolkSvar(json.svar));
       panel.settLokalt({ hvor, sted });
       melding.textContent = "Du har planlagt å dra til " + (sted || stedtekst(kamp, hvor, sted)) + ".";
       // Tjenesten sier fra nar raden er skrevet, men ingen andre kan lese
@@ -912,7 +922,7 @@ async function svarSted(kamp, panel, hvor, sted, melding, avmeld) {
     //
     // Og det er her vennene kommer inn: har noen svart siden runden ble
     // hentet, star de i kortet med det samme framfor ved neste lasting.
-    if (!ferdigLest) await friskeOppSvar(kamp.id);
+    if (!ferdigLest) await friskeOppSvar(kampNokkelFor(kamp));
     // Rekkefolgen i runden og linja under kampen skal si det samme som
     // kortet: ett svar, ett sted som tegner det.
     tegnSvar(document.getElementById("fotballInnhold"));
@@ -1231,7 +1241,7 @@ function tomtekst(del, data) {
 function kamprad(kamp, del, delbar) {
   const rad = el("li", delbar ? "kamp delbar" : "kamp");
   // Id-en pa raden, sa en delt lenke finner igjen kampen sin i runden.
-  if (kamp.id != null) rad.dataset.kamp = String(kamp.id);
+  if (kampNokkelFor(kamp)) rad.dataset.kamp = kampNokkelFor(kamp);
   // Og kampen selv: arenaen trengs for a skrive «Du skal til Aspmyra
   // Stadion» nar noen valgte stadion uten a skrive et navn.
   rad.kamp = kamp;
@@ -1306,7 +1316,7 @@ async function hentSvar(rot, del, data) {
   // men leseren ser én runde — og tjenesten kapper spørringen ved tjue
   // id-er, sa et vindu som vokser ville stilt spor om kamper ingen ser.
   const viste = del === "neste" ? nesteRunde(data.kamper) : data.kamper;
-  const ider = viste.map((k) => k.id).filter((id) => id != null);
+  const ider = viste.map(kampNokkelFor).filter(Boolean);
   if (!ider.length) return;
 
   const hentet = await hentSvarFor(ider);
@@ -1489,7 +1499,7 @@ function tegnPanelListe(kamp) {
   const boks = panel && panel.querySelector(".kamp-panel-liste");
   if (!boks) return;
 
-  const mine = sisteSvar.filter((s) => s.kampId === String(kamp.id));
+  const mine = sisteSvar.filter((s) => s.kampId === kampNokkelFor(kamp));
   boks.replaceChildren();
   const grupper = perSted(mine, kamp);
   if (!grupper.length) return;
@@ -1537,11 +1547,12 @@ function visInvitasjon(rot, del, data, invitasjon) {
   if (!invitasjon || del !== "neste") return;
 
   const kamp = ((data && data.kamper) || [])
-    .find((k) => String(k.id) === String(invitasjon.kampId));
+    .find((k) => kampNokkelFor(k) === String(invitasjon.kampId) ||
+                 String(k.id) === String(invitasjon.kampId));
   if (!kamp) return;
 
   const rad = Array.from(rot.querySelectorAll(".kamp"))
-    .find((r) => r.dataset.kamp === String(kamp.id));
+    .find((r) => r.dataset.kamp === kampNokkelFor(kamp));
   if (!rad) return;
 
   rad.classList.add("kamp-invitert");
@@ -1585,7 +1596,7 @@ function vaerlinje(kamp) {
 }
 
 async function hentVaer(kamp) {
-  const nokkel = kamp.id + "@" + kamp.dato;
+  const nokkel = kampNokkelFor(kamp) + "@" + kamp.dato;
   if (vaerHusket.has(nokkel)) return vaerHusket.get(nokkel);
   const lofte = (async () => {
     try {

@@ -14,7 +14,8 @@ import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          tilgjengeligSesong, SESONGVINDU, redaksjonsnavn, normaliserLagnavn,
          tsdbSti, tsdbHeadere, tolkKamperTsdb, tolkTabellTsdb, tsdbSesong, delingstekst, tidstekst, HVOR,
          FANER, DELER, DEL_NAVN,
-         kamplenke, tolkKamplenke, invitasjonstekst, stedtekst, STED_MAKS }
+         kamplenke, tolkKamplenke, invitasjonstekst, stedtekst, STED_MAKS,
+         kampNokkel, gyldigKampId }
   from "../fotball-data.js";
 
 import { normaliserEpost, gyldigEpost, normaliserKode, gyldigKode, maskerEpost,
@@ -692,10 +693,13 @@ const VNAA = Date.parse("2026-09-11T10:00:00Z");
 
 const SATT = slaSammen([], "Carls", [11], VKAMPER, VNAA);
 ok("en valgt kamp blir en visning",
-   SATT.length === 1 && SATT[0].pub === "Carls" && SATT[0].kampId === 11 &&
+   SATT.length === 1 && SATT[0].pub === "Carls" &&
    SATT[0].kamp === "Brann – Bodø/Glimt" && SATT[0].satt === new Date(VNAA).toISOString(),
    JSON.stringify(SATT));
-ok("kampId er et tall, ikke en streng", typeof SATT[0].kampId === "number");
+// Ikke kildens id: en id herfra pekte pa ingenting sa snart runden kom
+// fra den andre kilden, og «denne kampen vises pa» forsvant.
+ok("visningen lagres pa kampens nokkel, ikke pa id-en",
+   SATT[0].kampId === "2026-09-13-brann-bodoglimt", SATT[0].kampId);
 
 // Admin retter opp en runde uten a rore resten.
 const BLANDET = slaSammen(
@@ -708,7 +712,13 @@ ok("kamper utenfor runden star igjen",
    BLANDET.some((v) => v.pub === "Carls" && v.kampId === 99));
 ok("en kamp som ikke lenger er krysset av, forsvinner",
    !BLANDET.some((v) => v.pub === "Carls" && v.kampId === 11));
-ok("den nye er med", BLANDET.some((v) => v.pub === "Carls" && v.kampId === 12));
+ok("den nye er med", BLANDET.some((v) => v.pub === "Carls" &&
+   v.kampId === "2026-09-14-molde-rosenborg"), JSON.stringify(BLANDET));
+// Radene som alt star i visninger.js ble skrevet med et tall, og de skal
+// virke ut kampen sin framfor a forsvinne ved utrullingen.
+ok("en rad med gammel id finnes fortsatt",
+   visningerFor(VKAMPER[0], [{ pub: "Lincoln Pub", kampId: 11, kamp: "x",
+     dato: VKAMPER[0].dato, satt: "x" }]).length === 1);
 ok("lista er sortert pa dato", BLANDET.every((v, i) =>
    i === 0 || String(v.dato) >= String(BLANDET[i - 1].dato)), BLANDET.map((v) => v.dato).join(","));
 // Store og sma bokstaver skal ikke gi to rader for samme pub.
@@ -764,8 +774,11 @@ function vrad(endring) {
 }
 ok("ukjent pub fanges", sjekkVisninger([vrad({ pub: "Utepils AS" })], PUBNAVN)[0].indexOf("ukjent pub") > -1);
 ok("manglende felt fanges", sjekkVisninger([vrad({ kamp: "" })], PUBNAVN)[0].indexOf("mangler kamp") > -1);
-ok("kampId som ikke er tall fanges",
-   sjekkVisninger([vrad({ kampId: "elleve" })], PUBNAVN).some((f) => f.indexOf("ikke et tall") > -1));
+ok("kampId med ugyldig form fanges",
+   sjekkVisninger([vrad({ kampId: "2026-09-13-a,b" })], PUBNAVN)
+     .some((f) => f.indexOf("ugyldig form") > -1));
+ok("en nokkel er en gyldig kampId",
+   sjekkVisninger([vrad({ kampId: "2026-09-13-brann-bodoglimt" })], PUBNAVN).length === 0);
 ok("ugyldig dato fanges",
    sjekkVisninger([vrad({ dato: "snart" })], PUBNAVN)[0].indexOf("ikke en dato") > -1);
 ok("samme pub og kamp to ganger fanges",
@@ -928,6 +941,48 @@ ok("neste runde er den som kommer forst", NESTE[0].runde === "Runde 21", NESTE[0
 // Kampene oversettes ogsa, sa hjemme- og bortelag matcher tabellen.
 ok("lagnavn i kamper oversettes", KOMMENDE[0].borte === "Bodø/Glimt", KOMMENDE[0].borte);
 ok("tom liste gir tom runde", nesteRunde([]).length === 0);
+
+// Kampens nokkel, ikke kildens id.
+//
+// Dette er testen som manglet, og den manglende testen kostet to dager.
+// id-en er info.id fra API-Football eller idEvent fra TheSportsDB — to
+// ulike tallrekker — og kilden byttes uten at leseren gjor noe. Sa lenge
+// identiteten var id-en, ble hver lagrede rad usynlig i det oyeblikket
+// den andre kilden svarte.
+const SAMME_AF = tolkKamper(kampsvar([
+  lagKamp(981234, "2026-09-13T15:00:00+00:00", "Runde 21", "Brann", "Bodo/Glimt")]))[0];
+const SAMME_TS = tolkKamperTsdb({ events: [hendelse()] })[0];
+ok("de to kildene gir hver sin id for samme kamp",
+   SAMME_AF.id !== SAMME_TS.id, SAMME_AF.id + " vs " + SAMME_TS.id);
+ok("men samme nokkel",
+   SAMME_AF.nokkel === SAMME_TS.nokkel && SAMME_AF.nokkel === "2026-09-13-brann-bodoglimt",
+   SAMME_AF.nokkel + " vs " + SAMME_TS.nokkel);
+// Kildene skriver lagnavnet ulikt. Foldingen som finnes for tabellen er
+// den samme som gjor at nokkelen holder.
+ok("skrivematen pa laget spiller ingen rolle",
+   kampNokkel({ hjemme: "Brann", borte: "Bodo/Glimt", dato: "2026-09-13T15:00:00Z" }) ===
+   kampNokkel({ hjemme: "Brann", borte: "Bodø/Glimt", dato: "2026-09-13T15:00:00+00:00" }));
+// En kamp vi ikke kan navngi far ingen nokkel, og da skrives ingenting:
+// en rad under en tom nokkel ville samlet alle slike kamper i én.
+ok("uten dato gir ingen nokkel", kampNokkel({ hjemme: "Brann", borte: "Viking" }) === "");
+ok("uten lag gir ingen nokkel",
+   kampNokkel({ hjemme: "", borte: "Viking", dato: "2026-09-13T15:00:00Z" }) === "");
+ok("uten kamp i det hele tatt gir ingen nokkel", kampNokkel(null) === "");
+
+ok("nokkelen er en gyldig kamp-id", gyldigKampId("2026-09-13-brann-bodoglimt"));
+// En delt lenke som alt er sendt baerer et tall, og skal fortsatt virke.
+ok("en gammel id er ogsa gyldig", gyldigKampId("2399151") && gyldigKampId(2399151));
+// Verdien gar inn i en PostgREST-liste. Komma og parentes ville betydd
+// noe annet der enn tegn i et navn.
+ok("komma slipper ikke gjennom", !gyldigKampId("2026-09-13-brann,bodoglimt"));
+ok("parentes slipper ikke gjennom", !gyldigKampId("11)"));
+ok("store bokstaver slipper ikke gjennom", !gyldigKampId("2026-09-13-Brann-Bodoglimt"));
+ok("tom id slipper ikke gjennom", !gyldigKampId(""));
+
+// Lenka ma baere nokkelen: mottakeren kan fa runden fra den andre kilden.
+ok("delingslenka baerer nokkelen, ikke id-en",
+   kamplenke("eliteserien", SAMME_AF, "pub", "Carls").indexOf("kamp=2026-09-13-brann-bodoglimt") > -1,
+   kamplenke("eliteserien", SAMME_AF, "pub", "Carls"));
 
 /* ---------------- fotball: ruting ---------------- */
 
