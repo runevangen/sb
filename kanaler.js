@@ -39,10 +39,11 @@
 //       sjekket: "2026-09-14",             // dagen DU sa det selv
 //     },
 
+
 export const KANALER = {
-  eliteserien: { kanal: null, kilde: null, sjekket: null },
-  premier: { kanal: null, kilde: null, sjekket: null },
-  laliga: { kanal: null, kilde: null, sjekket: null },
-  bundesliga: { kanal: null, kilde: null, sjekket: null },
-  seriea: { kanal: null, kilde: null, sjekket: null },
+  eliteserien: { kanal: "TV 2 Play", kilde: "https://www.tv2.no/sport/eliteserien", sjekket: "2026-09-14" },
+  premier:     { kanal: "Viaplay", kilde: "https://viaplay.no/sport/fotball/premier-league", sjekket: "2026-09-14" },
+  laliga:      { kanal: "TV 2 Play", kilde: "https://www.tv2.no/sport/fotball/la-liga", sjekket: "2026-09-14" },
+  bundesliga:  { kanal: "Viaplay", kilde: "https://viaplay.no/sport/fotball/bundesliga", sjekket: "2026-09-14" },
+  seriea:      { kanal: "VG+", kilde: "https://www.vg.no/sport", sjekket: "2026-09-14" },
 };
