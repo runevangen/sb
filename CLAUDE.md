@@ -226,8 +226,34 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 - Ruting: `#/fotball/<liga>/<del>`, begge ledd valgfrie og gjenkjent på
   innhold framfor rekkefølge. Ukjente ledd faller tilbake til standard, så
   en klippet lenke åpner noe framfor ingenting.
-- Menyen beskriver visningen du står i: kategorier i nyheter, ligaer i
-  fotball.
+- **Menyen er én liste, og emnene bærer snarveiene.** Den byttet innhold
+  før — kategorier i nyheter, ligaer i fotball — og det var én knapp som
+  ga to verdener, avhengig av en tilstand du ikke ser mens menyen er
+  åpen. Meldt som «to hamburgermenyer» 14. september 2026, og det var
+  nettopp poenget: de *så* ut som to.
+  Nå står «Tabell» og «Kamper» som brikker til høyre på de emnene som
+  faktisk er en liga vi har data for. Ligameny-listen står igjen for
+  fotballvisningen, men grensa er ikke lenger noe leseren må krysse for å
+  finne tabellen.
+- `ligaForKategori()` i `fotball-data.js` er koblingen, og den matcher på
+  **navnet** med samme `normaliserLagnavn` som lagnavnene: heter
+  kategorien «Eliteserien», treffer den uten at noen har ført opp noe.
+  Heter den noe annet hos redaksjonen, føres det navnet i `kategorier` på
+  ligaen — ett sted, og det eneste stedet. Lista er tom i dag med vilje:
+  vi vet ikke hva kategoriene faktisk heter, og en oppdiktet oppføring
+  ville sett ut som en kobling som virker. Ingen treff er et normalt
+  svar; «Kommentar» har ingen tabell, og raden ser da ut som en vanlig
+  rad og beholder saksantallet sitt.
+- Brikkene er **søsken** til emneknappen, ikke barn: en knapp i en knapp
+  finnes ikke, og raden skal ha tre mål som betyr tre ting. Derfor
+  trenger de ingen `stopPropagation` — et trykk på en brikke passerer
+  aldri emneknappen. Legger noen dem inni knappen igjen, filtrerer feeden
+  seg i bakgrunnen mens fotballfanen åpner, og to nettlesertester slår
+  ut: én som teller knapper inni knapper, og én som sjekker at feeden
+  ikke hentes på nytt når snarveien trykkes.
+- Saksantallet viker for snarveiene på de radene som har dem. To tall på
+  samme rad, der det ene er en telling og det andre er knapper, blir støy
+  på en telefon.
 - API-Football skriver lagnavn uten norske bokstaver («Bodo/Glimt»,
   «Tromso»). `redaksjonsnavn()` i `fotball-data.js` oversetter til
   redaksjonens skrivemåte i det ene stedet dataene formes, så tabell,
@@ -1106,9 +1132,9 @@ er i seg selv noe om adressen.
 
 ## Testing
 
-    node test/unit.mjs      475 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      480 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  238 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       400 tester, ~200 s, headless Chromium
+    node test/run.mjs       411 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

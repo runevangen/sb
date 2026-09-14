@@ -5,7 +5,8 @@
 
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug, rangerTreff, listeTekst }
   from "./lib.js";
-import { LIGAER, tolkFotballHash, fotballHash, tolkKamplenke } from "./fotball-data.js";
+import { LIGAER, tolkFotballHash, fotballHash, tolkKamplenke,
+         ligaForKategori } from "./fotball-data.js";
 import { ofteBrukt, noterPub } from "./pub-data.js";
 import { maskerEpost, oktGyldig, kanFornyes, maaFornyes,
          FORNY_MARGIN } from "./konto-data.js";
@@ -1436,12 +1437,17 @@ function renderMenu(categories) {
 
 function menuEntry(cat) {
   const item = document.createElement("li");
+  item.className = "menu-rad";
   const button = el("button", "menu-item");
   button.type = "button";
   button.dataset.catId = cat.id ? String(cat.id) : "";
   button.appendChild(el("span", null, cat.name || "Uten navn"));
 
-  if (typeof cat.count === "number") {
+  const treff = ligaForKategori(cat.name);
+
+  // Saksantallet viker for snarveiene: to tall pa samme rad, der det ene
+  // er en telling og det andre er knapper, blir stoy pa en telefon.
+  if (typeof cat.count === "number" && !treff) {
     button.appendChild(el("span", "count", String(cat.count)));
   }
 
@@ -1451,7 +1457,34 @@ function menuEntry(cat) {
 
   button.addEventListener("click", () => selectCategory(cat));
   item.appendChild(button);
+
+  // Handler kategorien om en liga vi har data for, star tabellen og
+  // kampene som snarveier pa samme rad. De er soesken til hovedknappen,
+  // ikke barn: en knapp i en knapp finnes ikke, og raden ville da hatt
+  // ett malpunkt som betydde tre ting.
+  if (treff) item.appendChild(ligaSnarveier(treff));
   return item;
+}
+
+// «Tabell» og «Kamper» ved siden av emnet. Rekkefolgen er den samme som i
+// fotballfanen, sa den som har vaert der kjenner den igjen.
+function ligaSnarveier(treff) {
+  const boks = el("div", "menu-snarvei");
+  [["Tabell", "tabell"], ["Kamper", "neste"]].forEach(([tekst, del]) => {
+    const knapp = el("button", "snarvei-knapp", tekst);
+    knapp.type = "button";
+    knapp.setAttribute("aria-label", tekst + " for " + treff.liga.navn);
+    // Ingen stopPropagation: brikkene er soesken til emneknappen, ikke
+    // barn av den, sa et trykk her passerer den aldri. Legger noen dem
+    // inni knappen igjen, filtrerer feeden seg i bakgrunnen mens
+    // fotballfanen apner — og da slar nettlesertesten ut.
+    knapp.addEventListener("click", () => {
+      settFane("fotball", treff.nokkel, del);
+      closeMenu();
+    });
+    boks.appendChild(knapp);
+  });
+  return boks;
 }
 
 // Markerer valgt punkt uten a hente menyen pa nytt. Brukes bade av

@@ -327,6 +327,50 @@ body {
   flex: 1;
 }
 
+/* Raden baerer emnet og — der emnet er en liga vi har data for — to
+   snarveier. De ligger ved siden av hovedknappen, ikke inni: en knapp i
+   en knapp finnes ikke, og raden skal ha tre mal som betyr tre ting,
+   ikke ett som betyr alle. */
+.menu-rad {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border-faint);
+}
+
+/* Streken tegnes av raden nar den finnes, ellers ville den gatt under
+   bare halve linja. */
+.menu-rad > .menu-item { border-bottom: 0; }
+
+.menu-snarvei {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  padding-right: 18px;
+}
+
+/* Faste piksler: dette er ramme rundt innholdet, ikke innhold, og
+   snarveiene skal ikke vokse med --fs til de dytter emnet ut av raden. */
+.snarvei-knapp {
+  padding: 4px 10px;
+  border: 1px solid var(--border-btn);
+  border-radius: 999px;
+  background: none;
+  color: var(--accent);
+  font-family: 'Inter', sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.snarvei-knapp:hover { background: var(--bg-raised); }
+
+.snarvei-knapp:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .menu-item {
   display: flex;
   align-items: baseline;

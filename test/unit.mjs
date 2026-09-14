@@ -11,6 +11,7 @@ import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
          foldTekst, treffScore, rangerTreff, listeTekst } from "../lib.js";
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          SPORTER, sportFor, tolkDatasett, kommendeKamper, kallPerSport, DOGNKVOTE,
+         ligaForKategori,
          apiSti, tolkKamper, nesteRunde, tolkFotballHash, fotballHash,
          tilgjengeligSesong, SESONGVINDU, redaksjonsnavn, normaliserLagnavn,
          tsdbSti, tsdbHeadere, tolkKamperTsdb, tolkTabellTsdb, tsdbSesong, delingstekst, tidstekst, HVOR,
@@ -925,6 +926,30 @@ ok("neste spor om de kommende",
    apiSti("neste", LIGAER.premier, 2026).indexOf("status=NS&next=") > -1,
    apiSti("neste", LIGAER.premier, 2026));
 ok("ukjent datasett gir null", apiSti("toppscorere", LIGAER.premier, 2026) === null);
+
+/* ---------------- kategori til liga ---------------- */
+
+// Snarveiene i menyen henger pa denne: heter kategorien det samme som
+// ligaen, trenger ingen a fore opp noe.
+ok("kategori med ligaens navn treffer",
+   ligaForKategori("Eliteserien").nokkel === "eliteserien" &&
+   ligaForKategori("Premier League").nokkel === "premier");
+// Samme folding som lagnavnene: skrivematen skal ikke avgjore.
+ok("skrivemate og norske tegn avgjor ikke",
+   ligaForKategori("eliteserien").nokkel === "eliteserien" &&
+   ligaForKategori("ELITESERIEN").nokkel === "eliteserien" &&
+   ligaForKategori("Premier-League").nokkel === "premier");
+// Ingen treff er et normalt svar, ikke en feil: «Kommentar» har ingen
+// tabell, og raden skal da se ut som en vanlig rad.
+ok("kategori uten liga gir null",
+   ligaForKategori("Kommentar") === null && ligaForKategori("Podkast") === null);
+ok("tomt navn gir null",
+   ligaForKategori("") === null && ligaForKategori(null) === null &&
+   ligaForKategori(undefined) === null);
+// Aliaset er veien for kategorier som heter noe annet enn ligaen.
+ok("aliaset i kategorier treffer ogsa",
+   Object.keys(LIGAER).every((n) => Array.isArray(LIGAER[n].kategorier)),
+   Object.keys(LIGAER).map((n) => n + ":" + JSON.stringify(LIGAER[n].kategorier)).join(" "));
 
 /* ---------------- sporten bak ligaen ---------------- */
 
