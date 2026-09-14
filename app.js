@@ -1394,38 +1394,22 @@ async function loadMenu() {
   list.appendChild(note);
 }
 
-// Menyen viser det du kan velge i den visningen du star i: kategorier i
-// nyheter, ligaer i fotball. Ellers ville et menyvalg tatt deg ut av
-// visningen du nettopp valgte.
+// Menyen er den samme uansett hvor du star.
+//
+// For byttet den innhold — kategorier i nyheter, ligaer i fotball — og
+// det var samme knapp som ga to verdener, avhengig av en tilstand du
+// ikke ser mens menyen er apen. Det leses som to menyer, og ble meldt
+// som det.
+//
+// Ligaene er ikke borte: de byttes i #ligaVelger i selve
+// fotballvisningen, der man alt star nar man skal bytte liga, og
+// snarveiene pa emneradene er veien inn dit. Menyen skulle aldri vaert
+// det andre stedet.
 function visMeny() {
-  if (aktivVisning === "fotball") {
-    renderLigameny();
-    return;
-  }
   if (kategorier) renderMenu(kategorier);
   loadMenu();
 }
 
-function renderLigameny() {
-  const list = document.getElementById("menuList");
-  list.replaceChildren();
-
-  Object.keys(LIGAER).forEach((nokkel) => {
-    const item = document.createElement("li");
-    const knapp = el("button", "menu-item");
-    knapp.type = "button";
-    knapp.dataset.liga = nokkel;
-    knapp.appendChild(el("span", null, LIGAER[nokkel].navn));
-    knapp.appendChild(el("span", "count", LIGAER[nokkel].land));
-    if (nokkel === fotballLiga) knapp.setAttribute("aria-current", "true");
-    knapp.addEventListener("click", () => {
-      settFane("fotball", nokkel, fotballDel);
-      closeMenu();
-    });
-    item.appendChild(knapp);
-    list.appendChild(item);
-  });
-}
 
 function renderMenu(categories) {
   const list = document.getElementById("menuList");
