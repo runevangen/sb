@@ -23,6 +23,8 @@ utvelgelsen ut av funksjonen så adminportalen kunne planlegge lenger fram.
 Det er samme svar og samme cache-nøkkel — bare uten at halvparten kastes i
 nettleseren.
 
+**Sett virke i prod 14. september 2026**, samme dag det ble meldt.
+
 ## Konsekvens
 
 ### Runden er en overskrift, ikke en filtreringsregel
