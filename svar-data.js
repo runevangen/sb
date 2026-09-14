@@ -58,13 +58,26 @@ export function svarRad(kampId, navn, hvor, sted) {
 
 // Svarene fra databasen, formet til det visningen trenger. Ukjente rader
 // og rader uten navn faller bort framfor a tegne et tomt navn i lista.
+//
+// **Den ma tale a kjores to ganger, og det er ikke pedanteri.** Funksjonen
+// deles mellom tjenesten og appen, og begge kjorer den: `svar.mjs` tolker
+// radene fra PostgREST (`kamp_id`) for den svarer, og `fotball.js` tolker
+// svaret én gang til. Andre gang fantes ikke `kamp_id` lenger — feltet het
+// `kampId` — sa kamp-id-en ble tom. Da ble hver eneste rad noklet under
+// «», `perKamp` fant aldri noe, og «blir med»-lista var usynlig for alle,
+// bestandig. Den har aldri virket i prod.
+//
+// Derfor leses begge formene. Og 412 nettlesertester fanget det ikke,
+// fordi stubben svarte med `kamp_id` — formen i basen — mens tjenesten
+// svarer med `kampId`. Stubben var skrevet ut fra samme tankefeil som
+// koden. En stubb som er enig med feilen din beviser ingenting.
 export function tolkSvar(rader) {
   if (!Array.isArray(rader)) return [];
   return rader
     .filter((r) => r && gyldigNavn(r.navn))
     .slice(0, SVAR_MAKS)
     .map((r) => ({
-      kampId: String(r.kamp_id == null ? "" : r.kamp_id),
+      kampId: String((r.kamp_id == null ? r.kampId : r.kamp_id) ?? ""),
       navn: normaliserNavn(r.navn),
       hvor: HVOR[r.hvor] ? r.hvor : null,
       sted: r.sted ? String(r.sted).slice(0, 60) : "",
