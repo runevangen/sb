@@ -1396,7 +1396,7 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
       // ti kamper, og mottakeren skal slippe a lete etter den det gjaldt.
       ok("lenken apner kampen som ble delt, med sted og svar",
          String(d.url).indexOf("#/fotball/eliteserien/neste?") > -1 &&
-         String(d.url).indexOf("kamp=3") > -1 && String(d.url).indexOf("hvor=pub") > -1 &&
+         String(d.url).indexOf("kamp=2026-09-20-brann-bodoglimt") > -1 && String(d.url).indexOf("hvor=pub") > -1 &&
          String(d.url).indexOf("sted=Pub") > -1, d.url);
       ok("panelet lukkes etter deling", !document.querySelector(".kamp-panel"));
       ferdig();
@@ -1653,7 +1653,8 @@ const SAK_15 = await kjor("admin", `
     setTimeout(function () { try {
       ok("valget sendes til tjenesten", !!sendt);
       ok("bare den avkryssede kampen er med",
-         sendt.kampIder.length === 1 && sendt.kampIder[0] === 501, JSON.stringify(sendt.kampIder));
+         sendt.kampIder.length === 1 && sendt.kampIder[0] === "2026-09-20-rosenborg-brann",
+         JSON.stringify(sendt.kampIder));
       ok("puben blir med", sendt.pub === puber.value, sendt.pub);
       ok("passordet blir med", sendt.passord === "hemmelig");
       // Alle kampene pa skjermen sendes med, ogsa de i runden etter:
@@ -1683,7 +1684,8 @@ const SAK_15 = await kjor("admin", `
         document.getElementById("lagre").click();
         setTimeout(function () { try {
           ok("«kryss av alle» tar hele den nye ligaen",
-             sendt.kampIder.length === 1 && sendt.kampIder[0] === 901, JSON.stringify(sendt.kampIder));
+             sendt.kampIder.length === 1 &&
+             sendt.kampIder[0] === "2026-09-19-arsenal-liverpool", JSON.stringify(sendt.kampIder));
 
           /* ---- brukerne ---- */
 
@@ -1770,7 +1772,7 @@ const SAK_15 = await kjor("admin", `
 // som tjeneren serverer framfor den i repoet.
 writeFileSync(join(tmp, "visninger.js"),
   'export const VISNINGER = [\n' +
-  '  {"pub":"Lincoln Pub","kampId":3,"kamp":"Brann – Bodo/Glimt",' +
+  '  {"pub":"Lincoln Pub","kampId":"2026-09-20-brann-bodoglimt","kamp":"Brann – Bodo/Glimt",' +
   '"dato":"2026-09-20T17:00:00+00:00","satt":"2026-09-11T10:00:00.000Z"},\n' +
   '  {"pub":"Carls","kampId":4,"kamp":"Molde – Rosenborg",' +
   '"dato":"2026-09-21T17:00:00+00:00","satt":"2026-09-11T10:00:00.000Z"}\n' +
@@ -1951,8 +1953,11 @@ const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
     ok("en delt lenke apner fotballfanen", !document.getElementById("fotball").hidden);
     var merket = document.querySelectorAll(".kamp-invitert");
     ok("bare den delte kampen loftes fram", merket.length === 1, merket.length);
+    // Lenka i adressen baerer den gamle tallformen, slik alle lenker som
+    // alt er sendt gjor. Den skal fortsatt apne kampen — men kampen baerer
+    // na sin egen nokkel, ikke kildens id.
     ok("og det er den lenka pekte pa",
-       merket[0].dataset.kamp === "4" && merket[0].textContent.indexOf("Molde") > -1,
+       merket[0].dataset.kamp === "2026-09-21-molde-rosenborg" && merket[0].textContent.indexOf("Molde") > -1,
        merket[0].dataset.kamp + " " + merket[0].textContent);
     var linje = merket[0].querySelector(".kamp-invitasjon");
     ok("det star hvor avsenderen ser den",
@@ -2320,8 +2325,10 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
     // Ti kamper skal ikke bli ti kall.
     var lesekall = window.__svar.filter(function (k) { return !k.inn; });
     ok("hele runden hentes i ett kall", lesekall.length === 1, lesekall.length);
-    ok("og med begge kampene", lesekall[0].url.indexOf("kamper=3%2C4") > -1 ||
-       lesekall[0].url.indexOf("kamper=3,4") > -1, lesekall[0].url);
+    // Nokler, ikke kildens id-er: se kampNokkel() i fotball-data.js.
+    ok("og med begge kampene",
+       lesekall[0].url.indexOf("2026-09-20-brann-bodoglimt") > -1 &&
+       lesekall[0].url.indexOf("2026-09-21-molde-rosenborg") > -1, lesekall[0].url);
     ok("ingen er med enda", !document.querySelector(".kamp-blirmed"));
 
     var rad = document.querySelectorAll(".kamp.delbar")[0];
@@ -2362,7 +2369,7 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
       ok("svaret sendes med okta", skriv.length === 1 && skriv[0].inn.token === "okt-1",
          JSON.stringify(skriv.map(function (k) { return k.inn; })));
       ok("med kamp, navn og sted",
-         skriv[0].inn.kampId === 3 && skriv[0].inn.navn === "Ola" &&
+         skriv[0].inn.kampId === "2026-09-20-brann-bodoglimt" && skriv[0].inn.navn === "Ola" &&
          skriv[0].inn.hvor === "pub" && skriv[0].inn.sted === "Pub X",
          JSON.stringify(skriv[0].inn));
       // Navnet kommer fra innloggingen og lagres med visningsvalgene, sa
@@ -2444,7 +2451,8 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
       setTimeout(function () { try {
         var fjern = window.__svar.filter(function (k) { return k.inn && k.inn.handling === "fjern"; });
         ok("et nytt trykk pa stedet sender en fjerning med okta",
-           fjern.length === 1 && fjern[0].inn.token === "okt-1" && fjern[0].inn.kampId === 3,
+           fjern.length === 1 && fjern[0].inn.token === "okt-1" &&
+           fjern[0].inn.kampId === "2026-09-20-brann-bodoglimt",
            JSON.stringify(fjern.map(function (k) { return k.inn; })));
         ok("og lista under kampen er borte", !rad.querySelector(".kamp-blirmed"));
         // Ingen igjen som blir med: runden skal se ut som en runde igjen.
@@ -2482,7 +2490,7 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
              panel.querySelector(".kamp-panel-liste").textContent);
           // Vennene som har svart siden runden ble hentet kommer med i
           // samme oppfriskning — det er derfor den finnes.
-          window.__lagret = window.__lagret.concat([{ kamp_id: "3", navn: "Kari",
+          window.__lagret = window.__lagret.concat([{ kamp_id: "2026-09-20-brann-bodoglimt", navn: "Kari",
             hvor: "pub", sted: "Pub X", bruker: "u-2" }]);
           stedChip("Pub X").click();
           setTimeout(function () { try {
@@ -2633,8 +2641,8 @@ const SAK_19A = await kjor("kort-for-svar", FELLES + FOTBALL + `
     utloper: new Date(Date.now() + 3600000).toISOString() }));
 
   // Svaret ligger i basen fra for — det ble skrevet en annen dag.
-  var LAGRET = [{ kamp_id: "3", navn: "Ola", hvor: "pub", sted: "Pub X", bruker: "u-1" },
-                { kamp_id: "3", navn: "Kari", hvor: "pub", sted: "Pub X", bruker: "u-2" }];
+  var LAGRET = [{ kamp_id: "2026-09-20-brann-bodoglimt", navn: "Ola", hvor: "pub", sted: "Pub X", bruker: "u-1" },
+                { kamp_id: "2026-09-20-brann-bodoglimt", navn: "Kari", hvor: "pub", sted: "Pub X", bruker: "u-2" }];
   window.__slippSvar = null;
   function svarMed(kropp) {
     return Promise.resolve({ ok: true, status: 200, statusText: "OK",
@@ -2841,7 +2849,8 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
       // Svaret ligger pa Premier League-kampen, ikke i eliteserien: det
       // er nettopp den en fane per liga ikke ville vist.
       return svarMed({ svar: window.__harSvar
-        ? [{ kamp_id: "901", navn: "Kari", hvor: "pub", sted: "Andys", bruker: "u-2" }]
+        ? [{ kamp_id: "2026-09-19-arsenal-liverpool", navn: "Kari", hvor: "pub",
+            sted: "Andys", bruker: "u-2" }]
         : [] });
     }
     if (u.indexOf("/api/fotball/neste") === 0) {
@@ -2878,7 +2887,7 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
     // ligaen stille ut — og det er nettopp den fanen finnes for.
     var spurte = decodeURIComponent(window.__svarUrl).split("kamper=")[1] || "";
     ok("Premier League-kampen er med i sporringen",
-       spurte.split(",").indexOf("901") > -1, spurte);
+       spurte.split(",").indexOf("2026-09-19-arsenal-liverpool") > -1, spurte);
     ok("og sporringen holder seg under taket pa tjue",
        spurte.split(",").length <= 20, spurte.split(",").length + ": " + spurte);
 
@@ -2955,8 +2964,9 @@ const SAK_20B = await kjor("venner-tak", FELLES + FOTBALL + `
       // gjore det samme, ellers kan testen ikke se kappingen.
       var bedt = decodeURIComponent(u.split("kamper=")[1] || "").split(",").slice(0, 20);
       window.__spurte = window.__spurte.concat(bedt);
-      return svarMed({ svar: bedt.indexOf("901") > -1
-        ? [{ kamp_id: "901", navn: "Kari", hvor: "pub", sted: "Andys", bruker: "u-2" }]
+      return svarMed({ svar: bedt.indexOf("2026-09-19-arsenal-liverpool") > -1
+        ? [{ kamp_id: "2026-09-19-arsenal-liverpool", navn: "Kari", hvor: "pub",
+            sted: "Andys", bruker: "u-2" }]
         : [] });
     }
     if (u.indexOf("/api/fotball/neste") === 0) {
@@ -2977,7 +2987,7 @@ const SAK_20B = await kjor("venner-tak", FELLES + FOTBALL + `
     ok("uten rundetall deles sporringen framfor a kappes",
        window.__svarKall > 1, window.__svarKall);
     ok("og kampen i den andre ligaen blir faktisk spurt om",
-       window.__spurte.indexOf("901") > -1,
+       window.__spurte.indexOf("2026-09-19-arsenal-liverpool") > -1,
        window.__spurte.length + " id-er, siste: " + window.__spurte.slice(-3).join(","));
     ok("sa den star i lista", rot.textContent.indexOf("Arsenal") > -1,
        rot.textContent.slice(0, 140));

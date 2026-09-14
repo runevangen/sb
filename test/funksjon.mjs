@@ -693,7 +693,8 @@ ok("commit-meldingen sier hva som skjedde",
    JSON.parse(put.opsjoner.body).message);
 const skrevet = Buffer.from(JSON.parse(put.opsjoner.body).content, "base64").toString("utf8");
 ok("det som skrives er en gyldig fil vi kan lese tilbake",
-   lesVisninger(skrevet).length === 1 && lesVisninger(skrevet)[0].kampId === 11, skrevet);
+   lesVisninger(skrevet).length === 1 &&
+   lesVisninger(skrevet)[0].kampId === "2126-09-13-brann-bodoglimt", skrevet);
 
 // Lagringen bygger pa det som star i fila na, ikke pa en utrullet kopi.
 kall = stubGithub(TOM_FIL.replace("[]",

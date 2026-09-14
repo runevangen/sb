@@ -16,7 +16,7 @@
 
 import { PUBER_OSLO } from "./puber-oslo.js";
 import { VISNINGER } from "./visninger.js";
-import { LIGAER } from "./fotball-data.js";
+import { LIGAER, kampNokkel } from "./fotball-data.js";
 import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
 
 const felt = (id) => document.getElementById(id);
@@ -334,8 +334,8 @@ function tegnKamper() {
     merke.className = "kamp";
     const boks = document.createElement("input");
     boks.type = "checkbox";
-    boks.value = String(k.id);
-    boks.checked = alt.indexOf(String(k.id)) > -1;
+    boks.value = kampNokkel(k) || String(k.id);
+    boks.checked = alt.indexOf(boks.value) > -1 || alt.indexOf(String(k.id)) > -1;
     const tekst = document.createElement("span");
     tekst.className = "kamp-navn";
     tekst.textContent = k.hjemme + " – " + k.borte;
@@ -382,7 +382,7 @@ felt("merkIngen").addEventListener("click", () => alleBokser().forEach((b) => { 
 felt("lagre").addEventListener("click", async () => {
   if (!passord) { vis("Logg inn først.", "feil"); felt("passord").focus(); return; }
 
-  const valgte = alleBokser().filter((b) => b.checked).map((b) => Number(b.value));
+  const valgte = alleBokser().filter((b) => b.checked).map((b) => b.value);
   felt("lagre").disabled = true;
   vis("Lagrer …", "");
   try {
@@ -395,7 +395,8 @@ felt("lagre").addEventListener("click", async () => {
         kampIder: valgte,
         // Kampene sendes med, sa funksjonen slipper a hente dem pa nytt
         // og vi er sikre pa at det er de samme som sto pa skjermen.
-        kamper: kamper.map((k) => ({ id: k.id, hjemme: k.hjemme, borte: k.borte, dato: k.dato })),
+        kamper: kamper.map((k) => ({ id: k.id, nokkel: kampNokkel(k),
+          hjemme: k.hjemme, borte: k.borte, dato: k.dato })),
       }),
     });
     const data = JSON.parse(await respons.text());

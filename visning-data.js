@@ -1,7 +1,23 @@
 // Rene funksjoner for visninger: hvilke puber viser hvilke kamper.
 // Ingen DOM, ingen nettverk, ingen lagring.
 
-import { normaliserLagnavn } from "./fotball-data.js";
+import { normaliserLagnavn, kampNokkel, gyldigKampId } from "./fotball-data.js";
+
+// Kampens identitet, som i fotball.js: nokkelen, ikke kildens id.
+// Sto det en id her, forsvant «denne kampen vises pa» i det
+// oyeblikket runden kom fra den andre kilden.
+function nokkelFor(kamp) {
+  if (!kamp) return "";
+  return String(kamp.nokkel || kampNokkel(kamp) || (kamp.id == null ? "" : kamp.id));
+}
+
+// Bade nokkelen og den gamle id-en treffer: radene som alt star i
+// visninger.js ble skrevet med en id, og de skal virke ut kampen sin.
+function samme(kamp, v) {
+  const n = nokkelFor(kamp);
+  return (n && String(v.kampId) === n) ||
+         (kamp.id != null && String(v.kampId) === String(kamp.id));
+}
 
 export const VISNING_FELT = ["pub", "kampId", "kamp", "dato", "satt"];
 
@@ -22,7 +38,7 @@ export function sjekkVisninger(liste, pubnavn) {
     if (kjent.size && !kjent.has(normaliserLagnavn(v.pub))) {
       feil.push(hvor + ": ukjent pub");
     }
-    if (!Number.isFinite(Number(v.kampId))) feil.push(hvor + ": kampId er ikke et tall");
+    if (!gyldigKampId(v.kampId)) feil.push(hvor + ": kampId har ugyldig form");
     if (v.dato && Number.isNaN(Date.parse(v.dato))) feil.push(hvor + ": dato er ikke en dato");
     if (v.satt && Number.isNaN(Date.parse(v.satt))) feil.push(hvor + ": satt er ikke et tidspunkt");
     const nokkel = normaliserLagnavn(v.pub) + "@" + v.kampId;
@@ -35,7 +51,7 @@ export function sjekkVisninger(liste, pubnavn) {
 // Pubene som viser en gitt kamp, i den rekkefolgen de ble satt.
 export function visningerFor(kamp, alle) {
   if (!kamp || !Array.isArray(alle)) return [];
-  return alle.filter((v) => String(v.kampId) === String(kamp.id));
+  return alle.filter((v) => samme(kamp, v));
 }
 
 // Pubene som har bekreftet denne kampen, med det vi ellers vet om dem
@@ -68,14 +84,15 @@ export function merkBekreftet(puber, bekreftede) {
 export function slaSammen(alle, pub, valgteIder, kamper, naa) {
   const beholdt = (Array.isArray(alle) ? alle : []).filter((v) => {
     if (normaliserLagnavn(v.pub) !== normaliserLagnavn(pub)) return true;
-    return !kamper.some((k) => String(k.id) === String(v.kampId));
+    return !kamper.some((k) => samme(k, v));
   });
   const tid = new Date(naa || Date.now()).toISOString();
   const nye = kamper
-    .filter((k) => valgteIder.map(String).indexOf(String(k.id)) > -1)
+    .filter((k) => valgteIder.map(String).indexOf(nokkelFor(k)) > -1 ||
+                   valgteIder.map(String).indexOf(String(k.id)) > -1)
     .map((k) => ({
       pub,
-      kampId: Number(k.id),
+      kampId: nokkelFor(k),
       kamp: k.hjemme + " – " + k.borte,
       dato: k.dato,
       satt: tid,
@@ -108,9 +125,12 @@ const HODE = `// Hvilke kamper pubene viser. Skrives av admin-portalen pa /admin
 // ekte tilstanden fra GitHub framfor a stole pa en utrullet kopi, som
 // ville vaert utdatert mellom to lagringer.
 //
-// pub ma stemme med et navn i puber-oslo.js. kampId er id-en fra
-// terminlisten. kamp og dato star her for at fila skal vaere lesbar
-// alene; det er kampId som gjelder.
+// pub ma stemme med et navn i puber-oslo.js. kampId er kampens egen
+// nokkel — dagen og de to lagene — ikke id-en fra terminlisten: de to
+// kildene nummererer hver sin vei, og en id herfra pekte pa ingenting
+// sa snart runden kom fra den andre. Eldre rader baerer fortsatt et
+// tall, og de virker ut kampen sin. kamp og dato star her for at fila
+// skal vaere lesbar alene; det er kampId som gjelder.
 
 export const VISNINGER = [`;
 
@@ -119,7 +139,7 @@ export const VISNINGER = [`;
 export function visningerFil(liste) {
   const rader = (liste || []).map((v) => "  " + JSON.stringify({
     pub: String(v.pub),
-    kampId: Number(v.kampId),
+    kampId: String(v.kampId),
     kamp: String(v.kamp),
     dato: String(v.dato),
     satt: String(v.satt),

@@ -17,7 +17,8 @@
 // de, svarer funksjonen 503 og sier hva som mangler, framfor å sende en
 // PostgREST-feil videre til leseren.
 
-import { tolkSvar, svarRad, gyldigNavn, SVAR_MAKS, KAMPER_MAKS } from "../../svar-data.js";
+import { tolkSvar, svarRad, gyldigNavn, gyldigKampId, SVAR_MAKS, KAMPER_MAKS }
+  from "../../svar-data.js";
 
 const TABELL = "kampsvar";
 const FELT = "kamp_id,navn,hvor,sted,bruker";
@@ -51,7 +52,7 @@ async function hentSvar(url) {
   const ider = (url.searchParams.get("kamper") || url.searchParams.get("kamp") || "")
     .split(",")
     .map((s) => s.trim())
-    .filter((s) => /^\d{1,12}$/.test(s))
+    .filter(gyldigKampId)
     .slice(0, KAMPER_MAKS);
 
   if (!ider.length) return svar({ svar: [] }, 200);
@@ -71,7 +72,7 @@ async function settSvar(inn) {
   if (!token) return svar({ feil: "Logg inn for å si at du blir med" }, 401);
 
   const kampId = String(inn.kampId == null ? "" : inn.kampId);
-  if (!/^\d{1,12}$/.test(kampId)) return svar({ feil: "Ukjent kamp" }, 400);
+  if (!gyldigKampId(kampId)) return svar({ feil: "Ukjent kamp" }, 400);
   if (!gyldigNavn(inn.navn)) return svar({ feil: "Skriv navnet vennene ser deg som" }, 400);
 
   // Upsert: svarer du to ganger pa samme kamp, endrer du svaret ditt.
@@ -137,7 +138,7 @@ async function fjernSvar(inn) {
   if (!token) return svar({ feil: "Logg inn først" }, 401);
 
   const kampId = String(inn.kampId == null ? "" : inn.kampId);
-  if (!/^\d{1,12}$/.test(kampId)) return svar({ feil: "Ukjent kamp" }, 400);
+  if (!gyldigKampId(kampId)) return svar({ feil: "Ukjent kamp" }, 400);
 
   const r = await hosSupabase("DELETE", "/rest/v1/" + TABELL + "?kamp_id=eq." + kampId,
     null, token);

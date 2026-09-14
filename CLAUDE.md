@@ -235,6 +235,38 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   (små bokstaver, norske tegn foldet, tegnsetting fjernet), så lista
   tåler at API-et endrer skrivemåte. Ukjente navn går uendret gjennom —
   bare lag der API-ets form faktisk avviker står i lista.
+- **Kamp-id-en er kampens, ikke kildens** (`kampNokkel()` i
+  `fotball-data.js`). `id` på en kamp var `fixture.id` fra API-Football
+  eller `idEvent` fra TheSportsDB — to helt ulike tallrekker skrevet inn i
+  samme kolonne. Og kilden byttes av seg selv: TheSportsDB spørres først
+  og faller tilbake til API-Football når den svikter eller svarer for
+  kort (`TSDB_MINST`), kant-cachen holder i tre timer, og en utrulling
+  tømmer den. Ingen av delene er noe leseren gjør. Når kilden byttet, ble
+  hver eneste lagrede rad usynlig: kampen fantes, raden fantes, men id-en
+  den ble skrevet under stemte ikke med id-en runden viste.
+  Meldt fra prod 14. september 2026 — og beviset sto i basen, ikke i
+  koden: samme person, samme pub, to rader fem timer fra hverandre.
+  Skrivingen er en upsert mot `(kamp_id, bruker)`, så to rader er to
+  id-er, ikke to kamper. Det forklarte alt som så ut som at ingenting ble
+  lagret: `{"svar":[]}` på en kamp som hadde rader, to innlogginger som
+  ikke så hverandre, og en vennefane som sa at ingen ble med.
+  Nøkkelen er derfor noe ved kampen selv: dagen i UTC og de to lagene,
+  `2026-09-14-bodoglimt-sandefjord`. Lagnavnene er alt forent på tvers av
+  kildene av `redaksjonsnavn()` og `normaliserLagnavn()` — de finnes
+  nettopp fordi de to skriver «Bodo/Glimt» ulikt — så mekanismen lå der
+  hele tiden, den var bare aldri brukt på identiteten. Ligaen står ikke i
+  nøkkelen: to lag møter ikke hverandre to ganger på én dag, og et
+  liganavn de to skriver ulikt ville bare flyttet problemet.
+  `id` blir stående ved siden av, for feilsøking — men alt som lagres,
+  slås opp eller deles går på `nokkel`. **Testen som manglet** er den som
+  kjører begge parserne på samme kamp og krever ulik `id` og lik
+  `nokkel`; uten den kunne ingenting fange dette.
+  Nøkler og gamle tall er begge gyldige id-er (`gyldigKampId()`), så en
+  delt lenke som alt er sendt åpner fortsatt kampen sin, og radene som
+  står i `visninger.js` med et tall virker ut kampen sin. Tegnsettet er
+  `[a-z0-9-]` med vilje: verdien går inn i en PostgREST-liste
+  (`kamp_id=in.(...)`), der komma og parentes ville betydd noe annet enn
+  tegn i et navn.
 - **Lagmerket kostet ingen kall** (#33). Både API-Football og
   TheSportsDB bærer merket i tabellsvaret (`team.logo` / `strBadge`), og
   begge parserne har plukket det ut hele tiden — det var bare aldri
