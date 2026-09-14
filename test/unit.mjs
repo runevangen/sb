@@ -7,6 +7,7 @@
 // millisekunder framfor de titalls sekundene nettlesertestene bruker.
 // Alt som trenger DOM ligger i test/run.mjs.
 
+import { readFileSync } from "node:fs";
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
          foldTekst, treffScore, rangerTreff, listeTekst } from "../lib.js";
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
@@ -17,7 +18,7 @@ import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          tsdbSti, tsdbHeadere, tolkKamperTsdb, tolkTabellTsdb, tsdbSesong, delingstekst, tidstekst, HVOR,
          FANER, DELER, DEL_NAVN,
          kamplenke, tolkKamplenke, invitasjonstekst, stedtekst, STED_MAKS,
-         kampNokkel, gyldigKampId }
+         kampNokkel, gyldigKampId, kanalFor, sjekkKanalliste }
   from "../fotball-data.js";
 
 import { normaliserEpost, gyldigEpost, normaliserKode, gyldigKode, maskerEpost,
@@ -43,6 +44,7 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
          sjekkPubliste, kuraterteNaer, merkKuraterte,
          sjekkKontaktliste, kontaktFor, finnKontakt, KONTAKT_FELT } from "../pub-data.js";
 import { PUBER_KONTAKT } from "../puber-kontakt.js";
+import { KANALER } from "../kanaler.js";
 import { PUBER_OSLO } from "../puber-oslo.js";
 import { VISNINGER as VISNINGER_EKTE } from "../visninger.js";
 import { sjekkVisninger, visningerFor, slaSammen, utenGamle, visningerFil, lesVisninger,
@@ -1714,6 +1716,90 @@ ok("ingenting i den ekte fila vises for noen har sett etter",
 ok("feltlista er den fila bruker",
    Object.values(PUBER_KONTAKT).every((rad) =>
      Object.keys(rad).every((f) => KONTAKT_FELT.indexOf(f) > -1)));
+
+/* ---------------- kanalen som sender ligaen ---------------- */
+
+// Samme regel som kontaktopplysningene: en rad uten kilde og dato er et
+// forslag, ikke en opplysning, og den skal aldri na leseren.
+const KANAL_OK = { kanal: "TV 2 Play", kilde: "https://www.tv2.no/", sjekket: "2026-09-14" };
+
+ok("en verifisert rad gir kanalen",
+   kanalFor("eliteserien", { eliteserien: KANAL_OK }).kanal === "TV 2 Play");
+ok("radene i den ekte fila star tomme til noen har sett etter",
+   Object.keys(KANALER).every((liga) => kanalFor(liga, KANALER) === null));
+
+// Hver av de tre manglene for seg. Uten dette kunne vokteren fange to av
+// dem og slippe den tredje gjennom.
+ok("uten kilde gir ingen kanal",
+   kanalFor("a", { a: { ...KANAL_OK, kilde: null } }) === null);
+ok("uten dato gir ingen kanal",
+   kanalFor("a", { a: { ...KANAL_OK, sjekket: null } }) === null);
+ok("uten kanalnavn gir ingenting",
+   kanalFor("a", { a: { ...KANAL_OK, kanal: null } }) === null);
+
+// Ukjent liga gir ingenting, ikke feil kanal — som ukjent arena i vaeret.
+ok("ukjent liga gir null framfor feil kanal",
+   kanalFor("handball", { eliteserien: KANAL_OK }) === null);
+ok("uten liga og uten liste faller den pent",
+   kanalFor(null, { eliteserien: KANAL_OK }) === null &&
+   kanalFor("eliteserien", null) === null &&
+   kanalFor(undefined, undefined) === null);
+
+// Vokteren mot den EKTE fila, som publista og kontaktfila.
+ok("kanalfila holder formen",
+   sjekkKanalliste(KANALER, LIGAER).length === 0,
+   sjekkKanalliste(KANALER, LIGAER).slice(0, 3).join(" | "));
+ok("hver liga vi viser har en rad a fylle ut",
+   Object.keys(LIGAER).every((liga) => KANALER[liga] !== undefined),
+   Object.keys(LIGAER).filter((l) => !KANALER[l]).join(", "));
+
+// Den viktigste regelen: et kanalnavn UTEN kilde og dato skal sla ut i
+// testene. Da er det umulig a fore opp en kanal uten a si hvor den kom
+// fra — og det er hele forskjellen pa en opplysning og en pastand.
+ok("et kanalnavn uten kilde og dato slar ut",
+   sjekkKanalliste({ eliteserien: { kanal: "Viaplay", kilde: null, sjekket: null } }, LIGAER)
+     .some((f) => f.indexOf("uten kilde og dato") > -1));
+ok("en kilde som ikke er en lenke slar ut",
+   sjekkKanalliste({ eliteserien: { ...KANAL_OK, kilde: "tv2.no" } }, LIGAER)
+     .some((f) => f.indexOf("ikke en lenke") > -1));
+ok("en dato pa feil form slar ut",
+   sjekkKanalliste({ eliteserien: { ...KANAL_OK, sjekket: "14.09.2026" } }, LIGAER)
+     .some((f) => f.indexOf("ikke en dato") > -1));
+ok("en ukjent liga i kanalfila slar ut",
+   sjekkKanalliste({ handball: KANAL_OK }, LIGAER)
+     .some((f) => f.indexOf("ukjent liga") > -1));
+ok("et ukjent felt slar ut",
+   sjekkKanalliste({ eliteserien: { ...KANAL_OK, pris: 449 } }, LIGAER)
+     .some((f) => f.indexOf("ukjent felt") > -1));
+ok("en tom kanalstreng slar ut framfor a bli en tom linje",
+   sjekkKanalliste({ eliteserien: { ...KANAL_OK, kanal: "  " } }, LIGAER)
+     .some((f) => f.indexOf("star oppfort tom") > -1));
+
+/* ---------------- skallet i service workeren ---------------- */
+
+// Hver modul appen importerer MA staa i SKALL. Mangler en, feiler
+// c.addAll() i sin helhet — og da er ikke bare den ene visningen borte
+// uten nett, hele skallet er det. Kommentaren i sw.js sier det; denne
+// testen haandhever det.
+//
+// Lista vedlikeholdes for hand, sa dette er nettopp feilen en ny fil
+// forer til: kanaler.js ble lagt til og glemt, og ingenting sa fra.
+const KILDER = ["app.js", "fotball.js", "pub-data.js", "fotball-data.js", "lib.js",
+                "visning-data.js", "svar-data.js", "konto-data.js", "pin-data.js",
+                "vaer-data.js"];
+const importert = new Set();
+KILDER.forEach((fil) => {
+  const tekst = readFileSync(new URL("../" + fil, import.meta.url), "utf8");
+  for (const m of tekst.matchAll(/from\s+"\.\/([a-z0-9-]+\.js)"/g)) importert.add(m[1]);
+});
+const skall = readFileSync(new URL("../sw.js", import.meta.url), "utf8");
+const iSkall = new Set(Array.from(skall.matchAll(/"\/([a-z0-9-]+\.js)"/g), (m) => m[1]));
+const utenfor = [...importert].filter((f) => !iSkall.has(f));
+
+ok("hver modul appen importerer ligger i service workerens skall",
+   utenfor.length === 0, "mangler i SKALL: " + utenfor.join(", "));
+ok("testen fant faktisk noen importer a sjekke",
+   importert.size >= 10, importert.size);
 
 /* ---------------- rapport ---------------- */
 

@@ -28,6 +28,7 @@ der — ikke her.
     fotball.js / fotball-data.js / netlify/functions/fotball.mjs
     vaer-data.js / netlify/functions/vaer.mjs
     pub-data.js / puber-oslo.js / puber-kontakt.js / netlify/functions/puber.mjs
+    kanaler.js      hvilken kanal som sender ligaen — tom til noen har sjekket
     konto-data.js / pin-data.js / netlify/functions/konto.mjs
     svar-data.js / netlify/functions/svar.mjs
     visning-data.js / visninger.js / netlify/functions/visninger.mjs
@@ -69,6 +70,11 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   noe annet, ti — men da får den som handlet beskjed.
 - **Feilmeldinger bærer tjenestens egne ord.** `forsok` i svaret, uten
   nøkler og uten adresser, så det kan leses fra nettleseren.
+- **Opplysninger om virkeligheten trenger kilde og dato.** Pubenes
+  kontaktfelt (`kontaktFor`) og kanalen som sender ligaen (`kanalFor`)
+  slipper bare gjennom når begge står. Voktere i `unit.mjs` kjører mot de
+  ekte filene, og et navn uten kilde slår ut der framfor i appen.
+  [ADR 0016](docs/adr/0016-kanalen-som-sender.md)
 
 ### Form
 - Farger er CSS-variabler i `:root`; et tema overstyrer **kun** variabler.
@@ -94,9 +100,9 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 
 ## Testing
 
-    node test/unit.mjs      484 tester
+    node test/unit.mjs      501 tester
     node test/funksjon.mjs  238 tester
-    node test/run.mjs       413 tester, ~200 s, headless Chromium
+    node test/run.mjs       423 tester, ~200 s, headless Chromium
 
 Tre regler, og de har alle kostet noe:
 

@@ -3136,9 +3136,117 @@ const SAK_20B = await kjor("venner-tak", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
 `);
 
+/* ---------------- 21. kanalen som sender kampen ---------------- */
+
+// kanaler.js star tom i repoet: ingen rad har kilde og dato, sa
+// ingenting skal vises. Testen legger sin egen utgave i temp, som
+// tjeneren serverer framfor den i repoet — samme grep som visninger.js.
+//
+// To ligaer med vilje: én verifisert og én uten dato. Da ser testen
+// bade at en verifisert rad vises, og at en udatert IKKE gjor det — og
+// den andre halvdelen er den viktigste.
+writeFileSync(join(tmp, "kanaler.js"),
+  'export const KANALER = {\n' +
+  '  eliteserien: { kanal: "TV 2 Play", kilde: "https://www.tv2.no/", sjekket: "2026-09-14" },\n' +
+  '  premier: { kanal: "Viaplay", kilde: null, sjekket: null },\n' +
+  '  laliga: { kanal: null, kilde: null, sjekket: null },\n' +
+  '  bundesliga: { kanal: null, kilde: null, sjekket: null },\n' +
+  '  seriea: { kanal: null, kilde: null, sjekket: null }\n' +
+  '};\n');
+
+const SAK_21 = await kjor("kanal", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
+  var bedtOm = [];
+  window.fetch = function (u) {
+    u = String(u);
+    bedtOm.push(u);
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 ||
+        u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var liga = (u.split("liga=")[1] || "eliteserien").split("&")[0];
+      var kropp = { liga: liga, sesong: 2026, sisteSesong: true, del: del, kilde: "TheSportsDB",
+                    oppdatert: new Date().toISOString(), kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    // Ingenting hentes for kanalen: den ligger i koden, ikke bak et kall.
+    // Sprekker dette, har noen lagt den bak et endepunkt uten a si fra.
+    ok("kanalen koster ingen nettkall",
+       bedtOm.every(function (u) { return u.indexOf("kanal") === -1; }),
+       bedtOm.filter(function (u) { return u.indexOf("kanal") > -1; }).join(" "));
+
+    // Linja star i kortet, ikke i kampraden: raden baerer alt tid, vaer,
+    // pub-linje og «blir med»-linje.
+    ok("kanalen star ikke i kampraden", !document.querySelector(".kamp-linje .kamp-kanal"));
+
+    document.querySelectorAll(".kamp-del")[0].click();
+    var panel = document.querySelector(".kamp-panel");
+    var kanal = panel.querySelector(".kamp-kanal");
+    ok("kortet sier hvilken kanal som sender", !!kanal);
+    ok("og hvilken", kanal.textContent.indexOf("Sendes på TV 2 Play") > -1, kanal.textContent);
+
+    // Den staar OVER stedene: ser du at kampen sendes, er resten av
+    // kortet et valg om a se den sammen med noen framfor alene.
+    var liste = panel.querySelector(".sted-liste");
+    ok("kanalen star over stedene",
+       kanal.compareDocumentPosition(liste) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+    // Og den er INGEN sted-rad. En kanal er ikke et motested — det var
+    // nettopp «Hjemme», som er tatt ut med vilje. En rad med «Jeg skal
+    // hit» ville gjenreist den.
+    ok("kanalen er ingen sted-rad man kan melde seg pa",
+       !kanal.classList.contains("sted-rad-kort") &&
+       !kanal.querySelector("button") &&
+       !liste.contains(kanal));
+
+    // Datoen staar i title, ikke pa skjermen: den som lurer pa hvor
+    // ferskt det er kan se etter, resten skal slippe.
+    ok("naar noen sist sa etter staar i title",
+       kanal.title.indexOf("2026-09-14") > -1, kanal.title);
+
+    // Skjermleseren skal ikke lese emojien som et ord i tillegg.
+    ok("skjermleseren far én setning",
+       kanal.getAttribute("aria-label") === "Kampen sendes på TV 2 Play",
+       kanal.getAttribute("aria-label"));
+
+    // DEN VIKTIGSTE: Premier League har et kanalnavn i fila, men hverken
+    // kilde eller dato. Da skal den ikke vises. En feil kanal er verre
+    // enn ingen — leseren kjoper et abonnement hen ikke trenger, eller
+    // gar glipp av kampen fordi vi sa feil sted.
+    location.hash = "#/fotball/premier/neste";
+    setTimeout(function () { try {
+      document.querySelectorAll(".kamp-del")[0].click();
+      var udatert = document.querySelector(".kamp-panel");
+      ok("en kanal uten kilde og dato vises ikke",
+         !udatert.querySelector(".kamp-kanal"),
+         udatert.querySelector(".kamp-kanal")
+           ? udatert.querySelector(".kamp-kanal").textContent : "");
+      // Og kortet virker som for: kanalen er et tillegg, ikke en
+      // forutsetning.
+      ok("kortet staar likevel ferdig",
+         udatert.querySelector(".kamp-panel-tittel").textContent === "Hvor skal du se den?");
+      ferdig();
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
+`);
+
+rmSync(join(tmp, "kanaler.js"));
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_18B, ...SAK_19, ...SAK_19A, ...SAK_19B, ...SAK_19C, ...SAK_20, ...SAK_20B];
+const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_18B, ...SAK_19, ...SAK_19A, ...SAK_19B, ...SAK_19C, ...SAK_20, ...SAK_20B, ...SAK_21];
 let feilet = 0;
 
 for (const t of alle) {

@@ -9,7 +9,7 @@
 
 import { LIGAER, DELER, FANER, DEL_NAVN, HVOR, STED_MAKS, delingstekst,
          kamplenke, invitasjonstekst, stedtekst, nesteRunde,
-         kampNokkel } from "./fotball-data.js";
+         kampNokkel, kanalFor } from "./fotball-data.js";
 import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
          loftMedSvar, bareMedSvar, stederFraSvar, perSted, KAMPER_MAKS,
          stedNokkel, blirMedLinje, mittSted, navnIRad } from "./svar-data.js";
@@ -20,6 +20,7 @@ import { PUBER_OSLO } from "./puber-oslo.js";
 import { VISNINGER } from "./visninger.js";
 import { bekreftetFor, merkBekreftet } from "./visning-data.js";
 import { arenaFor } from "./vaer-data.js";
+import { KANALER } from "./kanaler.js";
 
 // Kuraterte steder vi stoler pa. «usikker» vises ikke: et sted vi ikke
 // tor sta inne for, er verre enn ett forslag faerre.
@@ -153,6 +154,15 @@ async function hent(liga, del) {
   if (!respons.ok || !data || data.feil) {
     throw new Error((data && data.feil) || "Tjenesten svarte " + respons.status + ".");
   }
+
+  // Kampen maa vite hvilken liga den kom fra, ellers kan ingen slaa opp
+  // kanalen. aktivLiga duger ikke: vennefanen blander ligaene i en liste,
+  // sa den ville merket en Premier League-kamp med Eliteseriens kanal —
+  // en stille feil opplysning, som er nettopp det vi ikke skal gi.
+  //
+  // Her, og ikke i parserne: de ser ett datasett om gangen og vet ikke
+  // hvem som spurte. hent() er den ene trakta begge fanene gaar gjennom.
+  if (Array.isArray(data.kamper)) data.kamper.forEach((k) => { k.liga = liga; });
   return data;
 }
 
@@ -559,6 +569,17 @@ function delPanel(kamp) {
   // som faktisk har meldt inn, rad for rad, som i forslagslista.
   panel.appendChild(el("p", "kamp-panel-tittel", "Hvor skal du se den?"));
 
+  // Kanalen staar som en opplysning, ikke som en rad man kan melde seg
+  // paa. En kanal er ikke et motested — det var nettopp «Hjemme», som er
+  // tatt ut med vilje: kortet handler om hvor man treffer noen, og sofaen
+  // er ikke et sted. Men den hoerer hjemme i kortet, for spoersmaalet er
+  // «hvor skal du se den?», og for de fleste kamper er svaret en kanal.
+  //
+  // Den staar over stedene, ikke under: ser du at kampen sendes, er
+  // resten av kortet et valg om aa se den sammen med noen framfor alene.
+  const kanal = kanallinje(kamp);
+  if (kanal) panel.appendChild(kanal);
+
   const steder = el("div", "sted-liste");
   panel.appendChild(steder);
 
@@ -789,6 +810,24 @@ function stedKilder(kamp, bekreftede, rad, egne) {
 // Raden er derfor ingen knapp. Den har en inni seg, og en knapp i en
 // knapp finnes ikke — samme grunn som at kamplinja loser trykkflata med
 // en utstrakt knapp framfor aa vaere en selv.
+// «Sendes paa TV 2 Play», eller ingenting. Ingenting er det normale til
+// noen har verifisert ligaen sin rad i kanaler.js — og ingenting er et
+// aerlig svar, mens feil kanal ikke er det.
+function kanallinje(kamp) {
+  const rad = kanalFor(kamp && kamp.liga, KANALER);
+  if (!rad) return null;
+  const linje = el("p", "kamp-kanal");
+  linje.appendChild(el("span", "kamp-kanal-merke", "📺"));
+  linje.appendChild(el("span", "kamp-kanal-navn", "Sendes på " + rad.kanal));
+  // Datoen staar i title framfor paa skjermen, som stjerna til pubene:
+  // den som lurer paa hvor ferskt det er, kan se etter — resten skal ikke
+  // lese en dato de ikke spurte om. Rettighetene flytter seg, sa naar
+  // noen sist sa etter er en del av opplysningen.
+  linje.title = "Sjekket " + rad.sjekket + ". Rettighetene kan ha endret seg siden.";
+  linje.setAttribute("aria-label", "Kampen sendes på " + rad.kanal);
+  return linje;
+}
+
 function stedRad(kamp, panel, sted, form) {
   const rad = el("div", "sted-rad-kort");
   if (sted.bekreftet) rad.classList.add("bekreftet");

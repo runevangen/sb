@@ -695,3 +695,59 @@ function tall(verdi) {
 function tekst(verdi) {
   return String(verdi === undefined || verdi === null ? "" : verdi).slice(0, 40);
 }
+
+// ---------- kanalen som sender ligaen ----------
+
+// Kanalen leseren skal se, eller null. Gir bare ut rader der bade kilde
+// og sjekket star — samme regel som kontaktFor() i pub-data.js, og av
+// samme grunn: en feil kanal er verre enn ingen. Leseren kjoper enten et
+// abonnement hen ikke trenger, eller gar glipp av kampen fordi vi sa
+// feil sted.
+//
+// Ukjent liga gir null, ikke feil kanal. Det er samme valg som ukjent
+// arena i vaer-data.js: ingenting er et riktig svar, noe galt er ikke.
+export function kanalFor(liga, kanaler) {
+  const rad = kanaler && liga ? kanaler[liga] : null;
+  if (!rad || !rad.kanal || !rad.kilde || !rad.sjekket) return null;
+  return { kanal: rad.kanal, kilde: rad.kilde, sjekket: rad.sjekket };
+}
+
+// Vokter formen pa KANALER, og kjores av unit.mjs mot den EKTE fila, som
+// sjekkPubliste og sjekkKontaktliste. En feilskrevet rad skal sla ut i
+// testene framfor i appen.
+//
+// Den viktigste regelen her er den siste: star det et kanalnavn, MAA det
+// staa en kilde og en dato. Da er det umulig a foere opp en kanal uten a
+// si hvor den kommer fra og naar noen sa den — og en tom rad er et
+// gyldig, aerlig svar.
+export function sjekkKanalliste(kanaler, ligaer) {
+  if (!kanaler || typeof kanaler !== "object") return ["Kanalene er ikke et oppslag"];
+  const kjent = ligaer ? Object.keys(ligaer) : [];
+  const feil = [];
+  Object.keys(kanaler).forEach((liga) => {
+    const rad = kanaler[liga];
+    if (kjent.length && kjent.indexOf(liga) === -1) feil.push(liga + ": ukjent liga");
+    if (!rad || typeof rad !== "object") { feil.push(liga + ": ikke et objekt"); return; }
+    Object.keys(rad).forEach((felt) => {
+      if (["kanal", "kilde", "sjekket"].indexOf(felt) === -1) {
+        feil.push(liga + " / " + felt + ": ukjent felt");
+      }
+    });
+    if (rad.kanal !== null && typeof rad.kanal !== "string") {
+      feil.push(liga + ": kanal ma vaere tekst eller null");
+    }
+    if (rad.kanal !== null && !String(rad.kanal).trim()) {
+      feil.push(liga + ": kanal star oppfort tom — bruk null");
+    }
+    if (rad.kilde !== null && String(rad.kilde || "").indexOf("http") !== 0) {
+      feil.push(liga + ": kilde er ikke en lenke");
+    }
+    if (rad.sjekket !== null && !/^\d{4}-\d{2}-\d{2}$/.test(String(rad.sjekket))) {
+      feil.push(liga + ": sjekket er ikke en dato");
+    }
+    if (rad.kanal && (!rad.kilde || !rad.sjekket)) {
+      feil.push(liga + ": " + rad.kanal + " star uten kilde og dato");
+    }
+  });
+  return feil;
+}
