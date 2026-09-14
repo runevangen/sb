@@ -8,6 +8,12 @@ Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
 hele tatt starter.
 
+**De ~200 sekundene er en treg maskin, ikke et fast tall.** På
+GitHub-runneren tar hele jobben rundt 35 sekunder. Et grønt CI-resultat på
+under et minutt er altså normalt — det betyr *ikke* at nettlesertestene
+ble hoppet over. Sjekk antallet i loggen framfor å lese klokka; det er
+tallet som sier at de kjørte.
+
 ## De tre reglene
 
 **Tallene telles av testene selv.** De sto en stund som konstanter, og da
