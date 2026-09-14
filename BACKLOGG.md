@@ -15,6 +15,7 @@ Denne fila finnes bare for å peke dit, og for å si hvorfor.
 | `sikkerhet` | Hører hjemme i wp-admin på sportsbibelen.no, ikke her |
 | `fotball` | Fotballmodulen (beta) |
 | `uverifisert` | Bygget, men aldri prøvd i virkeligheten |
+| `nattlogg` | Tas etter kl. 23, når ingen bruker appen |
 
 ## Der jeg ville begynt
 
@@ -32,6 +33,17 @@ Denne fila finnes bare for å peke dit, og for å si hvorfor.
 - **[#80](https://github.com/runevangen/sb/issues/80)** — og steget før
   #65: at leseren kan sende inn et sted som mangler i lista. #65 er
   puben som bekrefter en kamp; #80 er stedet som i det hele tatt finnes.
+
+## Nattloggen
+
+`nattlogg` er ikke «lav prioritet». Det er arbeid som **rører prod mens
+det pågår** — en datamigrering, et bytte av lagring, noe der en halvferdig
+tilstand er synlig for en leser. Netlify deployer på push, så det finnes
+ingen mellomting mellom «ikke gjort» og «ute». Da er tidspunktet det
+eneste vernet vi har.
+
+Ligger noe her, er det fordi det skal gjøres når ingen ser det, ikke fordi
+det kan vente.
 
 Denne lista pekte en stund til #26, som ble lukket samme dag den ble
 skrevet — Netlify Analytics ble valgt framfor Plausible. Akkurat den
