@@ -84,9 +84,34 @@ export const LIGAER = {
   // sesongen startet i begge tilfeller.
   // tsdb: ligaens id hos TheSportsDB, som gir kommende kamper for
   // inneværende sesong gratis nar API-Footballs vindu ikke gjor det.
-  eliteserien: { id: 103, tsdb: 4358, navn: "Eliteserien", land: "Norge", sesong: "kalender" },
-  premier: { id: 39, tsdb: 4328, navn: "Premier League", land: "England", sesong: "host-var" },
+  // kategorier: navn i nyhetsmenyen som betyr denne ligaen. Navnet i
+  // «navn» teller alltid med, sa lista her er bare for det som heter noe
+  // annet hos redaksjonen. Tom i dag med vilje: vi vet ikke hva
+  // kategoriene faktisk heter, og en oppdiktet oppforing ville sett ut
+  // som en kobling som virker.
+  eliteserien: { id: 103, tsdb: 4358, navn: "Eliteserien", land: "Norge", sesong: "kalender", kategorier: [] },
+  premier: { id: 39, tsdb: 4328, navn: "Premier League", land: "England", sesong: "host-var", kategorier: [] },
 };
+
+// Ligaen en nyhetskategori handler om, eller null.
+//
+// Matcher pa navnet, foldet med samme normaliserLagnavn som lagnavnene:
+// heter kategorien «Eliteserien», treffer den uten at noen har fort opp
+// noe. Heter den noe annet, foeres det navnet i «kategorier» pa ligaen —
+// ett sted, og det eneste stedet.
+//
+// Ingen treff er et helt normalt svar: «Kommentar» og «Podkast» er
+// kategorier uten tabell, og da skal raden se ut som en vanlig rad.
+export function ligaForKategori(navn) {
+  const leit = normaliserLagnavn(navn);
+  if (!leit) return null;
+  const treff = Object.keys(LIGAER).find((nokkel) => {
+    const liga = LIGAER[nokkel];
+    if (normaliserLagnavn(liga.navn) === leit) return true;
+    return (liga.kategorier || []).some((a) => normaliserLagnavn(a) === leit);
+  });
+  return treff ? { nokkel: treff, liga: LIGAER[treff] } : null;
+}
 
 // Slar opp en liga fra nokkelen i adressen. Ukjent nokkel gir null, sa
 // hverken funksjonen eller visningen trenger a gjette.

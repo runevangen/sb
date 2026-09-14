@@ -182,7 +182,13 @@ const FELLES = `
       };
     });
   }
-  var KATEGORIER = [{ id: 7, name: "Fotball", count: 412 }];
+  // En kategori som heter det samme som en liga, og en som ikke gjor det:
+  // den forste skal fa snarveier til tabell og kamper, den andre ikke.
+  var KATEGORIER = [
+    { id: 7, name: "Fotball", count: 412 },
+    { id: 8, name: "Eliteserien", count: 203 },
+    { id: 9, name: "Kommentar", count: 31 }
+  ];
 `;
 
 function mockFetch(saker) {
@@ -611,6 +617,41 @@ const SAK_5 = await kjor("visning", FELLES + `
   window.addEventListener("load", function () { setTimeout(function () {
     document.getElementById("menuBtn").click();
     setTimeout(function () {
+      // Snarveiene: emnet til venstre, tabell og kamper til hoyre — men
+      // bare pa de emnene som faktisk er en liga vi har data for.
+      var rader = document.querySelectorAll(".menu-rad");
+      var elite = Array.prototype.find.call(rader, function (r) {
+        var b = r.querySelector(".menu-item");
+        return b && b.textContent.indexOf("Eliteserien") === 0;
+      });
+      var kommentar = Array.prototype.find.call(rader, function (r) {
+        var b = r.querySelector(".menu-item");
+        return b && b.textContent.indexOf("Kommentar") === 0;
+      });
+      ok("kategorien som er en liga far to snarveier",
+         !!elite && elite.querySelectorAll(".snarvei-knapp").length === 2,
+         elite && elite.querySelectorAll(".snarvei-knapp").length);
+      ok("og de heter det samme som fanene",
+         !!elite && Array.prototype.map.call(elite.querySelectorAll(".snarvei-knapp"),
+           function (b) { return b.textContent; }).join("|") === "Tabell|Kamper",
+         elite && elite.textContent);
+      ok("kategorien uten liga far ingen",
+         !!kommentar && kommentar.querySelectorAll(".snarvei-knapp").length === 0);
+      var antallCelle = kommentar && kommentar.querySelector(".count");
+      ok("og beholder saksantallet sitt",
+         !!antallCelle && antallCelle.textContent === "31",
+         kommentar && kommentar.textContent);
+      // En knapp i en knapp finnes ikke: snarveiene er soesken til
+      // hovedknappen, ikke barn av den.
+      ok("ingen knapp ligger inni en annen knapp i menyen",
+         document.querySelectorAll("#menuPanel button button").length === 0,
+         document.querySelectorAll("#menuPanel button button").length);
+      var forsteBrikke = elite && elite.querySelector(".snarvei-knapp");
+      ok("snarveien sier hvilken liga den gjelder",
+         !!forsteBrikke &&
+         String(forsteBrikke.getAttribute("aria-label")).indexOf("Eliteserien") > -1,
+         forsteBrikke && forsteBrikke.getAttribute("aria-label"));
+
       ok("lyst er markert som aktivt fra start", aktiv("temaLys") && !aktiv("temaSvart"));
       ok("normal skrift er markert fra start", aktiv("skriftNormal") && !aktiv("skriftStor"));
 
@@ -643,7 +684,35 @@ const SAK_5 = await kjor("visning", FELLES + `
          !document.documentElement.getAttribute("data-theme") && aktiv("temaLys"));
       ok("skriftvalget star igjen nar temaet byttes", aktiv("skriftStor"));
 
-      ferdig();
+      // Snarveien skal ta deg til fotballfanen — og bare dit. Uten
+      // stopPropagation ville trykket ogsa telt som et trykk pa emnet, og
+      // feeden hadde filtrert seg i bakgrunnen mens fanen apnet.
+      var rader = document.querySelectorAll(".menu-rad");
+      var elite = Array.prototype.find.call(rader, function (r) {
+        var b = r.querySelector(".menu-item");
+        return b && b.textContent.indexOf("Eliteserien") === 0;
+      });
+      var sokFor = window.__sokUrl;
+      // Null-sikkert: en test som kaster velter sida, og da forsvinner
+      // alle pastandene etter den ogsa. Den skal feile, ikke krasje.
+      var snarvei = forsteBrikke;
+      ok("det finnes en snarvei a trykke pa", !!snarvei);
+      if (snarvei) snarvei.click();
+
+      setTimeout(function () { try {
+        ok("snarveien apner fotballvisningen",
+           !!snarvei && !document.getElementById("fotball").hidden &&
+           document.getElementById("feed").hidden);
+        ok("og pa den ligaen raden gjaldt",
+           location.hash.indexOf("#/fotball/eliteserien/tabell") === 0, location.hash);
+        ok("menyen lukker seg etter trykket",
+           document.getElementById("menuPanel").className.indexOf("open") === -1,
+           document.getElementById("menuPanel").className);
+        // Emnet skal ikke vaere valgt: du ba om tabellen, ikke om saker.
+        ok("feeden filtreres ikke i bakgrunnen",
+           window.__sokUrl === sokFor, sokFor + " -> " + window.__sokUrl);
+        ferdig();
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
     }, 500);
   }, 900); });
 `);
