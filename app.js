@@ -127,11 +127,18 @@ function imageEl(url, lazy) {
 // WordPress leverer titler som HTML. Vi henter ut ren tekst med textContent,
 // som allerede dekoder entiteter én gang — å dekode en gang til ville gjort
 // "&lt;img onerror=...&gt;" om til en levende tag igjen.
+//
+// <template> parser inert, som i sanitizeHtml under, og av samme grunn.
+// Et <div> ville faktisk **lastet** bildet i "<img src=… onerror=…>" — det
+// skjer også i et element som aldri settes inn i dokumentet, og da fyrer
+// onerror. Vi kastet innholdet rett etterpå og beholdt bare teksten, så
+// koden hadde alt kjørt når vi trodde vi var ferdige med å rense.
+// <template> legger innholdet i et DocumentFragment som aldri henter noe.
 function stripHtml(html) {
   if (!html) return "";
-  const div = document.createElement("div");
-  div.innerHTML = html;
-  return (div.textContent || "").trim();
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html;
+  return (tpl.content.textContent || "").trim();
 }
 
 

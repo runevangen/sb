@@ -225,10 +225,49 @@ const SAK_1 = await kjor("feed", FELLES + `
   var saker = lagSaker(12);
   // Slik WordPress returnerer en tittel som bokstavelig inneholder en img-tag.
   saker[0].title.rendered = "&lt;img src=x onerror=&quot;document.body.setAttribute('pwned','ja')&quot;&gt; Toppsak";
+
+  // Den over er entitetskodet, og textContent dekoder den én gang — det har
+  // alltid virket. Denne er en **levende** tag, slik den ser ut om noen
+  // skriver den i WordPress framfor a la editoren kode den. En slik gikk
+  // rett inn i et <div> i stripHtml(), og et <div> parser ikke inert: det
+  // aktiverer det det leser, ogsa i et element som aldri settes inn i
+  // dokumentet. Vi kastet innholdet rett etterpa og beholdt bare teksten,
+  // sa det som ble aktivert hadde alt kjort nar vi trodde vi var ferdige.
+  //
+  // Prøven er et egendefinert element og ikke <img src=… onerror=…>, som er
+  // den ekte trusselen. Grunnen er malbarhet: en bildelasting fyrer fra en
+  // dekodetrad, og under --virtual-time-budget rekker den ikke alltid a
+  // fyre i det hele tatt — en test som noen ganger sier «ingen kode kjorte»
+  // fordi bildet aldri ble lest, beviser ingenting. Et egendefinert element
+  // bygges **synkront** av parseren, og det er samme egenskap som avgjor
+  // begge: <template>-innhold hoerer til et dokument uten nettleserkontekst,
+  // sa der skjer ingen av delene.
+  window.__bygd = [];
+  customElements.define("x-pwn", class extends HTMLElement {
+    constructor() { super(); window.__bygd.push(this.getAttribute("merke") || "?"); }
+  });
+  saker[1].title.rendered = '<x-pwn merke="tittel"></x-pwn> Andre sak';
+
+  // Kontrollen er det som gjor assertionen under verdt noe: samme HTML i
+  // et <div>, slik stripHtml() gjorde det for. Bygges den ikke her, sier
+  // ikke testen noe om <template> heller — da er det proven som er daarlig,
+  // ikke koden som er trygg.
+  var kontroll = document.createElement("div");
+  kontroll.innerHTML = '<x-pwn merke="kontroll"></x-pwn>';
   ` + mockFetch("saker") + `
   window.addEventListener("load", function () { setTimeout(function () {
     var topp = document.querySelector(".hero-title");
     ok("tittel-XSS kjorer ikke kode", !document.body.hasAttribute("pwned"));
+    ok("kontrollen bygges, sa vektoren er ekte i denne nettleseren",
+       window.__bygd.indexOf("kontroll") > -1, window.__bygd.join(","));
+    ok("en levende tag i tittelen aktiveres ikke",
+       window.__bygd.indexOf("tittel") === -1, window.__bygd.join(","));
+    ok("og ingenting av den star igjen i dokumentet",
+       document.querySelectorAll("x-pwn").length === 0,
+       document.querySelectorAll("x-pwn").length);
+    // Fiksen skal ikke endre det leseren ser: teksten er den samme.
+    ok("tittelen vises fortsatt som tekst",
+       document.body.textContent.indexOf("Andre sak") > -1);
     ok("tittel-XSS vises som tekst", topp.textContent.indexOf("<img") === 0, topp.textContent.slice(0, 24));
 
     var tid = document.querySelector(".hero-overlay time");

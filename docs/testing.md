@@ -72,6 +72,14 @@ til angring, og hele fotballmodulen.
   `getCurrentPosition` til å avslå, og tester som trenger en posisjon
   overstyrer den selv. Samme felle gjelder bilder som må hentes — derfor
   godtar `godtattMerke()` `data:image/`.
+- **En bildelasting er ingen god prøve på om noe ble aktivert.** `onerror`
+  fyrer fra en dekodetråd, og under `--virtual-time-budget` rekker den
+  ikke alltid å fyre i det hele tatt — også for en `data:`-URL som feiler
+  uten nettverk. En test som noen ganger sier «ingen kode kjørte» fordi
+  bildet aldri ble lest, beviser ingenting. XSS-testen bruker derfor et
+  **egendefinert element**: det bygges synkront av parseren, og det er
+  samme egenskap som avgjør begge — `<template>`-innhold hører til et
+  dokument uten nettleserkontekst, så der skjer ingen av delene.
 - **`kjor()` tar en valgfri vindusstørrelse.** Høydetesten trenger et
   telefonformat for at taket i det hele tatt skal binde.
 - **Template-literal-feller:** bakstreker spises (bruk enkeltfnutter inne

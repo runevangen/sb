@@ -83,6 +83,10 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 - **En knapp i en knapp finnes ikke.** Trenger en rad to mål, er de
   søsken — eller trykkflata legges utstrakt over innholdet (`.kamp-del`).
 - Artikkel-HTML renses med allowlist. Utvid lista framfor å lage unntak.
+- **Fremmed HTML parses i `<template>`, aldri i et `<div>`.** Gjelder både
+  `sanitizeHtml()` og `stripHtml()`. Et `<div>` aktiverer det det leser —
+  også i et element som aldri settes inn i dokumentet, og også når vi
+  kaster alt utenom teksten rett etterpå.
 - Filtrerer noe feeden, står det som en knapp med kryss i toppfeltet.
 
 ### Data
@@ -106,7 +110,7 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 
     node test/unit.mjs      504 tester
     node test/funksjon.mjs  238 tester
-    node test/run.mjs       425 tester, ~200 s, headless Chromium
+    node test/run.mjs       429 tester, ~200 s, headless Chromium
 
 Tre regler, og de har alle kostet noe:
 
