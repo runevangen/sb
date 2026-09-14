@@ -267,7 +267,10 @@ body {
 .menu-lukk {
   width: 100%;
   margin-top: 4px;
-  padding: 13px 12px;
+  /* 10px og ikke 13: knappen er 38 px hoy, og med margin og gapet over
+     er trykkflata fortsatt over 44. Luften den ga fra seg gikk til
+     emnelista, som er det menyen finnes for. */
+  padding: 10px 12px;
   border: 1px solid var(--border-btn);
   border-radius: 8px;
   background: none;
@@ -436,6 +439,21 @@ body {
   gap: 8px;
 }
 
+/* De to app-handlingene ved siden av hverandre. Footeren tok 38 % av
+   menyen pa en telefon med stor skrift, og da sto det siste emnet halvt
+   under kanten — menyen handler om emnene, ikke om knappene under dem.
+
+   flex framfor grid med to kolonner: «Installer appen» er skjult sa lenge
+   nettleseren ikke tilbyr installasjon, og en tom kolonne ville latt
+   «Del appen» sta pa halve bredden med et hull ved siden av. Med flex:1
+   pa begge tar den ene hele bredden nar den star alene. */
+.action-par {
+  display: flex;
+  gap: 8px;
+}
+
+.action-par .action-btn { flex: 1; }
+
 .action-btn {
   display: flex;
   align-items: center;
@@ -458,6 +476,13 @@ body {
   outline-offset: 2px;
 }
 
+/* display:flex over slar [hidden] fra nettleserens eget stilark, sa uten
+   denne sto «Installer appen» framme overalt — ogsa der nettleseren aldri
+   tilbyr installasjon, og ogsa etter at appen var installert. Knappen lovet
+   noe den ikke kunne gi. Samme grep som .konto-felt[hidden] og de andre:
+   hver regel som setter display ma si hva [hidden] betyr. */
+.action-btn[hidden] { display: none; }
+
 .action-ico {
   font-size: 15px;
   line-height: 1;
@@ -473,6 +498,17 @@ body {
   line-height: 1.5;
   color: var(--text-dim);
 }
+
+/* To lenker pa én linje framfor to avsnitt. Bryter de likevel — lang
+   tekst, stor skrift — er det to linjer, ikke et kuttet ord: skillet er
+   ren dekor og forsvinner ved linjeskift. */
+.action-lenker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.lenke-skille { color: var(--text-faint); }
 
 /* Innloggingen: to felt og en knapp, rett under knappen som apner den.
    Ingen dialog — det er ett sporsmal, og menyen er alt apen. */

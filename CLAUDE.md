@@ -88,6 +88,9 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   også i et element som aldri settes inn i dokumentet, og også når vi
   kaster alt utenom teksten rett etterpå.
 - Filtrerer noe feeden, står det som en knapp med kryss i toppfeltet.
+- **Hver regel som setter `display`, må si hva `[hidden]` betyr.**
+  `display: flex` slår `[hidden]` fra nettleserens eget stilark, og da står
+  et element framme som koden tror den har skjult.
 
 ### Data
 - **Kamp-id er `kampNokkel()`**, ikke kildens id. Alt som lagres, slås opp
@@ -110,7 +113,7 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 
     node test/unit.mjs      504 tester
     node test/funksjon.mjs  238 tester
-    node test/run.mjs       432 tester, ~200 s, headless Chromium
+    node test/run.mjs       435 tester, ~200 s, headless Chromium
 
 Tre regler, og de har alle kostet noe:
 

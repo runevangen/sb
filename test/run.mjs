@@ -698,6 +698,37 @@ const SAK_5 = await kjor("visning", FELLES + `
       ok("ingen knapp ligger inni en annen knapp i menyen",
          document.querySelectorAll("#menuPanel button button").length === 0,
          document.querySelectorAll("#menuPanel button button").length);
+
+      // Footeren tok 38 % av menyen pa en telefon med stor skrift, og da
+      // sto det siste emnet halvt under kanten. Malt med A+ og med
+      // «Installer appen» synlig, som er det verste tilfellet: begge
+      // knappene og alle lenkene inne samtidig.
+      document.documentElement.style.setProperty("--fs", "1.15");
+      document.getElementById("installBtn").hidden = false;
+      // Malt i piksler og ikke i prosent av panelet: panelhoyden folger
+      // testvinduet, og da hadde terskelen sagt noe om vinduet framfor om
+      // footeren. Den var 277 px for og er 196 na; taket er 220.
+      var footerH = document.querySelector(".menu-actions").getBoundingClientRect().height;
+      ok("footeren tar ikke en tredel av menyen", footerH < 220, Math.round(footerH));
+
+      // Del og Installer star pa samme linje. Uten det er footeren en rad
+      // hoyere, og raden er det emnelista mister.
+      var del = document.getElementById("shareBtn").getBoundingClientRect();
+      var inst = document.getElementById("installBtn").getBoundingClientRect();
+      ok("del og installer star pa samme linje",
+         Math.abs(del.top - inst.top) < 2,
+         Math.round(del.top) + " mot " + Math.round(inst.top));
+
+      // Og nar installasjon ikke tilbys — som er det vanlige — skal «Del
+      // appen» ta hele bredden framfor a sta pa halve med et hull ved
+      // siden av. Det er derfor de ligger i flex og ikke i to kolonner.
+      document.getElementById("installBtn").hidden = true;
+      var par = document.querySelector(".action-par").getBoundingClientRect();
+      var alene = document.getElementById("shareBtn").getBoundingClientRect();
+      ok("del appen tar hele bredden nar installer er skjult",
+         Math.abs(alene.width - par.width) < 2,
+         Math.round(alene.width) + " av " + Math.round(par.width));
+      document.documentElement.style.removeProperty("--fs");
       var forsteBrikke = elite && elite.querySelector(".snarvei-knapp");
       ok("snarveien sier hvilken liga den gjelder",
          !!forsteBrikke &&
