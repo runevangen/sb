@@ -13,6 +13,7 @@ Denne fila finnes bare for å peke dit, og for å si hvorfor.
 | `avklaring` | Venter på en avgjørelse, ikke på kode |
 | `prod` | Står ute på `mvp-sb.netlify.app` nå |
 | `sikkerhet` | Hører hjemme i wp-admin på sportsbibelen.no, ikke her |
+| `wordpress` | Krever tilgang til sportsbibelen.no. Kan ikke gjøres herfra |
 | `fotball` | Fotballmodulen (beta) |
 | `uverifisert` | Bygget, men aldri prøvd i virkeligheten |
 | `nattlogg` | Tas etter kl. 23, når ingen bruker appen |
