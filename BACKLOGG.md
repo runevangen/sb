@@ -25,7 +25,10 @@ Denne fila finnes bare for å peke dit, og for å si hvorfor.
   proxy-reglene i `netlify.toml` er smale, og den regelen må stå.
 - **[#65](https://github.com/runevangen/sb/issues/65)** — adminportalen
   virker, og pubene er ført inn av oss. Neste steg er at puben fører
-  inn selv. Veien dit er kortere nå enn da issuen ble skrevet.
+  inn selv. Veien dit er kortere nå enn da issuen ble skrevet — men den
+  går gjennom **[#79](https://github.com/runevangen/sb/issues/79)**:
+  pubene kan ikke skrive til repoet, så visningene må flyttes til
+  Supabase først.
 
 Denne lista pekte en stund til #26, som ble lukket samme dag den ble
 skrevet — Netlify Analytics ble valgt framfor Plausible. Akkurat den
