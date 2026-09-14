@@ -2908,9 +2908,102 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
 `);
 
+/* ---------------- 20B. vennefanen: taket og feilen ---------------- */
+
+// To ting fanen ikke kunne se selv.
+//
+// nesteRunde() holder rundevisningen under taket pa tjue id-er — men bare
+// nar kampene baerer et rundetall. TheSportsDBs kommende kamper gjor ikke
+// alltid det, og uten det er «neste runde» hele vinduet. Da blir to ligaer
+// tjueen id-er, tjenesten kapper ved tjue, og den siste ligaen faller
+// stille ut.
+//
+// Og feiler kallet, sto det «ingen har sagt at de blir med ennå» — en
+// pastand om noe vi ikke vet. I rundevisningen er lista et tillegg til
+// kampen og tausheten riktig; her er lista hele visningen.
+const SAK_20B = await kjor("venner-tak", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  // Uten rundetall, som TheSportsDB gir dem: tjue kamper i ett vindu.
+  var VINDU = [];
+  for (var vk = 0; vk < 20; vk++) {
+    VINDU.push({ id: 2000 + vk, hjemme: "Lag " + vk, borte: "Lag " + (vk + 20),
+      dato: "2026-09-15T17:00:00+00:00", runde: "", arena: "Brann Stadion" });
+  }
+  var PL = [{ id: 901, hjemme: "Arsenal", borte: "Liverpool",
+              dato: "2026-09-19T14:00:00+00:00", arena: "Emirates Stadium",
+              runde: "" }];
+
+  window.__svarKall = 0;
+  window.__spurte = [];
+  window.__svarFeiler = false;
+
+  function svarMed(kropp) {
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("/api/svar") === 0) {
+      window.__svarKall++;
+      if (window.__svarFeiler) {
+        return Promise.resolve({ ok: false, status: 503, statusText: "Service Unavailable",
+          text: function () { return Promise.resolve(JSON.stringify(
+            { feil: "Tabellen «kampsvar» finnes ikke. Kjor docs/oppsett.sql i Supabase." })); } });
+      }
+      // Tjenesten kapper ved tjue id-er, og kappingen er stille: id-ene
+      // etter den tjuende gir ingen feil, de gir ingen rader. Stubben ma
+      // gjore det samme, ellers kan testen ikke se kappingen.
+      var bedt = decodeURIComponent(u.split("kamper=")[1] || "").split(",").slice(0, 20);
+      window.__spurte = window.__spurte.concat(bedt);
+      return svarMed({ svar: bedt.indexOf("901") > -1
+        ? [{ kamp_id: "901", navn: "Kari", hvor: "pub", sted: "Andys", bruker: "u-2" }]
+        : [] });
+    }
+    if (u.indexOf("/api/fotball/neste") === 0) {
+      var pl = u.indexOf("liga=premier") > -1;
+      return svarMed({ liga: pl ? "Premier League" : "Eliteserien", sesong: 2026,
+        sisteSesong: true, kilde: "TheSportsDB", kamper: pl ? PL : VINDU });
+    }
+    if (u.indexOf("/api/fotball") === 0) return svarMed({ kamper: [] });
+    if (u.indexOf("/api/vaer") === 0) return svarMed({ timer: [] });
+    if (u.indexOf("/api/puber") === 0) return svarMed({ grupper: [] });
+    return svarMed(u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker);
+  };
+
+  location.hash = "#/fotball/venner";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var rot = document.getElementById("fotballInnhold");
+
+    ok("uten rundetall deles sporringen framfor a kappes",
+       window.__svarKall > 1, window.__svarKall);
+    ok("og kampen i den andre ligaen blir faktisk spurt om",
+       window.__spurte.indexOf("901") > -1,
+       window.__spurte.length + " id-er, siste: " + window.__spurte.slice(-3).join(","));
+    ok("sa den star i lista", rot.textContent.indexOf("Arsenal") > -1,
+       rot.textContent.slice(0, 140));
+    ok("med den som blir med, én gang", rot.textContent.indexOf("Kari blir med") > -1 &&
+       rot.textContent.indexOf("Kari og Kari") === -1, rot.textContent.slice(0, 200));
+
+    // Feiler kallet, er ikke lista tom — vi vet ikke hva som star i den.
+    window.__svarFeiler = true;
+    document.querySelector("#fotballFaner .segment-del[data-verdi='tabell']").click();
+    setTimeout(function () { try {
+      document.querySelector("#fotballFaner .segment-del[data-verdi='venner']").click();
+      setTimeout(function () { try {
+        ok("en feil sier hva tjenesten sa",
+           rot.textContent.indexOf("kampsvar") > -1, rot.textContent.slice(0, 200));
+        ok("og pastar ikke at ingen blir med",
+           rot.textContent.indexOf("Ingen har sagt at de blir med") === -1,
+           rot.textContent.slice(0, 200));
+        ferdig();
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
+`);
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_18B, ...SAK_19, ...SAK_19A, ...SAK_19B, ...SAK_19C, ...SAK_20];
+const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_18B, ...SAK_19, ...SAK_19A, ...SAK_19B, ...SAK_19C, ...SAK_20, ...SAK_20B];
 let feilet = 0;
 
 for (const t of alle) {

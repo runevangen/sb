@@ -16,6 +16,13 @@ export const NAVN_MAKS = 24;
 // for at en kamp ikke skal kunne fylles opp av en robot.
 export const SVAR_MAKS = 60;
 
+// Hvor mange kamper én sporring kan spore om. Grensa finnes for at
+// adressen ikke skal kunne vokse til noe som spor om hele sesongen — men
+// da ma den som sporr kjenne den ogsa, ellers faller de siste kampene
+// stille ut av svaret. Derfor star den her, delt mellom appen og
+// tjenesten, som navnereglene og PIN-reglene.
+export const KAMPER_MAKS = 20;
+
 export function normaliserNavn(verdi) {
   return String(verdi == null ? "" : verdi).replace(/\s+/g, " ").trim().slice(0, NAVN_MAKS);
 }

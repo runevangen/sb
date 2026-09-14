@@ -17,14 +17,10 @@
 // de, svarer funksjonen 503 og sier hva som mangler, framfor å sende en
 // PostgREST-feil videre til leseren.
 
-import { tolkSvar, svarRad, gyldigNavn, SVAR_MAKS } from "../../svar-data.js";
+import { tolkSvar, svarRad, gyldigNavn, SVAR_MAKS, KAMPER_MAKS } from "../../svar-data.js";
 
 const TABELL = "kampsvar";
 const FELT = "kamp_id,navn,hvor,sted,bruker";
-
-// En runde er ti kamper. Taket finnes for at adressen ikke skal kunne
-// vokse til noe som spør om hele sesongen i ett kall.
-const KAMPER_MAKS = 20;
 
 export default async (req) => {
   const mangler = manglerIOppsettet();

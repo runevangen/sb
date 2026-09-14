@@ -10,7 +10,7 @@
 import { LIGAER, DELER, FANER, DEL_NAVN, HVOR, STED_MAKS, delingstekst,
          kamplenke, invitasjonstekst, stedtekst, nesteRunde } from "./fotball-data.js";
 import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
-         loftMedSvar, bareMedSvar, stederFraSvar, perSted,
+         loftMedSvar, bareMedSvar, stederFraSvar, perSted, KAMPER_MAKS,
          stedNokkel, blirMedLinje, mittSted } from "./svar-data.js";
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
@@ -364,21 +364,22 @@ async function visVenner(rot) {
     return;
   }
 
-  // Hvem som blir med, i ett kall for alle ligaene samlet.
-  let svar = [];
-  try {
-    const ider = kamper.map((k) => k.id).filter((id) => id != null);
-    const respons = await fetch("/api/svar?kamper=" + encodeURIComponent(ider.join(",")),
-      { headers: { "Accept": "application/json" } });
-    const json = JSON.parse(await respons.text());
-    if (respons.ok && !json.feil) svar = tolkSvar(json.svar);
-  } catch (err) {
-    // Stille: lista er et tillegg til kampene, ikke kampene.
-  }
+  // Hvem som blir med, for alle ligaene samlet.
+  const hentet = await hentSvarFor(kamper.map((k) => k.id).filter((id) => id != null));
   if (aktivDel !== "venner") return;
 
-  sisteSvar = svar;
-  const med = bareMedSvar(kamper, perKamp(svar));
+  // Her er lista hele visningen, ikke et tillegg til kampen. Feiler
+  // kallet, skal det sta — «ingen har sagt at de blir med» ville pastatt
+  // noe vi ikke vet. Det er samme regel som ellers i appen: en stille tom
+  // liste er ikke til a skille fra et tomt svar, og da er det den som
+  // leter som betaler.
+  if (hentet.feil) {
+    rot.replaceChildren(tilstand(hentet.feil));
+    return;
+  }
+
+  sisteSvar = hentet.svar;
+  const med = bareMedSvar(kamper, perKamp(hentet.svar));
 
   if (!med.length) {
     // Tom til noen svarer — og da er nettopp den lista hele poenget. Da
@@ -1308,20 +1309,53 @@ async function hentSvar(rot, del, data) {
   const ider = viste.map((k) => k.id).filter((id) => id != null);
   if (!ider.length) return;
 
-  try {
-    const respons = await fetch("/api/svar?kamper=" + encodeURIComponent(ider.join(",")),
-      { headers: { "Accept": "application/json" } });
-    const json = JSON.parse(await respons.text());
-    // Stille her, med vilje: lista er et tillegg til kampen, ikke kampen.
-    // En feilmelding under hver eneste rad ville dekket over runden. Den
-    // som faktisk trykker «Jeg blir med», far beskjed — det er der man
-    // venter et svar.
-    if (!respons.ok || json.feil) return;
-    sisteSvar = tolkSvar(json.svar);
-  } catch (err) {
-    return;
-  }
+  const hentet = await hentSvarFor(ider);
+  // Stille her, med vilje: lista er et tillegg til kampen, ikke kampen.
+  // En feilmelding under hver eneste rad ville dekket over runden. Den som
+  // faktisk trykker «Jeg blir med», far beskjed — det er der man venter et
+  // svar. Vennefanen er det motsatte: der er lista alt som finnes.
+  if (hentet.feil) return;
+  sisteSvar = hentet.svar;
   tegnSvar(rot);
+}
+
+// Svarene for kampene som star pa skjermen, uansett hvor mange de er.
+//
+// Tjenesten kapper spørringen ved KAMPER_MAKS id-er, og kappingen er
+// stille: id-ene etter den tjuende gir ingen feil, de gir ingen rader.
+// nesteRunde() holder rundevisningen godt under taket — men bare nar
+// kampene baerer et rundetall. TheSportsDBs kommende kamper gjor ikke
+// alltid det, og uten det er «neste runde» hele vinduet: tre ligaer i
+// vennefanen blir seksti id-er, og de to siste ligaene faller ut. Det er
+// nettopp de fanen finnes for.
+//
+// Derfor deles spørringen opp framfor a kappes. Tre kall for tre ligaer,
+// ikke ett per kamp — og bare i den ene fanen som spor om sa mange.
+async function hentSvarFor(ider) {
+  const bunter = [];
+  for (let i = 0; i < ider.length; i += KAMPER_MAKS) {
+    bunter.push(ider.slice(i, i + KAMPER_MAKS));
+  }
+
+  const svar = [];
+  let feil = "";
+
+  await Promise.all(bunter.map(async (bunt) => {
+    try {
+      const respons = await fetch("/api/svar?kamper=" + encodeURIComponent(bunt.join(",")),
+        { headers: { "Accept": "application/json" } });
+      const json = JSON.parse(await respons.text());
+      if (!respons.ok || json.feil) {
+        feil = feil || String(json.feil || "Tjenesten svarte " + respons.status) + hvemSviktet(json);
+        return;
+      }
+      tolkSvar(json.svar).forEach((s) => svar.push(s));
+    } catch (err) {
+      feil = feil || "Klarte ikke å hente hvem som blir med.";
+    }
+  }));
+
+  return { svar, feil };
 }
 
 function tegnSvar(rot) {

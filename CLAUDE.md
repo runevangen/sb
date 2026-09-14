@@ -886,6 +886,24 @@ er i seg selv noe om adressen.
   tjue kamper hver ga 40 id-er, og den andre ligaen falt stille ut — og
   det er nettopp den fanen finnes for. Testen gir hver liga tre runder à
   åtte og sjekker at spørringen holder seg under taket.
+- **Men `nesteRunde()` holder bare taket når kampene bærer et rundetall.**
+  TheSportsDBs kommende kamper gjør ikke alltid det (`intRound` mangler),
+  og uten det er «neste runde» hele vinduet: to ligaer blir 21 id-er,
+  tjenesten kapper ved tjue, og den siste ligaen faller stille ut igjen.
+  `hentSvarFor()` i `fotball.js` deler derfor spørringen i bunter på
+  `KAMPER_MAKS` framfor å la den kappes — tre kall for tre ligaer, ikke
+  ett per kamp, og bare i den ene fanen som spør om så mange. Taket står i
+  `svar-data.js`, delt mellom appen og funksjonen: blir de to uenige om
+  det, kapper tjenesten noe appen tror den har spurt om. Testen gir en
+  liga tjue kamper uten rundetall, og stubben kapper ved tjue som
+  tjenesten gjør — ellers kan testen ikke se kappingen.
+- **Feiler `/api/svar`, sier vennefanen det.** I rundevisningen er
+  tausheten riktig: lista er et tillegg til kampen, og en feilmelding
+  under hver rad ville dekket over runden. I vennefanen *er* lista hele
+  visningen, og «Ingen har sagt at de blir med ennå» er da en påstand om
+  noe vi ikke vet — samme felle som en manglende RLS-regel, der en stille
+  tom liste ikke er til å skille fra «ingen har svart». Tjenestens egen
+  melding står nå i stedet, med `hvemSviktet()` som ellers.
 - **Kampene noen blir med på løftes øverst**, i to merkede bolker: «2
   kamper noen blir med på» og «Resten av runden». Ikke som en flat
   omstokking — lista har dagskiller, og en søndagskamp løftet over
@@ -1007,7 +1025,7 @@ er i seg selv noe om adressen.
 
     node test/unit.mjs      438 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  238 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       391 tester, ~200 s, headless Chromium
+    node test/run.mjs       397 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og
