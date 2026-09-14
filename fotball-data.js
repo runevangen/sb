@@ -91,6 +91,9 @@ export const LIGAER = {
   // som en kobling som virker.
   eliteserien: { id: 103, tsdb: 4358, navn: "Eliteserien", land: "Norge", sesong: "kalender", kategorier: [] },
   premier: { id: 39, tsdb: 4328, navn: "Premier League", land: "England", sesong: "host-var", kategorier: [] },
+  laliga: { id: 140, tsdb: 4335, navn: "La Liga", land: "Spania", sesong: "host-var", kategorier: [] },
+  bundesliga: { id: 78, tsdb: 4331, navn: "Bundesliga", land: "Tyskland", sesong: "host-var", kategorier: [] },
+  seriea: { id: 135, tsdb: 4332, navn: "Serie A", land: "Italia", sesong: "host-var", kategorier: [] },
 };
 
 // Ligaen en nyhetskategori handler om, eller null.
@@ -152,13 +155,21 @@ export function tilgjengeligSesong(liga, naa, vindu) {
   return ekte;
 }
 
-// Gratisnivaet gir 100 kall i dognet. Tre datasett for to ligaer, hvert
-// oppfrisket hver time, ville blitt 144 — over taket for noen har apnet
-// appen to ganger. Levetidene under gir 72, og lar tabellen stivne litt
-// framfor resultatene, som er det leserne kommer tilbake for.
+// Gratisnivaet gir 100 kall i dognet, og levetidene er prisen vi betaler
+// for antall ligaer. To ligaer med tabell hver tredje time og resultater
+// hver time kostet 36 kall hver — 72 av hundre, og en tredje liga ville
+// sprengt taket. Fem ligaer ma derfor ned i 16 hver: tabell hver sjette
+// time (4), resultater hver tredje (8), neste runde hver sjette (4).
+// 5 x 16 = 80.
+//
+// Resultatene star fortsatt ferskest av de tre — det er dem leserne
+// kommer tilbake for — men en tabell som er tre timer gammel og en som er
+// seks er samme tabell mellom rundene. Skal en sjette liga inn, er det
+// disse tallene som ma gi etter, ikke kvoten: enhetstesten regner det ut
+// og slar ut foer det skjer.
 export const LEVETID = {
-  tabell: 3 * 3600,
-  resultater: 1 * 3600,
+  tabell: 6 * 3600,
+  resultater: 3 * 3600,
   neste: 6 * 3600,
 };
 

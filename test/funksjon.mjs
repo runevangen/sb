@@ -145,7 +145,7 @@ ok("svaret sier at sesongen ikke er inneværende",
    kropp.sisteSesong === false, String(kropp.sisteSesong));
 
 const kant = r.headers.get("Netlify-CDN-Cache-Control") || "";
-ok("svaret caches pa kanten i tre timer", kant.indexOf("s-maxage=10800") > -1, kant);
+ok("tabellen caches pa kanten i seks timer", kant.indexOf("s-maxage=21600") > -1, kant);
 // Uten durable ville hver Netlify-region hentet sitt eget eksemplar, og
 // dognkvoten ganget seg opp med antall regioner leserne kommer fra.
 ok("cachen er delt for hele kanten", kant.indexOf("durable") > -1, kant);
@@ -190,8 +190,8 @@ ok("resultater sporr om spilte kamper",
 // Nyeste forst: API-et gir dem i stigende rekkefolge, og en resultatliste
 // som begynner med den eldste kampen leses feil vei.
 ok("nyeste resultat star forst", res.kamper[0].hjemme === "Molde", res.kamper[0].hjemme);
-ok("resultater caches en time",
-   (r.headers.get("Netlify-CDN-Cache-Control") || "").indexOf("s-maxage=3600") > -1,
+ok("resultater caches i tre timer",
+   (r.headers.get("Netlify-CDN-Cache-Control") || "").indexOf("s-maxage=10800") > -1,
    r.headers.get("Netlify-CDN-Cache-Control"));
 
 kall = stub({ errors: [], response: [

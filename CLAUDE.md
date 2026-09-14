@@ -570,6 +570,23 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
   `Netlify-CDN-Cache-Control` og `durable`, som gir én delt cache i stedet
   for én per region. Levetidene står i `LEVETID` i `fotball-data.js`, og
   en enhetstest slår ut hvis en ny liga sprenger kvoten.
+- **Levetidene er prisen for antall ligaer, og kvoten er den som ikke gir
+  etter.** To ligaer med tabell hver tredje time og resultater hver time
+  kostet 36 kall hver — 72 av hundre, og en tredje liga sprengte taket.
+  Fem ligaer (Eliteserien, Premier League, La Liga, Bundesliga, Serie A)
+  koster 16 hver: tabell hver sjette time, resultater hver tredje, neste
+  runde hver sjette. 5 × 16 = 80. Resultatene står fortsatt ferskest av de
+  tre — det er dem leserne kommer tilbake for — men mellom rundene er en
+  tabell fra i formiddag den samme tabellen.
+  Enhetstesten regner på `LIGAER` slik den faktisk står, ikke på et tall
+  skrevet inn i testen: et tall der ville blitt stående når en liga kom
+  til. Og den vokter begge veier — kvoten kan alltid holdes ved å la alt
+  bli gammelt, så ingen levetid får være lengre enn et halvt døgn.
+- `tsdb`-id-ene er TheSportsDBs egne: 4358 Eliteserien, 4328 Premier
+  League, 4335 La Liga, 4331 Bundesliga, 4332 Serie A. En feil id her
+  gir ikke en feilmelding — den gir en annen ligas tabell under riktig
+  navn, som er verre. `/api/fotball/tabell?liga=<nøkkel>` i nettleseren
+  er sjekken: står det riktige lag i tabellen, er id-en riktig.
 - Feilsvar caches aldri (`no-store`). Ellers ville et blaff låst seg fast
   i timevis.
 - API-et svarer 200 også når noe er galt og legger feilen i `errors`.
@@ -1164,7 +1181,7 @@ er i seg selv noe om adressen.
 
     node test/unit.mjs      484 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  238 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       412 tester, ~200 s, headless Chromium
+    node test/run.mjs       413 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

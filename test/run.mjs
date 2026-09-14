@@ -938,7 +938,12 @@ const SAK_6 = await kjor("fotball", FELLES + FOTBALL + `
         // Ligaene er ikke borte — de byttes der man alt star.
         var ligaKnapper = document.querySelectorAll("#ligaVelger .segment-del");
         ok("ligaene byttes i fotballvisningen, ikke i menyen",
-           ligaKnapper.length === 2, ligaKnapper.length);
+           ligaKnapper.length === 5, ligaKnapper.length);
+        // Tallet alene ville statt gront om en liga byttet plass med en
+        // annen, sa en av de nye navngis.
+        ok("og de nye ligaene star i velgeren",
+           !!document.querySelector("#ligaVelger .segment-del[data-verdi='laliga']"),
+           document.getElementById("ligaVelger").textContent);
         document.getElementById("menuClose").click();
 
         document.querySelector("#fotballFaner .segment-del[data-verdi='resultater']").click();
@@ -1681,9 +1686,10 @@ const SAK_15 = await kjor("admin", `
        puber.textContent.indexOf("usikker") === -1);
 
     var ligaer = document.getElementById("liga");
+    var ligaVerdier = Array.prototype.map.call(ligaer.options, function (o) { return o.value; });
     ok("ligaene kommer fra fotballmodulen",
-       ligaer.options.length === 2 && ligaer.options[0].value === "eliteserien",
-       Array.prototype.map.call(ligaer.options, function (o) { return o.value; }).join(","));
+       ligaVerdier.length === 5 && ligaVerdier[0] === "eliteserien" &&
+       ligaVerdier.indexOf("laliga") > -1, ligaVerdier.join(","));
 
     // Uten passord skjer ingenting: portalen ber ikke tjenesten om noe.
     document.getElementById("loggInn").click();
@@ -2970,11 +2976,14 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
         : [] });
     }
     if (u.indexOf("/api/fotball/neste") === 0) {
-      var pl = u.indexOf("liga=premier") > -1;
-      window.__ligaer.push(pl ? "premier" : "eliteserien");
-      return svarMed({ liga: pl ? "Premier League" : "Eliteserien", sesong: 2026,
-        sisteSesong: true, kilde: "TheSportsDB", runde: "Runde 5",
-        kamper: pl ? PL : VINDU });
+      // Stubben svarer per liga. Lot den alt som ikke var Premier League
+      // fa det samme vinduet, ville de tre ovrige ligaene gitt de samme
+      // kamp-id-ene om igjen — og «Kari og Kari» i lista.
+      var nokkel = (decodeURIComponent(u).split("liga=")[1] || "").split("&")[0];
+      window.__ligaer.push(nokkel);
+      var egne = nokkel === "premier" ? PL : nokkel === "eliteserien" ? VINDU : [];
+      return svarMed({ liga: nokkel, sesong: 2026,
+        sisteSesong: true, kilde: "TheSportsDB", runde: "Runde 5", kamper: egne });
     }
     if (u.indexOf("/api/fotball") === 0) return svarMed({ kamper: [] });
     if (u.indexOf("/api/vaer") === 0) return svarMed({ timer: [] });

@@ -880,11 +880,18 @@ ok("arvede navn oversettes ikke",
 /* ---------------- fotball: dognkvoten ---------------- */
 
 // Gratisnivaet gir 100 kall i dognet. Slar denne ut, er en levetid satt
-// for kort eller en liga lagt til uten a regne pa det.
-ok("to ligaer holder seg under dognkvoten",
-   kallPerDogn(2) <= 100, kallPerDogn(2));
-ok("en tredje liga sprenger den, og skal merkes her",
-   kallPerDogn(3) > 100, kallPerDogn(3));
+// for kort eller en liga lagt til uten a regne pa det. Tallet regnes av
+// de ligaene som faktisk star i LIGAER, ikke av et tall skrevet inn her:
+// et tall her ville blitt staende nar en liga kom til.
+ok("ligaene vi har holder seg under dognkvoten",
+   kallPerDogn(Object.keys(LIGAER).length) <= DOGNKVOTE,
+   kallPerDogn(Object.keys(LIGAER).length));
+// Det omvendte vernet. Kvoten kan alltid holdes ved a la alt bli gammelt,
+// og da star testen over gronn mens tabellen er et dogn gammel. Et halvt
+// dogn er taket: lenger, og tallene er ikke lenger dagens.
+ok("og ingen levetid er sa lang at tallene blir gamle",
+   Object.keys(LEVETID).every((del) => LEVETID[del] <= 12 * 3600),
+   JSON.stringify(LEVETID));
 ok("resultater friskes opp oftere enn tabellen",
    LEVETID.resultater < LEVETID.tabell);
 
