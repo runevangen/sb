@@ -226,15 +226,21 @@ hjemme der — ingen DOM, ingen nettverk, ingen lagring — så legg den der.
 - Ruting: `#/fotball/<liga>/<del>`, begge ledd valgfrie og gjenkjent på
   innhold framfor rekkefølge. Ukjente ledd faller tilbake til standard, så
   en klippet lenke åpner noe framfor ingenting.
-- **Menyen er én liste, og emnene bærer snarveiene.** Den byttet innhold
-  før — kategorier i nyheter, ligaer i fotball — og det var én knapp som
-  ga to verdener, avhengig av en tilstand du ikke ser mens menyen er
-  åpen. Meldt som «to hamburgermenyer» 14. september 2026, og det var
-  nettopp poenget: de *så* ut som to.
+- **Menyen er den samme uansett hvor du står, og emnene bærer
+  snarveiene.** Den byttet innhold før — kategorier i nyheter, ligaer i
+  fotball — og det var én knapp som ga to verdener, avhengig av en
+  tilstand du ikke ser mens menyen er åpen. Meldt som «to
+  hamburgermenyer» 14. september 2026, og det var nettopp poenget: de
+  *så* ut som to.
   Nå står «Tabell» og «Kamper» som brikker til høyre på de emnene som
-  faktisk er en liga vi har data for. Ligameny-listen står igjen for
-  fotballvisningen, men grensa er ikke lenger noe leseren må krysse for å
-  finne tabellen.
+  faktisk er en liga vi har data for, og `visMeny()` har ingen gren på
+  visning i det hele tatt.
+  Ligaene er ikke borte: de byttes i `#ligaVelger` i selve
+  fotballvisningen, der man alt står når man skal bytte liga. Menyen
+  skulle aldri vært det andre stedet — `renderLigameny()` er slettet, og
+  nettlesertesten sjekker at menyen viser de samme emnene i fotball som i
+  nyheter, at det ikke finnes en ligaliste i stedet, og at ligavelgeren
+  fortsatt står i visningen.
 - `ligaForKategori()` i `fotball-data.js` er koblingen, og den matcher på
   **navnet** med samme `normaliserLagnavn` som lagnavnene: heter
   kategorien «Eliteserien», treffer den uten at noen har ført opp noe.
@@ -1104,9 +1110,9 @@ er i seg selv noe om adressen.
 
 ## Testing
 
-    node test/unit.mjs      458 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      473 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  238 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       408 tester, ~200 s, headless Chromium
+    node test/run.mjs       409 tester, ~200 s, headless Chromium
 
 Tallene telles av testene selv. De sto en stund som konstanter, og da
 gled de fra virkeligheten: enhetstestene meldte 271 mens 279 kjørte, og

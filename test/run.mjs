@@ -910,14 +910,22 @@ const SAK_6 = await kjor("fotball", FELLES + FOTBALL + `
       ok("lagnavnet er en knapp, ikke bare tekst",
          lagKnapp && lagKnapp.tagName === "BUTTON", lagKnapp && lagKnapp.tagName);
 
-      // Menyen skal beskrive visningen du star i.
+      // Menyen skal vaere den samme uansett hvor du star. For byttet den
+      // innhold her — ligaer i stedet for kategorier — og samme knapp ga
+      // to verdener, avhengig av en tilstand man ikke ser mens menyen er
+      // apen.
       document.getElementById("menuBtn").click();
       setTimeout(function () {
-        var punkter = document.querySelectorAll(".menu-item");
-        var navn = Array.prototype.map.call(punkter, function (b) { return b.dataset.liga; });
-        ok("menyen viser ligaer i fotball", navn.indexOf("premier") > -1, navn.join(","));
-        ok("nyhetskategoriene er ute av veien",
-           !document.querySelector(".menu-item[data-cat-id]"));
+        ok("menyen viser de samme emnene i fotball som i nyheter",
+           !!document.querySelector(".menu-item[data-cat-id]"),
+           document.getElementById("menuList").textContent.slice(0, 80));
+        ok("og ingen egen ligaliste i stedet",
+           !document.querySelector(".menu-item[data-liga]"),
+           document.getElementById("menuList").textContent.slice(0, 80));
+        // Ligaene er ikke borte — de byttes der man alt star.
+        var ligaKnapper = document.querySelectorAll("#ligaVelger .segment-del");
+        ok("ligaene byttes i fotballvisningen, ikke i menyen",
+           ligaKnapper.length === 2, ligaKnapper.length);
         document.getElementById("menuClose").click();
 
         document.querySelector("#fotballFaner .segment-del[data-verdi='resultater']").click();
