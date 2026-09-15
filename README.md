@@ -41,9 +41,15 @@ tømmer også kant-cachen, så funksjonene leser miljøet på nytt.
 parallelt. En rød test er en rapport, ikke en vakt
 ([#77](https://github.com/runevangen/sb/issues/77)).
 
-**Adminportalen har skrevet noe galt.** `visninger.js` er gyldig JSON inni
-en `export`, nettopp for at den skal kunne rettes for hånd. Rediger,
-commit, ferdig.
+**Adminportalen har skrevet noe galt.** Visningene er rader i tabellen
+`visninger` i Supabase, ikke en fil i repoet ([ADR
+0018](docs/adr/0018-visninger-i-supabase.md)). Rett eller slett raden i
+Supabases tabellredigerer.
+
+**Og merk hva det betyr for rollback:** å publisere en tidligere deploy
+ruller tilbake *koden*, ikke *dataene*. En feil pubvisning, et «jeg blir
+med» eller en konto står der etterpå. Før lå visningene i repoet, og da
+fulgte de med tilbake. Det gjør de ikke nå.
 
 **En funksjon svarer 503.** Da mangler en miljøvariabel, og svaret sier
 hvilken. To ting gjelder alle: funksjonene leser miljøet **ved utrulling**
