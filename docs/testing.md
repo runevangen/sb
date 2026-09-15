@@ -1,6 +1,6 @@
 # Testing
 
-    node test/unit.mjs      504 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      509 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  238 tester, ~250 ms, ingen nettleser
     node test/run.mjs       435 tester, ~200 s, headless Chromium
 

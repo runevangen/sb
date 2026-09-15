@@ -14,7 +14,7 @@ deployer på push til `main`.
 
 ```sh
 git clone https://github.com/runevangen/sb.git && cd sb
-node test/unit.mjs        # 504 tester, ~90 ms
+node test/unit.mjs        # 509 tester, ~90 ms
 node test/funksjon.mjs    # 238 tester, ~250 ms
 node test/run.mjs         # 435 tester, krever Chromium
 ```

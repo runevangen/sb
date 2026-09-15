@@ -167,12 +167,31 @@ export function sistInneTekst(iso, naa = Date.now()) {
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return "—";
 
-  const dager = Math.floor((naa - t) / 86400000);
+  // Kalenderdogn i Oslo, ikke forlopte 24-timersperioder. Forskjellen er
+  // ikke akademisk: (naa - t) / 86400000 ga «I dag 23:00» klokka 01:00
+  // natt til dagen etter — et tidspunkt som ikke har vaert enda. Meldt fra
+  // adminportalen 15. september 2026 som «bruker har vaert inne i dag for
+  // tiden er mulig».
+  //
+  // Selve klokkeslettet var riktig hele tiden; det er bucketet «i dag /
+  // i gar» som var regnet ut feil. Derfor sa den feil bare mellom midnatt
+  // og samme klokkeslett neste dag — og derfor sto den sa lenge.
+  const dager = osloDogn(naa) - osloDogn(t);
   const klokke = new Date(t).toLocaleTimeString("nb-NO",
     { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Oslo" });
-  if (dager <= 0) return "I dag " + klokke;
+  if (dager === 0) return "I dag " + klokke;
   if (dager === 1) return "I går " + klokke;
-  if (dager < 7) return dager + " dager siden";
+  // Negativt betyr en dato fram i tid — klokkeavvik hos tjenesten, eller
+  // en rad vi har lest feil. Da er datoen aerligere enn «I dag».
+  if (dager > 1 && dager < 7) return dager + " dager siden";
   return new Date(t).toLocaleDateString("nb-NO",
     { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Oslo" });
+}
+
+// Hvilket dogn et tidspunkt tilhorer i Oslo, talt fra epoken. en-CA gir
+// datoen pa ISO-form («2026-09-15»), og Date.parse leser en ren dato som
+// midnatt UTC — sa differansen blir hele dogn uansett sommertid.
+function osloDogn(ms) {
+  const dato = new Date(ms).toLocaleDateString("en-CA", { timeZone: "Europe/Oslo" });
+  return Math.round(Date.parse(dato) / 86400000);
 }
