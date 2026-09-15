@@ -13,6 +13,7 @@ import vaer from "../netlify/functions/vaer.mjs";
 import puber from "../netlify/functions/puber.mjs";
 import { OVERPASS_SPEIL } from "../pub-data.js";
 import visninger from "../netlify/functions/visninger.mjs";
+import pubForslag from "../netlify/functions/pub-forslag.mjs";
 import konto from "../netlify/functions/konto.mjs";
 import brukere from "../netlify/functions/brukere.mjs";
 import svarfunksjon from "../netlify/functions/svar.mjs";
@@ -759,6 +760,147 @@ r = await visninger(lagre());
 const nektet = await r.json();
 ok("nekter databasen skrivingen, sies det med ord",
    r.status === 401 && nektet.feil.indexOf("visning_skrivere") > -1, nektet.feil);
+
+delete process.env.ADMIN_PASSORD;
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_ANON_KEY;
+
+/* ---------------- steder lesere sender inn (#80) ---------------- */
+
+// En ko, ikke lista. Innsendingen gar med leserens egen okt; koen leses
+// med ADMIN_PASSORD **og** en okt som star i visning_skrivere.
+
+const FORSLAG_OKT = "lesers-okt-token";
+
+function stubForslag(rader, status) {
+  const kall = [];
+  global.fetch = async (url, opsjoner) => {
+    const o = opsjoner || {};
+    kall.push({ url: String(url), metode: o.method || "GET", opsjoner: o });
+    if (status && status !== 200) {
+      return new Response(JSON.stringify({ message: "nei", code: status === 503 ? "42P01" : "x" }),
+        { status: status === 503 ? 400 : status });
+    }
+    if (o.method === "POST" || o.method === "PATCH") {
+      return new Response(JSON.stringify(rader === undefined
+        ? [{ id: "11111111-2222-3333-4444-555555555555", navn: "Bar Boca",
+             adresse: "Storgata 1", viser_fotball: true, status: "ny" }]
+        : rader), { status: 201 });
+    }
+    return new Response(JSON.stringify(rader || []), { status: 200 });
+  };
+  return kall;
+}
+
+function forslagBe(kropp) {
+  return new Request("https://mvp-sb.netlify.app/api/pub-forslag", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(kropp),
+  });
+}
+
+const ET_FORSLAG = { token: FORSLAG_OKT, navn: "Bar Boca", adresse: "Storgata 1",
+  viserFotball: true };
+
+delete process.env.ADMIN_PASSORD;
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_ANON_KEY;
+kall = stubForslag();
+r = await pubForslag(forslagBe(ET_FORSLAG));
+ok("uten oppsett svarer innsendingen 503", r.status === 503, r.status);
+ok("og ingenting ble sendt noe sted", kall.length === 0, kall.length);
+
+process.env.ADMIN_PASSORD = PASSORD;
+process.env.SUPABASE_URL = "https://prosjekt.supabase.co";
+process.env.SUPABASE_ANON_KEY = "anon-nokkel";
+
+// Uten okt er det ingenting a skrive med, og da skal det sta hvorfor.
+kall = stubForslag();
+r = await pubForslag(forslagBe(Object.assign({}, ET_FORSLAG, { token: "" })));
+const utenInnlogging = await r.json();
+ok("uten innlogging avvises innsendingen", r.status === 401, r.status);
+ok("og meldinga ber deg logge inn",
+   utenInnlogging.feil.indexOf("Logg inn") > -1, utenInnlogging.feil);
+ok("uten a rore Supabase", kall.length === 0, kall.length);
+
+// Samme sjekk som appen gjor, fra den samme fila.
+kall = stubForslag();
+r = await pubForslag(forslagBe(Object.assign({}, ET_FORSLAG, { adresse: "" })));
+ok("uten adresse avvises forslaget", r.status === 400, r.status);
+ok("og det nar ikke basen", kall.length === 0, kall.length);
+
+kall = stubForslag();
+r = await pubForslag(forslagBe(ET_FORSLAG));
+const sendt = await r.json();
+ok("et fullt forslag lagres", r.status === 200 && sendt.ok === true,
+   r.status + " " + JSON.stringify(sendt));
+ok("svaret sier at noen skal se pa det",
+   sendt.merknad.indexOf("sjekket adressen") > -1, sendt.merknad);
+const skrivKall = kall.find((k) => k.metode === "POST");
+ok("skrivingen gar med leserens egen okt",
+   skrivKall.opsjoner.headers["Authorization"] === "Bearer " + FORSLAG_OKT,
+   skrivKall.opsjoner.headers["Authorization"]);
+ok("og raden sender aldri foreslatt_av eller status",
+   !("foreslatt_av" in JSON.parse(skrivKall.opsjoner.body))
+   && !("status" in JSON.parse(skrivKall.opsjoner.body)), skrivKall.opsjoner.body);
+
+// En skriving som svarer 200 er ikke bevis pa at raden ligger der.
+kall = stubForslag([]);
+r = await pubForslag(forslagBe(ET_FORSLAG));
+ok("et tomt svar pa skrivingen meldes som feil", r.status === 502, r.status);
+
+// Koen: passordet forst, og det nar aldri Supabase nar det er feil.
+kall = stubForslag();
+r = await pubForslag(forslagBe({ handling: "liste", passord: "feil", token: FORSLAG_OKT }));
+ok("feil passord slipper ikke inn i koen", r.status === 401, r.status);
+ok("og nar aldri Supabase", kall.length === 0, kall.length);
+
+kall = stubForslag();
+r = await pubForslag(forslagBe({ handling: "liste", passord: PASSORD, token: "" }));
+ok("riktig passord uten okt slipper heller ikke inn", r.status === 401, r.status);
+ok("og nar heller ikke Supabase", kall.length === 0, kall.length);
+
+kall = stubForslag([{ id: "11111111-2222-3333-4444-555555555555", navn: "Bar Boca",
+  adresse: "Storgata 1", viser_fotball: true, foreslatt: "2026-09-15T08:00:00Z", status: "ny" }]);
+r = await pubForslag(forslagBe({ handling: "liste", passord: PASSORD, token: FORSLAG_OKT }));
+const koen = await r.json();
+ok("koen leses med bade passord og okt",
+   r.status === 200 && koen.forslag.length === 1, r.status + " " + JSON.stringify(koen));
+ok("og den leses med admins egen okt",
+   kall[0].opsjoner.headers["Authorization"] === "Bearer " + FORSLAG_OKT);
+ok("adminpassordet nar aldri Supabase",
+   kall.every((k) => JSON.stringify(k.opsjoner).indexOf(PASSORD) === -1));
+
+// Id-en gar inn i en adresse, sa den sjekkes mot formen en uuid har.
+kall = stubForslag();
+r = await pubForslag(forslagBe({ handling: "behandle", passord: PASSORD,
+  token: FORSLAG_OKT, id: "ikke-en-uuid", status: "avvist" }));
+ok("en id som ikke er en uuid avvises", r.status === 400, r.status);
+ok("og den nar ikke basen", kall.length === 0, kall.length);
+
+// «ny» er default i basen. A sette den herfra ville vaert a melde noe
+// ubehandlet som behandlet, og det er ingen gyldig handling.
+kall = stubForslag();
+r = await pubForslag(forslagBe({ handling: "behandle", passord: PASSORD,
+  token: FORSLAG_OKT, id: "11111111-2222-3333-4444-555555555555", status: "ny" }));
+ok("status ny kan ikke settes herfra", r.status === 400, r.status);
+
+kall = stubForslag([{ id: "11111111-2222-3333-4444-555555555555", navn: "Bar Boca",
+  adresse: "Storgata 1", status: "lagt-inn" }]);
+r = await pubForslag(forslagBe({ handling: "behandle", passord: PASSORD,
+  token: FORSLAG_OKT, id: "11111111-2222-3333-4444-555555555555", status: "lagt-inn" }));
+ok("et forslag kan merkes som lagt inn",
+   r.status === 200 && (await r.json()).ok === true, r.status);
+ok("og det gar som PATCH pa den ene id-en",
+   kall[0].metode === "PATCH" && kall[0].url.indexOf("id=eq.11111111") > -1, kall[0].url);
+
+kall = stubForslag([], 503);
+r = await pubForslag(forslagBe(ET_FORSLAG));
+const utenForslagTabell = await r.json();
+ok("mangler tabellen, star det hva som mangler",
+   r.status === 503 && utenForslagTabell.feil.indexOf("pub_forslag") > -1,
+   utenForslagTabell.feil);
 
 delete process.env.ADMIN_PASSORD;
 delete process.env.SUPABASE_URL;

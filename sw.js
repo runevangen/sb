@@ -16,6 +16,7 @@ const SKALL = [
   "/fotball-data.js",
   "/vaer-data.js",
   "/pub-data.js",
+  "/pub-forslag-data.js",
   "/puber-oslo.js",
   "/kanaler.js",
   // Modulene appen importerer ma alle ligge her. Mangler en, feiler hele
