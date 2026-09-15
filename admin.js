@@ -23,6 +23,7 @@ import { PUBER_OSLO } from "./puber-oslo.js";
 import { oktGyldig, kanFornyes } from "./konto-data.js";
 import { LIGAER, kampNokkel } from "./fotball-data.js";
 import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
+import { publisteRad, alleredeILista } from "./pub-forslag-data.js";
 
 const felt = (id) => document.getElementById(id);
 let kamper = [];
@@ -142,6 +143,7 @@ async function loggInn() {
   felt("portal").hidden = false;
   hentKamper();
   hentBrukere();
+  hentForslag();
 }
 
 function visAdgang(tekst, art) {
@@ -187,6 +189,126 @@ async function hentBrukere() {
   } catch (err) {
     felt("brukere").hidden = true;
     felt("brukerHint").textContent = err.message;
+  }
+}
+
+/* ---------- foreslatte steder (#80) ---------- */
+
+// Koen, ikke lista. puber-oslo.js baerer en redaksjonell vurdering, og
+// hver rad har kilde og sjekket — derfor skriver ingenting her til fila.
+// Portalen gir raden ferdig formet; et menneske limer den inn, slar opp
+// koordinatene og setter kilden.
+async function forslagKall(kropp) {
+  const okt = lesOkt();
+  if (!okt || !okt.token) {
+    throw new Error("Logg inn i appen først. Køen leses med din egen økt.");
+  }
+  const respons = await fetch("/api/pub-forslag", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(Object.assign({ passord, token: okt.token }, kropp)),
+  });
+  const data = JSON.parse(await respons.text());
+  if (!respons.ok || !data || data.feil) {
+    throw new Error((data && data.feil) || ("Tjenesten svarte " + respons.status + "."));
+  }
+  return data;
+}
+
+async function hentForslag() {
+  felt("forslagHint").textContent = "Henter forslagene …";
+  felt("forslagHint").hidden = false;
+  try {
+    const data = await forslagKall({ handling: "liste" });
+    tegnForslag(data.forslag || []);
+  } catch (err) {
+    felt("forslagListe").textContent = "";
+    felt("forslagHint").textContent = err.message;
+  }
+}
+
+function tegnForslag(liste) {
+  const boks = felt("forslagListe");
+  boks.textContent = "";
+
+  // Behandlede rader blir staende i basen, men koen viser bare det som
+  // gjenstar: en liste som vokser med gamle avgjorelser blir ikke lest.
+  const nye = liste.filter((f) => f.status === "ny");
+  if (!nye.length) {
+    felt("forslagHint").hidden = false;
+    felt("forslagHint").textContent = liste.length
+      ? "Ingen nye forslag. " + liste.length + " er behandlet."
+      : "Ingen har foreslått et sted ennå.";
+    return;
+  }
+  felt("forslagHint").hidden = true;
+
+  nye.forEach((f) => {
+    const rad = document.createElement("div");
+    rad.className = "forslag";
+
+    const tittel = document.createElement("p");
+    tittel.className = "forslag-navn";
+    tittel.textContent = f.navn;
+    if (alleredeILista(f.navn, PUBER_OSLO)) {
+      const merke = document.createElement("span");
+      merke.className = "forslag-merke";
+      merke.textContent = "står allerede i lista";
+      tittel.appendChild(merke);
+    }
+    rad.appendChild(tittel);
+
+    const under = document.createElement("p");
+    under.className = "forslag-under";
+    under.textContent = f.adresse
+      + (f.viserFotball ? " · viser fotball" : " · uvisst om de viser fotball")
+      + (f.merknad ? " · " + f.merknad : "");
+    rad.appendChild(under);
+
+    // Raden ferdig formet. lat/lon og kilde star tomme med vilje: de ma
+    // slas opp, og oppdiktede tall ville vaert verre enn ingen rad.
+    const kode = document.createElement("pre");
+    kode.className = "forslag-kode";
+    kode.textContent = publisteRad(f);
+    rad.appendChild(kode);
+
+    const knapper = document.createElement("div");
+    knapper.className = "forslag-knapper";
+
+    const lagtInn = document.createElement("button");
+    lagtInn.className = "lenke";
+    lagtInn.type = "button";
+    lagtInn.textContent = "Lagt inn";
+    lagtInn.addEventListener("click", () => behandleForslag(f, "lagt-inn"));
+
+    const avvis = document.createElement("button");
+    avvis.className = "lenke";
+    avvis.type = "button";
+    avvis.textContent = "Avvis";
+    avvis.addEventListener("click", () => behandleForslag(f, "avvist"));
+
+    knapper.appendChild(lagtInn);
+    knapper.appendChild(avvis);
+    rad.appendChild(knapper);
+    boks.appendChild(rad);
+  });
+}
+
+async function behandleForslag(f, status) {
+  const m = felt("forslagMelding");
+  m.textContent = "Lagrer …";
+  m.className = "melding";
+  try {
+    await forslagKall({ handling: "behandle", id: f.id, status });
+    m.textContent = status === "lagt-inn"
+      ? "«" + f.navn + "» er merket som lagt inn. Husk å lime raden inn i"
+        + " puber-oslo.js — den havner ikke der av seg selv."
+      : "«" + f.navn + "» er avvist.";
+    m.className = "melding ok";
+    hentForslag();
+  } catch (err) {
+    m.textContent = err.message;
+    m.className = "melding feil";
   }
 }
 
@@ -273,6 +395,7 @@ function brukerRad(b) {
       await brukerKall({ handling: "slett", id: b.id });
       visBruker(b.navn + " er slettet. Fornavnet er ledig igjen.", "ok");
       hentBrukere();
+  hentForslag();
     } catch (err) {
       visBruker(err.message, "feil");
       slettKnapp.disabled = false;

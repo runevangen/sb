@@ -46,6 +46,8 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
 import { PUBER_KONTAKT } from "../puber-kontakt.js";
 import { KANALER } from "../kanaler.js";
 import { PUBER_OSLO } from "../puber-oslo.js";
+import { sjekkForslag, forslagRad, tolkForslag, alleredeILista, publisteRad }
+  from "../pub-forslag-data.js";
 import { sjekkVisninger, visningerFor, slaSammen, utenGamle, tolkVisninger, visningRad, kampIderFor,
          bekreftetFor, merkBekreftet } from "../visning-data.js";
 
@@ -872,6 +874,82 @@ ok("kamp-id-ene hentes ut av kampene",
    kampIderFor([{ nokkel: "a-b" }, { id: 7 }]).join(",") === "a-b,7",
    kampIderFor([{ nokkel: "a-b" }, { id: 7 }]).join(","));
 ok("kamper uten id gir ingen id", kampIderFor([{}]).length === 0);
+
+/* ---------------- steder lesere sender inn (#80) ---------------- */
+
+// Sjekken deles mellom appen og tjenesten. Blir de to uenige om hva et
+// gyldig navn er, far leseren «noe er galt» pa noe som stemmer — det
+// kostet en kveld sist, da appen kappet en attesifret kode til seks.
+ok("et fullt forslag er gyldig",
+   sjekkForslag({ navn: "Bar Boca", adresse: "Thorvald Meyers gate 30" }).length === 0,
+   sjekkForslag({ navn: "Bar Boca", adresse: "Thorvald Meyers gate 30" }).join(" | "));
+ok("uten navn sier den hva som mangler",
+   sjekkForslag({ adresse: "Storgata 1" })[0].indexOf("navnet") > -1,
+   sjekkForslag({ adresse: "Storgata 1" })[0]);
+// Adressen er ikke pynt: koordinatene er anslag fra gateadressen, og uten
+// den kan ikke stedet sorteres etter avstand.
+ok("uten adresse sier den hvorfor den trengs",
+   sjekkForslag({ navn: "Bar Boca" })[0].indexOf("finner stedet") > -1,
+   sjekkForslag({ navn: "Bar Boca" })[0]);
+ok("mellomrom alene er ikke et navn",
+   sjekkForslag({ navn: "   ", adresse: "Storgata 1" }).length === 1);
+ok("for langt navn fanges",
+   sjekkForslag({ navn: "a".repeat(81), adresse: "Storgata 1" })[0].indexOf("for langt") > -1);
+ok("ingenting gir en liste med feil, ikke unntak", sjekkForslag().length === 2);
+
+// Databasen setter foreslatt_av fra okten og status fra sin egen default.
+// Sender funksjonen dem selv, kan en feil her skrive i en annens navn —
+// eller melde et forslag som ferdig behandlet.
+const FRAD = forslagRad({ navn: "  Bar Boca  ", adresse: " Thorvald Meyers gate 30 ",
+  viserFotball: true, merknad: "  Storskjerm i kjelleren  " });
+ok("navn og adresse trimmes", FRAD.navn === "Bar Boca" && FRAD.adresse === "Thorvald Meyers gate 30",
+   JSON.stringify(FRAD));
+ok("raden sender aldri foreslatt_av eller status",
+   !("foreslatt_av" in FRAD) && !("status" in FRAD), Object.keys(FRAD).join(","));
+ok("tom merknad blir null, ikke tom streng",
+   forslagRad({ navn: "A", adresse: "B" }).merknad === null);
+
+// Ma tale a kjores to ganger: tjenesten tolker radene for den svarer,
+// portalen tolker svaret en gang til.
+const FRA_KO = [{ id: "a-b", navn: "Bar Boca", adresse: "Storgata 1",
+  viser_fotball: true, merknad: "", foreslatt: "2026-09-15T08:00:00Z", status: "ny" }];
+const KO_EN = tolkForslag(FRA_KO);
+ok("radene fra basen far appens form",
+   KO_EN.length === 1 && KO_EN[0].viserFotball === true, JSON.stringify(KO_EN));
+ok("to kjoringer gir det samme som en",
+   JSON.stringify(tolkForslag(KO_EN)) === JSON.stringify(KO_EN), JSON.stringify(tolkForslag(KO_EN)));
+ok("en ukjent status faller til ny",
+   tolkForslag([{ navn: "A", status: "tullete" }])[0].status === "ny");
+ok("en rad uten navn faller ut", tolkForslag([{ navn: "" }]).length === 0);
+
+// Samme folding som lagnavnene: «Andys Pub» og «Andy's Pub» er ett sted.
+ok("et sted som alt star i lista kjennes igjen",
+   alleredeILista("andys pub", [{ navn: "Andy's Pub" }]));
+ok("og et nytt sted gjor det ikke",
+   !alleredeILista("Bar Boca", [{ navn: "Andy's Pub" }]));
+ok("tomt navn treffer ingenting", !alleredeILista("", [{ navn: "Andy's Pub" }]));
+
+// Raden portalen gir deg. Koen skriver ikke til fila — det er hele
+// poenget — sa teksten ma vaere klar til a limes inn, og ma holde formen
+// sjekkPubliste vokter nar koordinater og kilde er fylt ut.
+const LIMES = publisteRad({ navn: "Bar Boca", adresse: "Storgata 1" },
+  Date.UTC(2026, 8, 15));
+ok("raden baerer navnet og adressen",
+   LIMES.indexOf('"Bar Boca"') > -1 && LIMES.indexOf('"Storgata 1"') > -1, LIMES);
+ok("og dagens dato som sjekket", LIMES.indexOf('"2026-09-15"') > -1, LIMES);
+// Oppdiktede koordinater ville vaert verre enn ingen rad: de ser riktige
+// ut og sorterer feil.
+ok("koordinatene star tomme, ikke gjettet",
+   LIMES.indexOf("lat: 0, lon: 0") > -1 && LIMES.indexOf("kilde: \"\"") > -1, LIMES);
+// Teksten havner i en fil som kjores som kode.
+const OND_PUB = publisteRad({ navn: '" };evil()//', adresse: "A" });
+ok("anforselstegn i et navn bryter ikke ut av strengen",
+   OND_PUB.indexOf('\\"') > -1, OND_PUB);
+ok("en merknad blir med nar den finnes",
+   publiste_med_merknad().indexOf("Storskjerm") > -1, publiste_med_merknad());
+function publiste_med_merknad() {
+  return publisteRad({ navn: "A", adresse: "B", merknad: "Storskjerm" });
+}
 
 /* ---------------- fotball: lagnavn ---------------- */
 

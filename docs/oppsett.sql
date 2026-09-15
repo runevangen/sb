@@ -188,3 +188,55 @@ alter table visninger alter column satt_av set default auth.uid();
 --   select id, raw_user_meta_data->>'navn' from auth.users
 --   where email = 'rune@pin.mvp-sb.netlify.app'
 --   on conflict (bruker) do nothing;
+
+
+-- ---------------------------------------------------------------
+-- 5. pub_forslag — steder lesere sender inn
+-- ---------------------------------------------------------------
+-- En kø, ikke lista. puber-oslo.js bærer en redaksjonell vurdering, og
+-- hver rad har kilde og sjekket. En rad som kom inn uten at noen så på
+-- den, bryter nettopp det sjekkPubliste() vokter — så et forslag havner
+-- her, og blir en ekte rad først når en person har limt den inn (#80).
+
+create table if not exists pub_forslag (
+  id            uuid primary key default gen_random_uuid(),
+  navn          text not null check (char_length(navn) between 2 and 80),
+  adresse       text not null check (char_length(adresse) between 2 and 120),
+  viser_fotball boolean not null default false,
+  merknad       text check (char_length(merknad) <= 300),
+  -- Settes av databasen fra økten, som satt_av i visninger. Funksjonen
+  -- sender den aldri selv — og defaulten er halvparten av det.
+  foreslatt_av  uuid default auth.uid() references auth.users (id) on delete set null,
+  foreslatt     timestamptz not null default now(),
+  status        text not null default 'ny'
+                check (status in ('ny', 'lagt-inn', 'avvist')),
+  behandlet     timestamptz,
+  behandlet_av  uuid references auth.users (id) on delete set null
+);
+
+alter table pub_forslag enable row level security;
+
+-- Send inn: den som er logget inn, i sitt eget navn.
+drop policy if exists "send inn i eget navn" on pub_forslag;
+create policy "send inn i eget navn" on pub_forslag
+  for insert to authenticated with check (foreslatt_av = auth.uid());
+
+-- Les: dine egne forslag, og alt for den som skal behandle dem. Et
+-- forslag er ikke offentlig før noen har sett på det.
+drop policy if exists "les egne og alle for skrivere" on pub_forslag;
+create policy "les egne og alle for skrivere" on pub_forslag
+  for select to authenticated using (
+    foreslatt_av = auth.uid()
+    or exists (select 1 from visning_skrivere s where s.bruker = auth.uid()));
+
+drop policy if exists "behandle som skriver" on pub_forslag;
+create policy "behandle som skriver" on pub_forslag
+  for update to authenticated using (
+    exists (select 1 from visning_skrivere s where s.bruker = auth.uid()));
+
+drop policy if exists "slett som skriver" on pub_forslag;
+create policy "slett som skriver" on pub_forslag
+  for delete to authenticated using (
+    exists (select 1 from visning_skrivere s where s.bruker = auth.uid()));
+
+create index if not exists pub_forslag_status_idx on pub_forslag (status, foreslatt);

@@ -17,6 +17,8 @@ import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
          rangerForslag, FORSLAG_MAKS } from "./pub-data.js";
 import { PUBER_OSLO } from "./puber-oslo.js";
+import { sjekkForslag, alleredeILista, NAVN_MAKS, ADRESSE_MAKS }
+  from "./pub-forslag-data.js";
 import { bekreftetFor, merkBekreftet, tolkVisninger } from "./visning-data.js";
 import { arenaFor } from "./vaer-data.js";
 import { KANALER } from "./kanaler.js";
@@ -622,6 +624,10 @@ function delPanel(kamp) {
   utvidet.appendChild(forslag);
   utvidet.appendChild(pubFelt);
   utvidet.appendChild(egen);
+  // Star du pa en pub som ikke finnes i lista, har du til na ikke hatt
+  // noen vei til a si fra (#80). Skjemaet star her og ikke lenger opp:
+  // det er nettopp nar du har skrevet et navn selv at stedet mangler.
+  utvidet.appendChild(sendInnSted(pubFelt));
 
   // Lenka ut til pubene som pleier a vise fotball. Har ingen meldt inn
   // noe pa denne kampen, er det den eneste veien videre — da sier lenka
@@ -1343,6 +1349,137 @@ function kamprad(kamp, del, delbar) {
     if (viser) rad.appendChild(viser);
   }
   return rad;
+}
+
+// «Mangler stedet? Send det inn.»
+//
+// Lista i puber-oslo.js vokser i dag bare nar noen redigerer en fil. Den
+// som star pa puben og ser at den ikke finnes der, har ingen vei til a si
+// fra — annet enn a skrive navnet i feltet over, der det blir staende for
+// hen alene (#80).
+//
+// Forslaget gar i en ko, ikke i lista. Lista baerer en redaksjonell
+// vurdering, og hver rad har kilde og sjekket; en rad som kom inn uten at
+// noen sa pa den, ville brutt nettopp det sjekkPubliste() vokter. Det sier
+// teksten under knappen med ord, sa ingen tror stedet dukker opp straks.
+//
+// Skjemaet er skjult til man trykker: de fleste kamper trenger det ikke,
+// og footeren i kortet var allerede full.
+function sendInnSted(pubFelt) {
+  const boks = el("div", "sted-forslag");
+
+  const apne = el("button", "sted-forslag-apne", "Mangler stedet? Send det inn.");
+  apne.type = "button";
+  apne.setAttribute("aria-expanded", "false");
+
+  const skjema = el("div", "sted-forslag-skjema");
+  skjema.hidden = true;
+
+  const navn = el("input", "konto-felt");
+  navn.type = "text";
+  navn.placeholder = "Navn på stedet";
+  navn.setAttribute("aria-label", "Navn på stedet");
+  navn.maxLength = NAVN_MAKS;
+
+  // Adressen er ikke pynt. Koordinatene i lista er anslag fra
+  // gateadressen, og uten den kan ikke stedet sorteres etter avstand.
+  const adresse = el("input", "konto-felt");
+  adresse.type = "text";
+  adresse.placeholder = "Gateadresse";
+  adresse.setAttribute("aria-label", "Gateadresse");
+  adresse.maxLength = ADRESSE_MAKS;
+
+  const merke = el("label", "sted-forslag-merke");
+  const kryss = el("input");
+  kryss.type = "checkbox";
+  kryss.checked = true;
+  merke.appendChild(kryss);
+  merke.appendChild(el("span", null, "De viser fotball"));
+
+  const send = el("button", "konto-send", "Send inn");
+  send.type = "button";
+
+  const melding = el("p", "kamp-svar");
+  melding.setAttribute("aria-live", "polite");
+
+  const si = (tekst, art) => {
+    melding.textContent = tekst;
+    melding.className = "kamp-svar" + (art ? " " + art : "");
+  };
+
+  skjema.appendChild(navn);
+  skjema.appendChild(adresse);
+  skjema.appendChild(merke);
+  skjema.appendChild(send);
+  skjema.appendChild(el("p", "sted-forslag-note",
+    "Vi sjekker adressen før stedet havner i lista. Det er derfor den er"
+    + " verdt å stole på."));
+  skjema.appendChild(melding);
+
+  apne.addEventListener("click", () => {
+    const pa = skjema.hidden;
+    skjema.hidden = !pa;
+    apne.setAttribute("aria-expanded", pa ? "true" : "false");
+    if (!pa) return;
+    // Har du alt skrevet et navn i feltet over, er det stedet du mener.
+    if (!navn.value && pubFelt.value.trim()) navn.value = pubFelt.value.trim();
+    navn.focus();
+  });
+
+  send.addEventListener("click", async () => {
+    const inn = {
+      navn: navn.value,
+      adresse: adresse.value,
+      viserFotball: kryss.checked,
+    };
+
+    // Samme sjekk som tjenesten gjor, fra den samme fila: blir de to
+    // uenige om hva et gyldig navn er, far leseren «noe er galt» pa noe
+    // som stemmer.
+    const problemer = sjekkForslag(inn);
+    if (problemer.length) { si(problemer[0], "feil"); navn.focus(); return; }
+
+    // Stedet star kanskje der alt, under et navn som skrives litt
+    // annerledes. Da er det ingen feil — men det er unodvendig arbeid for
+    // begge, og leseren skal slippe a vente pa et svar hen ikke trenger.
+    if (alleredeILista(inn.navn, KJENTE)) {
+      si("Det stedet står allerede i lista. Finner du det ikke over, er det"
+        + " kanskje skrevet litt annerledes.", "");
+      return;
+    }
+
+    const okt = konto.okt();
+    if (!okt || !okt.token) {
+      si("Logg inn først, så vet vi hvem forslaget kommer fra. Du finner"
+        + " innloggingen i menyen.", "feil");
+      return;
+    }
+
+    send.disabled = true;
+    si("Sender …", "");
+    try {
+      const respons = await fetch("/api/pub-forslag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.assign({ token: okt.token }, inn)),
+      });
+      const data = JSON.parse(await respons.text());
+      if (!respons.ok || data.feil) {
+        si(data.feil || ("Tjenesten svarte " + respons.status), "feil");
+      } else {
+        si(data.merknad || "Takk, vi ser på det.", "ok");
+        navn.value = "";
+        adresse.value = "";
+      }
+    } catch (err) {
+      si("Fikk ikke sendt inn. Prøv igjen om litt.", "feil");
+    }
+    send.disabled = false;
+  });
+
+  boks.appendChild(apne);
+  boks.appendChild(skjema);
+  return boks;
 }
 
 // «Denne kampen vises på: Lincoln Pub» rett under kampen, ikke bare inne

@@ -2303,6 +2303,55 @@ a.ad-cta:focus-visible {
 
 .kamp-svar:empty { display: none; }
 
+/* «Mangler stedet? Send det inn.» Ligger nederst i pubdelen av kortet,
+   under feltet der man alt har skrevet et navn selv — det er der man
+   oppdager at stedet mangler. Tekstknapp og ikke en fylt flate: den skal
+   vaere der for den som trenger den, uten a konkurrere med stedene over. */
+.sted-forslag {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-faint);
+}
+
+.sted-forslag-apne {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: calc(12px * var(--fs));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.sted-forslag-apne:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.sted-forslag-skjema {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sted-forslag-skjema[hidden] { display: none; }
+
+.sted-forslag-merke {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: calc(13px * var(--fs));
+  color: var(--text-body);
+  cursor: pointer;
+}
+
+.sted-forslag-note {
+  margin: 0;
+  font-size: calc(11.5px * var(--fs));
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+
 .kamp-notis {
   margin: 12px 0 0;
   font-size: 12px;

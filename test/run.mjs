@@ -3414,9 +3414,196 @@ const SAK_21 = await kjor("kanal", FELLES + FOTBALL + `
 
 rmSync(join(tmp, "kanaler.js"));
 
+/* ---------------- 22. foreslatte steder (#80) ---------------- */
+
+// Star du pa en pub som ikke finnes i lista, hadde du til na ingen vei til
+// a si fra. Skjemaet ligger nederst i pubdelen av kortet — der man alt har
+// skrevet et navn selv, og der stedet mangler.
+const SAK_22 = await kjor("pub-forslag", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
+  window.__forslag = [];
+  try {
+    localStorage.setItem("sb-konto", JSON.stringify({
+      token: "okt-token", fornyer: "fornyer", bruker: "u-1", navn: "Rune",
+      utloper: Date.now() + 3600000 }));
+  } catch (e) { /* privat modus */ }
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("/api/pub-forslag") === 0) {
+      window.__forslag.push(JSON.parse((opt || {}).body || "{}"));
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { ok: true, merknad: "Takk. Vi ser på det." })); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ svar: [], visninger: [] })); } });
+    }
+    if (u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: true, status: 200,
+        json: function () { return Promise.resolve({ elements: [] }); } });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.querySelector(".kamp.delbar .kamp-del").click();
+    setTimeout(function () { try {
+      var panel = document.querySelector(".kamp-panel");
+      // Skjulingen ligger i .pub-utvidet, ikke i at elementet mangler — sa
+      // testen maler synlighet, ikke tilstedevaerelse. Forste utkast sto
+      // rodt pa noe som virket.
+      var utvidet = panel && panel.querySelector(".pub-utvidet");
+      ok("skjemaet star ikke framme uoppfordret", !!utvidet && utvidet.hidden,
+         utvidet ? "synlig" : "ingen panel");
+
+      panel.querySelector(".pub-apne").click();
+      setTimeout(function () { try {
+        var apne = panel.querySelector(".sted-forslag-apne");
+        ok("og dukker opp nar stedene apnes", !!apne);
+        if (!apne) { ferdig(); return; }
+
+        panel.querySelector(".kamp-pub").value = "Bar Boca";
+        apne.click();
+        var skjema = panel.querySelector(".sted-forslag-skjema");
+        var felter = skjema.querySelectorAll(".konto-felt");
+        ok("navnet du alt skrev er fylt inn", felter[0].value === "Bar Boca", felter[0].value);
+
+        // Adressen er ikke pynt: uten den kan ikke stedet sorteres etter
+        // avstand. Sjekken er den samme fila tjenesten bruker.
+        skjema.querySelector(".konto-send").click();
+        ok("uten adresse sendes ingenting", window.__forslag.length === 0,
+           JSON.stringify(window.__forslag));
+        ok("og det star hvorfor adressen trengs",
+           skjema.querySelector(".kamp-svar").textContent.indexOf("finner stedet") > -1,
+           skjema.querySelector(".kamp-svar").textContent);
+
+        // Et sted som alt star i lista er ikke feil, men unodvendig arbeid.
+        felter[0].value = "Andys Pub";
+        felter[1].value = "Storgata 1";
+        skjema.querySelector(".konto-send").click();
+        ok("et sted som alt star i lista sendes ikke", window.__forslag.length === 0,
+           JSON.stringify(window.__forslag));
+        ok("og det sies med ord",
+           skjema.querySelector(".kamp-svar").textContent.indexOf("allerede i lista") > -1,
+           skjema.querySelector(".kamp-svar").textContent);
+
+        felter[0].value = "Bar Boca";
+        felter[1].value = "Thorvald Meyers gate 30";
+        skjema.querySelector(".konto-send").click();
+        setTimeout(function () { try {
+          ok("et fullt forslag sendes", window.__forslag.length === 1,
+             JSON.stringify(window.__forslag));
+          var f = window.__forslag[0] || {};
+          ok("med navn og adresse",
+             f.navn === "Bar Boca" && f.adresse === "Thorvald Meyers gate 30", JSON.stringify(f));
+          // Skrivingen gar med leserens egen okt, ikke med en nokkel.
+          ok("og med din egen okt", f.token === "okt-token", f.token);
+          ok("svaret fra tjenesten vises",
+             skjema.querySelector(".kamp-svar").textContent.indexOf("Takk") > -1,
+             skjema.querySelector(".kamp-svar").textContent);
+          ok("og feltene tommes sa det samme ikke sendes to ganger",
+             felter[0].value === "" && felter[1].value === "",
+             felter[0].value + "|" + felter[1].value);
+          ferdig();
+        } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
+`);
+
+// Utlogget: egen side, ikke samme. Appen leser okten ved oppstart, sa a
+// slette den fra localStorage midt i en test er ingen utlogging — den
+// oversatte bare til at konto.okt() fortsatt svarte. Testen sto rodt pa
+// noe som virker, og det var testen som var feil.
+const SAK_22B = await kjor("pub-forslag-utlogget", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
+  window.__forslag = [];
+  try { localStorage.removeItem("sb-konto"); } catch (e) { /* privat modus */ }
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("/api/pub-forslag") === 0) {
+      window.__forslag.push(JSON.parse((opt || {}).body || "{}"));
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { ok: true, merknad: "Takk. Vi ser på det." })); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ svar: [], visninger: [] })); } });
+    }
+    if (u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: true, status: 200,
+        json: function () { return Promise.resolve({ elements: [] }); } });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.querySelector(".kamp.delbar .kamp-del").click();
+    setTimeout(function () { try {
+      var panel = document.querySelector(".kamp-panel");
+      panel.querySelector(".pub-apne").click();
+      setTimeout(function () { try {
+        panel.querySelector(".sted-forslag-apne").click();
+        var skjema = panel.querySelector(".sted-forslag-skjema");
+        var felter = skjema.querySelectorAll(".konto-felt");
+        felter[0].value = "Bar Boca";
+        felter[1].value = "Thorvald Meyers gate 30";
+        skjema.querySelector(".konto-send").click();
+        setTimeout(function () { try {
+          ok("utlogget sendes ingenting", window.__forslag.length === 0,
+             JSON.stringify(window.__forslag));
+          ok("og det star at man ma logge inn forst",
+             skjema.querySelector(".kamp-svar").textContent.indexOf("Logg inn") > -1,
+             skjema.querySelector(".kamp-svar").textContent);
+          // Ingenting er last bak innlogging: kortet og stedene star som for.
+          ok("men stedene i kortet star som for",
+             !!panel.querySelector(".sted-liste"), "ingen stedliste");
+          ferdig();
+        } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
+`);
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_18B, ...SAK_19, ...SAK_19A, ...SAK_19B, ...SAK_19C, ...SAK_20, ...SAK_20B, ...SAK_21];
+const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_18B, ...SAK_19, ...SAK_19A, ...SAK_19B, ...SAK_19C, ...SAK_20, ...SAK_20B, ...SAK_21, ...SAK_22, ...SAK_22B];
 let feilet = 0;
 
 for (const t of alle) {

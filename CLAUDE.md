@@ -28,6 +28,7 @@ der — ikke her.
     fotball.js / fotball-data.js / netlify/functions/fotball.mjs
     vaer-data.js / netlify/functions/vaer.mjs
     pub-data.js / puber-oslo.js / puber-kontakt.js / netlify/functions/puber.mjs
+    pub-forslag-data.js / netlify/functions/pub-forslag.mjs
     kanaler.js      hvilken kanal som sender ligaen — tom til noen har sjekket
     konto-data.js / pin-data.js / netlify/functions/konto.mjs
     svar-data.js / netlify/functions/svar.mjs
@@ -70,6 +71,11 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   noe annet, ti — men da får den som handlet beskjed.
 - **Feilmeldinger bærer tjenestens egne ord.** `forsok` i svaret, uten
   nøkler og uten adresser, så det kan leses fra nettleseren.
+- **Et forslag fra en leser er ikke en rad i lista.** `puber-oslo.js` er
+  kode fordi den bærer en redaksjonell vurdering. Innsendinger går i
+  `pub_forslag`, og portalen gir deg raden ferdig formet — men limer den
+  aldri inn selv. Det finnes ingen vei fra et skjema på nettet og rett inn
+  i det leseren ser. [ADR 0019](docs/adr/0019-pubforslag.md)
 - **Opplysninger om virkeligheten trenger kilde og dato.** Pubenes
   kontaktfelt (`kontaktFor`) og kanalen som sender ligaen (`kanalFor`)
   slipper bare gjennom når begge står. Voktere i `unit.mjs` kjører mot de
@@ -120,9 +126,9 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 
 ## Testing
 
-    node test/unit.mjs      510 tester
-    node test/funksjon.mjs  247 tester
-    node test/run.mjs       438 tester, ~200 s, headless Chromium
+    node test/unit.mjs      531 tester
+    node test/funksjon.mjs  272 tester
+    node test/run.mjs       453 tester, ~200 s, headless Chromium
 
 Tre regler, og de har alle kostet noe:
 
