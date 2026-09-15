@@ -16,7 +16,6 @@ import visninger from "../netlify/functions/visninger.mjs";
 import konto from "../netlify/functions/konto.mjs";
 import brukere from "../netlify/functions/brukere.mjs";
 import svarfunksjon from "../netlify/functions/svar.mjs";
-import { lesVisninger } from "../visning-data.js";
 
 let feilet = 0;
 let kjort = 0;
@@ -586,21 +585,32 @@ ok("Entur star forst i forsok uansett hvem som ble ferdig forst",
 
 /* ---------------- admin: visninger ---------------- */
 
-const PASSORD = "et-langt-adminpassord";
-const GHTOKEN = "ghp_hemmelig";
+// Lagret var GitHub til 15. september 2026: hver lagring en commit i
+// visninger.js. Na er det Supabase (#79), og skrivingen gar med **admins
+// egen okt** — ikke med en nokkel. ADMIN_PASSORD er vart eget passord, og
+// Supabase vet ikke hva det er; databasen slar opp uid-en i
+// visning_skrivere. Det er de to lassene disse testene skiller.
 
-function stubGithub(fila, lesStatus, skrivStatus) {
+const PASSORD = "et-langt-adminpassord";
+const OKT_TOKEN = "okt-token-fra-appen";
+
+// Stubben svarer som PostgREST: DELETE gir 204 uten kropp, POST med
+// Prefer: return=representation gir radene tilbake.
+function stubVisninger(rader, status, skrivRader) {
   const kall = [];
   global.fetch = async (url, opsjoner) => {
     const o = opsjoner || {};
     kall.push({ url: String(url), metode: o.method || "GET", opsjoner: o });
-    if (o.method === "PUT") {
-      return new Response(JSON.stringify({ commit: { sha: "abc" } }), { status: skrivStatus || 200 });
+    if (status && status !== 200) {
+      return new Response(JSON.stringify({ message: "nei", code: status === 503 ? "42P01" : "x" }),
+        { status: status === 503 ? 400 : status });
     }
-    return new Response(JSON.stringify({
-      sha: "gammel-sha",
-      content: Buffer.from(fila, "utf8").toString("base64"),
-    }), { status: lesStatus || 200 });
+    if (o.method === "DELETE") return new Response(null, { status: 204 });
+    if (o.method === "POST") {
+      return new Response(JSON.stringify(skrivRader === undefined ? JSON.parse(o.body) : skrivRader),
+        { status: 201 });
+    }
+    return new Response(JSON.stringify(rader || []), { status: 200 });
   };
   return kall;
 }
@@ -613,119 +623,163 @@ function adminBe(kropp, metode) {
   });
 }
 
-const TOM_FIL = "export const VISNINGER = [];\n";
 const ADMIN_KAMPER = [
   { id: 11, hjemme: "Brann", borte: "Bodo/Glimt", dato: "2126-09-13T15:00:00Z" },
   { id: 12, hjemme: "Molde", borte: "Rosenborg", dato: "2126-09-14T17:00:00Z" },
 ];
 
+function lagre(ekstra) {
+  return adminBe(Object.assign({
+    passord: PASSORD, token: OKT_TOKEN, pub: "Carls",
+    kampIder: ["2126-09-13-brann-bodoglimt"], kamper: ADMIN_KAMPER,
+  }, ekstra || {}));
+}
+
 delete process.env.ADMIN_PASSORD;
-delete process.env.GITHUB_TOKEN;
-kall = stubGithub(TOM_FIL);
-r = await visninger(adminBe({ passord: PASSORD, pub: "Carls", kampIder: [11], kamper: ADMIN_KAMPER }));
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_ANON_KEY;
+kall = stubVisninger([]);
+r = await visninger(lagre());
 const uoppsatt = await r.json();
 ok("uten oppsett svarer portalen 503", r.status === 503, r.status);
-ok("uten oppsett rores ikke GitHub", kall.length === 0, kall.length);
-// «Portalen er ikke satt opp» alene sender admin til a lete i koden
-// etter noe som star i Netlify-panelet.
-ok("503-svaret navngir det som mangler",
-   uoppsatt.feil.indexOf("ADMIN_PASSORD") > -1 && uoppsatt.feil.indexOf("GITHUB_TOKEN") > -1,
+ok("og sier hvilke variabler som mangler",
+   uoppsatt.feil.indexOf("ADMIN_PASSORD") > -1 && uoppsatt.feil.indexOf("SUPABASE_URL") > -1,
    uoppsatt.feil);
-ok("og det sier at det ma rulles ut pa nytt",
-   uoppsatt.feil.indexOf("Trigger deploy") > -1, uoppsatt.feil);
+// GITHUB_TOKEN kreves ikke lenger: lagringen gar ikke via repoet.
+ok("og krever ikke GITHUB_TOKEN lenger",
+   uoppsatt.feil.indexOf("GITHUB_TOKEN") === -1, uoppsatt.feil);
+ok("ingenting ble sendt noe sted", kall.length === 0, kall.length);
 
-// Portalen sporr ved apning, sa admin far vite det for kampene er
-// krysset av — ikke etterpa.
+// Portalen sporr om oppsettet for den viser noe. Da star det der for
+// kampene er krysset av, ikke etter.
 r = await visninger(adminBe(null, "GET"));
 const uklar = await r.json();
-ok("GET sier at portalen ikke er klar",
-   r.status === 200 && uklar.klar === false, r.status + " " + JSON.stringify(uklar));
-ok("og hvilke variabler som mangler",
-   uklar.mangler.join(",") === "ADMIN_PASSORD,GITHUB_TOKEN", JSON.stringify(uklar.mangler));
+ok("GET sier fra at portalen ikke er klar", r.status === 200 && uklar.klar === false, r.status);
+ok("og navngir alle tre", uklar.mangler.length === 3, JSON.stringify(uklar.mangler));
 
 process.env.ADMIN_PASSORD = PASSORD;
-r = await visninger(adminBe({ passord: PASSORD, pub: "Carls", kampIder: [11], kamper: ADMIN_KAMPER }));
-const halvt = await r.json();
-ok("mangler bare tokenet, er det bare det som star",
-   halvt.feil.indexOf("GITHUB_TOKEN") > -1 && halvt.feil.indexOf("ADMIN_PASSORD") === -1, halvt.feil);
+process.env.SUPABASE_URL = "https://prosjekt.supabase.co";
+process.env.SUPABASE_ANON_KEY = "anon-nokkel";
 
-process.env.GITHUB_TOKEN = GHTOKEN;
-
+// GET henter ogsa lista: portalen trenger den for a krysse av det som
+// alt star lagret. Fila i repoet gjorde den jobben for.
+kall = stubVisninger([{ pub: "Carls", kamp_id: "2126-09-13-brann-bodoglimt",
+  kamp: "Brann – Bodø/Glimt", dato: "2126-09-13T15:00:00Z", satt: "2026-09-11T10:00:00Z" }]);
 r = await visninger(adminBe(null, "GET"));
-ok("med begge satt sier GET at portalen er klar", (await r.json()).klar === true);
+const klar = await r.json();
+ok("GET sier at portalen er klar", r.status === 200 && klar.klar === true, JSON.stringify(klar));
+ok("og gir lista som alt star lagret",
+   klar.visninger.length === 1 && klar.visninger[0].kampId === "2126-09-13-brann-bodoglimt",
+   JSON.stringify(klar.visninger));
 
 r = await visninger(adminBe(null, "PUT"));
 ok("andre metoder avvises", r.status === 405, r.status);
 
-// Innloggingen: portalen viser ingenting for passordet er godtatt.
-kall = stubGithub(TOM_FIL);
+kall = stubVisninger([]);
 r = await visninger(adminBe({ handling: "sjekk", passord: "feil" }));
-ok("innlogging med feil passord gir 401", r.status === 401, r.status);
+ok("feil passord slipper ikke inn", r.status === 401, r.status);
+ok("og nar aldri Supabase", kall.length === 0, kall.length);
 r = await visninger(adminBe({ handling: "sjekk", passord: PASSORD }));
-ok("innlogging med riktig passord gir 200", r.status === 200 && (await r.json()).ok === true, r.status);
-ok("en innlogging skriver ingenting", kall.length === 0, kall.length);
+ok("riktig passord apner portalen", r.status === 200 && (await r.json()).ok === true, r.status);
+ok("og sjekken skriver ingenting", kall.length === 0, kall.length);
 
-kall = stubGithub(TOM_FIL);
-r = await visninger(adminBe({ passord: "feil", pub: "Carls", kampIder: [11], kamper: ADMIN_KAMPER }));
-ok("feil passord gir 401", r.status === 401, r.status);
-// Et feil passord skal ikke koste et kall mot GitHub.
-ok("feil passord rorer ikke GitHub", kall.length === 0, kall.length);
+kall = stubVisninger([]);
+r = await visninger(lagre({ passord: "feil" }));
+ok("en lagring med feil passord avvises", r.status === 401, r.status);
+ok("og den nar heller ikke Supabase", kall.length === 0, kall.length);
 
-kall = stubGithub(TOM_FIL);
-r = await visninger(adminBe({ passord: PASSORD, pub: "Utepils AS", kampIder: [11], kamper: ADMIN_KAMPER }));
-ok("ukjent pub gir 400", r.status === 400, r.status);
-ok("ukjent pub rorer ikke GitHub", kall.length === 0, kall.length);
+// Uten okt er det ingenting a skrive med, og da skal det sta hvorfor —
+// ikke 401 pa noe som ser ut som passordet.
+kall = stubVisninger([]);
+r = await visninger(lagre({ token: "" }));
+const utenOkt = await r.json();
+ok("uten okt avvises lagringen", r.status === 401, r.status);
+ok("og meldinga ber deg logge inn i appen",
+   utenOkt.feil.indexOf("Logg inn i appen") > -1, utenOkt.feil);
+ok("uten a rore Supabase", kall.length === 0, kall.length);
 
-kall = stubGithub(TOM_FIL);
-r = await visninger(adminBe({ passord: PASSORD, pub: "Carls", kampIder: [11], kamper: ADMIN_KAMPER }));
+kall = stubVisninger([]);
+r = await visninger(lagre({ pub: "Utepils AS" }));
+ok("en pub som ikke star i publista avvises", r.status === 400, r.status);
+
+kall = stubVisninger([]);
+r = await visninger(lagre());
 const lagret = await r.json();
 ok("en lagring svarer 200", r.status === 200 && lagret.ok === true, r.status + " " + JSON.stringify(lagret));
 ok("svaret sier hva som ble lagret",
-   lagret.pub === "Carls" && lagret.valgt === 1 && lagret.totalt === 1, JSON.stringify(lagret));
-// Tokenet er det eneste som ikke tåler a lekke.
-ok("tokenet lekker ikke ut til portalen", JSON.stringify(lagret).indexOf(GHTOKEN) === -1);
-ok("tokenet sendes som Bearer til GitHub",
-   kall[0].opsjoner.headers["Authorization"] === "Bearer " + GHTOKEN);
-const put = kall.find((k) => k.metode === "PUT");
-ok("fila skrives med sha fra lesingen", put && JSON.parse(put.opsjoner.body).sha === "gammel-sha");
-ok("commit-meldingen sier hva som skjedde",
-   JSON.parse(put.opsjoner.body).message.indexOf("Carls viser 1 kamper") > -1,
-   JSON.parse(put.opsjoner.body).message);
-const skrevet = Buffer.from(JSON.parse(put.opsjoner.body).content, "base64").toString("utf8");
-ok("det som skrives er en gyldig fil vi kan lese tilbake",
-   lesVisninger(skrevet).length === 1 &&
-   lesVisninger(skrevet)[0].kampId === "2126-09-13-brann-bodoglimt", skrevet);
+   lagret.pub === "Carls" && lagret.valgt === 1, JSON.stringify(lagret));
 
-// Lagringen bygger pa det som star i fila na, ikke pa en utrullet kopi.
-kall = stubGithub(TOM_FIL.replace("[]",
-  '[{"pub":"Lincoln Pub","kampId":11,"kamp":"A","dato":"2126-09-13T15:00:00Z","satt":"2026-09-11T10:00:00Z"}]'));
-r = await visninger(adminBe({ passord: PASSORD, pub: "Carls", kampIder: [12], kamper: ADMIN_KAMPER }));
-const sammen = Buffer.from(JSON.parse(kall.find((k) => k.metode === "PUT").opsjoner.body).content, "base64").toString("utf8");
-ok("en annen pubs visning star igjen",
-   lesVisninger(sammen).length === 2 && lesVisninger(sammen).some((v) => v.pub === "Lincoln Pub"),
-   sammen);
+// Okten gar som Bearer, anon-nokkelen som apikey. Databasen setter
+// satt_av fra okten — sender funksjonen den selv, kan en feil her skrive
+// i en annens navn.
+const skriv = kall.find((k) => k.metode === "POST");
+ok("skrivingen gar med admins egen okt",
+   skriv.opsjoner.headers["Authorization"] === "Bearer " + OKT_TOKEN,
+   skriv.opsjoner.headers["Authorization"]);
+ok("og med anon-nokkelen som apikey",
+   skriv.opsjoner.headers["apikey"] === "anon-nokkel");
+ok("raden sender aldri satt_av",
+   JSON.parse(skriv.opsjoner.body).every((v) => !("satt_av" in v)), skriv.opsjoner.body);
+ok("adminpassordet nar aldri Supabase",
+   kall.every((k) => (k.opsjoner.body || "").indexOf(PASSORD) === -1
+     && JSON.stringify(k.opsjoner.headers || {}).indexOf(PASSORD) === -1));
+ok("passordet lekker heller ikke ut til portalen",
+   JSON.stringify(lagret).indexOf(PASSORD) === -1);
 
-kall = stubGithub(TOM_FIL, 404);
-r = await visninger(adminBe({ passord: PASSORD, pub: "Carls", kampIder: [11], kamper: ADMIN_KAMPER }));
-ok("far vi ikke lest fila, gir det 502 med grunn",
-   r.status === 502 && (await r.json()).feil.indexOf("404") > -1, r.status);
+// Ryddingen forst, og bare for denne puben og disse kampene: to puber
+// skal kunne settes etter hverandre, og en annen ligas visninger
+// overleve et bytte. Det er samme avgrensning slaSammen gjorde i minnet.
+const slett = kall.find((k) => k.metode === "DELETE");
+ok("puben sine rader ryddes for de nye skrives",
+   kall.indexOf(slett) < kall.indexOf(skriv), kall.map((k) => k.metode).join(","));
+ok("og ryddingen treffer bare denne puben",
+   slett.url.indexOf("pub=eq.Carls") > -1, slett.url);
+ok("og bare kampene som sto pa skjermen",
+   slett.url.indexOf("2126-09-13-brann-bodoglimt") > -1 &&
+   slett.url.indexOf("2126-09-14-molde-rosenborg") > -1, slett.url);
 
-kall = stubGithub(TOM_FIL, 200, 409);
-r = await visninger(adminBe({ passord: PASSORD, pub: "Carls", kampIder: [11], kamper: ADMIN_KAMPER }));
-ok("far vi ikke skrevet, gir det 502 med grunn",
-   r.status === 502 && (await r.json()).feil.indexOf("409") > -1, r.status);
+// En skriving som svarer 200 er ikke bevis pa at raden ligger der. Samme
+// lekse som kampsvar: mangler skrivepolicyen, ser svaret vellykket ut
+// mens ingenting ble lagret.
+kall = stubVisninger([], 200, []);
+r = await visninger(lagre());
+const tomt = await r.json();
+ok("et tomt svar pa skrivingen meldes som feil", r.status === 502, r.status);
+ok("og peker pa lista over skrivere",
+   tomt.feil.indexOf("visning_skrivere") > -1, tomt.feil);
+
+kall = stubVisninger([], 503);
+r = await visninger(lagre());
+const visningTabell = await r.json();
+ok("mangler tabellen, star det hva som mangler",
+   r.status === 503 && visningTabell.feil.indexOf("visninger") > -1, visningTabell.feil);
+
+kall = stubVisninger([], 403);
+r = await visninger(lagre());
+const nektet = await r.json();
+ok("nekter databasen skrivingen, sies det med ord",
+   r.status === 401 && nektet.feil.indexOf("visning_skrivere") > -1, nektet.feil);
 
 delete process.env.ADMIN_PASSORD;
-delete process.env.GITHUB_TOKEN;
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_ANON_KEY;
 
 /* ---------------- innlogging ---------------- */
 
 // Kallet mot Supabase gar fra funksjonen, ikke fra nettleseren: nokkelen
 // skal aldri na leseren, og appen skal bare snakke med sitt eget domene.
-function stubSupabase(svar, status) {
+// visningRader er eget: /api/svar sporr bade kampsvar og visninger i
+// samme kall (#79), og en stubb som svarte likt pa begge kunne ikke se
+// forskjell pa dem — da hadde testen bevist noe annet enn den trodde.
+function stubSupabase(svar, status, visningRader) {
   const kall = [];
   global.fetch = async (url, opsjoner) => {
     kall.push({ url: String(url), opsjoner: opsjoner || {} });
+    if (String(url).indexOf("/visninger") > -1) {
+      return new Response(JSON.stringify(visningRader || []), {
+        status: 200, headers: { "Content-Type": "application/json" },
+      });
+    }
     return new Response(JSON.stringify(svar === undefined ? {} : svar), {
       status: status || 200,
       headers: { "Content-Type": "application/json" },
@@ -1252,12 +1306,28 @@ ok("uten oppsett svarer lista 503", r.status === 503 && kall.length === 0,
 process.env.SUPABASE_URL = "https://prosjekt.supabase.co";
 process.env.SUPABASE_ANON_KEY = SUPA_NOKKEL;
 
-kall = stubSupabase(SVAR_RADER);
+kall = stubSupabase(SVAR_RADER, 200, [
+  { pub: "Carls", kamp_id: 8, kamp: "A – B", dato: "2126-09-13T15:00:00Z",
+    satt: "2026-09-11T10:00:00Z" },
+]);
 r = await svarfunksjon(svarBe(null, "GET", "/api/svar?kamper=7,8"));
 const svarLista = await r.json();
-ok("hele runden hentes i ett kall", kall.length === 1, kall.length);
-ok("og med kampene i ett filter",
-   kall[0].url.indexOf("kamp_id=in.(7,8)") > -1, kall[0].url);
+// Ett kall fra leseren. Funksjonen gjor to sporringer mot basen —
+// «hvem blir med» og «hvem viser kampen» — men samtidig, og pa de samme
+// id-ene. Visningene la i visninger.js og kostet null nettkall til
+// 15. september 2026; a gi dem et eget endepunkt ville lagt et kall til
+// per fotballvisning, og denne sporringen ber alt om nettopp de kampene.
+ok("hele runden hentes i ett kall fra leseren", kall.length === 2, kall.length);
+ok("og begge sporringene har de samme kampene i ett filter",
+   kall.every((k) => k.url.indexOf("kamp_id=in.(7,8)") > -1),
+   kall.map((k) => k.url).join(" | "));
+ok("den ene er hvem som blir med, den andre hvem som viser",
+   kall.some((k) => k.url.indexOf("/kampsvar") > -1) &&
+   kall.some((k) => k.url.indexOf("/visninger") > -1),
+   kall.map((k) => k.url).join(" | "));
+ok("visningene folger med i svaret",
+   svarLista.visninger.length === 1 && svarLista.visninger[0].pub === "Carls",
+   JSON.stringify(svarLista.visninger));
 // A se hvem som blir med krever ingen konto: appen skal kunne leses uten.
 ok("lesing sender ingen okt", !kall[0].opsjoner.headers.Authorization,
    JSON.stringify(kall[0].opsjoner.headers));

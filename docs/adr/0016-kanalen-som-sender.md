@@ -60,12 +60,12 @@ og vet ikke hvem som spurte.
   per kamp løser et problem vi ikke har — kanalen er per liga.
 - **En modell ved visning.** Koster per leser, og en modell som gjetter
   «Viaplay» er nøyaktig løgnen appen ellers er nøye på å ikke fortelle.
-- **TheSportsDB `strTvStation`.** Feltet finnes i svaret vi alt henter, så
-  det ville kostet null kall — som lagmerket i #33. **Ikke verifisert:**
-  sandkassen når ikke TheSportsDB, og feltet er kjent for å være
-  amerikansk-orientert. Verdt å sjekke i prod: står det norske kanaler
-  der, er det en bedre kilde enn en tabell noen må vedlikeholde. Da blir
-  `kanaler.js` reserven, ikke sannheten.
+- **TheSportsDB `strTvStation`.** Ville kostet null kall om feltet fantes
+  i svaret vi alt henter — som lagmerket i #33. **Sjekket 15. september
+  2026: det finnes ikke.** Ikke tomt, fraværende. `eventsnextleague.php`
+  gir lag, arena, runde, merker og tidspunkt, men ingen kanal.
+  `kanaler.js` er dermed sannheten, ikke reserven, og radene må føres inn
+  for hånd med kilde og dato.
 
 ### Per kamp, den dagen det trengs
 En kamp flyttet til en annen kanal, eller en cupkamp, passer ikke i en

@@ -46,8 +46,7 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
 import { PUBER_KONTAKT } from "../puber-kontakt.js";
 import { KANALER } from "../kanaler.js";
 import { PUBER_OSLO } from "../puber-oslo.js";
-import { VISNINGER as VISNINGER_EKTE } from "../visninger.js";
-import { sjekkVisninger, visningerFor, slaSammen, utenGamle, visningerFil, lesVisninger,
+import { sjekkVisninger, visningerFor, slaSammen, utenGamle, tolkVisninger, visningRad, kampIderFor,
          bekreftetFor, merkBekreftet } from "../visning-data.js";
 
 let feilet = 0;
@@ -823,8 +822,6 @@ ok("rader uten et gyldig navn faller ut",
    navnIRad([nrad("•••", "u2"), nrad("Per", "u3")], "u1").navn.join(",") === "Per");
 ok("ingen svar gir ingen navn", navnIRad([], "u1").navn.length === 0);
 
-ok("den ekte lista holder formen", sjekkVisninger(VISNINGER_EKTE, PUBNAVN).length === 0,
-   sjekkVisninger(VISNINGER_EKTE, PUBNAVN).join(" | "));
 function vrad(endring) {
   return Object.assign({ pub: "Carls", kampId: 11, kamp: "A – B",
     dato: "2026-09-13T15:00:00Z", satt: "2026-09-11T10:00:00Z" }, endring);
@@ -842,19 +839,39 @@ ok("samme pub og kamp to ganger fanges",
    sjekkVisninger([vrad(), vrad()], PUBNAVN).some((f) => f.indexOf("to ganger") > -1));
 ok("noe annet enn en liste fanges", sjekkVisninger("nei", PUBNAVN).length === 1);
 
-// Fila er bade en modul appen importerer og JSON funksjonen leser.
-const FIL = visningerFil(SATT);
-ok("fila kan leses tilbake uendret", JSON.stringify(lesVisninger(FIL)) === JSON.stringify(SATT), FIL);
-ok("tom liste gir en gyldig, tom fil", lesVisninger(visningerFil([])).length === 0);
-ok("en rad per linje, sa git-diffen viser hva som endret seg",
-   FIL.split("\n").filter((l) => l.trim().indexOf("{") === 0).length === SATT.length);
-// Teksten kommer fra et skjema, og havner i en fil som kjores som kode.
-const OND = visningerFil([vrad({ pub: '"};evil()//' })]);
-ok("anforselstegn i et navn bryter ikke ut av strengen",
-   lesVisninger(OND)[0].pub === '"};evil()//' && OND.indexOf('\\"};evil()//') > -1,
-   OND.split("\n").find((l) => l.trim().indexOf("{") === 0));
-ok("en fil uten VISNINGER kaster", kaster(() => lesVisninger("bare tekst")));
-ok("en avkortet fil kaster", kaster(() => lesVisninger("export const VISNINGER = [")));
+// Radene kommer fra PostgREST na, ikke fra en fil i repoet (#79).
+//
+// **Ma tale a kjores to ganger**, og det er ikke pedanteri: nøyaktig den
+// feilen gjorde «blir med»-lista usynlig for alle i tre dager. Tjenesten
+// tolker radene for den svarer, appen tolker svaret en gang til — og
+// andre gang finnes ikke `kamp_id`, feltet heter `kampId`.
+const VISNING_FRA_BASEN = [{ pub: "Carls", kamp_id: "2026-09-13-brann-molde",
+  kamp: "Brann – Molde", dato: "2026-09-13T15:00:00Z", satt: "2026-09-11T10:00:00Z" }];
+const EN = tolkVisninger(VISNING_FRA_BASEN);
+ok("radene fra basen far appens form", EN.length === 1 && EN[0].kampId === "2026-09-13-brann-molde",
+   JSON.stringify(EN));
+ok("to kjoringer gir det samme som en",
+   JSON.stringify(tolkVisninger(EN)) === JSON.stringify(EN), JSON.stringify(tolkVisninger(EN)));
+ok("en rad uten pub eller kamp faller ut",
+   tolkVisninger([{ pub: "", kamp_id: "x" }, { pub: "Carls" }]).length === 0);
+ok("ingenting gir tom liste, ikke unntak", tolkVisninger().length === 0);
+
+// Den andre veien: satt_av star aldri her. Databasen setter den fra
+// okten, som `bruker` i kampsvar — sender funksjonen den selv, kan en
+// feil der skrive i en annens navn.
+const VISNING_RAD = visningRad({ pub: "Carls", kampId: "2026-09-13-brann-molde",
+  kamp: "Brann – Molde", dato: "2026-09-13T15:00:00Z", satt: "2026-09-11T10:00:00Z" });
+ok("raden til basen bruker kamp_id",
+   VISNING_RAD.kamp_id === "2026-09-13-brann-molde", JSON.stringify(VISNING_RAD));
+ok("og sender aldri satt_av",
+   !("satt_av" in VISNING_RAD) && !("bruker" in VISNING_RAD), Object.keys(VISNING_RAD).join(","));
+
+// Kampene som sto pa skjermen. Tjenesten rydder puben sine rader for
+// akkurat disse, og ingen andre — samme avgrensning som slaSammen.
+ok("kamp-id-ene hentes ut av kampene",
+   kampIderFor([{ nokkel: "a-b" }, { id: 7 }]).join(",") === "a-b,7",
+   kampIderFor([{ nokkel: "a-b" }, { id: 7 }]).join(","));
+ok("kamper uten id gir ingen id", kampIderFor([{}]).length === 0);
 
 /* ---------------- fotball: lagnavn ---------------- */
 

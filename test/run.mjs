@@ -41,7 +41,7 @@ function startTjener() {
     const sti = decodeURIComponent(req.url.split("?")[0]);
     // Testsidene ligger i temp; alt annet hentes fra repoet. En test kan
     // ogsa legge sin egen utgave av en modul i temp — da vinner den. Det
-    // er slik en datafil som visninger.js kan fylles i en test uten at
+    // er slik en datafil som kanaler.js kan fylles i en test uten at
     // det som star i repoet endres.
     const rel = sti.replace(/^\/+/, "");
     const iTmp = join(tmp, rel);
@@ -1716,6 +1716,17 @@ const SAK_14 = await kjor("pub-feil", FELLES + FOTBALL + `
 // Portalen er en egen side. Den skriver ingenting selv: testen fanger
 // POST-en og sjekker at det som sendes er det samme som sto pa skjermen.
 const SAK_15 = await kjor("admin", `
+  // Skrivingen gar med admins egen okt na (#79), ikke med en nokkel:
+  // RLS slar opp uid-en i visning_skrivere, og ADMIN_PASSORD betyr
+  // ingenting for Supabase. Uten en okt i localStorage skal portalen si
+  // fra framfor a sende noe — det testes lenger nede.
+  try {
+    localStorage.setItem("sb-konto", JSON.stringify({
+      token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
+      utloper: Date.now() + 3600000,
+    }));
+  } catch (e) { /* privat modus */ }
+
   var KAMPER_ES = [
     { id: 501, hjemme: "Rosenborg", borte: "Brann", dato: "2026-09-20T17:00:00+00:00", arena: "Lerkendal Stadion", runde: "Runde 21" },
     { id: 502, hjemme: "Vaalerenga", borte: "Bodo/Glimt", dato: "2026-09-21T15:00:00+00:00", arena: "Intility Arena", runde: "Runde 21" },
@@ -1870,6 +1881,9 @@ const SAK_15 = await kjor("admin", `
          JSON.stringify(sendt.kampIder));
       ok("puben blir med", sendt.pub === puber.value, sendt.pub);
       ok("passordet blir med", sendt.passord === "hemmelig");
+      // Passordet apner skjemaet; okten er den databasen faktisk sjekker.
+      ok("og okten din, som er den databasen sjekker",
+         sendt.token === "okt-token", sendt.token);
       // Alle kampene pa skjermen sendes med, ogsa de i runden etter:
       // slaSammen rorer bare dem, og en kamp admin fjernet avkryssingen
       // pa skal faktisk bli fjernet.
@@ -1964,7 +1978,21 @@ const SAK_15 = await kjor("admin", `
               ok("og lista hentes pa nytt etterpa",
                  brukerKall.filter(function (k) { return k.handling === "liste"; }).length === 2,
                  JSON.stringify(brukerKall.map(function (k) { return k.handling; })));
-              ferdig();
+
+              // Uten okt er det ingenting a skrive med. Passordet apner
+              // skjemaet, men det er databasen som avgjor skrivingen —
+              // og da skal portalen si det framfor a sende noe som blir
+              // avvist med 401 pa noe som ser ut som passordet.
+              try { localStorage.removeItem("sb-konto"); } catch (e) { /* privat modus */ }
+              sendt = null;
+              document.getElementById("lagre").click();
+              setTimeout(function () { try {
+                ok("uten innlogging i appen sendes ingen lagring", !sendt, JSON.stringify(sendt));
+                ok("og portalen sier hvorfor",
+                   document.getElementById("melding").textContent.indexOf("logget inn i appen") > -1,
+                   document.getElementById("melding").textContent);
+                ferdig();
+              } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 200);
             } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
           } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
         } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 200);
@@ -1981,18 +2009,23 @@ const SAK_15 = await kjor("admin", `
 // denne kampen star over alle andre forslag, og er merket ogsa der de
 // dukker opp i en annen gruppe.
 //
-// visninger.js er tom i repoet. Testen legger sin egen utgave i temp,
-// som tjeneren serverer framfor den i repoet.
-writeFileSync(join(tmp, "visninger.js"),
-  'export const VISNINGER = [\n' +
-  '  {"pub":"Lincoln Pub","kampId":"2026-09-20-brann-bodoglimt","kamp":"Brann – Bodo/Glimt",' +
-  '"dato":"2026-09-20T17:00:00+00:00","satt":"2026-09-11T10:00:00.000Z"},\n' +
-  '  {"pub":"Carls","kampId":4,"kamp":"Molde – Rosenborg",' +
-  '"dato":"2026-09-21T17:00:00+00:00","satt":"2026-09-11T10:00:00.000Z"}\n' +
-  '];\n');
+// Visningene la i visninger.js i repoet til 15. september 2026 og fulgte
+// med utrullingen; na kommer de fra Supabase, pa lasset i /api/svar
+// (#79). Stubben under svarer derfor som **tjenesten** gjor — med
+// `kampId`, ikke `kamp_id` som star i basen. Den retningen er ikke
+// pedanteri: en stubb skrevet ut fra basen framfor ut fra svaret var
+// grunnen til at 412 tester ikke sa at «blir med»-lista aldri hadde
+// virket.
+const VISNINGER_FRA_TJENESTEN = [
+  { pub: "Lincoln Pub", kampId: "2026-09-20-brann-bodoglimt", kamp: "Brann – Bodo/Glimt",
+    dato: "2026-09-20T17:00:00+00:00", satt: "2026-09-11T10:00:00.000Z" },
+  { pub: "Carls", kampId: "4", kamp: "Molde – Rosenborg",
+    dato: "2026-09-21T17:00:00+00:00", satt: "2026-09-11T10:00:00.000Z" },
+];
 
 const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
   var saker = lagSaker(12);
+  var VISNINGER = ${JSON.stringify(VISNINGER_FRA_TJENESTEN)};`  + `
   var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
   // Leseren star ved Lincoln Pub. Overpass svarer med den samme puben,
   // sa den dukker opp bade som bekreftet og som treff naer deg.
@@ -2005,6 +2038,12 @@ const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
       return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve({ elements: [
         { type: "node", id: 9, lat: 59.9165, lon: 10.7531, tags: { amenity: "pub", name: "Lincoln Pub" } },
         { type: "node", id: 10, lat: 59.9168, lon: 10.7540, tags: { amenity: "pub", name: "Tilfeldig Bar" } } ] }); } });
+    }
+    // Visningene rir med pa /api/svar, som «hvem blir med».
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { svar: [], visninger: VISNINGER })); } });
     }
     if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0) {
       return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
@@ -2026,22 +2065,30 @@ const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
   window.addEventListener("load", function () { setTimeout(function () { try {
     // Linja star pa kampen selv, sa den som blar ser det uten a apne noe.
     var rader = document.querySelectorAll(".kamp.delbar");
-    var viser = rader[0].querySelector(".kamp-viser");
+    // Nullsikre med vilje. Visningene kommer over nettet na, sa «linja
+    // mangler» er en realistisk feil — og en assertion som kaster tar
+    // hele testsida med seg, sa de nitten under forsvinner istedenfor a
+    // bli rode. Det har skjedd to ganger i dette prosjektet.
+    var viser = rader[0] && rader[0].querySelector(".kamp-viser");
     ok("kampen sier selv at den vises et sted", !!viser);
-    ok("og hvor", viser.textContent.indexOf("Denne kampen vises på: Lincoln Pub") > -1,
-       viser.textContent);
+    ok("og hvor",
+       !!viser && viser.textContent.indexOf("Denne kampen vises på: Lincoln Pub") > -1,
+       viser ? viser.textContent : "ingen linje");
     // Stjerna er merket for «denne kampen vises her»; ballen sier bare at
     // stedet pleier a vise fotball.
+    var merke = viser && viser.querySelector(".kamp-viser-merke");
     ok("linja er merket med stjerne",
-       viser.querySelector(".kamp-viser-merke").textContent === "\u2605",
-       viser.querySelector(".kamp-viser-merke").textContent);
+       !!merke && merke.textContent === "\u2605", merke ? merke.textContent : "ingen merke");
+    var andre = rader[1] && rader[1].querySelector(".kamp-viser");
     ok("neste kamp har sin egen pub pa raden",
-       rader[1].querySelector(".kamp-viser").textContent.indexOf("Carls") > -1,
-       rader[1].querySelector(".kamp-viser").textContent);
+       !!andre && andre.textContent.indexOf("Carls") > -1,
+       andre ? andre.textContent : "ingen linje");
     // Pubnavnet tar deg videre: panelet apnes med puben valgt.
-    rader[0].querySelector(".kamp-viser-pub").click();
+    var pubKnapp = viser && viser.querySelector(".kamp-viser-pub");
+    if (pubKnapp) pubKnapp.click();
     var apnet = document.querySelector(".kamp-panel");
     ok("et trykk pa pubnavnet apner delingspanelet", !!apnet);
+    if (!apnet) { ferdig(); return; }
     // Stedet blir pekt ut, ikke valgt: et trykk pa et sted er svaret «jeg
     // skal dit», og det svaret skal leseren gi selv. Chipen markeres og
     // far fokus, sa det fortsatt koster ett trykk — hens eget.
@@ -2139,7 +2186,6 @@ const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
 `);
 
-rmSync(join(tmp, "visninger.js"));
 
 /* ---------------- 17. lenka apner kampen som ble delt ---------------- */
 
@@ -3264,7 +3310,7 @@ const SAK_20B = await kjor("venner-tak", FELLES + FOTBALL + `
 
 // kanaler.js star tom i repoet: ingen rad har kilde og dato, sa
 // ingenting skal vises. Testen legger sin egen utgave i temp, som
-// tjeneren serverer framfor den i repoet — samme grep som visninger.js.
+// tjeneren serverer framfor den i repoet.
 //
 // To ligaer med vilje: én verifisert og én uten dato. Da ser testen
 // bade at en verifisert rad vises, og at en udatert IKKE gjor det — og
