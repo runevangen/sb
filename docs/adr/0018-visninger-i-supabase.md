@@ -19,6 +19,16 @@ Tabellen `visninger` i Supabase, med RLS som `kampsvar`. Lesing for alle.
 **Skrivingen går med skriverens egen økt**, og databasen slår opp uid-en i
 `visning_skrivere`.
 
+**Sett virke i prod 15. september 2026**, samme natt: ti migrerte rader ble
+til atten, fem puber, skrevet fra portalen med admins egen økt gjennom RLS.
+
+Én feil fulgte med ut: `satt_av` sto **uten `default auth.uid()`**, så
+kolonnen var null på hver eneste rad — også de som ble skrevet med en økt.
+Ingenting var ødelagt (skrivingen og RLS virket), men kolonnen skal si
+hvem som skrev raden, og en kolonne som later som den fører regnskap er
+verre enn ingen. Rettet samme morgen. De atten første radene har ingen
+skriver, og det er riktig: vi vet det ikke.
+
 ## Konsekvens
 
 ### Hvorfor ikke «bak ADMIN_PASSORD», slik issuen sa

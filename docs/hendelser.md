@@ -9,6 +9,28 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 15. september 2026 — kolonnen som ikke førte regnskap
+
+**Meldt som:** ingenting. Funnet ved å telle rader i basen etter at
+visningene var flyttet dit, mens alt så riktig ut i appen.
+
+**Årsak:** `satt_av` ble opprettet som `uuid references auth.users(id)`
+— uten `default auth.uid()`. Funksjonen sender aldri kolonnen selv, med
+vilje, så da var det ingen som satte den. Null på hver eneste rad, også
+de som ble skrevet med en gyldig økt.
+
+**Hvorfor den var vanskelig å se:** ingenting feilet. Skrivingen gikk,
+RLS slapp den gjennom, leseren så pubene sine. Kolonnen er ikke lest av
+noe ennå — den ligger der for #65, der det nettopp er *hvem* som meldte
+inn som er poenget. En kolonne som later som den fører regnskap er verre
+enn ingen kolonne, og den ville løyet først den dagen noen stolte på den.
+
+**Lærdommen:** «funksjonen sender den aldri selv» er bare halve regelen.
+Den andre halvparten er at databasen faktisk må sette den. To kommentarer
+i koden påsto at den gjorde det.
+
+---
+
 ## 14. september 2026 — én kamp igjen i fanen
 
 **Meldt som:** «dumt at man ser kun en kamp når det er slutten av en

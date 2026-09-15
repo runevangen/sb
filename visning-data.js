@@ -137,9 +137,11 @@ export function tolkVisninger(rader) {
   })).filter((v) => v.pub && v.kampId);
 }
 
-// Den andre veien: en rad klar for tjenesten. `satt_av` settes av
-// databasen fra okten, som `bruker` i kampsvar — funksjonen sender den
-// aldri selv, sa en feil her kan ikke skrive i en annens navn.
+// Den andre veien: en rad klar for tjenesten. `satt_av` star ikke her:
+// databasen setter den fra okten med `default auth.uid()`, som `bruker` i
+// kampsvar. Funksjonen sender den aldri selv, sa en feil her kan ikke
+// skrive i en annens navn — og defaulten er halvparten av det: uten den
+// blir kolonnen bare staende tom, og det sto den i ett dogn.
 export function visningRad(v) {
   return {
     pub: String(v.pub),

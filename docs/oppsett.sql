@@ -144,7 +144,11 @@ create table if not exists visninger (
   kamp    text check (char_length(kamp) <= 120),
   dato    timestamptz,
   satt    timestamptz not null default now(),
-  satt_av uuid references auth.users (id) on delete set null,
+  -- Default, ikke bare en referanse: uten den sto satt_av null pa hver
+  -- eneste rad, ogsa de som ble skrevet med en okt. Funksjonen sender
+  -- den aldri selv — som `bruker` i kampsvar — sa det er databasen som
+  -- ma sette den, eller sa blir den ikke satt.
+  satt_av uuid default auth.uid() references auth.users (id) on delete set null,
   unique (pub, kamp_id)
 );
 
@@ -172,6 +176,10 @@ create policy "slett som skriver" on visninger
     exists (select 1 from visning_skrivere s where s.bruker = auth.uid()));
 
 create index if not exists visninger_kamp_id_idx on visninger (kamp_id);
+
+-- For baser som alt har tabellen fra 15. september 2026, da defaulten
+-- manglet. Trygg a kjore om igjen.
+alter table visninger alter column satt_av set default auth.uid();
 
 -- Den første skriveren må føres inn for hånd. Bytt ut id-en med din egen
 -- fra Authentication → Users, eller slå den opp på fornavnet:
