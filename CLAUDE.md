@@ -120,7 +120,7 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 
 ## Testing
 
-    node test/unit.mjs      505 tester
+    node test/unit.mjs      510 tester
     node test/funksjon.mjs  247 tester
     node test/run.mjs       438 tester, ~200 s, headless Chromium
 

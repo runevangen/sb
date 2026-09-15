@@ -1504,7 +1504,10 @@ ok("tull inn gir en tom liste",
 ok("lista kan ligge under users",
    tolkBrukere({ users: [{ id: "a", email: "ola@" + PIN_DOMENE }] }).length === 1);
 
-const NAA_TID = Date.parse("2026-09-12T22:00:00Z");
+// 22:00 i Oslo den 12. Sto en stund som 22:00 UTC, som er MIDNATT den
+// 13. i Oslo — altsa midt i det ene tidsvinduet der funksjonen loy, og
+// testene pastod derfor den gale oppforselen.
+const NAA_TID = Date.parse("2026-09-12T20:00:00Z");
 ok("i dag vises med klokkeslett",
    sistInneTekst("2026-09-12T19:04:00Z", NAA_TID).indexOf("I dag") === 0,
    sistInneTekst("2026-09-12T19:04:00Z", NAA_TID));
@@ -1513,6 +1516,35 @@ ok("i gar ogsa", sistInneTekst("2026-09-11T19:04:00Z", NAA_TID).indexOf("I går"
 ok("lenger tilbake teller dager",
    sistInneTekst("2026-09-09T19:04:00Z", NAA_TID) === "3 dager siden",
    sistInneTekst("2026-09-09T19:04:00Z", NAA_TID));
+
+// «Bruker har vaert inne i dag for tiden er mulig», meldt fra
+// adminportalen 15. september 2026.
+//
+// Klokka 01:00 natt til den 15. i Oslo. En innlogging 23:00 kvelden for
+// er to timer siden — og med forlopte doegn (naa - t) / 86400000 ble det
+// «I dag 23:00», altsa 22 timer inn i framtida. Klokkeslettet var riktig
+// hele tiden; det var kalenderdognet som var regnet ut feil.
+const MIDNATT = Date.parse("2026-09-14T23:00:00Z");
+ok("en innlogging i gar kveld er i gar, ogsa rett etter midnatt",
+   sistInneTekst("2026-09-14T21:00:00Z", MIDNATT) === "I går 23:00",
+   sistInneTekst("2026-09-14T21:00:00Z", MIDNATT));
+ok("og en tidligere pa samme kveld likesa",
+   sistInneTekst("2026-09-14T14:00:00Z", MIDNATT) === "I går 16:00",
+   sistInneTekst("2026-09-14T14:00:00Z", MIDNATT));
+// Samme feil den andre veien: 26 timer siden er to kalenderdogn, ikke ett.
+ok("og forgars blir ikke til i gar",
+   sistInneTekst("2026-09-13T21:00:00Z", MIDNATT) === "2 dager siden",
+   sistInneTekst("2026-09-13T21:00:00Z", MIDNATT));
+// Det som FAKTISK er i dag, skal fortsatt sta som i dag.
+ok("et kvarter etter midnatt er i dag",
+   sistInneTekst("2026-09-14T22:15:00Z", MIDNATT) === "I dag 00:15",
+   sistInneTekst("2026-09-14T22:15:00Z", MIDNATT));
+// Sommertid: 25. oktober 2026 gar Oslo fra UTC+2 til UTC+1. Et dogn med
+// 25 timer skal fortsatt telle som ett.
+ok("dognet teller ett ogsa naar klokka stilles",
+   sistInneTekst("2026-10-24T20:00:00Z", Date.parse("2026-10-25T20:00:00Z"))
+     .indexOf("I går") === 0,
+   sistInneTekst("2026-10-24T20:00:00Z", Date.parse("2026-10-25T20:00:00Z")));
 ok("og over en uke blir en dato",
    sistInneTekst("2026-08-01T19:04:00Z", NAA_TID).indexOf("2026") > -1,
    sistInneTekst("2026-08-01T19:04:00Z", NAA_TID));
