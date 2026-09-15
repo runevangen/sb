@@ -31,6 +31,38 @@ i koden påsto at den gjorde det.
 
 ---
 
+## 15. september 2026 — «inne i dag før tiden er mulig»
+
+**Meldt som:** «Ser bruker har vært inne i dag før tiden er mulig.»
+Første mistanke var tidssone.
+
+**Årsak:** ikke tidssonen. `sistInneTekst()` setter eksplisitt
+`timeZone: "Europe/Oslo"`, og klokkeslettet var riktig hele tiden. Det var
+*bøtta* som var feil: `(naa - t) / 86400000` teller forløpte
+24-timersperioder, ikke kalenderdøgn.
+
+Klokka 01:00 natt til den 15. er en innlogging 23:00 kvelden før to timer
+siden — altså «dager = 0» — og raden sa **«I dag 23:00»**, 22 timer inn i
+framtida. Samme feil den andre veien: 26 timer siden ble «I går» når det
+var to kalenderdøgn.
+
+**Hvorfor det sto så lenge:** funksjonen lyver bare mellom midnatt og
+samme klokkeslett neste dag. Resten av døgnet faller de to måtene å telle
+på sammen.
+
+**Og testene påsto den gale oppførselen.** `NAA_TID` var
+`2026-09-12T22:00:00Z` — som er *midnatt den 13. i Oslo*. Fixturen sto
+midt i det ene vinduet der feilen viser seg, og de tre assertionene var
+skrevet ut fra det koden gjorde. De feilet i det fiksen kom, og det var
+riktig av dem.
+
+**Ingen andre steder har den.** `utenGamle` bruker forløpt tid som en
+terskel, og `timeAgo` sier «3d siden» uten å påstå noe om kalenderen.
+`sistInneTekst` var den eneste som oversetter til kalenderord, og det er
+nettopp der forløpte døgn ikke holder.
+
+---
+
 ## 14. september 2026 — én kamp igjen i fanen
 
 **Meldt som:** «dumt at man ser kun en kamp når det er slutten av en
