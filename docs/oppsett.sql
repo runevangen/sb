@@ -104,3 +104,79 @@ $$;
 
 revoke all on function public.slett_meg() from public, anon;
 grant execute on function public.slett_meg() to authenticated;
+
+
+-- ---------------------------------------------------------------
+-- 4. visninger — hvilke kamper pubene viser
+-- ---------------------------------------------------------------
+-- Lå i visninger.js i repoet til 15. september 2026. Hver lagring var en
+-- commit, med historikk og mulighet til å rette for hånd — og det var
+-- riktig så lenge det var få rader og én admin. To ting veltet det (#79):
+-- GITHUB_TOKEN kan skrive kode, ikke bare data, og to samtidige
+-- lagringer lot den ene tape stille.
+--
+-- Skrivingen går med **leserens egen økt**, som i kampsvar. ADMIN_PASSORD
+-- er vårt eget passord, og Supabase vet ikke hva det er: databasen
+-- trenger sin egen identitet for å slippe en skriving gjennom. Derfor
+-- slår RLS opp uid-en i visning_skrivere.
+
+-- Hvem som får skrive. Ingen skrivepolicy med vilje: raden føres inn her,
+-- i SQL, av en som allerede har tilgang til basen — ikke fra appen. Det
+-- er nettopp poenget, at lista ikke kan utvides av noen som bare er
+-- logget inn.
+create table if not exists visning_skrivere (
+  bruker   uuid primary key references auth.users (id) on delete cascade,
+  navn     text,
+  lagt_til timestamptz not null default now()
+);
+
+alter table visning_skrivere enable row level security;
+
+-- Du ser din egen rad, og bare den.
+drop policy if exists "se min egen skriverett" on visning_skrivere;
+create policy "se min egen skriverett" on visning_skrivere
+  for select to authenticated using (bruker = auth.uid());
+
+create table if not exists visninger (
+  id      uuid primary key default gen_random_uuid(),
+  pub     text not null check (char_length(pub) between 1 and 80),
+  kamp_id text not null check (char_length(kamp_id) between 1 and 80),
+  kamp    text check (char_length(kamp) <= 120),
+  dato    timestamptz,
+  satt    timestamptz not null default now(),
+  satt_av uuid references auth.users (id) on delete set null,
+  unique (pub, kamp_id)
+);
+
+alter table visninger enable row level security;
+
+-- Lesing for alle: «denne kampen vises på Lincoln Pub» skal stå for den
+-- som blar gjennom runden, uten konto.
+drop policy if exists "les for alle" on visninger;
+create policy "les for alle" on visninger
+  for select using (true);
+
+drop policy if exists "skriv som skriver" on visninger;
+create policy "skriv som skriver" on visninger
+  for insert to authenticated with check (
+    exists (select 1 from visning_skrivere s where s.bruker = auth.uid()));
+
+drop policy if exists "endre som skriver" on visninger;
+create policy "endre som skriver" on visninger
+  for update to authenticated using (
+    exists (select 1 from visning_skrivere s where s.bruker = auth.uid()));
+
+drop policy if exists "slett som skriver" on visninger;
+create policy "slett som skriver" on visninger
+  for delete to authenticated using (
+    exists (select 1 from visning_skrivere s where s.bruker = auth.uid()));
+
+create index if not exists visninger_kamp_id_idx on visninger (kamp_id);
+
+-- Den første skriveren må føres inn for hånd. Bytt ut id-en med din egen
+-- fra Authentication → Users, eller slå den opp på fornavnet:
+--
+--   insert into visning_skrivere (bruker, navn)
+--   select id, raw_user_meta_data->>'navn' from auth.users
+--   where email = 'rune@pin.mvp-sb.netlify.app'
+--   on conflict (bruker) do nothing;

@@ -19,9 +19,21 @@
 
 import { tolkSvar, svarRad, gyldigNavn, gyldigKampId, SVAR_MAKS, KAMPER_MAKS }
   from "../../svar-data.js";
+import { tolkVisninger } from "../../visning-data.js";
 
 const TABELL = "kampsvar";
 const FELT = "kamp_id,navn,hvor,sted,bruker";
+
+// Hvilke puber som viser kampene. Lista la i visninger.js i repoet til
+// 15. september 2026 og kostet null nettkall — den fulgte med utrullingen.
+// Na ligger den i Supabase, og da matte den hentes over nettet.
+//
+// Den rir derfor med her framfor a fa sitt eget endepunkt: denne
+// spørringen ber alt om noyaktig de samme kamp-id-ene, en gang per runde.
+// De to tingene som star under kampraden — «3 blir med» og «vises pa
+// Lincoln Pub» — kommer dermed fra ett svar og ett kall, som for.
+const VISNING_TABELL = "visninger";
+const VISNING_FELT = "pub,kamp_id,kamp,dato,satt";
 
 export default async (req) => {
   const mangler = manglerIOppsettet();
@@ -55,14 +67,31 @@ async function hentSvar(url) {
     .filter(gyldigKampId)
     .slice(0, KAMPER_MAKS);
 
-  if (!ider.length) return svar({ svar: [] }, 200);
+  if (!ider.length) return svar({ svar: [], visninger: [] }, 200);
 
   const sti = "/rest/v1/" + TABELL + "?select=" + FELT +
     "&kamp_id=in.(" + ider.join(",") + ")&limit=" + (SVAR_MAKS * KAMPER_MAKS);
+  const vSti = "/rest/v1/" + VISNING_TABELL + "?select=" + VISNING_FELT +
+    "&kamp_id=in.(" + ider.join(",") + ")&order=satt&limit=" + (SVAR_MAKS * KAMPER_MAKS);
 
-  const r = await hosSupabase("GET", sti, null, null);
+  // Samtidig, ikke etter tur: to sporringer mot samme base skal ikke
+  // koste to ganger ventetiden.
+  const [r, v] = await Promise.all([
+    hosSupabase("GET", sti, null, null),
+    hosSupabase("GET", vSti, null, null),
+  ]);
   if (!r.ok) return feilSvar(r);
-  return svar({ svar: tolkSvar(r.json) }, 200);
+
+  // Visningene er et tillegg. Svikter de alene, skal «blir med»-lista
+  // fortsatt komme — en tom visningsliste ser ut som «ingen pub har meldt
+  // inn», og det er riktig nok til at runden star. Feilen logges sa den
+  // ikke forsvinner stille.
+  if (!v.ok) console.error("[svar] visninger " + v.status + ": " + (v.melding || ""));
+
+  return svar({
+    svar: tolkSvar(r.json),
+    visninger: v.ok ? tolkVisninger(v.json) : [],
+  }, 200);
 }
 
 /* ---------- skriving ---------- */

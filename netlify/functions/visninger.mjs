@@ -1,28 +1,38 @@
-// Admin-portalens lagring: skriver visninger.js til GitHub.
+// Admin-portalens lagring: hvilke kamper pubene viser.
 //
-// Hvorfor GitHub og ikke et ekte lager: fila skal ligge i koden, slik
-// puber-oslo.js gjor, sa leseren ser hvem som viser kampen uten et
-// nettkall. Da blir hver lagring en commit, med historikk og mulighet
-// til a rette for hand. Det koster en utrulling per lagring — greit sa
-// lenge det er en admin. Skal puber skrive selv (#65), ma dette byttes
-// mot et lager som talér mange skrivere.
+// Lagret var GitHub til 15. september 2026: hver lagring var en commit i
+// visninger.js, med historikk og mulighet til a rette for hand. To ting
+// veltet det (#79). GITHUB_TOKEN kan skrive kode, ikke bare data — en
+// feil her kunne endret appen. Og funksjonen leste sha, flettet og skrev
+// tilbake, sa to samtidige lagringer lot den ene tape stille. Med én
+// admin var det teoretisk; med puber som skriver selv (#65) er det ikke
+// det, og pubene kan uansett ikke skrive til repoet.
 //
-// Passordet ligger i ADMIN_PASSORD, tokenet i GITHUB_TOKEN. Tokenet skal
-// vaere finkornet og bare ha skrivetilgang til innhold i dette ene
-// repoet. Uten begge svarer funksjonen 503, og sier hvilken som mangler.
-// Et GET spor bare om oppsettet: portalen bruker det til a si fra for
-// admin har gjort jobben, framfor etterpa.
+// Na er lagret Supabase, som kampsvar — og skrivingen gar med **leserens
+// egen okt**, ikke med en nokkel som kan skrive hva som helst. Det er
+// verdt a si hvorfor, siden ADMIN_PASSORD ser ut som at det burde holde:
+// passordet er vart, og Supabase vet ikke hva det er. Databasen trenger
+// sin egen identitet for a slippe en skriving gjennom RLS. Alternativene
+// var a la anon skrive (da er tabellen apen for hvem som helst som
+// kjenner nokkelen), en security definer-funksjon med passordet som
+// argument (samme makt, bare flyttet inn i basen — avvist for
+// brukere.mjs av nettopp den grunnen), eller en service_role-nokkel til
+// (regelen er at det er én fil som har en).
+//
+// Derfor: RLS slar opp uid-en i visning_skrivere. ADMIN_PASSORD star
+// igjen som doren til skjemaet, ikke til skrivingen — to lasser, og den
+// som faktisk holder er databasens.
 
 import { PUBER_OSLO } from "../../puber-oslo.js";
 import {
-  sjekkVisninger, slaSammen, utenGamle, visningerFil, lesVisninger,
+  sjekkVisninger, slaSammen, tolkVisninger, visningRad, kampIderFor,
 } from "../../visning-data.js";
 
-const GITHUB = "https://api.github.com";
-const REPO = process.env.GITHUB_REPO || "runevangen/sb";
-const GREN = process.env.GITHUB_BRANCH || "main";
-const STI = "visninger.js";
-const IDENTITET = "sportsbibelen-app/1.0 https://mvp-sb.netlify.app";
+const TABELL = "visninger";
+const FELT = "pub,kamp_id,kamp,dato,satt";
+// Rader for kamper som er spilt for lenge siden har ingen verdi, og lista
+// ville vokst uten ende. Ryddes hver gang admin lagrer, som for.
+const RYDD_DAGER = 2;
 
 export default async (req) => {
   const mangler = manglerIOppsettet();
@@ -31,12 +41,10 @@ export default async (req) => {
   // forst vite at portalen ikke er satt opp nar hen trykker Lagre, er
   // valget allerede gjort en gang til ingen nytte. Svaret rooper
   // ingenting: navnene pa miljovariablene star i repoet fra for.
-  if (req.method === "GET") return svar({ klar: mangler.length === 0, mangler }, 200);
-  if (req.method !== "POST") return svar({ feil: "Bruk POST" }, 405);
+  if (req.method === "GET") return hentOppsett(mangler);
+  if (req.method !== "POST") return svar({ feil: "Bruk GET eller POST" }, 405);
 
   if (mangler.length) return svar({ feil: oppsettTekst(mangler), mangler }, 503);
-  const passord = process.env.ADMIN_PASSORD;
-  const token = process.env.GITHUB_TOKEN;
 
   let inn;
   try {
@@ -46,15 +54,43 @@ export default async (req) => {
   }
 
   // Sammenlikner hele lengden uansett, sa svartiden ikke rooper hvor
-  // mange tegn som stemte.
-  if (!likeStrenger(String(inn.passord || ""), passord)) {
+  // mange tegn som stemte. Sjekken skjer for alt annet: et feil passord
+  // nar aldri Supabase.
+  if (!likeStrenger(String(inn.passord || ""), process.env.ADMIN_PASSORD)) {
     return svar({ feil: "Feil passord" }, 401);
   }
 
   // Innloggingen: portalen viser ingenting for passordet er godtatt.
-  // Den gir ingen annen tilgang enn et POST uten «sjekk» ville gitt —
-  // den flytter bare svaret dit admin er, fra Lagre til innloggingen.
   if (inn.handling === "sjekk") return svar({ ok: true }, 200);
+
+  return lagre(inn);
+};
+
+/* ---------- lesing ---------- */
+
+// Oppsettet og lista i ett. Portalen trenger begge ved apning: hva som
+// mangler i miljoet, og hva som alt star lagret for puben admin velger.
+async function hentOppsett(mangler) {
+  if (mangler.length) return svar({ klar: false, mangler, visninger: [] }, 200);
+
+  const r = await hosSupabase("GET",
+    "/rest/v1/" + TABELL + "?select=" + FELT + "&order=dato&limit=500", null, null);
+  if (!r.ok) {
+    return svar({ klar: true, mangler: [], visninger: [], feil: feilTekst(r), forsok: r.forsok }, 200);
+  }
+  return svar({ klar: true, mangler: [], visninger: tolkVisninger(r.json) }, 200);
+}
+
+/* ---------- skriving ---------- */
+
+async function lagre(inn) {
+  const token = String(inn.token || "");
+  if (!token) {
+    return svar({
+      feil: "Logg inn i appen først. Lagringen går med din egen økt, ikke"
+        + " med en nøkkel — og da må databasen vite hvem du er.",
+    }, 401);
+  }
 
   const pub = String(inn.pub || "");
   const kamper = Array.isArray(inn.kamper) ? inn.kamper : [];
@@ -62,77 +98,145 @@ export default async (req) => {
   if (!pub || !kamper.length) return svar({ feil: "Mangler pub eller kamper" }, 400);
   if (!PUBER_OSLO.some((p) => p.navn === pub)) return svar({ feil: "Ukjent pub" }, 400);
 
-  let naa;
-  try {
-    naa = await hentFila(token);
-  } catch (err) {
-    console.error("[visninger] klarte ikke lese fila:", err);
-    return svar({ feil: "Fikk ikke lest visninger.js: " + kort(err) }, 502);
-  }
-
-  const oppdatert = utenGamle(slaSammen(naa.liste, pub, valgte, kamper), Date.now(), 2);
-  const problemer = sjekkVisninger(oppdatert, PUBER_OSLO.map((p) => p.navn));
+  // Radene for denne puben og disse kampene. Tom liste inn: slaSammen gir
+  // da noyaktig de nye radene, og den samme regnemaskinen som for avgjor
+  // hvilken kamp-id en avkrysning betyr.
+  const nye = slaSammen([], pub, valgte, kamper);
+  const problemer = sjekkVisninger(nye, PUBER_OSLO.map((p) => p.navn));
   if (problemer.length) return svar({ feil: "Ugyldige visninger", problemer }, 400);
 
-  try {
-    await skrivFila(token, visningerFil(oppdatert), naa.sha, pub, valgte.length);
-  } catch (err) {
-    console.error("[visninger] klarte ikke skrive fila:", err);
-    return svar({ feil: "Fikk ikke lagret: " + kort(err) }, 502);
+  const ider = kampIderFor(kamper);
+  if (!ider.length) return svar({ feil: "Kampene mangler id" }, 400);
+
+  // Ryddingen forst: puben sine rader for akkurat de kampene som sto pa
+  // skjermen, og ingen andre. Da kan to puber settes etter hverandre, og
+  // en annen ligas visninger overlever et bytte — samme avgrensning som
+  // slaSammen gjorde i minnet.
+  const slett = await hosSupabase("DELETE",
+    "/rest/v1/" + TABELL + "?pub=eq." + encodeURIComponent(pub) +
+    "&kamp_id=in.(" + ider.map(encodeURIComponent).join(",") + ")", null, token);
+  if (!slett.ok) return feilSvar(slett);
+
+  let skrevet = [];
+  if (nye.length) {
+    const r = await hosSupabase("POST",
+      "/rest/v1/" + TABELL + "?select=" + FELT, nye.map(visningRad), token,
+      { "Prefer": "return=representation" });
+    if (!r.ok) return feilSvar(r);
+    skrevet = tolkVisninger(r.json);
+
+    // En skriving som svarer 200 er ikke bevis pa at raden ligger der.
+    // Samme lekse som kampsvar: mangler skrivepolicyen, kan svaret se
+    // vellykket ut mens ingenting ble lagret.
+    if (!skrevet.length) {
+      return svar({
+        feil: "Ingenting ble lagret. Skrivingen svarte " + r.status
+          + ", men ingen rader kom tilbake. Star du i visning_skrivere?",
+        forsok: r.forsok,
+      }, 502);
+    }
   }
+
+  // Ryddebøtta til slutt, og en feil her skal ikke velte en lagring som
+  // gikk bra: gamle rader er stoy, ikke en feil leseren merker.
+  const grense = new Date(Date.now() - RYDD_DAGER * 86400000).toISOString();
+  const ryddet = await hosSupabase("DELETE",
+    "/rest/v1/" + TABELL + "?dato=lt." + encodeURIComponent(grense), null, token);
+  if (!ryddet.ok) console.error("[visninger] rydding feilet: " + (ryddet.melding || ""));
 
   return svar({
     ok: true,
     pub,
-    valgt: valgte.length,
-    totalt: oppdatert.length,
-    merknad: "Lagret. Endringen er ute i appen når utrullingen er ferdig, om et minutt eller to.",
+    valgt: skrevet.length,
+    visninger: skrevet,
+    merknad: "Lagret. Endringen er ute for leserne med det samme — ingen"
+      + " utrulling å vente på lenger.",
   }, 200);
-};
-
-async function hentFila(token) {
-  const respons = await fetch(
-    GITHUB + "/repos/" + REPO + "/contents/" + STI + "?ref=" + encodeURIComponent(GREN),
-    { headers: githubHodet(token) });
-  if (!respons.ok) throw new Error("HTTP " + respons.status);
-  const json = await respons.json();
-  const tekst = Buffer.from(String(json.content || ""), "base64").toString("utf8");
-  return { sha: json.sha, liste: lesVisninger(tekst) };
 }
 
-async function skrivFila(token, innhold, sha, pub, antall) {
-  const respons = await fetch(GITHUB + "/repos/" + REPO + "/contents/" + STI, {
-    method: "PUT",
-    headers: Object.assign(githubHodet(token), { "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      message: "Visninger: " + pub + " viser " + antall + " kamper",
-      content: Buffer.from(innhold, "utf8").toString("base64"),
-      sha,
-      branch: GREN,
-    }),
-  });
-  if (!respons.ok) {
-    const kropp = (await respons.text().catch(() => "")).replace(/\s+/g, " ").trim();
-    throw new Error("HTTP " + respons.status + (kropp ? " " + kropp.slice(0, 120) : ""));
+/* ---------- tjenesten ---------- */
+
+function base() {
+  return String(process.env.SUPABASE_URL || "").replace(/\/+$/, "");
+}
+
+async function hosSupabase(metode, sti, kropp, token, ekstra) {
+  const forsok = { kilde: "Supabase", tabell: TABELL };
+  const headere = {
+    "apikey": process.env.SUPABASE_ANON_KEY,
+    "Accept": "application/json",
+  };
+  // Leserens egen okt ved skriving. Ved lesing sendes ingen: hvem som
+  // viser kampen skal kunne leses uten konto.
+  if (token) headere.Authorization = "Bearer " + token;
+  if (kropp) headere["Content-Type"] = "application/json";
+  Object.assign(headere, ekstra || {});
+
+  try {
+    const respons = await fetch(base() + sti, {
+      method: metode,
+      headers: headere,
+      body: kropp ? JSON.stringify(kropp) : undefined,
+    });
+    forsok.status = respons.status;
+
+    const tekst = await respons.text().catch(() => "");
+    let json = null;
+    try {
+      json = tekst ? JSON.parse(tekst) : null;
+    } catch (err) {
+      json = null;
+    }
+    const melding = kortMelding(json) || tekst.slice(0, 120);
+    if (melding) forsok.melding = melding;
+    return { ok: respons.ok, status: respons.status, json, melding, forsok: [forsok] };
+  } catch (err) {
+    forsok.utfall = String((err && err.message) || err).slice(0, 80);
+    return { ok: false, status: 0, json: null, melding: forsok.utfall, forsok: [forsok] };
   }
 }
 
-function githubHodet(token) {
-  return {
-    "Authorization": "Bearer " + token,
-    "Accept": "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-    "User-Agent": IDENTITET,
-  };
+function feilTekst(r) {
+  const kode = (r.json && r.json.code) || "";
+  if (kode === "42P01" || /does not exist/i.test(r.melding || "")) {
+    return "Tabellen «" + TABELL + "» finnes ikke i Supabase ennå."
+      + " SQL-en står i docs/oppsett.sql.";
+  }
+  if (r.status === 401 || r.status === 403) {
+    return "Økten gjelder ikke lenger, eller du står ikke i visning_skrivere."
+      + " Logg inn i appen på nytt, og se docs/oppsett.sql for lista.";
+  }
+  return "Fikk ikke svar fra lageret. Prøv igjen om litt.";
 }
 
-// Uten begge hemmelighetene kan portalen ingenting, og da skal det sta
-// hvilken som mangler. «Portalen er ikke satt opp» alene sender admin
-// til a lete i koden etter noe som star i Netlify-panelet.
+function feilSvar(r) {
+  const kode = (r.json && r.json.code) || "";
+  if (kode === "42P01" || /does not exist/i.test(r.melding || "")) {
+    return svar({ feil: feilTekst(r), forsok: r.forsok }, 503);
+  }
+  if (r.status === 401 || r.status === 403) {
+    return svar({ feil: feilTekst(r), forsok: r.forsok }, 401);
+  }
+  console.error("[visninger] " + r.status + ": " + (r.melding || ""));
+  return svar({ feil: feilTekst(r), forsok: r.forsok }, 502);
+}
+
+function kortMelding(json) {
+  if (!json) return "";
+  const tekst = json.message || json.error_description || json.msg || json.error || "";
+  return String(tekst).slice(0, 120);
+}
+
+// Uten disse kan portalen ingenting, og da skal det sta hvilken som
+// mangler. «Portalen er ikke satt opp» alene sender admin til a lete i
+// koden etter noe som star i Netlify-panelet.
+//
+// GITHUB_TOKEN star ikke her lenger: lagringen gar ikke via repoet.
 function manglerIOppsettet() {
   const mangler = [];
   if (!process.env.ADMIN_PASSORD) mangler.push("ADMIN_PASSORD");
-  if (!process.env.GITHUB_TOKEN) mangler.push("GITHUB_TOKEN");
+  if (!process.env.SUPABASE_URL) mangler.push("SUPABASE_URL");
+  if (!process.env.SUPABASE_ANON_KEY) mangler.push("SUPABASE_ANON_KEY");
   return mangler;
 }
 
@@ -147,18 +251,17 @@ function oppsettTekst(mangler) {
 // Konstant tid: en sammenlikning som stopper ved forste avvik, forteller
 // hvor langt en gjetning kom.
 function likeStrenger(a, b) {
-  const lengde = Math.max(a.length, b.length);
-  let ulikt = a.length ^ b.length;
+  const fasit = String(b == null ? "" : b);
+  const lengde = Math.max(a.length, fasit.length);
+  let ulikt = a.length ^ fasit.length;
   for (let i = 0; i < lengde; i += 1) {
-    ulikt |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+    ulikt |= (a.charCodeAt(i) || 0) ^ (fasit.charCodeAt(i) || 0);
   }
   return ulikt === 0;
 }
 
-function kort(err) {
-  return String((err && err.message) || err).slice(0, 120);
-}
-
+// Aldri cache. Admin skal se det hen nettopp lagret, ikke et svar som
+// henger igjen fra forrige runde.
 function svar(kropp, status) {
   return new Response(JSON.stringify(kropp), {
     status,

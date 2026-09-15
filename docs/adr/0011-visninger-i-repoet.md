@@ -1,3 +1,7 @@
+> **Erstattet av [ADR 0018](0018-visninger-i-supabase.md)** 15. september 2026.
+> Visningene ligger i Supabase nå. Denne står igjen fordi den forklarer
+> hvorfor repoet var riktig først, og hva som gikk tapt ved å flytte.
+
 # 0011 — «Hvem viser kampen» lagres som en commit
 
 ## Kontekst

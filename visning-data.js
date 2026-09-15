@@ -21,6 +21,13 @@ function samme(kamp, v) {
 
 export const VISNING_FELT = ["pub", "kampId", "kamp", "dato", "satt"];
 
+// Kamp-id-ene for kampene som sto pa skjermen. Tjenesten trenger dem for
+// a rydde bort puben sine rader for akkurat de kampene, og ingen andre —
+// det er den samme avgrensningen slaSammen gjor i minnet.
+export function kampIderFor(kamper) {
+  return (kamper || []).map(nokkelFor).filter(Boolean);
+}
+
 // Vokter formen, som sjekkPubliste gjor for publista. Gir en liste med
 // det som er galt; tom liste betyr at alt er bra. pubnavn er navnene fra
 // puber-oslo.js: en visning pa en pub vi ikke kjenner, er en skrivefeil.
@@ -109,54 +116,36 @@ export function utenGamle(alle, naa, dager) {
     .filter((v) => !v.dato || Date.parse(v.dato) >= grense);
 }
 
-/* ---------- fila ---------- */
+/* ---------- fra lageret ---------- */
 
-const HODE = `// Hvilke kamper pubene viser. Skrives av admin-portalen pa /admin.html,
-// ikke for hand — men fila er lesbar og kan rettes for hand om noe gar
-// galt.
+// Radene slik PostgREST gir dem, formet som appen vil ha dem.
 //
-// Den ligger i koden, som puber-oslo.js, av samme grunn: da trenger
-// leseren ingen nettkall for a se hvem som viser kampen, og historikken
-// star i git. Det koster en utrulling per lagring, som er greit sa lenge
-// det er en admin. Skal puber skrive selv (#65), ma dette flyttes til et
-// ekte lager.
-//
-// Lista er gyldig JSON med vilje: da kan funksjonen lese tilbake den
-// ekte tilstanden fra GitHub framfor a stole pa en utrullet kopi, som
-// ville vaert utdatert mellom to lagringer.
-//
-// pub ma stemme med et navn i puber-oslo.js. kampId er kampens egen
-// nokkel — dagen og de to lagene — ikke id-en fra terminlisten: de to
-// kildene nummererer hver sin vei, og en id herfra pekte pa ingenting
-// sa snart runden kom fra den andre. Eldre rader baerer fortsatt et
-// tall, og de virker ut kampen sin. kamp og dato star her for at fila
-// skal vaere lesbar alene; det er kampId som gjelder.
-
-export const VISNINGER = [`;
-
-// Skriver fila. En rad per linje, sortert, sa en diff i git viser hva
-// som faktisk ble endret framfor en omstokking av hele lista.
-export function visningerFil(liste) {
-  const rader = (liste || []).map((v) => "  " + JSON.stringify({
-    pub: String(v.pub),
-    kampId: String(v.kampId),
-    kamp: String(v.kamp),
-    dato: String(v.dato),
-    satt: String(v.satt),
-  }));
-  return HODE + (rader.length ? "\n" + rader.join(",\n") + "\n" : "") + "];\n";
+// **Ma tale a kjores to ganger.** Funksjonen deles mellom tjenesten og
+// appen, og det var nettopp det som veltet «blir med»-lista: `svar.mjs`
+// tolket radene for den svarte, `fotball.js` tolket svaret en gang til,
+// og andre gang fantes ikke `kamp_id` — feltet het `kampId`. Hver rad ble
+// noklet under «», og lista var usynlig for alle i tre dager. Derfor
+// leses begge formene her, og en enhetstest krever at to kjoringer gir
+// noyaktig det samme som en.
+export function tolkVisninger(rader) {
+  return (Array.isArray(rader) ? rader : []).map((r) => ({
+    pub: String((r && r.pub) || ""),
+    kampId: String((r && (r.kamp_id != null ? r.kamp_id : r.kampId)) || ""),
+    kamp: String((r && r.kamp) || ""),
+    dato: (r && r.dato) || "",
+    satt: (r && r.satt) || "",
+  })).filter((v) => v.pub && v.kampId);
 }
 
-// Leser lista ut igjen. Funksjonen henter fila fra GitHub for a skrive
-// den, og ma da vite hva som star der na — ikke hva som var utrullet.
-export function lesVisninger(tekst) {
-  const s = String(tekst || "");
-  const start = s.indexOf("export const VISNINGER = [");
-  if (start === -1) throw new Error("Fant ikke VISNINGER i fila");
-  const fra = s.indexOf("[", start);
-  const til = s.lastIndexOf("]");
-  if (til <= fra) throw new Error("Fant ikke slutten pa lista");
-  const liste = JSON.parse(s.slice(fra, til + 1));
-  if (!Array.isArray(liste)) throw new Error("VISNINGER er ikke en liste");
-  return liste;
+// Den andre veien: en rad klar for tjenesten. `satt_av` settes av
+// databasen fra okten, som `bruker` i kampsvar — funksjonen sender den
+// aldri selv, sa en feil her kan ikke skrive i en annens navn.
+export function visningRad(v) {
+  return {
+    pub: String(v.pub),
+    kamp_id: String(v.kampId),
+    kamp: String(v.kamp || ""),
+    dato: v.dato || null,
+    satt: v.satt || new Date().toISOString(),
+  };
 }

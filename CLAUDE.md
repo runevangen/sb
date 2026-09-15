@@ -31,7 +31,7 @@ der — ikke her.
     kanaler.js      hvilken kanal som sender ligaen — tom til noen har sjekket
     konto-data.js / pin-data.js / netlify/functions/konto.mjs
     svar-data.js / netlify/functions/svar.mjs
-    visning-data.js / visninger.js / netlify/functions/visninger.mjs
+    visning-data.js / netlify/functions/visninger.mjs
     admin.html / admin.js / netlify/functions/brukere.mjs
 
     personvern.html hva vi lagrer, og hvordan du blir kvitt det
@@ -95,6 +95,15 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 ### Data
 - **Kamp-id er `kampNokkel()`**, ikke kildens id. Alt som lagres, slås opp
   eller deles går på `nokkel`. [ADR 0008](docs/adr/0008-kampnokkel.md)
+- **«Hvem viser kampen» ligger i Supabase**, ikke i repoet, og rir med på
+  `/api/svar` — den spør alt om de samme kampene. Skrivingen går med
+  skriverens **egen økt**; RLS slår opp uid-en i `visning_skrivere`.
+  `ADMIN_PASSORD` er døren til skjemaet, ikke til skrivingen.
+  [ADR 0018](docs/adr/0018-visninger-i-supabase.md)
+- **Det som kommer over nettet, lander etter at visningen står ferdig.**
+  Alt som tegnes av data fra `/api/svar` må tegnes på nytt i `tegnSvar()`
+  — kampraden, den åpne kampen og linjene under. Tre feil i dette
+  prosjektet har vært den samme.
 - **«Kommende» viser hele vinduet**, ikke én runde, med en overskrift per
   runde. Taket på tjue id-er mot `/api/svar` holdes av buntingen i
   `hentSvarFor()`, ikke av at lista kappes i forkant.
@@ -111,9 +120,9 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 
 ## Testing
 
-    node test/unit.mjs      504 tester
-    node test/funksjon.mjs  238 tester
-    node test/run.mjs       435 tester, ~200 s, headless Chromium
+    node test/unit.mjs      505 tester
+    node test/funksjon.mjs  247 tester
+    node test/run.mjs       438 tester, ~200 s, headless Chromium
 
 Tre regler, og de har alle kostet noe:
 

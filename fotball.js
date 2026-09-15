@@ -17,8 +17,7 @@ import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
          rangerForslag, FORSLAG_MAKS } from "./pub-data.js";
 import { PUBER_OSLO } from "./puber-oslo.js";
-import { VISNINGER } from "./visninger.js";
-import { bekreftetFor, merkBekreftet } from "./visning-data.js";
+import { bekreftetFor, merkBekreftet, tolkVisninger } from "./visning-data.js";
 import { arenaFor } from "./vaer-data.js";
 import { KANALER } from "./kanaler.js";
 
@@ -398,6 +397,7 @@ async function visVenner(rot) {
   }
 
   sisteSvar = hentet.svar;
+  sisteVisninger = hentet.visninger;
   const med = bareMedSvar(kamper, perKamp(hentet.svar));
 
   if (!med.length) {
@@ -568,7 +568,10 @@ function delPanel(kamp) {
   // Kampen huskes pa panelet, sa en ny tegning utenfra — nar svarene
   // lander etter at kortet ble apnet — vet hvilken kamp den gjelder.
   panel.kamp = kamp;
-  const bekreftede = bekreftetFor(kamp, VISNINGER, KJENTE);
+  // En funksjon, ikke en verdi: visningene kommer fra nettet na, og et
+  // kort som ble apnet for svaret landet ville ellers statt med det
+  // tomme svaret for alltid. tegnSteder() kalles pa nytt av tegnSvar().
+  const bekreftede = () => bekreftetFor(kamp, sisteVisninger, KJENTE);
 
   // Overskrifta i kortet sier hva lista under er. Lagene er overskrifta
   // pa kampen, og de star i linja over — kortet skal ikke ha en tittel
@@ -626,7 +629,7 @@ function delPanel(kamp) {
   const apne = el("button", "pub-apne sted-rad-annet");
   apne.type = "button";
   apne.setAttribute("aria-expanded", "false");
-  const apneTekst = () => (bekreftede.length
+  const apneTekst = () => (bekreftede().length
     ? "Et annet sted" : "Puber som pleier å vise fotball");
   apne.textContent = apneTekst();
   const vis = (pa) => {
@@ -692,7 +695,7 @@ function delPanel(kamp) {
     const paaLista = !!konto.okt();
 
     steder.replaceChildren();
-    stedKilder(kamp, bekreftede, rad, egneSteder).forEach((sted) => {
+    stedKilder(kamp, bekreftede(), rad, egneSteder).forEach((sted) => {
       const nokkel = stedNokkel(sted.navn);
       steder.appendChild(stedRad(kamp, panel, sted, {
         valgt: !!valgt && nokkel === valgt,
@@ -1051,7 +1054,7 @@ function fyllForslag(boks, kamp) {
 
   // Pubene som har meldt at de viser nettopp denne kampen. Den eneste
   // kilden som svarer pa kampen framfor pa stedet — derfor forst.
-  const bekreftede = bekreftetFor(kamp, VISNINGER, KJENTE);
+  const bekreftede = bekreftetFor(kamp, sisteVisninger, KJENTE);
   boks.kilder.bekreftede = bekreftede;
   // Huskes sa et nytt forsok pa posisjon kan merke treffene likt.
   boks.bekreftede = bekreftede;
@@ -1347,7 +1350,7 @@ function kamprad(kamp, del, delbar) {
 // noe. Navnet er en knapp som apner panelet med puben ferdig valgt —
 // linja svarer pa sporsmalet og tar deg videre til a dele det.
 function viserlinje(kamp) {
-  const bekreftede = bekreftetFor(kamp, VISNINGER, KJENTE);
+  const bekreftede = bekreftetFor(kamp, sisteVisninger, KJENTE);
   if (!bekreftede.length) return null;
   const linje = el("div", "kamp-viser");
   const merke = el("span", "kamp-viser-merke", "★");
@@ -1378,6 +1381,13 @@ function viserlinje(kamp) {
 // grunn som for «denne kampen vises pa».
 let sisteSvar = [];
 
+// Hvilke puber som viser kampene. La i visninger.js og fulgte med
+// utrullingen til 15. september 2026 (#79); na kommer den fra Supabase,
+// pa lasset i det samme /api/svar-kallet. Tom til det svaret er inne —
+// og det er riktig: «ingen har meldt inn» er det normale svaret, sa en
+// rad uten stjerne ser ut som en rad, ikke som noe som mangler.
+let sisteVisninger = [];
+
 async function hentSvar(rot, del, data) {
   if ((del !== "neste" && del !== "venner") || !data || !Array.isArray(data.kamper)) return;
 
@@ -1395,6 +1405,7 @@ async function hentSvar(rot, del, data) {
   // svar. Vennefanen er det motsatte: der er lista alt som finnes.
   if (hentet.feil) return;
   sisteSvar = hentet.svar;
+  sisteVisninger = hentet.visninger;
   tegnSvar(rot);
 }
 
@@ -1418,6 +1429,7 @@ async function hentSvarFor(ider) {
   }
 
   const svar = [];
+  const visninger = [];
   let feil = "";
 
   await Promise.all(bunter.map(async (bunt) => {
@@ -1430,12 +1442,13 @@ async function hentSvarFor(ider) {
         return;
       }
       tolkSvar(json.svar).forEach((s) => svar.push(s));
+      tolkVisninger(json.visninger).forEach((v) => visninger.push(v));
     } catch (err) {
       feil = feil || "Klarte ikke å hente hvem som blir med.";
     }
   }));
 
-  return { svar, feil };
+  return { svar, visninger, feil };
 }
 
 function tegnSvar(rot) {
@@ -1444,6 +1457,27 @@ function tegnSvar(rot) {
   Array.from(rot.querySelectorAll(".kamp")).forEach((rad) => {
     const gammel = rad.querySelector(".kamp-blirmed");
     if (gammel) gammel.remove();
+
+    // «Denne kampen vises pa: …» tegnes ogsa her, og ikke bare i
+    // kamprad(). Visningene la i koden og fulgte med utrullingen til
+    // 15. september 2026; na kommer de over nettet, i det samme svaret,
+    // og det lander **etter** at runden star ferdig. Tegnet vi linja bare
+    // nar raden lages, ville den aldri dukket opp. Samme felle som det
+    // apne kortet under — og den ble fanget av at dette er tredje gang
+    // den slar til.
+    const gammelViser = rad.querySelector(".kamp-viser");
+    if (gammelViser) gammelViser.remove();
+    const kampen = radensKamp(rad);
+    if (kampen && rad.classList.contains("delbar")) {
+      const viser = viserlinje(kampen);
+      if (viser) {
+        const panel = rad.querySelector(".kamp-panel");
+        const blirMed = rad.querySelector(".kamp-blirmed");
+        const for_ = blirMed || panel;
+        if (for_) rad.insertBefore(viser, for_);
+        else rad.appendChild(viser);
+      }
+    }
 
     const svar = kart.get(String(rad.dataset.kamp || "")) || [];
     const okt = konto.okt();
