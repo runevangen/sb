@@ -11,8 +11,48 @@
 # ingen ekte verdi skal inn her, og skanningen gjelder fortsatt for all
 # kode og alt markup — det er bare dokumentasjonen og testdataene som
 # slipper unna, og de inneholder oppdiktede verdier med vilje.
+# Testene er porten foran prod. Netlify deployer pa push, og CI kjorer
+# parallelt — sa for dette sto her var en rod test en RAPPORT, ikke en vakt
+# (#77): pushet du noe rodt til main, rullet det ut uansett, og CI sa fra
+# etterpa. Feiler kommandoen her, feiler bygget, og ingenting publiseres.
+# Forrige deploy star.
+#
+# Dette er ikke et byggesteg i den forstand prosjektet mener. Kommandoen
+# produserer ingenting: ingen bundler, ingen node_modules, ingen
+# transpilering, og publiseringsmappa er fortsatt repo-rota. Den kjorer to
+# filer og ser pa exit-koden.
+#
+# Bare de to raske. De tar under ett sekund til sammen, krever ingen
+# avhengigheter, ingen nokler og ingen nettverk — og de er sjekket a vaere
+# maskinuavhengige: bade unit og funksjon passerer under UTC,
+# America/Los_Angeles, Pacific/Kiritimati og Australia/Sydney.
+#
+# HVA DETTE IKKE DEKKER: test/run.mjs. Den tar ~200 s og trenger Chromium,
+# som ikke er noe a regne med i Netlifys byggemiljo. En DOM-regresjon kan
+# altsa fortsatt rulle ut — den fanges bare av CI, etterpa. Det er en
+# bevisst halv port, og halv er mye bedre enn ingen.
+#
+# GAR DET GALT: fjern `command`-linja, commit, og deployene gar som for.
+[build]
+  command = "node test/unit.mjs && node test/funksjon.mjs"
+  # INGEN `publish` her, og det er et funn framfor en forglemmelse.
+  #
+  # Forste utgave satte `publish = "."` — eksplisitt framfor a hvile pa en
+  # default jeg ikke kunne etterprove herfra. Netlify avviste bygget:
+  # publiseringsmappa kan ikke vaere den samme som basismappa. Deploy
+  # preview pa #89 feilet med exit 2 mens de samme to kommandoene ga exit 0
+  # lokalt.
+  #
+  # Resonnementet var snudd. Defaulten var ikke det uverifiserte — den er
+  # bevist av hver eneste deploy prosjektet har hatt. Det var den
+  # eksplisitte verdien som var uproevd.
+
 [build.environment]
   SECRETS_SCAN_OMIT_PATHS = "docs/**,test/**"
+  # Samme Node som CI. Star de pa ulike versjoner, beviser en gronn
+  # CI-kjoring ingenting om det som faktisk kjorer ved deploy — og
+  # Netlifys egen default flytter seg over tid uten at noen ber om det.
+  NODE_VERSION = "22"
 
 # Proxy WordPress REST API via samme domene som frontenden.
 # Fjerner behovet for CORS-headere på sportsbibelen.no og for en offentlig
