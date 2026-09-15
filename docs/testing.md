@@ -8,6 +8,19 @@ Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
 hele tatt starter.
 
+**De to raske er porten foran prod.** `netlify.toml` kjører
+`node test/unit.mjs && node test/funksjon.mjs` som byggekommando, så en rød
+test publiserer ingenting (#77). De er sjekket å være maskinuavhengige —
+begge passerer under UTC, `America/Los_Angeles`, `Pacific/Kiritimati` og
+`Australia/Sydney` — og de bruker ingenting som krever nyere enn Node 18.
+Det er de to egenskapene som gjør dem trygge som en port: en test som er
+avhengig av maskinen den kjører på, ville stoppet deployer av grunner som
+ikke har noe med koden å gjøre.
+
+`run.mjs` står utenfor porten. Byggeloggen blir dessuten full av
+stakksporene fra feilstitestene også når alt går bra — det er `console.error`
+i funksjonene, ikke en feil.
+
 **De ~200 sekundene er en treg maskin, ikke et fast tall.** På
 GitHub-runneren tar hele jobben rundt 35 sekunder. Et grønt CI-resultat på
 under et minutt er altså normalt — det betyr *ikke* at nettlesertestene

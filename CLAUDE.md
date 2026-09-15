@@ -138,8 +138,16 @@ Detaljer og feller: [`docs/testing.md`](docs/testing.md).
 ## Arbeidsflyt
 
 Små, trygge endringer kan pushes rett til `main` — Netlify deployer på
-push, og CI kjører der også. **Merk at CI ikke stopper en deploy:** en rød
-test er en rapport, ikke en vakt.
+push, og CI kjører der også.
+
+**Enhets- og funksjonstestene er porten foran prod.** De kjører som
+byggekommando i `netlify.toml`; feiler de, publiseres ingenting og forrige
+deploy står. Ingen bundler og ingen `node_modules` — kommandoen kjører to
+filer og ser på exit-koden.
+
+**Men `test/run.mjs` er ikke med.** Den tar ~200 s og trenger Chromium, som
+ikke er noe å regne med i Netlifys byggemiljø. En DOM-regresjon kan fortsatt
+rulle ut, og fanges bare av CI — etterpå. Halv port, med vilje.
 
 Bruk pull request for alt som endrer arkitektur, sikkerhet eller flere
 filer samtidig.
