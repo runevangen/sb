@@ -35,11 +35,17 @@
 # GAR DET GALT: fjern `command`-linja, commit, og deployene gar som for.
 [build]
   command = "node test/unit.mjs && node test/funksjon.mjs"
-  # Eksplisitt, ikke fordi den endrer noe: repo-rota er det som publiseres
-  # i dag ogsa (se kommentaren om hemmelighetsskanningen over). Men uten
-  # `command` fulgte den av en default, og en default jeg ikke kan
-  # etterprove herfra er ikke noe a la en publisering hvile pa.
-  publish = "."
+  # INGEN `publish` her, og det er et funn framfor en forglemmelse.
+  #
+  # Forste utgave satte `publish = "."` — eksplisitt framfor a hvile pa en
+  # default jeg ikke kunne etterprove herfra. Netlify avviste bygget:
+  # publiseringsmappa kan ikke vaere den samme som basismappa. Deploy
+  # preview pa #89 feilet med exit 2 mens de samme to kommandoene ga exit 0
+  # lokalt.
+  #
+  # Resonnementet var snudd. Defaulten var ikke det uverifiserte — den er
+  # bevist av hver eneste deploy prosjektet har hatt. Det var den
+  # eksplisitte verdien som var uproevd.
 
 [build.environment]
   SECRETS_SCAN_OMIT_PATHS = "docs/**,test/**"
