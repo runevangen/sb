@@ -23,7 +23,6 @@ const SKALL = [
   "/konto-data.js",
   "/pin-data.js",
   "/svar-data.js",
-  "/visninger.js",
   "/visning-data.js",
   "/manifest.webmanifest",
   "/icons/icon-192.png",

@@ -2,12 +2,17 @@
 // lagre.
 //
 // Den skriver ikke selv — den sender valget til /api/visninger, som er
-// det eneste stedet passordet og GitHub-tokenet finnes. Portalen kan
-// ligge apent; uten passord skjer ingenting.
+// det eneste stedet passordet finnes. Portalen kan ligge apent; uten
+// passord skjer ingenting.
+//
+// **To lasser, og den som holder er databasens.** ADMIN_PASSORD er doren
+// til skjemaet. Selve skrivingen gar med din egen okt fra appen, og RLS
+// slar opp uid-en i visning_skrivere — passordet vart betyr ingenting
+// for Supabase (#79). Derfor ma du vaere logget inn i appen for a lagre.
 //
 // Passordet forst: resten av portalen ligger skjult til tjenesten har
-// godtatt det. Det er ikke sikkerheten — den ligger i funksjonen, som
-// krever passordet ved hver skriving — men det er ordenen. Den som apner
+// godtatt det. Det er ikke sikkerheten — den ligger i funksjonen og i
+// basen — men det er ordenen. Den som apner
 // sida skal se ett felt, ikke et skjema hen ikke kan lagre. Og det
 // sparer et kall mot API-Football per apning: kvoten er hundre i dognet.
 //
@@ -15,13 +20,36 @@
 // oppfriskning er billigere enn et passord som blir liggende.
 
 import { PUBER_OSLO } from "./puber-oslo.js";
-import { VISNINGER } from "./visninger.js";
+import { oktGyldig, kanFornyes } from "./konto-data.js";
 import { LIGAER, kampNokkel } from "./fotball-data.js";
 import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
 
 const felt = (id) => document.getElementById(id);
 let kamper = [];
 let passord = "";
+
+// Visningene som alt star lagret. La i visninger.js og fulgte med
+// utrullingen til 15. september 2026 (#79); na hentes de ved apning.
+let visninger = [];
+
+// Okten din, den samme appen bruker. Portalen ligger pa samme domene, sa
+// den kan lese den — og det er nettopp poenget med a skrive med din egen
+// okt framfor med en nokkel: databasen avgjor om du far lov, ikke vi.
+const KONTO_KEY = "sb-konto";
+
+function lesOkt() {
+  let lagret = null;
+  try {
+    lagret = JSON.parse(localStorage.getItem(KONTO_KEY));
+  } catch (err) {
+    return null;
+  }
+  // Samme skille som i appen: et utlopt tilgangstoken er ikke det samme
+  // som a vaere logget ut. Portalen fornyer ikke selv — da ma du apne
+  // appen — men den skal si det framfor a pasta at du er logget ut.
+  if (!oktGyldig(lagret) && !kanFornyes(lagret)) return null;
+  return lagret;
+}
 
 /* ---------- pubvelgeren ---------- */
 
@@ -65,6 +93,7 @@ async function sjekkOppsett() {
     const data = JSON.parse(await respons.text());
     // Bare et tydelig nei skal stenge knappen. Svarer en eldre utrulling
     // noe annet pa GET, lar vi innloggingen forsoke.
+    if (Array.isArray(data.visninger)) visninger = data.visninger;
     if (data.klar !== false) return;
     visAdgang(data.feil || "Portalen er ikke satt opp.", "feil");
     felt("loggInn").disabled = true;
@@ -313,7 +342,7 @@ function tegnKamper() {
     return;
   }
   const pub = felt("pub").value;
-  const alt = VISNINGER.filter((v) => v.pub === pub).map((v) => String(v.kampId));
+  const alt = visninger.filter((v) => v.pub === pub).map((v) => String(v.kampId));
   felt("pubHint").textContent = alt.length
     ? "Viser " + alt.length + " kamper fra før."
     : "Ingen kamper satt på denne puben ennå.";
@@ -382,6 +411,17 @@ felt("merkIngen").addEventListener("click", () => alleBokser().forEach((b) => { 
 felt("lagre").addEventListener("click", async () => {
   if (!passord) { vis("Logg inn først.", "feil"); felt("passord").focus(); return; }
 
+  // Skrivingen gar med din egen okt, ikke med en nokkel — databasen slar
+  // opp uid-en i visning_skrivere og avgjor om den slipper gjennom. Uten
+  // en okt er det ingenting a sende, og da skal det sta hvorfor framfor
+  // at tjenesten svarer 401 pa noe som ser ut som passordet.
+  const okt = lesOkt();
+  if (!okt || !okt.token) {
+    vis("Du må være logget inn i appen for å lagre. Åpne mvp-sb.netlify.app,"
+      + " logg inn med fornavn og PIN, og kom tilbake hit.", "feil");
+    return;
+  }
+
   const valgte = alleBokser().filter((b) => b.checked).map((b) => b.value);
   felt("lagre").disabled = true;
   vis("Lagrer …", "");
@@ -391,6 +431,7 @@ felt("lagre").addEventListener("click", async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         passord,
+        token: okt.token,
         pub: felt("pub").value,
         kampIder: valgte,
         // Kampene sendes med, sa funksjonen slipper a hente dem pa nytt
@@ -400,7 +441,11 @@ felt("lagre").addEventListener("click", async () => {
       }),
     });
     const data = JSON.parse(await respons.text());
-    if (respons.status === 401) {
+    // 401 betyr to ulike ting na, og de krever hver sin handling.
+    // Passordet er portalens dor; okten er databasens. A sende admin
+    // tilbake til passordfeltet fordi Supabase-okten var utlopt, ville
+    // vaert a be om noe som ikke hjelper.
+    if (respons.status === 401 && /passord/i.test(String(data.feil || ""))) {
       // Passordet er byttet mens fanen sto apen. Da er innloggingen
       // ikke lenger sann, og skjemaet skal ikke se ut som om den er det.
       passord = "";
@@ -414,6 +459,16 @@ felt("lagre").addEventListener("click", async () => {
     } else if (!respons.ok || data.feil) {
       vis(data.feil || ("Tjenesten svarte " + respons.status), "feil");
     } else {
+      // Lista holdes i takt med det som faktisk ble skrevet, sa et bytte
+      // av liga og tilbake viser avkrysningene som star i basen — ikke de
+      // som sto der da portalen ble apnet.
+      if (Array.isArray(data.visninger)) {
+        const pubNa = felt("pub").value;
+        const rort = kamper.map((k) => String(kampNokkel(k)));
+        visninger = visninger
+          .filter((v) => v.pub !== pubNa || rort.indexOf(String(v.kampId)) === -1)
+          .concat(data.visninger);
+      }
       vis(data.merknad || "Lagret.", "ok");
     }
   } catch (err) {

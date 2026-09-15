@@ -68,7 +68,7 @@ funksjonen sier det med de ordene, framfor å la deg lete.
 | `API_FOOTBALL_KEY` | tabell, resultater, terminliste | hele fotballfanen svarer 503 | nei |
 | `THESPORTSDB_KEY` | årets sesong i fotballfanen | faller tilbake til fjorårets tall | med abonnementet |
 | `ADMIN_PASSORD` | innlogging i adminportalen | portalen svarer 503 | nei |
-| `GITHUB_TOKEN` | lagring fra adminportalen | portalen svarer 503 | **ja — 90 dager** |
+| `GITHUB_TOKEN` | *ingenting lenger* — se under | ingenting | **ja — 90 dager** |
 | `SUPABASE_URL` | innlogging i appen | innloggingen svarer 503 | nei |
 | `SUPABASE_ANON_KEY` | innlogging i appen | innloggingen svarer 503 | ved rotering |
 | `PIN_PEPPER` | innlogging med fornavn og PIN | innloggingen svarer 503 | nei — **men kan ikke endres etterpå** |
@@ -623,7 +623,23 @@ Tabellen kan ikke leses eller skrives med `service_role`-nøkkelen fra
 denne koden, for den nøkkelen finnes ikke her. Det er med vilje: da kan
 heller ikke en feil i funksjonen skrive i en annens navn.
 
-### `GITHUB_TOKEN` — adminportalens lagring
+### `GITHUB_TOKEN` — ikke i bruk siden 15. september 2026
+
+**Ingen funksjon krever den lenger.** Adminportalen lagret ved å committe
+`visninger.js` til repoet; nå skriver den til Supabase
+([ADR 0018](adr/0018-visninger-i-supabase.md)). Utløper den, skjer det
+ingenting.
+
+Den er likevel ikke slettet fra Netlify-miljøet, og det er et valg:
+[#80](https://github.com/runevangen/sb/issues/80) foreslår en
+innsendingsvei som også ville skrevet til repoet, og en nøkkel som må
+settes tilbake om to uker er verre enn en som ligger ubrukt. Lander #80 et
+annet sted, skal den slettes — og da forsvinner en nøkkel som kan skrive
+kode helt ut av prosjektet.
+
+Resten av dette avsnittet står som det var, for den dagen den trengs igjen.
+
+### `GITHUB_TOKEN` — slik den var satt opp
 
 Lagring i portalen er en commit. Tokenet er det som får lov til å skrive.
 
