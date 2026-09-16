@@ -4,8 +4,8 @@
 kommandoene, men ikke tallene: de sto i tre filer og glei fire ganger på to
 dager. Legger du til tester, er det denne fila som skal rettes.
 
-    node test/unit.mjs      570 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  308 tester, ~250 ms, ingen nettleser
+    node test/unit.mjs      575 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  313 tester, ~250 ms, ingen nettleser
     node test/run.mjs       498 tester, ~200 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De

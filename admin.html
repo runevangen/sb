@@ -264,12 +264,19 @@
       </div>
 
       <!-- Kilde og dato er ikke pynt: en udatert rad er verre enn ingen
-           rad. Skjemaet slipper ingen rad gjennom uten dem. -->
+           rad. Skjemaet slipper ingen rad gjennom uten dem.
+           type="text", ikke "url": kilden kan vaere en setning, og et
+           url-felt ville merket den som ugyldig av nettleseren selv. -->
       <div class="felt-blokk">
-        <label for="stedKilde">Kilde</label>
-        <input type="url" id="stedKilde" autocomplete="off"
-               placeholder="https://stedet.no/sport-pa-storskjerm">
-        <p class="hint">En lenke som faktisk sier at stedet viser fotball.</p>
+        <label for="stedKilde">Hvordan vet vi det?</label>
+        <input type="text" id="stedKilde" autocomplete="off" maxlength="200"
+               placeholder="https://stedet.no/sport – eller: Var innom, storskjerm i baren">
+        <p class="hint">
+          En lenke, eller en setning. Små puber har ofte ingen nettside, og
+          «Var innom 16.09.2026, storskjerm i baren» er en bedre kilde enn
+          en side som ikke er rørt siden 2019. Feltet vises aldri for
+          leseren — det er her for den som skal sjekke raden om et år.
+        </p>
       </div>
 
       <div class="felt-blokk felt-par">

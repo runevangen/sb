@@ -160,6 +160,31 @@ export const PUBLISTE_FELT = ["navn", "bydel", "lat", "lon", "type", "kilde", "s
 export const PUBTYPER = ["sportsbar", "supporterpub", "pub"];
 export const PUBSIKKERHET = ["bekreftet", "sannsynlig", "usikker"];
 
+// Hva som teller som kilde.
+//
+// Den var en URL til 16. september 2026, og det var for strengt. Regelen
+// er «kilde og dato», ikke «lenke og dato» — og den sma puben i
+// Torggata har ingen nettside. En rad du selv sto i, er bedre dokumentert
+// enn en nettside som ikke er rort siden 2019.
+//
+// Feltet vises aldri for leseren. Det er et revisjonsfelt for den som
+// vedlikeholder lista, og da trenger det ikke vaere klikkbart — det
+// trenger a svare pa *hvordan vet vi det*.
+//
+// Terskelen er tre ord og tolv tegn. «ok» og «ja» sier ingenting; «Var
+// innom 16.09.2026, storskjerm i baren» sier alt. Formen kan ikke skille
+// en god kilde fra en darlig, men den kan skille et svar fra et ikke-svar.
+export const KILDE_MIN_TEGN = 12;
+export const KILDE_MIN_ORD = 3;
+
+export function kildeHolder(kilde) {
+  const tekst = String(kilde == null ? "" : kilde).trim();
+  if (!tekst) return false;
+  if (tekst.indexOf("http") === 0) return true;
+  return tekst.length >= KILDE_MIN_TEGN &&
+    tekst.split(/\s+/).filter(Boolean).length >= KILDE_MIN_ORD;
+}
+
 // Vokter formen sa hvem som helst kan redigere lista uten a odelegge
 // appen. Gir en liste med det som er galt; tom liste betyr at alt er bra.
 export function sjekkPubliste(liste, ramme) {
@@ -182,7 +207,10 @@ export function sjekkPubliste(liste, ramme) {
     if (PUBTYPER.indexOf(p.type) === -1) feil.push(hvor + ": ukjent type " + p.type);
     if (PUBSIKKERHET.indexOf(p.sikkerhet) === -1) feil.push(hvor + ": ukjent sikkerhet " + p.sikkerhet);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(p.sjekket))) feil.push(hvor + ": sjekket er ikke en dato");
-    if (String(p.kilde).indexOf("http") !== 0) feil.push(hvor + ": kilde er ikke en lenke");
+    if (p.kilde !== undefined && p.kilde !== "" && !kildeHolder(p.kilde)) {
+      feil.push(hvor + ": kilde sier ikke hvordan vi vet det"
+        + " (en lenke, eller minst " + KILDE_MIN_ORD + " ord)");
+    }
   });
   return feil;
 }
