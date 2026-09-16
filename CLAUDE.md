@@ -65,7 +65,10 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 
 ### Si sant
 - **Hvert annonsekort sier hva det er** — «Reklame», «Ledig plass» eller
-  «Spøk». Merket ligger som data i `EGNE_MERKER`, ikke som `if`-er.
+  «Spøk». Merket ligger som data i `EGNE_MERKER`, ikke som `if`-er, og
+  slås opp på `merke` — ikke på `format`, som er fasongen (`kort`,
+  `banner`, `stripe`). **Ingen oppdiktet annonsør i prod:** en rad uten
+  `merke` er en ekte annonsør, og det finnes ingen ennå.
   [ADR 0005](docs/adr/0005-egen-annonseplass.md)
 - **En knapp som ser ut som den gir noe den ikke gir, er verre enn en som
   sier hva den er.** Gjelder «Venner», «Meldt inn til oss», og

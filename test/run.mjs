@@ -398,6 +398,61 @@ const SAK_1B = await kjor("annonse-varianter", FELLES + `
          getComputedStyle(hoy).color === "rgb(255, 255, 255)",
          getComputedStyle(hoy).color);
 
+      // **Ingen oppdiktet annonsor i feeden.** NORDBANE, PADELHUSET,
+      // SPRINTA og TRIBUNE sto her til 16. september 2026, merket
+      // «Reklame» og fullstendig oppfunnet (#25). En slik rad er en
+      // pastand om et samarbeid som ikke finnes.
+      //
+      // Testen sjekker regelen, ikke de fire navnene: hver plass i feeden
+      // ma si enten «Ledig plass» eller «Spok». Et navn hadde gatt an a
+      // bytte uten a bryte noe.
+      var plasser = document.querySelectorAll(
+        "#feed > .ad-banner, #feed > .ad-stripe, #feed > .ad-ledig");
+      var merkeFeil = [];
+      Array.prototype.forEach.call(plasser, function (a) {
+        var e = a.querySelector(".ad-label");
+        var m = e ? e.textContent : "";
+        if (m !== "Ledig plass" && m !== "Spøk") merkeFeil.push(m || "uten merke");
+      });
+      ok("ingen plass i feeden pastar a vaere reklame fra noen",
+         plasser.length >= 4 && merkeFeil.length === 0,
+         plasser.length + " plasser, merker: " + (merkeFeil.join(",") || "bare vare egne"));
+
+      // De to tekstformatene ble ikke slettet da de oppdiktede gikk ut.
+      // De er fasongene en ekte annonsor kan kjope, og en fasong ingen
+      // bruker er en fasong ingen ser — sa na selger de seg selv.
+      var banner = document.querySelector("#feed > .ad-banner");
+      var stripe = document.querySelector("#feed > .ad-stripe");
+      ok("banneret og stripa star fortsatt i feeden", !!banner && !!stripe,
+         String(!!banner) + " " + String(!!stripe));
+      // Merkingen er data, ikke en if inne i tegningen: bade bildekortet
+      // og de to tekstformatene slar opp i EGNE_MERKER pa merke.
+      var tekstFeil = [];
+      [banner, stripe].forEach(function (a) {
+        if (!a) { tekstFeil.push("mangler"); return; }
+        if (a.getAttribute("aria-label") !== "Ledig annonseplass") tekstFeil.push("aria");
+        if (a.textContent.indexOf("Reklame") > -1) tekstFeil.push("reklame");
+      });
+      // Bannerets flate er varen: der ekte annonsemateriell skal sta, star
+      // det hva plassen er til. Stripa navngir ingen annonsor — det finnes
+      // ingen a navngi.
+      var flate = banner && banner.querySelector(".ad-creative");
+      ok("bannerets flate sier hva plassen er til",
+         !!flate && flate.textContent === "DIN ANNONSE HER",
+         flate ? flate.textContent : "ingen flate");
+      ok("stripa navngir ingen annonsor",
+         !!stripe && !stripe.querySelector(".ad-brand"),
+         stripe && stripe.querySelector(".ad-brand")
+           ? stripe.querySelector(".ad-brand").textContent : "ingen");
+      // Var egen plass far en ekte knapp, ogsa i tekstformatene. En span
+      // som ser ut som en knapp og ikke gar noe sted, er verre enn tekst.
+      var bk = banner && banner.querySelector(".ad-cta");
+      if (!bk || bk.tagName !== "A") tekstFeil.push("lenke");
+      else if (bk.href.indexOf("https://m.me/") !== 0) tekstFeil.push("m.me");
+      else if (bk.target !== "_blank" || bk.rel.indexOf("noopener") === -1) tekstFeil.push("rel");
+      ok("og tekstplassene er merket og lenket som bildekortene",
+         tekstFeil.length === 0, tekstFeil.join(",") || "ingen");
+
       // Spokene. Ullevalseter er et ekte sted, og en tulleannonse merket
       // «Reklame» ville pastatt at de har kjopt plassen — nøyaktig lognen
       // appen ellers er noye pa a ikke fortelle. Vitsen blir ikke darligere
