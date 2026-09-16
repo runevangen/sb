@@ -599,6 +599,19 @@ body {
 }
 
 .konto-slett[hidden] { display: none; }
+
+/* Logg ut og Slett star som et par, ikke som to rader. Panelet apnes
+   ogsa fra navnemerket i toppfeltet, og der er footeren alt det storste
+   pa skjermen — hver rad her er en emnerad mindre. */
+.konto-par {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.konto-par > * { flex: 1; }
+/* display: flex slar [hidden] fra nettleserens eget stilark. */
+.konto-par[hidden] { display: none; }
 .konto-slett:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .konto-send:disabled { opacity: 0.45; cursor: default; }

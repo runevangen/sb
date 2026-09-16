@@ -1565,8 +1565,6 @@ const KONTO_TEKST = {
     + " ikke bruker andre steder.",
   kjent: "Skriv PIN-en du valgte. Er du ikke denne personen, bytt navn."
     + " Favorittlagene og «jeg blir med» følger kontoen, ikke telefonen.",
-  inne: "Du er logget inn. Deling av kamper og favoritter kommer hit først."
-    + " Resten av appen virker som før, med eller uten konto.",
 };
 
 let kontoOkt = lesKonto();
@@ -1722,6 +1720,7 @@ function visKonto() {
   const bytt = document.getElementById("kontoBytt");
   const ut = document.getElementById("kontoUt");
   const slett = document.getElementById("kontoSlett");
+  const par = document.getElementById("kontoPar");
   const note = document.getElementById("kontoNote");
 
   visHvem();
@@ -1734,13 +1733,19 @@ function visKonto() {
     pin2.hidden = true;
     send.hidden = true;
     bytt.hidden = true;
+    par.hidden = false;
     ut.hidden = false;
     slett.hidden = false;
-    note.textContent = KONTO_TEKST.inne;
+    // Ingen setning her. Du trykket pa ditt eget navn — at du er logget
+    // inn er ikke en nyhet, og teksten gjorde bunnen av menyen nesten
+    // dobbelt sa hoy som emnelista over den.
+    note.hidden = true;
     return;
   }
 
   tekst.textContent = "Logg inn";
+  note.hidden = false;
+  par.hidden = true;
   ut.hidden = true;
   slett.hidden = true;
   slett.dataset.sikker = "nei";

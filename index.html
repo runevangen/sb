@@ -126,8 +126,13 @@
                  aria-label="Gjenta PIN-koden" maxlength="6" hidden>
           <button class="konto-send" id="kontoSend" type="button">Fortsett</button>
           <button class="konto-ut" id="kontoBytt" type="button" hidden>Bytt navn</button>
-          <button class="konto-ut" id="kontoUt" type="button" hidden>Logg ut</button>
-          <button class="konto-slett" id="kontoSlett" type="button" hidden>Slett kontoen min</button>
+          <!-- Innlogget er panelet disse to. De star ved siden av hverandre,
+               som Del og Installer i footeren over: stablet er de en rad til,
+               og raden er det emnelista mister. -->
+          <div class="konto-par" id="kontoPar" hidden>
+            <button class="konto-ut" id="kontoUt" type="button" hidden>Logg ut</button>
+            <button class="konto-slett" id="kontoSlett" type="button" hidden>Slett kontoen min</button>
+          </div>
           <p class="konto-svar" id="kontoSvar" aria-live="polite"></p>
         </div>
         <p class="action-note" id="actionNote" hidden></p>

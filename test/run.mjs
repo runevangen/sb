@@ -2480,6 +2480,21 @@ const SAK_18 = await kjor("innlogging", FELLES + `
           ok("merket apner kontoen igjen",
              document.getElementById("menuPanel").classList.contains("open") &&
              document.getElementById("kontoPanel").hidden === false);
+          // Det finnes bare én meny. Apnet fra navnet sa den ut som en
+          // egen, storre variant: setningen «du er logget inn» og to
+          // knapper stablet gjorde footeren 350 px mot hamburgerens 196.
+          // Malt med A+, som footertesten over. Na 265; taket er 280.
+          document.documentElement.style.setProperty("--fs", "1.15");
+          var kontoFooter = document.querySelector(".menu-actions").getBoundingClientRect().height;
+          var utR = document.getElementById("kontoUt").getBoundingClientRect();
+          var slettR = document.getElementById("kontoSlett").getBoundingClientRect();
+          document.documentElement.style.removeProperty("--fs");
+          ok("kontoen apnet fra navnet blaser ikke opp footeren",
+             kontoFooter < 280, Math.round(kontoFooter));
+          // Stablet er de en rad til, og raden er det emnelista mister.
+          ok("logg ut og slett star pa samme linje",
+             Math.abs(utR.top - slettR.top) < 2,
+             Math.round(utR.top) + " mot " + Math.round(slettR.top));
             // Vi lager en adresse av navnet for a snakke med tjenesten. Den
             // skal aldri vises noe sted, og ikke ligge i telefonen heller.
             ok("og aldri adressen vi lagde av navnet",
@@ -2487,8 +2502,12 @@ const SAK_18 = await kjor("innlogging", FELLES + `
                localStorage.getItem("sb-konto").indexOf("pin.mvp-sb") === -1);
             ok("PIN-feltene tommes etter innlogging",
                feltPin.value === "" && feltPin2.value === "", feltPin.value);
-            ok("og innlogget star det hva innloggingen er til",
-               document.getElementById("kontoNote").textContent.indexOf("med eller uten konto") > -1,
+            // Innlogget star setningen ikke der. Den fortalte deg at du
+            // var logget inn, rett etter at du trykket pa ditt eget navn,
+            // og den kostet 135 px nederst i menyen.
+            ok("og innlogget star ingen setning i kontopanelet",
+               document.getElementById("kontoNote").hidden === true &&
+               document.getElementById("kontoNote").offsetHeight === 0,
                document.getElementById("kontoNote").textContent);
 
             // Sletting er endelig, sa den krever to trykk: det forste sier
