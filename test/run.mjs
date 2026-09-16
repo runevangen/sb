@@ -3920,11 +3920,23 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
     var skall = document.querySelector(".tabell-skall");
     var kort = document.querySelector(".phone");
 
-    // Forst: er vi faktisk pa en telefonbredde? Uten dette ville testen
-    // kunne passere fordi vinduet var bredt, som den forrige gjorde.
-    ok("kortet er sa bredt som pa en iPhone 13 mini",
-       kort.getBoundingClientRect().width <= 356,
-       Math.round(kort.getBoundingClientRect().width) + " px");
+    // Bredden settes HER, ikke av --window-size. Flagget slar ikke gjennom
+    // likt overalt: lokalt er binaerfila ofte headless_shell, pa en
+    // CI-runner er det ekte Chrome, og der ble kortet 390 px uansett hva
+    // vinduet sa. Da malte vokteren runneren framfor koden.
+    //
+    // 355 px er det en iPhone 13 mini faktisk gir: 375 px skjerm minus
+    // body-luft pa 10 px i hver side. Samme grep som rulletesten lenger
+    // oppe, som setter feltbredden selv for a tvinge fram det smale
+    // tilfellet.
+    kort.style.width = "355px";
+
+    // Og vokteren ma fortsatt finnes: uten den kunne testen passere fordi
+    // feltet var bredt, som den forrige tabelltesten gjorde i to dager.
+    // Na sjekker den FELTET, som er det tabellen faktisk ma passe i.
+    ok("tabellfeltet er sa smalt som pa en iPhone 13 mini",
+       skall.clientWidth > 0 && skall.clientWidth <= 320,
+       skall.clientWidth + " px");
 
     ok("alle seksten lagene er tegnet",
        document.querySelectorAll(".tabell tbody tr").length === 16,
