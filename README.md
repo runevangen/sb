@@ -37,9 +37,11 @@ en forhåndsvisning fra en pull request.
 **Publish deploy**. Tar sekunder og krever ingen commit. En utrulling
 tømmer også kant-cachen, så funksjonene leser miljøet på nytt.
 
-**Merk at CI ikke stopper en deploy.** Netlify deployer på push, CI kjører
-parallelt. En rød test er en rapport, ikke en vakt
-([#77](https://github.com/runevangen/sb/issues/77)).
+**Deployen stoppet, og testene var røde.** Det er meningen: enhets- og
+funksjonstestene kjører som byggekommando, så en rød test publiserer
+ingenting og forrige deploy står. Les byggeloggen i Netlify — den siste
+linja før avbruddet sier hvilken test. `test/run.mjs` er *ikke* med i
+porten (den trenger Chromium), så en DOM-regresjon fanges bare av CI.
 
 **Adminportalen har skrevet noe galt.** Visningene er rader i tabellen
 `visninger` i Supabase, ikke en fil i repoet ([ADR

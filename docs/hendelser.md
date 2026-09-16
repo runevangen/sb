@@ -9,6 +9,31 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 16. september 2026 — porten feilet av miljøet, ikke av koden
+
+Da enhets- og funksjonstestene ble gjort til byggekommando (#77), feilet
+Netlify-bygget: «Build script returned non-zero exit code: 2». De samme to
+kommandoene ga exit 0 fra en ren utsjekking, og `netlify.toml` validerte.
+
+**Første diagnose var feil.** Jeg trodde det var `publish = "."`, som
+Netlify avviser når den er lik basismappa. Fjernet den — bygget var
+fortsatt rødt.
+
+**Årsaken var testenes miljø.** Tre funksjonstester dekker veien *uten*
+`THESPORTSDB_KEY` — testnøkkelen «3», v1 framfor v2 — og de stolte på at
+variabelen var tom framfor å tømme den. Lokalt og i CI er den tom.
+Netlifys byggemiljø har alle de ekte nøklene satt.
+
+**Funnet uten å bruke en deploy-runde:** å sette de samme variablene
+lokalt og kjøre suiten. `funksjon.mjs` exit 1, `unit.mjs` exit 0. Fire
+minutter per Netlify-syklus mot fire sekunder lokalt.
+
+`funksjon.mjs` sletter nå variablene den bryr seg om før første test. En
+port som feiler av miljøet den står i, er verre enn ingen port — og
+suitene hadde aldri vært prøvd i et miljø med nøkler.
+
+---
+
 ## 15. september 2026 — kolonnen som ikke førte regnskap
 
 **Meldt som:** ingenting. Funnet ved å telle rader i basen etter at
