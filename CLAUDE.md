@@ -35,6 +35,9 @@ der — ikke her.
     visning-data.js / netlify/functions/visninger.mjs
     admin.html / admin.js / netlify/functions/brukere.mjs
 
+    verktoy/        diagnostikk som kjores for hand, ikke av CI
+                    kanalsjekk.mjs: neste runde mot det kanaler.js pastar
+
     personvern.html hva vi lagrer, og hvordan du blir kvitt det
     bilder/         annonsebilder, ett ferdig utsnitt per form
     docs/           adr/, hendelser.md, testing.md,
