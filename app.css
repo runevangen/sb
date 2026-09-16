@@ -1584,10 +1584,16 @@ a.ad-cta:focus-visible {
 
 .tabell {
   width: 100%;
-  /* Lavt nok til at alle atte kolonnene far plass pa en telefon nar
-     lagnavnene er korte, hoyt nok til at tallene ikke klemmes sammen. Er
-     navnene lange, vokser tabellen forbi feltet og felter ruller. */
-  min-width: 316px;
+  /* INGEN min-width, og det er et funn framfor en forglemmelse.
+     Den sto pa 316px, med begrunnelsen «lavt nok til at alle atte
+     kolonnene far plass pa en telefon». Det stemte ikke: en iPhone 13
+     mini er 375px bred, body tar 10px pa hver side, og feltet blir 310px.
+     316 er storre enn 310 — sa den TVANG tabellen seks piksler forbi
+     skjermen og skjov poengkolonnen ut. Meldt fra prod 16. september 2026.
+     Og den andre halvdelen av begrunnelsen, «hoyt nok til at tallene ikke
+     klemmes sammen», gjor white-space: nowrap under alt: tallcellene kan
+     ikke bli smalere enn innholdet sitt. En px-verdi her var et gjett pa
+     feltets bredde, og feltets bredde avhenger av telefonen. */
   border-collapse: collapse;
   font-size: calc(13px * var(--fs));
   font-variant-numeric: tabular-nums;
@@ -1664,7 +1670,15 @@ a.ad-cta:focus-visible {
   object-fit: contain;
 }
 
-.lag-navn { min-width: 0; }
+/* min-width: 0 lar boksen krympe i flex-raden. Men teksten har fortsatt
+   en minstebredde: det lengste ORDET. «Kristiansund» kunne ikke brytes, og
+   da kunne ikke tabellen bli smalere enn det ordet pluss lagmerket — uansett
+   hvor smal telefonen var.
+   overflow-wrap: anywhere lar ordet brytes NAR DET MA, og — det er poenget —
+   teller med i min-content-bredden, sa tabellen faktisk kan krympe.
+   Et brukket lagnavn er styggere enn et helt. En tabell man ma dra i for a
+   se poengsummen er verre. */
+.lag-navn { min-width: 0; overflow-wrap: anywhere; }
 
 .lag-celle {
   display: flex;
