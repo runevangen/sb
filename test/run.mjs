@@ -3880,9 +3880,76 @@ const SAK_22B = await kjor("pub-forslag-utlogget", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
 `);
 
+/* ---------------- 22. tabellen pa en ekte iPhone ---------------- */
+
+// «Ma scrolle skjermen til siden for a se poeng» — meldt fra prod
+// 16. september 2026, testet pa iPhone.
+//
+// Det fantes alt en test som sa at alle atte kolonnene far plass. Den
+// passerte, og den tok feil om to ting:
+//
+//   VINDUET. Den kjorer i standard headless-vindu, der .phone far hele
+//   sine 390 px. En iPhone 13 mini er 375 px BREDT TOTALT, og body har
+//   10 px luft pa hver side — altsa 355 px til kortet. Testen malte en
+//   bredde ingen telefon gir.
+//
+//   NAVNENE. Tre rader: «Bodo/Glimt», «Brann», «Rosenborg». Eliteserien
+//   har «Kristiansund BK» og «Sarpsborg 08», og lagkolonnen er den ene
+//   som far vokse.
+//
+// Og siden den forrige testen ble skrevet, kom lagmerket (#33): 18 px
+// bilde pluss 6 px mellomrom i hver eneste rad i den kolonnen. Ingen
+// justerte bredden etterpa.
+//
+// Denne kjorer derfor i 375 px med alle seksten lagene.
+const ELITESERIEN = [
+  "Bodo/Glimt", "Brann", "Rosenborg", "Molde", "Viking", "Lillestrom",
+  "Tromso", "Sarpsborg 08", "Kristiansund BK", "Stromsgodset", "HamKam",
+  "Fredrikstad", "Sandefjord", "KFUM Oslo", "Haugesund", "Bryne",
+];
+
+const SAK_23 = await kjor("tabell-iphone", FELLES + `
+  var TABELL = [
+${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)}, kamper: 30, seier: ${21 - i}, uavgjort: 5,\n      tap: ${4 + i}, scoret: ${74 - i * 3}, sluppet: ${33 + i}, differanse: ${41 - i * 4}, poeng: ${68 - i * 3},\n      merke: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" },`).join("\n")}
+  ];
+  var RESULTATER = []; var KOMMENDE = [];
+  var saker = lagSaker(12);
+  ` + mockAlt("saker") + `
+  location.hash = "#/fotball/eliteserien/tabell";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var skall = document.querySelector(".tabell-skall");
+    var kort = document.querySelector(".phone");
+
+    // Forst: er vi faktisk pa en telefonbredde? Uten dette ville testen
+    // kunne passere fordi vinduet var bredt, som den forrige gjorde.
+    ok("kortet er sa bredt som pa en iPhone 13 mini",
+       kort.getBoundingClientRect().width <= 356,
+       Math.round(kort.getBoundingClientRect().width) + " px");
+
+    ok("alle seksten lagene er tegnet",
+       document.querySelectorAll(".tabell tbody tr").length === 16,
+       document.querySelectorAll(".tabell tbody tr").length);
+
+    // Selve feilen: poeng er det forste man ser etter i en tabell, og en
+    // tabell man ma dra i for a se det er en darligere tabell.
+    ok("tabellen far plass uten a rulle sidelengs",
+       skall.scrollWidth <= skall.clientWidth,
+       skall.scrollWidth + " av " + skall.clientWidth);
+
+    // Og konkret: staar poengkolonnen innenfor feltet uten a rulle?
+    var poeng = document.querySelector(".tabell tbody tr .kol-poeng");
+    var feltet = skall.getBoundingClientRect();
+    ok("poengkolonnen er synlig uten a dra",
+       poeng.getBoundingClientRect().right <= feltet.right + 1,
+       Math.round(poeng.getBoundingClientRect().right) + " mot feltets " + Math.round(feltet.right));
+
+    ferdig();
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
+`, "375,780");
+
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_15B, ...SAK_16, ...SAK_16B, ...SAK_17, ...SAK_18, ...SAK_18B, ...SAK_19, ...SAK_19A, ...SAK_19B, ...SAK_19C, ...SAK_20, ...SAK_20B, ...SAK_21, ...SAK_22, ...SAK_22B];
+const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_15B, ...SAK_16, ...SAK_16B, ...SAK_17, ...SAK_18, ...SAK_18B, ...SAK_19, ...SAK_19A, ...SAK_19B, ...SAK_19C, ...SAK_20, ...SAK_20B, ...SAK_21, ...SAK_22, ...SAK_22B, ...SAK_23];
 let feilet = 0;
 
 for (const t of alle) {

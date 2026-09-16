@@ -6,7 +6,7 @@ dager. Legger du til tester, er det denne fila som skal rettes.
 
     node test/unit.mjs      570 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  308 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       486 tester, ~200 s, headless Chromium
+    node test/run.mjs       490 tester, ~200 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
@@ -112,8 +112,13 @@ til angring, og hele fotballmodulen.
   **egendefinert element**: det bygges synkront av parseren, og det er
   samme egenskap som avgjør begge — `<template>`-innhold hører til et
   dokument uten nettleserkontekst, så der skjer ingen av delene.
-- **`kjor()` tar en valgfri vindusstørrelse.** Høydetesten trenger et
-  telefonformat for at taket i det hele tatt skal binde.
+- **`kjor()` tar en valgfri vindusstørrelse — og uten den måler du en
+  bredde ingen telefon gir.** Standardvinduet lar `.phone` få hele sine
+  390 px. En iPhone 13 mini er 375 px *totalt*, og `body` tar 10 px på hver
+  side: 355 px til kortet, 310 px til tabellfeltet. En tabelltest uten
+  størrelse passerte i to dager mens poengkolonnen sto utenfor skjermen i
+  prod. Høydetesten trenger den av samme grunn: uten et telefonformat
+  binder taket aldri.
 - **Template-literal-feller:** bakstreker spises (bruk enkeltfnutter inne
   i selektorer), og en bakstrek-apostrof i en kommentar avslutter
   literalen.

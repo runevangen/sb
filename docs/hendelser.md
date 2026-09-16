@@ -9,6 +9,39 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 16. september 2026 — poengkolonnen sto utenfor skjermen
+
+**Meldt som:** «Må scrolle skjermen til siden for å se poeng. Alt burde få
+plass på en side.» Testet på iPhone.
+
+**Årsak:** `min-width: 316px` på `.tabell`. Begrunnelsen i koden sa «lavt
+nok til at alle åtte kolonnene får plass på en telefon» — men en iPhone 13
+mini er 375 px bred, `body` tar 10 px på hver side, og tabellfeltet blir
+**310 px**. 316 er større enn 310, så regelen *tvang* tabellen seks piksler
+forbi skjermen og skjøv poengkolonnen ut.
+
+Den andre halvdelen av begrunnelsen — «høyt nok til at tallene ikke klemmes
+sammen» — gjør `white-space: nowrap` allerede. En px-verdi der var et gjett
+på feltets bredde, og feltets bredde avhenger av telefonen.
+
+**Og det fantes en test som sa at alt fikk plass.** Den passerte av to
+grunner som begge var feil:
+
+- **Vinduet.** Ingen størrelse sendt inn, så `.phone` fikk hele sine 390 px
+  — en bredde ingen telefon gir.
+- **Navnene.** Tre rader med «Brann» og «Rosenborg». Eliteserien har
+  «Kristiansund BK» og «Sarpsborg 08», og lagkolonnen er den ene som får
+  vokse.
+
+Og siden testen ble skrevet kom lagmerket (#33): 18 px bilde pluss 6 px
+mellomrom i hver rad i nettopp den kolonnen. Ingen justerte bredden etterpå.
+
+Den nye testen kjører i 375 px med alle seksten lagene, og sjekker først at
+kortet *faktisk* er smalt — ellers kunne den passere av samme grunn som den
+forrige.
+
+---
+
 ## 16. september 2026 — stubben modellerte koden, ikke basen
 
 **Hva som skjedde.** Testen for at rettelsene fra portalen treffer leseren
