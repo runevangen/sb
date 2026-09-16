@@ -1670,7 +1670,15 @@ a.ad-cta:focus-visible {
   object-fit: contain;
 }
 
-.lag-navn { min-width: 0; }
+/* min-width: 0 lar boksen krympe i flex-raden. Men teksten har fortsatt
+   en minstebredde: det lengste ORDET. «Kristiansund» kunne ikke brytes, og
+   da kunne ikke tabellen bli smalere enn det ordet pluss lagmerket — uansett
+   hvor smal telefonen var.
+   overflow-wrap: anywhere lar ordet brytes NAR DET MA, og — det er poenget —
+   teller med i min-content-bredden, sa tabellen faktisk kan krympe.
+   Et brukket lagnavn er styggere enn et helt. En tabell man ma dra i for a
+   se poengsummen er verre. */
+.lag-navn { min-width: 0; overflow-wrap: anywhere; }
 
 .lag-celle {
   display: flex;

@@ -6,7 +6,7 @@ dager. Legger du til tester, er det denne fila som skal rettes.
 
     node test/unit.mjs      570 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  308 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       490 tester, ~200 s, headless Chromium
+    node test/run.mjs       491 tester, ~200 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
@@ -112,7 +112,17 @@ til angring, og hele fotballmodulen.
   **egendefinert element**: det bygges synkront av parseren, og det er
   samme egenskap som avgjør begge — `<template>`-innhold hører til et
   dokument uten nettleserkontekst, så der skjer ingen av delene.
-- **`kjor()` tar en valgfri vindusstørrelse — og uten den måler du en
+- - **Bredder settes i testen, ikke av `--window-size`.** Flagget slår ikke
+  gjennom likt overalt: lokalt er binærfila ofte `headless_shell`, på en
+  CI-runner er det ekte Chrome, og der ble kortet 390 px uansett hva vinduet
+  sa. Sett `.phone` sin bredde selv når bredden er det du tester.
+- **Og mål med margin, ikke på grensen.** Fontene er ikke de samme på din
+  maskin og på runneren. Tabelltesten passerte lokalt med 310 px felt og
+  feilet på CI med «322 av 310» — tolv piksler, og hele forskjellen var
+  fontmetrikk. Den sjekker nå også en bredde smalere enn noen iPhone i bruk,
+  så en font som tegner litt bredere ikke kan velte den.
+
+**`kjor()` tar en valgfri vindusstørrelse — og uten den måler du en
   bredde ingen telefon gir.** Standardvinduet lar `.phone` få hele sine
   390 px. En iPhone 13 mini er 375 px *totalt*, og `body` tar 10 px på hver
   side: 355 px til kortet, 310 px til tabellfeltet. En tabelltest uten

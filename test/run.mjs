@@ -3955,6 +3955,19 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
        poeng.getBoundingClientRect().right <= feltet.right + 1,
        Math.round(poeng.getBoundingClientRect().right) + " mot feltets " + Math.round(feltet.right));
 
+    // Og med margin. Dette er dagens lekse: forste utgave passerte lokalt
+    // med 310 px felt og feilet pa CI med «322 av 310» — tolv piksler, og
+    // hele forskjellen var fontmetrikk. Runneren har andre fonter enn min
+    // maskin, og layouten hadde null slingringsmonn.
+    //
+    // 320 px kort er smalere enn noen iPhone i bruk. Far tabellen plass
+    // DER, kan ikke en font som tegner litt bredere velte den.
+    kort.style.width = "320px";
+    ok("og med margin: ogsa smalere enn noen iPhone i bruk",
+       skall.scrollWidth <= skall.clientWidth,
+       skall.scrollWidth + " av " + skall.clientWidth);
+    kort.style.width = "355px";
+
     ferdig();
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
 `, "375,780");
