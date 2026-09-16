@@ -24,6 +24,15 @@
   h1 { font-size: 22px; margin: 0 0 4px; }
   .undertittel { margin: 0 0 20px; color: var(--tekst-dim); font-size: 14px; }
   section { background: var(--kort); border: 1px solid var(--ramme); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+  /* Handlingsraden til kamplista. Klebrig mot bunnen av seksjonen, sa
+     knappen folger med mens du krysser av tjue kamper — for matte du
+     scrolle tilbake for a lagre. Bakgrunnen ma vaere ugjennomsiktig:
+     uten den leser radene gjennom knappene nar lista ruller under. */
+  .handling { position: sticky; bottom: 0; margin: 0 -16px -16px;
+              padding: 12px 16px; background: var(--kort);
+              border-top: 1px solid var(--ramme);
+              border-radius: 0 0 10px 10px; }
+  .handling .melding:empty { display: none; }
   .forslag { border-top: 1px solid var(--ramme); padding: 12px 0; }
   .forslag:first-child { border-top: 0; padding-top: 0; }
   .forslag-navn { margin: 0; font-weight: 600; }
@@ -156,12 +165,27 @@
     <p class="hint" id="pubHint"></p>
   </section>
 
+  <!-- Handlingen star HER, ikke i en egen seksjon nederst. For la «Lagre»
+       etter Foreslatte steder, Steder og Brukere — tre seksjoner som ikke
+       har noe med den a gjore — mens den lagret kampene her oppe. «Kryss
+       av alle» la samme sted: en knapp som opererer pa en liste du ikke
+       ser mens du trykker den. Meldt fra faktisk bruk 16. september 2026. -->
   <section>
-    <h2>Kamper</h2>
+    <h2 id="kampTittel">Kamper</h2>
     <label for="liga">Liga</label>
     <select id="liga"></select>
     <ul class="kamper" id="kamper"><li><p class="hint">Henter kamper …</p></li></ul>
     <p class="hint" id="kampHint"></p>
+    <!-- Klebrig: med tjue kamper i lista er knappen ute av syne nar du er
+         ferdig a krysse av, og da matte du scrolle tilbake for a lagre. -->
+    <div class="handling">
+      <div class="rad">
+        <button id="lagre" type="button" disabled>Lagre</button>
+        <button class="lenke" id="merkAlle" type="button">Kryss av alle</button>
+        <button class="lenke" id="merkIngen" type="button">Fjern alle</button>
+      </div>
+      <p class="melding" id="melding" role="status" aria-live="polite"></p>
+    </div>
   </section>
 
   <section>
@@ -289,14 +313,6 @@
     <p class="melding" id="brukerMelding" role="status" aria-live="polite"></p>
   </section>
 
-  <section>
-    <div class="rad">
-      <button id="lagre" type="button" disabled>Lagre</button>
-      <button class="lenke" id="merkAlle" type="button">Kryss av alle</button>
-      <button class="lenke" id="merkIngen" type="button">Fjern alle</button>
-    </div>
-    <p class="melding" id="melding" role="status" aria-live="polite"></p>
-  </section>
   </div>
 
   <p class="hint">

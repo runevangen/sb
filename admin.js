@@ -513,6 +513,10 @@ async function hentKamper() {
 function tegnKamper() {
   const liste = felt("kamper");
   liste.replaceChildren();
+  // Over den tidlige returnen: overskrifta handler om puben, ikke om
+  // hvorvidt ligaen har kamper. Under den ville den statt igjen med
+  // forrige pub i en liga uten kommende kamper.
+  settKamptittel();
   if (!kamper.length) {
     liste.appendChild(melding("Ingen kommende kamper i denne ligaen."));
     return;
@@ -554,6 +558,25 @@ function tegnKamper() {
     liste.appendChild(rad);
   });
   felt("lagre").disabled = false;
+  oppdaterLagreknapp();
+}
+
+// «Lagre» alene sier ikke hva den lagrer. Antallet og pubnavnet gjor at du
+// ser hva du er i ferd med a gjore for du gjor det — og fanger den ene
+// feilen som ellers er usynlig: feil pub valgt.
+function settKamptittel() {
+  const pub = felt("pub").value;
+  felt("kampTittel").textContent = pub ? "Kamper " + pub + " viser" : "Kamper";
+}
+
+function oppdaterLagreknapp() {
+  const knapp = felt("lagre");
+  const pub = felt("pub").value;
+  const antall = alleBokser().filter((b) => b.checked).length;
+  if (!pub || !alleBokser().length) { knapp.textContent = "Lagre"; return; }
+  knapp.textContent = antall
+    ? "Lagre " + antall + (antall === 1 ? " kamp" : " kamper") + " for " + pub
+    : "Fjern alle kamper for " + pub;
 }
 
 function nar(iso) {
@@ -579,8 +602,18 @@ function melding(tekst) {
 function alleBokser() {
   return Array.from(document.querySelectorAll(".kamp input"));
 }
-felt("merkAlle").addEventListener("click", () => alleBokser().forEach((b) => { b.checked = true; }));
-felt("merkIngen").addEventListener("click", () => alleBokser().forEach((b) => { b.checked = false; }));
+felt("merkAlle").addEventListener("click", () => {
+  alleBokser().forEach((b) => { b.checked = true; });
+  oppdaterLagreknapp();
+});
+felt("merkIngen").addEventListener("click", () => {
+  alleBokser().forEach((b) => { b.checked = false; });
+  oppdaterLagreknapp();
+});
+// Hvert eneste kryss, ikke bare de to knappene over: teksten skal alltid
+// si det samme som boksene. Lyttes pa lista framfor pa hver boks, sa den
+// ogsa gjelder rader som tegnes senere.
+felt("kamper").addEventListener("change", oppdaterLagreknapp);
 
 /* ---------- lagring ---------- */
 
