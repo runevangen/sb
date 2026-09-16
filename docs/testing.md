@@ -1,5 +1,9 @@
 # Testing
 
+**Dette er det ene stedet antallet står.** CLAUDE.md og README har
+kommandoene, men ikke tallene: de sto i tre filer og glei fire ganger på to
+dager. Legger du til tester, er det denne fila som skal rettes.
+
     node test/unit.mjs      531 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  272 tester, ~250 ms, ingen nettleser
     node test/run.mjs       453 tester, ~200 s, headless Chromium
