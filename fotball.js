@@ -15,7 +15,8 @@ import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
          stedNokkel, blirMedLinje, mittSted, navnIRad } from "./svar-data.js";
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
-         rangerForslag, FORSLAG_MAKS } from "./pub-data.js";
+         rangerForslag, FORSLAG_MAKS, tolkPubRader, slaSammenPuber }
+  from "./pub-data.js";
 import { PUBER_OSLO } from "./puber-oslo.js";
 import { sjekkForslag, alleredeILista, NAVN_MAKS, ADRESSE_MAKS }
   from "./pub-forslag-data.js";
@@ -25,8 +26,18 @@ import { KANALER } from "./kanaler.js";
 
 // Kuraterte steder vi stoler pa. «usikker» vises ikke: et sted vi ikke
 // tor sta inne for, er verre enn ett forslag faerre.
-const KJENTE = PUBER_OSLO.filter((p) => p.sikkerhet !== "usikker");
+//
+// Fila er grunnfjellet og star her uten et eneste nettkall. Oppa den
+// legger seg rettelsene admin har gjort i portalen — nye steder, en
+// adresse som flyttet, et sted som la ned (#80, ADR 0020). De kommer over
+// nettet, og derfor er dette ikke en const lenger: alt som tegnes av den,
+// ma kunne tegnes pa nytt nar de lander.
+let KJENTE = kjenteAv(PUBER_OSLO);
 const KJENT_RADIUS = 1500;
+
+function kjenteAv(liste) {
+  return liste.filter((p) => p.sikkerhet !== "usikker");
+}
 import { timeAgo, listeTekst } from "./lib.js";
 
 let naviger = () => {};
@@ -77,6 +88,51 @@ export function initFotball(paNavigering, paLagsok, paFavoritt, paDeling, paPube
   FANER.forEach((del) => {
     faner.appendChild(velgerknapp(del, DEL_NAVN[del],
       () => naviger(aktivLiga, del)));
+  });
+
+  hentPubRettelser();
+}
+
+// Rettelsene admin har gjort i portalen (#80).
+//
+// **Stille nar den feiler, og det er riktig her.** Lista er ikke hele
+// visningen — fila star der uansett, med alle radene sine. En feilmelding
+// over stedene ville sagt at noe mangler, i det vanlige tilfellet der
+// ingenting gjor det. Den som *skriver* en rettelse, far beskjed; det er
+// der man venter et svar.
+async function hentPubRettelser() {
+  let json = null;
+  try {
+    const respons = await fetch("/api/pub-liste", { headers: { "Accept": "application/json" } });
+    json = JSON.parse(await respons.text());
+  } catch (err) {
+    return;
+  }
+  if (!json || json.feil || !Array.isArray(json.puber) || !json.puber.length) return;
+
+  KJENTE = kjenteAv(slaSammenPuber(PUBER_OSLO, tolkPubRader(json.puber)));
+  tegnKjenteIgjen();
+}
+
+// Det som kommer over nettet, lander etter at visningen star ferdig.
+// Et kort som alt er apent har regnet ut sine kjente steder av den gamle
+// lista, og de ma regnes om — ellers star et sted som la ned i gar, der
+// til kortet lukkes. Tredje gang den fella har kostet noe i dette
+// prosjektet.
+function tegnKjenteIgjen() {
+  Array.from(apneBokser).forEach((boks) => {
+    if (!boks.isConnected) { apneBokser.delete(boks); return; }
+    const bekreftede = boks.bekreftede || [];
+    const arena = arenaFor(boks.dataset.arena || "");
+    if (arena) {
+      boks.kilder.kjenteVedArena = merkBekreftet(
+        kuraterteNaer(KJENTE, arena, KJENT_RADIUS), bekreftede);
+    }
+    if (boks.sistePosisjon) {
+      boks.kilder.kjenteNaer = merkBekreftet(
+        kuraterteNaer(KJENTE, boks.sistePosisjon, KJENT_RADIUS), bekreftede);
+    }
+    tegnForslag(boks);
   });
 }
 
@@ -1036,8 +1092,14 @@ async function svarSted(kamp, panel, hvor, sted, melding, avmeld) {
 // selv, hver for seg.
 const puberHusket = new Map();
 
+// Boksene som star pa skjermen na. Rettelsene fra portalen lander etter
+// at kortet er tegnet, og da er det disse som ma tegnes om. Lista lukes
+// nar den gas gjennom: et lukket kort er ute av dokumentet.
+const apneBokser = new Set();
+
 function pubForslag(kamp, pubFelt) {
   const boks = el("div", "pub-forslag");
+  apneBokser.add(boks);
   boks.dataset.arena = kamp.arena || "";
   boks.pubFelt = pubFelt;
   boks.kilder = {};
@@ -1245,6 +1307,7 @@ function hentNaerDeg(boks, bekreftede) {
     // Kjente fotballpuber naer deg star der med en gang: lista ligger i
     // koden, sa den virker ogsa nar Overpass ikke svarer. Det er verdt
     // mye her, der Overpass har vaert det skjoreste leddet.
+    boks.sistePosisjon = p;
     boks.kilder.kjenteNaer = merkBekreftet(
       kuraterteNaer(KJENTE, p, KJENT_RADIUS), bekreftede);
     tegnForslag(boks);

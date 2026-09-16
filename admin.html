@@ -35,10 +35,34 @@
   .forslag-knapper { display: flex; gap: 14px; }
   h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tekst-dim); margin: 0 0 10px; }
   label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
-  input[type="password"], select {
+  input[type="password"], input[type="text"], input[type="url"],
+  input[type="date"], input[type="number"], select, textarea {
     width: 100%; padding: 10px; border: 1px solid var(--ramme-sterk); border-radius: 8px;
     background: #fff; color: var(--tekst); font: inherit;
   }
+  textarea { resize: vertical; min-height: 60px; }
+  /* Stedredigeringen. To felt side om side der de hoerer sammen — gate og
+     nummer er ett sporsmal, breddegrad og lengdegrad er ett annet. */
+  .felt-par { display: flex; gap: 10px; }
+  .felt-par > * { flex: 1; min-width: 0; }
+  .felt-blokk { margin-bottom: 12px; }
+  .steder { list-style: none; margin: 10px 0 0; padding: 0; max-height: 320px; overflow-y: auto; }
+  .steder li { display: flex; align-items: center; gap: 10px; padding: 9px 2px;
+               border-bottom: 1px solid var(--ramme); }
+  .steder li:last-child { border-bottom: 0; }
+  .sted-navn { font-weight: 600; flex: 1; min-width: 0; }
+  .sted-under { display: block; font-size: 12px; color: var(--tekst-svak); font-weight: 400; }
+  /* Radene som er rettet i portalen skal kunne skilles fra fila med
+     oyet. Ellers er det ingen mate a se hva basen faktisk barer. */
+  .sted-merke { font-size: 11px; font-weight: 600; text-transform: uppercase;
+                letter-spacing: 0.04em; color: var(--aksent); }
+  .sted-merke.skjult { color: var(--feil); }
+  .steder button { padding: 6px 10px; font-size: 13px; }
+  .treff { list-style: none; margin: 8px 0 0; padding: 0; }
+  .treff li { border-top: 1px solid var(--ramme); }
+  .treff button { display: block; width: 100%; text-align: left; background: none;
+                  color: var(--tekst); font-weight: 500; padding: 9px 2px; }
+  .treff .sted-under { color: var(--tekst-dim); }
   .kamper { list-style: none; margin: 12px 0 0; padding: 0; }
   .kamper li { border-bottom: 1px solid var(--ramme); }
   /* Runden star som en overskrift i lista, ikke som en egen boks: den
@@ -148,6 +172,109 @@
     <p class="hint" id="forslagHint">Henter forslagene …</p>
     <div id="forslagListe"></div>
     <p class="melding" id="forslagMelding" role="status" aria-live="polite"></p>
+  </section>
+
+  <!-- Stedredigeringen (#80). puber-oslo.js er fortsatt grunnfjellet:
+       den ligger i koden og virker uten nett. Det som lagres her er
+       rettelsene oppa — nye steder, en adresse som flyttet, et sted som
+       la ned. Fila rores aldri herfra. ADR 0020. -->
+  <section>
+    <h2>Steder</h2>
+    <p class="hint" id="stedHint">Henter stedene …</p>
+    <div class="rad">
+      <button id="stedNytt" type="button">Nytt sted</button>
+      <button class="lenke" id="stedAvbryt" type="button" hidden>Avbryt</button>
+    </div>
+    <ul class="steder" id="stedListe"></ul>
+
+    <form id="stedSkjema" hidden>
+      <div class="felt-blokk">
+        <label for="stedNavn">Navn</label>
+        <div class="rad">
+          <input type="text" id="stedNavn" autocomplete="off" maxlength="80"
+                 style="flex: 1 1 180px; width: auto;">
+          <button class="lenke" id="stedSok" type="button">Slå opp i OpenStreetMap</button>
+        </div>
+        <p class="hint" id="stedSokHint" hidden></p>
+        <ul class="treff" id="stedTreff"></ul>
+      </div>
+
+      <div class="felt-blokk felt-par">
+        <div>
+          <label for="stedBydel">Bydel</label>
+          <input type="text" id="stedBydel" autocomplete="off" maxlength="40">
+        </div>
+        <div>
+          <label for="stedAdresse">Adresse</label>
+          <input type="text" id="stedAdresse" autocomplete="off" maxlength="120">
+        </div>
+      </div>
+
+      <div class="felt-blokk felt-par">
+        <div>
+          <label for="stedLat">Breddegrad</label>
+          <input type="number" id="stedLat" step="0.0001" inputmode="decimal">
+        </div>
+        <div>
+          <label for="stedLon">Lengdegrad</label>
+          <input type="number" id="stedLon" step="0.0001" inputmode="decimal">
+        </div>
+      </div>
+
+      <div class="felt-blokk felt-par">
+        <div>
+          <label for="stedType">Type</label>
+          <select id="stedType"></select>
+        </div>
+        <div>
+          <label for="stedSikkerhet">Sikkerhet</label>
+          <select id="stedSikkerhet"></select>
+        </div>
+      </div>
+
+      <div class="felt-blokk">
+        <label for="stedLag">Lag stedet er kjent for</label>
+        <input type="text" id="stedLag" autocomplete="off"
+               placeholder="Vålerenga, Tottenham">
+        <p class="hint">Skill med komma. Tomt er helt greit.</p>
+      </div>
+
+      <!-- Kilde og dato er ikke pynt: en udatert rad er verre enn ingen
+           rad. Skjemaet slipper ingen rad gjennom uten dem. -->
+      <div class="felt-blokk">
+        <label for="stedKilde">Kilde</label>
+        <input type="url" id="stedKilde" autocomplete="off"
+               placeholder="https://stedet.no/sport-pa-storskjerm">
+        <p class="hint">En lenke som faktisk sier at stedet viser fotball.</p>
+      </div>
+
+      <div class="felt-blokk felt-par">
+        <div>
+          <label for="stedSjekket">Sjekket</label>
+          <input type="date" id="stedSjekket">
+        </div>
+        <div>
+          <label for="stedFjernetFelt">Vises i appen</label>
+          <div class="rad" id="stedFjernetFelt">
+            <input type="checkbox" id="stedFjernet"
+                   style="width: 20px; height: 20px; accent-color: var(--aksent);">
+            <label for="stedFjernet" style="margin: 0; font-weight: 400;">
+              Ta stedet ut av lista
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="felt-blokk">
+        <label for="stedMerknad">Merknad</label>
+        <textarea id="stedMerknad" maxlength="300"></textarea>
+      </div>
+
+      <div class="rad">
+        <button id="stedLagre" type="button">Lagre stedet</button>
+      </div>
+    </form>
+    <p class="melding" id="stedMelding" role="status" aria-live="polite"></p>
   </section>
 
   <section>

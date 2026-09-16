@@ -377,3 +377,212 @@ export function finnKontakt(navn, kontakter) {
   const treff = Object.keys(kontakter).find((n) => normaliserLagnavn(n) === leit);
   return treff ? kontakter[treff] : null;
 }
+
+/* ---------- lista redigert fra portalen (#80) ---------- */
+
+// Til 16. september 2026 fantes det ingen vei fra et skjema og inn i
+// lista, og det var med vilje: `puber-oslo.js` baerer en redaksjonell
+// vurdering, og et forslag fra en leser er ikke en rad. ADR 0019.
+//
+// Den regelen star. Det som endret seg er *hvem* som limer. Ingen leser
+// skriver i lista; admin gjor det, og gjor det na i portalen framfor i en
+// koderedigerer. Fila er fortsatt grunnfjellet — den virker uten nett, og
+// er det leseren ser om Supabase er nede. Basen baerer bare rettelsene
+// oppa. ADR 0020.
+//
+// Nokkelen er navnet foldet, ikke navnet: «Andy's Pub» og «Andys Pub» er
+// ett sted, og to rader for det samme stedet er nettopp det en redigert
+// liste ikke tale. Samme grep som kampNokkel.
+export function pubNokkel(navn) {
+  return normaliserLagnavn(navn);
+}
+
+// Radene fra PostgREST, formet som lista er formet.
+//
+// **Ma tale a kjores to ganger.** Tjenesten tolker radene for den svarer,
+// portalen tolker svaret en gang til — og andre gang heter feltene alt
+// det de skal hete. Den feilen gjorde «blir med»-lista usynlig for alle i
+// tre dager.
+export function tolkPubRader(rader) {
+  return (Array.isArray(rader) ? rader : []).map((r) => ({
+    nokkel: String((r && r.nokkel) || pubNokkel((r && r.navn) || "")),
+    navn: String((r && r.navn) || ""),
+    bydel: String((r && r.bydel) || ""),
+    adresse: String((r && r.adresse) || ""),
+    lat: Number((r && r.lat) || 0),
+    lon: Number((r && r.lon) || 0),
+    type: String((r && r.type) || "pub"),
+    lag: Array.isArray(r && r.lag) ? r.lag.map(String) : [],
+    kilde: String((r && r.kilde) || ""),
+    sikkerhet: String((r && r.sikkerhet) || ""),
+    sjekket: String((r && r.sjekket) || "").slice(0, 10),
+    merknad: String((r && r.merknad) || ""),
+    fjernet: !!(r && r.fjernet),
+  })).filter((p) => p.nokkel);
+}
+
+// Raden slik tjenesten sender den til basen. `endret_av` og `endret` star
+// ikke her: databasen setter den forste fra okten og den andre fra now().
+// Sender funksjonen dem selv, kan en feil her skrive i en annens navn.
+export function pubRadTilBase(p) {
+  return {
+    nokkel: pubNokkel(p.navn),
+    navn: String(p.navn).trim(),
+    bydel: String(p.bydel || "").trim(),
+    adresse: String(p.adresse || "").trim(),
+    lat: Number(p.lat),
+    lon: Number(p.lon),
+    type: String(p.type || "pub"),
+    lag: Array.isArray(p.lag) ? p.lag.map((l) => String(l).trim()).filter(Boolean) : [],
+    kilde: String(p.kilde || "").trim(),
+    sikkerhet: String(p.sikkerhet || "").trim(),
+    sjekket: String(p.sjekket || "").slice(0, 10),
+    merknad: String(p.merknad || "").trim() || null,
+    fjernet: !!p.fjernet,
+  };
+}
+
+// Fila nederst, basen oppa.
+//
+// En rad i basen med samme nokkel erstatter raden i fila — hele raden,
+// ikke felt for felt. Halve rader fra to kilder er ikke til a lese
+// tilbake: sto adressen i fila og koordinatet i basen, ville ingen visst
+// hvilken av dem som var sjekket sist.
+//
+// `fjernet` tar raden ut. Et sted som har lagt ned skal kunne forsvinne
+// fra portalen, og da holder det ikke a la vaere a skrive en rad: raden
+// star jo i fila. Fila blir aldri rort herfra.
+//
+// Rekkefolgen fra fila holdes, og nye rader legges bakerst. Appen sorterer
+// etter avstand uansett, men portalen viser dem som de kommer.
+export function slaSammenPuber(fila, base) {
+  const over = new Map();
+  (Array.isArray(base) ? base : []).forEach((p) => {
+    if (p && p.nokkel) over.set(p.nokkel, p);
+  });
+
+  const ut = [];
+  const brukt = new Set();
+  (Array.isArray(fila) ? fila : []).forEach((p) => {
+    const nokkel = pubNokkel(p.navn);
+    brukt.add(nokkel);
+    const ny = over.get(nokkel);
+    if (!ny) { ut.push(p); return; }
+    if (ny.fjernet) return;
+    ut.push(utenBasefelt(ny));
+  });
+
+  (Array.isArray(base) ? base : []).forEach((p) => {
+    if (!p || !p.nokkel || brukt.has(p.nokkel) || p.fjernet) return;
+    ut.push(utenBasefelt(p));
+  });
+  return ut;
+}
+
+// Raden slik resten av appen venter den: uten nokkel og uten fjernet.
+// De to hoerer lagringen til, og en rad som barer dem ville sett ut som
+// noe annet enn radene fra fila.
+function utenBasefelt(p) {
+  const ut = {
+    navn: p.navn, bydel: p.bydel, adresse: p.adresse,
+    lat: p.lat, lon: p.lon, type: p.type, lag: p.lag || [],
+    kilde: p.kilde, sikkerhet: p.sikkerhet, sjekket: p.sjekket,
+  };
+  if (p.merknad) ut.merknad = p.merknad;
+  return ut;
+}
+
+// Hva som er galt med én rad, som en liste. Tom liste betyr at alt er bra
+// — samme form som sjekkPubliste, og den samme vurderingen: en rad uten
+// kilde og dato slipper ikke gjennom. Den regelen er ikke pynt. Oslos
+// uteliv flytter seg fort, og en udatert rad er verre enn ingen rad.
+//
+// En fjernet rad slipper med navnet alene: det eneste den sier er at
+// stedet ikke skal vises, og da er det ingen opplysning om virkeligheten
+// a sette en kilde bak.
+export function sjekkPubRad(p, ramme) {
+  if (!p || typeof p !== "object") return ["Raden er ikke et objekt"];
+  if (!pubNokkel(p.navn || "")) return ["Skriv navnet på stedet."];
+  if (p.fjernet) return [];
+  return sjekkPubliste([pubRadTilBase(p)], ramme)
+    .map((f) => f.replace(/^rad 1 \([^)]*\): /, ""));
+}
+
+/* ---------- sla opp et sted i OpenStreetMap ---------- */
+
+// Portalen skal slippe a gjette koordinater. Kommentaren i puber-oslo.js
+// har alltid sagt at OSMs koordinat brukes nar navnet stemmer — dette er
+// akkurat det, bare gjort av maskinen framfor for hand.
+//
+// Navnet vaskes til bokstaver, tall og mellomrom for det settes inn i
+// sporringen. Overpass' egen QL har bade hermetegn og regex, og et navn
+// som «O'Leary's "Vika"» ville ellers brutt sporringen — eller vaert en
+// vei til a skrive sin egen.
+//
+// Tegnsettingen *deler* framfor a forsvinne, og det er med vilje:
+// «O'Learys» blir «O Learys», ikke «OLearys». Det siste ville ikke
+// truffet noe som helst — navnet i OpenStreetMap har jo apostrofen. Den
+// lange biten star igjen, og den finner stedet.
+//
+// Norske bokstaver blir staende. De gjorde det ikke da fila her foldet
+// dem forst: «Bla Gronland» er verken det ene eller det andre.
+export function osmNavnVask(navn) {
+  return String(navn || "")
+    .replace(/[^0-9A-Za-zAEOAaeoa\u00C6\u00D8\u00C5\u00E6\u00F8\u00E5]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 60);
+}
+
+// Hvor lang en bit ma vaere for den kreves. «The», «Pub» og «Bar» star i
+// halve Oslo: de gjor sporringen strengere uten a gjore den mer
+// treffsikker, og «The Dubliner Folk Pub» skal finne «Dubliner Folk Pub».
+const SOK_MIN = 4;
+
+// Oslo-ramma, den samme sjekkPubliste bruker. Et sok som treffer en pub i
+// Bergen hjelper ingen her.
+export const OSLO_RAMME = { lat: [59.80, 60.05], lon: [10.45, 10.95] };
+
+export function osmNavnSporring(navn, ramme) {
+  const r = ramme || OSLO_RAMME;
+  const biter = osmNavnVask(navn).split(" ").filter(Boolean);
+  let ord = biter.filter((o) => o.length >= SOK_MIN);
+  // Star det bare korte biter igjen, brukes den lengste av dem alene —
+  // men aldri en pa to bokstaver. «(?=.*a)» treffer hver eneste pub i
+  // byen, og en liste pa tusen treff er det samme som ingen liste.
+  if (!ord.length) {
+    const lengst = biter.slice().sort((a, b) => b.length - a.length)[0] || "";
+    if (lengst.length < 3) return "";
+    ord = [lengst];
+  }
+  // Alle ordene ma finnes, i hvilken som helst rekkefolge: «Dubliner
+  // Folk Pub» skal treffe «The Dubliner», og «Andy's Pub» skal ikke
+  // treffe hver eneste pub i byen.
+  const monster = ord.map((o) => "(?=.*" + o + ")").join("");
+  const boks = "(" + r.lat[0] + "," + r.lon[0] + "," + r.lat[1] + "," + r.lon[1] + ")";
+  return '[out:json][timeout:12];nwr["name"~"' + monster + '",i]' + boks + ";out center;";
+}
+
+// Treffene, formet som portalen vil ha dem: navn, koordinat og adressen
+// OSM har, hvis den har en. Nummeret star etter gata, som i lista.
+export function tolkNavnTreff(json, maks) {
+  const rader = (json && Array.isArray(json.elements)) ? json.elements : [];
+  return rader.map((e) => {
+    const t = e.tags || {};
+    const punkt = e.center || e;
+    const gate = String(t["addr:street"] || "").trim();
+    const nr = String(t["addr:housenumber"] || "").trim();
+    return {
+      navn: String(t.name || "").trim(),
+      adresse: gate ? (nr ? gate + " " + nr : gate) : "",
+      lat: Number(punkt.lat),
+      lon: Number(punkt.lon),
+      // amenity sier hva OSM mener stedet er. Den oversettes ikke til var
+      // egen type: «bar» i OSM er ikke «sportsbar» hos oss, og den
+      // vurderingen er det admin som gjor.
+      slag: String(t.amenity || t.shop || "").trim(),
+      nettsted: String(t.website || t["contact:website"] || "").trim(),
+    };
+  }).filter((p) => p.navn && Number.isFinite(p.lat) && Number.isFinite(p.lon))
+    .slice(0, maks || 8);
+}

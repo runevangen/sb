@@ -9,6 +9,50 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 16. september 2026 — stubben modellerte koden, ikke basen
+
+**Hva som skjedde.** Testen for at rettelsene fra portalen treffer leseren
+(#80) var rød på ett punkt: stedet som var merket `fjernet` ble stående i
+kortet. Sammenslåingen så riktig ut, og enhetstestene for den var grønne.
+
+**Hva som faktisk var årsaken.** Stubben. Den la inn `nokkel: "the toucan
+public house"` — navnet med mellomrom, slik et menneske ville skrevet det.
+`pubNokkel()` er `normaliserLagnavn()`, som også fjerner mellomrom, så
+raden i basen bærer `"thetoucanpublichouse"`. Nøklene møttes aldri, og
+raden ble aldri matchet.
+
+**Hva som fanget det.** Ikke noe annet enn at assertionen var skrevet.
+Enhetstestene for `slaSammenPuber()` brukte `pubNokkel()` til å lage
+nøkkelen sin, og var derfor enige med koden uansett hva den gjorde.
+
+**Regelen det ble til.** Den står alt i `docs/testing.md`: stubben skal
+modellere svaret, ikke koden som lager det. Her ble den brutt i den andre
+retningen — jeg skrev nøkkelen for hånd og modellerte det jeg *trodde*
+koden gjorde. Rettelsen var å la stubben droppe nøkkelen helt, og la
+`tolkPubRader()` utlede den, slik tabellen garanterer at den er.
+
+---
+
+## 16. september 2026 — én test rev de neste to hundre med seg
+
+**Hva som skjedde.** Under en sabotasjesjekk av en ny funksjonstest døde
+hele suiten: `TypeError: Cannot read properties of undefined`. Ikke ett
+rødt punkt — kjøringen stoppet, og alt etter linja sto ukjørt.
+
+**Hva som faktisk var årsaken.** Assertionen gjorde `kall.find(…).opsjoner`
+uten å sjekke at `find` fant noe. Under sabotasjen gjorde den ikke det, og
+da kastet uttrykket framfor å svare `false`.
+
+**Hva som fanget det.** Sabotasjesjekken selv. I grønn tilstand ville
+linja aldri kastet, og fella ville ligget der til den dagen noen brøt
+akkurat det den beskytter — altså den dagen den trengtes.
+
+**Regelen det ble til.** Grønt på en test som aldri kjørte er verre enn
+rødt, og en test som drepte de neste to hundre er verst. En assertion som
+plukker fra en liste, må tåle at lista er tom.
+
+---
+
 ## 16. september 2026 — porten feilet av miljøet, ikke av koden
 
 Da enhets- og funksjonstestene ble gjort til byggekommando (#77), feilet

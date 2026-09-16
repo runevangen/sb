@@ -32,3 +32,4 @@ flyttes. Resten finner du i koden.
 | [0017](0017-kampene-framover.md) | Kampene framover, ikke bare neste runde |
 | [0018](0018-visninger-i-supabase.md) | «Hvem viser kampen» i Supabase (erstatter 0011) |
 | [0019](0019-pubforslag.md) | Lesere kan foreslå steder, men ikke legge dem inn |
+| [0020](0020-stedene-i-portalen.md) | Stedene redigeres i portalen (utvider 0019) |

@@ -240,3 +240,99 @@ create policy "slett som skriver" on pub_forslag
     exists (select 1 from visning_skrivere s where s.bruker = auth.uid()));
 
 create index if not exists pub_forslag_status_idx on pub_forslag (status, foreslatt);
+
+
+-- ---------------------------------------------------------------
+-- 6. puber — rettelsene som ligger oppå puber-oslo.js
+-- ---------------------------------------------------------------
+-- **Fila er grunnfjellet.** puber-oslo.js ligger i koden, virker uten
+-- nettverk, og er det leseren ser om Supabase er nede. Den skrives aldri
+-- herfra. Denne tabellen bærer bare rettelsene oppå, og appen slår dem
+-- sammen selv (ADR 0020).
+--
+-- Regelen fra ADR 0019 står: et forslag fra en leser er ikke en rad.
+-- pub_forslag over er fortsatt køen, og ingen rad flytter seg derfra og
+-- hit av seg selv. Det som endret seg er hvor admin limer — i portalen
+-- framfor i en koderedigerer. Vurderingen er den samme, og den er et
+-- menneskes.
+--
+-- Nøkkelen er navnet foldet, ikke navnet: «Andy's Pub» og «Andys Pub» er
+-- ett sted. Samme grep som kampNokkel — det som slås opp går på nøkkelen,
+-- aldri på det som ble skrevet inn.
+
+create table if not exists puber (
+  nokkel     text primary key check (char_length(nokkel) between 1 and 80),
+  navn       text not null check (char_length(navn) between 2 and 80),
+  bydel      text not null default '',
+  adresse    text not null default '',
+  lat        double precision,
+  lon        double precision,
+  type       text not null default 'pub'
+             check (type in ('sportsbar', 'supporterpub', 'pub')),
+  lag        text[] not null default '{}',
+  -- Kilde og dato er ikke pynt. Oslos uteliv flytter seg fort, og en
+  -- udatert rad er verre enn ingen rad. sjekkPubRad() i appen slipper
+  -- ingen rad gjennom uten dem; sjekken her er den som holder når noen
+  -- skriver rett mot basen.
+  kilde      text not null default '',
+  sikkerhet  text not null default 'bekreftet'
+             check (sikkerhet in ('bekreftet', 'sannsynlig', 'usikker')),
+  sjekket    date,
+  merknad    text check (char_length(merknad) <= 300),
+  -- Et sted som har lagt ned skal kunne forsvinne fra portalen. Raden i
+  -- fila står, så det holder ikke å la være å skrive — den må skjules.
+  fjernet    boolean not null default false,
+  check (fjernet or (kilde like 'http%' and sjekket is not null
+                     and lat is not null and lon is not null)),
+  endret     timestamptz not null default now(),
+  -- Settes av databasen fra økten, som satt_av i visninger.
+  endret_av  uuid default auth.uid() references auth.users (id) on delete set null
+);
+
+alter table puber enable row level security;
+
+-- Les: alle, uten konto. Lista er det appen viser, og ingenting i appen
+-- er låst bak innlogging.
+drop policy if exists "les for alle" on puber;
+create policy "les for alle" on puber
+  for select to anon, authenticated using (true);
+
+drop policy if exists "skriv som skriver" on puber;
+create policy "skriv som skriver" on puber
+  for insert to authenticated with check (
+    exists (select 1 from visning_skrivere s where s.bruker = auth.uid()));
+
+drop policy if exists "endre som skriver" on puber;
+create policy "endre som skriver" on puber
+  for update to authenticated using (
+    exists (select 1 from visning_skrivere s where s.bruker = auth.uid()));
+
+drop policy if exists "slett som skriver" on puber;
+create policy "slett som skriver" on puber
+  for delete to authenticated using (
+    exists (select 1 from visning_skrivere s where s.bruker = auth.uid()));
+
+-- En default gjelder bare ved insert. Upserten fra /api/pub-liste treffer
+-- update-grenen hver gang en rad rettes, og da ville «endret» stått stille
+-- på datoen raden ble laget, og «endret_av» pekt på den som la den inn
+-- første gang. Det var nøyaktig feilen i satt_av: «funksjonen sender den
+-- aldri selv» er bare halve regelen — den andre halvparten er at
+-- databasen faktisk setter den, hver gang.
+--
+-- `set search_path = ''` og fullt kvalifiserte navn: uten det avgjor
+-- kallerens egen search_path hvilken `now()` som kjores, og en funksjon
+-- som utloses av hver eneste skriving er feil sted a la det sta apent.
+-- Supabase' egen linter melder det som function_search_path_mutable.
+create or replace function puber_endret() returns trigger
+  language plpgsql security invoker
+  set search_path = '' as $$
+begin
+  new.endret := pg_catalog.now();
+  new.endret_av := auth.uid();
+  return new;
+end;
+$$;
+
+drop trigger if exists puber_endret_trigger on puber;
+create trigger puber_endret_trigger before insert or update on puber
+  for each row execute function puber_endret();

@@ -42,7 +42,10 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
          rangerForslag, FORSLAG_MAKS,
          OVERPASS_SPEIL, overpassHeadere, restTid,
          sjekkPubliste, kuraterteNaer, merkKuraterte,
-         sjekkKontaktliste, kontaktFor, finnKontakt, KONTAKT_FELT } from "../pub-data.js";
+         sjekkKontaktliste, kontaktFor, finnKontakt, KONTAKT_FELT,
+         pubNokkel, tolkPubRader, pubRadTilBase, slaSammenPuber, sjekkPubRad,
+         osmNavnVask, osmNavnSporring, tolkNavnTreff, PUBTYPER, PUBSIKKERHET,
+         OSLO_RAMME } from "../pub-data.js";
 import { PUBER_KONTAKT } from "../puber-kontakt.js";
 import { KANALER } from "../kanaler.js";
 import { PUBER_OSLO } from "../puber-oslo.js";
@@ -1953,6 +1956,162 @@ ok("hver modul appen importerer ligger i service workerens skall",
    utenfor.length === 0, "mangler i SKALL: " + utenfor.join(", "));
 ok("testen fant faktisk noen importer a sjekke",
    importert.size >= 10, importert.size);
+
+/* ---------------- stedene admin retter (#80) ---------------- */
+
+// Fila er grunnfjellet, basen barer rettelsene oppa. Det som testes her er
+// selve sammenslaingen: at en rettelse erstatter hele raden, at et fjernet
+// sted forsvinner, og at et nytt legges til — uten at fila rores.
+const PUBFILA = [
+  { navn: "Andy's Pub", bydel: "Sentrum", adresse: "Stortingsgata 8",
+    lat: 59.9135, lon: 10.7340, type: "sportsbar", lag: [],
+    kilde: "https://www.andyspub.no/", sikkerhet: "sannsynlig", sjekket: "2026-09-11" },
+  { navn: "Scotsman", bydel: "Sentrum", adresse: "Karl Johans gate 35",
+    lat: 59.9133, lon: 10.7412, type: "supporterpub", lag: ["Bod\u00f8/Glimt"],
+    kilde: "https://scotsman.no/", sikkerhet: "bekreftet", sjekket: "2026-09-11" },
+];
+
+ok("nokkelen folder navnet, som lagnavn",
+   pubNokkel("Andy's Pub") === pubNokkel("Andys Pub") && pubNokkel("Andy's Pub") !== "",
+   pubNokkel("Andy's Pub"));
+ok("et navn uten bokstaver gir ingen nokkel", pubNokkel("  ") === "" && pubNokkel(null) === "");
+
+const PUBBASE = tolkPubRader([
+  { nokkel: pubNokkel("Andys Pub"), navn: "Andy's Pub", bydel: "Sentrum",
+    adresse: "Stortingsgata 10", lat: 59.9136, lon: 10.7341, type: "sportsbar",
+    lag: ["Arsenal"], kilde: "https://www.andyspub.no/sport", sikkerhet: "bekreftet",
+    sjekket: "2026-09-16", merknad: "Flyttet to nummer opp.", fjernet: false },
+  { nokkel: pubNokkel("Scotsman"), navn: "Scotsman", fjernet: true },
+  { nokkel: pubNokkel("Ny Pub"), navn: "Ny Pub", bydel: "Grunerlokka",
+    adresse: "Thorvald Meyers gate 1", lat: 59.9230, lon: 10.7590, type: "pub",
+    lag: [], kilde: "https://nypub.no/", sikkerhet: "bekreftet", sjekket: "2026-09-16" },
+]);
+
+const PUBSAMMEN = slaSammenPuber(PUBFILA, PUBBASE);
+ok("en rettelse erstatter raden fra fila",
+   PUBSAMMEN[0].navn === "Andy's Pub" && PUBSAMMEN[0].adresse === "Stortingsgata 10" &&
+   PUBSAMMEN[0].sikkerhet === "bekreftet" && PUBSAMMEN[0].sjekket === "2026-09-16",
+   JSON.stringify(PUBSAMMEN[0]));
+// Hele raden, ikke felt for felt: halve rader fra to kilder er ikke til a
+// lese tilbake. Laget fra basen star, laget fra fila er borte.
+ok("og erstatter hele raden, ikke felt for felt",
+   PUBSAMMEN[0].lag.join(",") === "Arsenal", JSON.stringify(PUBSAMMEN[0].lag));
+ok("et fjernet sted forsvinner fra lista",
+   !PUBSAMMEN.some((p) => p.navn === "Scotsman"), PUBSAMMEN.map((p) => p.navn).join(", "));
+ok("et nytt sted legges bakerst",
+   PUBSAMMEN[PUBSAMMEN.length - 1].navn === "Ny Pub", PUBSAMMEN.map((p) => p.navn).join(", "));
+ok("den sammensatte lista holder formen sjekkPubliste krever",
+   sjekkPubliste(PUBSAMMEN).length === 0, sjekkPubliste(PUBSAMMEN).join(" | "));
+// Nokkelen er navnet foldet: apostrofen i basen er ikke den samme som i
+// fila, og de skal likevel vaere ett sted.
+ok("apostrofen skiller ikke to rader fra hverandre",
+   PUBSAMMEN.filter((p) => pubNokkel(p.navn) === pubNokkel("Andys Pub")).length === 1);
+ok("fila selv rores aldri",
+   PUBFILA[0].adresse === "Stortingsgata 8" && PUBFILA.length === 2, PUBFILA[0].adresse);
+ok("tom base gir lista fra fila, uendret",
+   slaSammenPuber(PUBFILA, []).length === 2 &&
+   slaSammenPuber(PUBFILA, null)[0].adresse === "Stortingsgata 8");
+ok("nokkelen og fjernet folger ikke med ut",
+   PUBSAMMEN.every((p) => p.nokkel === undefined && p.fjernet === undefined),
+   JSON.stringify(PUBSAMMEN[0]));
+
+// Ma tale a kjores to ganger: tjenesten tolker radene for den svarer, og
+// portalen tolker svaret en gang til.
+ok("tolkPubRader talar a kjores to ganger",
+   JSON.stringify(tolkPubRader(PUBBASE)) === JSON.stringify(PUBBASE));
+ok("og gir nokkel til en rad som kom uten",
+   tolkPubRader([{ navn: "Uten Nokkel" }])[0].nokkel === pubNokkel("Uten Nokkel"));
+ok("en rad uten navn faller ut", tolkPubRader([{ navn: "" }, null]).length === 0);
+
+// Kilde og dato er ikke pynt. En udatert rad er verre enn ingen rad.
+ok("en rad uten kilde slipper ikke gjennom",
+   sjekkPubRad(Object.assign({}, PUBBASE[0], { kilde: "" })).length > 0,
+   sjekkPubRad(Object.assign({}, PUBBASE[0], { kilde: "" })).join(" | "));
+ok("en rad uten dato slipper ikke gjennom",
+   sjekkPubRad(Object.assign({}, PUBBASE[0], { sjekket: "" })).length > 0);
+ok("en rad utenfor Oslo slipper ikke gjennom",
+   sjekkPubRad(Object.assign({}, PUBBASE[0], { lat: 63.43, lon: 10.39 })).length > 0);
+ok("en ukjent type slipper ikke gjennom",
+   sjekkPubRad(Object.assign({}, PUBBASE[0], { type: "kafe" })).length > 0);
+ok("en hel rad slipper gjennom", sjekkPubRad(PUBBASE[0]).length === 0,
+   sjekkPubRad(PUBBASE[0]).join(" | "));
+// Det eneste en fjernet rad sier er at stedet ikke skal vises. Da er det
+// ingen opplysning om virkeligheten a sette en kilde bak.
+ok("en fjernet rad slipper med navnet alene",
+   sjekkPubRad({ navn: "Scotsman", fjernet: true }).length === 0,
+   sjekkPubRad({ navn: "Scotsman", fjernet: true }).join(" | "));
+ok("men en fjernet rad uten navn gjor ikke det",
+   sjekkPubRad({ navn: "", fjernet: true }).length === 1);
+// Feilen skal kunne leses av et menneske i portalen, ikke bare av koden.
+ok("feilen sier hva som mangler, uten radnummer",
+   sjekkPubRad(Object.assign({}, PUBBASE[0], { kilde: "" }))[0] === "mangler kilde",
+   sjekkPubRad(Object.assign({}, PUBBASE[0], { kilde: "" }))[0]);
+
+ok("raden til basen barer verken endret_av eller endret",
+   pubRadTilBase(PUBBASE[0]).endret_av === undefined &&
+   pubRadTilBase(PUBBASE[0]).endret === undefined,
+   Object.keys(pubRadTilBase(PUBBASE[0])).join(","));
+ok("og setter nokkelen selv, fra navnet",
+   pubRadTilBase({ navn: "Andys Pub" }).nokkel === pubNokkel("Andy's Pub"));
+ok("en tom merknad blir null, ikke tom streng",
+   pubRadTilBase({ navn: "X", merknad: "  " }).merknad === null);
+ok("typene og sikkerhetene er de samme som lista bruker",
+   PUBTYPER.indexOf("sportsbar") > -1 && PUBSIKKERHET.indexOf("bekreftet") > -1);
+
+/* ---- oppslaget i OpenStreetMap ---- */
+
+// Overpass' eget sprak har bade hermetegn og regex. Et navn som
+// «O'Leary's "Vika"» ville ellers brutt sporringen — eller vaert en vei
+// til a skrive sin egen.
+ok("hermetegn og apostrof vaskes bort for sporringen",
+   osmNavnVask('O\'Leary\'s "Vika"').indexOf('"') === -1 &&
+   osmNavnVask('O\'Leary\'s "Vika"').indexOf("'") === -1,
+   osmNavnVask('O\'Leary\'s "Vika"'));
+ok("og norske bokstaver blir staende", osmNavnVask("Blå Grønland") === "Blå Grønland",
+   osmNavnVask("Blå Grønland"));
+const PUBSPOR = osmNavnSporring("The Dubliner Folk Pub");
+ok("sporringen krever alle ordene, i hvilken som helst rekkefolge",
+   PUBSPOR.indexOf("(?=.*Dubliner)") > -1 && PUBSPOR.indexOf("(?=.*Folk)") > -1,
+   PUBSPOR);
+ok("korte biter som «The» og «Pub» teller ikke med",
+   PUBSPOR.indexOf("(?=.*The)") === -1 && PUBSPOR.indexOf("(?=.*Pub)") === -1, PUBSPOR);
+// Apostrofen deler framfor a forsvinne: «OLearys» ville ikke truffet
+// «O'Learys» i OpenStreetMap, men «Learys» gjor.
+ok("apostrofen deler navnet framfor a lime det sammen",
+   osmNavnSporring("O'Learys Vika").indexOf("(?=.*Learys)") > -1 &&
+   osmNavnSporring("O'Learys Vika").indexOf("(?=.*OLearys)") === -1,
+   osmNavnSporring("O'Learys Vika"));
+ok("et navn med bare korte biter bruker den lengste alene",
+   osmNavnSporring("Kro & Co") === osmNavnSporring("Kro"),
+   osmNavnSporring("Kro & Co"));
+ok("og sporringen holder seg innenfor Oslo",
+   PUBSPOR.indexOf("(" + OSLO_RAMME.lat[0] + "," + OSLO_RAMME.lon[0]) > -1, PUBSPOR);
+ok("et navn uten ord a soke pa gir ingen sporring",
+   osmNavnSporring("a b") === "" && osmNavnSporring("") === "");
+
+const PUBTREFF = tolkNavnTreff({ elements: [
+  { type: "node", lat: 59.9135, lon: 10.7340,
+    tags: { name: "Andy's Pub", amenity: "bar", "addr:street": "Stortingsgata",
+            "addr:housenumber": "8", website: "https://www.andyspub.no/" } },
+  { type: "way", center: { lat: 59.9133, lon: 10.7412 },
+    tags: { name: "Scotsman", amenity: "pub" } },
+  { type: "node", lat: 59.9, lon: 10.7, tags: { amenity: "bar" } },
+] }, 8);
+ok("et treff barer navn, koordinat og adresse",
+   PUBTREFF[0].navn === "Andy's Pub" && PUBTREFF[0].adresse === "Stortingsgata 8" &&
+   PUBTREFF[0].lat === 59.9135, JSON.stringify(PUBTREFF[0]));
+// «out center» gir ett punkt ogsa for bygninger tegnet som flater. Uten
+// det ville halve treffene manglet koordinat.
+ok("en flate gir punktet sitt fra center",
+   PUBTREFF[1].lat === 59.9133 && PUBTREFF[1].lon === 10.7412, JSON.stringify(PUBTREFF[1]));
+ok("et treff uten navn faller ut", PUBTREFF.length === 2, PUBTREFF.length);
+// OSM sier «bar»; om det er en sportsbar hos oss er en vurdering, og den
+// er det admin som gjor.
+ok("slaget fra OSM oversettes ikke til var egen type",
+   PUBTREFF[0].slag === "bar" && PUBTREFF[0].type === undefined, PUBTREFF[0].slag);
+ok("taket pa antall treff holdes",
+   tolkNavnTreff({ elements: PUBTREFF.concat(PUBTREFF).map((t) =>
+     ({ lat: t.lat, lon: t.lon, tags: { name: t.navn } })) }, 3).length === 3);
 
 /* ---------------- rapport ---------------- */
 
