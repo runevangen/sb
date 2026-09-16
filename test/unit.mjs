@@ -1567,8 +1567,8 @@ ok("navnet kommer fra metadata nar det finnes", BRUKERE[1].navn === "Ola",
    BRUKERE[1].navn);
 ok("og fra slugen nar det ikke gjor det", BRUKERE[0].navn === "bjoernaage",
    BRUKERE[0].navn);
-// Sist inne forst: det er den lista admin faktisk leser.
-ok("sist inne star overst", BRUKERE[0].id === "b" && BRUKERE[1].id === "a",
+// Sist palogget forst: det er den lista admin faktisk leser.
+ok("sist palogget star overst", BRUKERE[0].id === "b" && BRUKERE[1].id === "a",
    BRUKERE.map((b) => b.id).join(","));
 // Kontoen lages ved forste innlogging, sa created_at *er* forste gang.
 ok("forste og siste palogging folger med",

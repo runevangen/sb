@@ -9,6 +9,35 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 16. september 2026 — «Sist inne» talte noe vi ikke måler
+
+**Meldt som:** «Sist inne-loggen av brukere er feil. Jeg er inne nå og det
+står 2 dager siden.»
+
+Kolonnen viste `last_sign_in_at` fra Supabase. Det feltet er **sist noen
+tastet PIN-en**, ikke sist de brukte appen. Appen holder telefonen
+innlogget med roterende fornyere ([ADR 0009](adr/0009-fornavn-og-pin.md)),
+og en fornying er ingen ny pålogging — feltet står stille. En som er innom
+hver dag kan derfor ha en dato flere uker tilbake.
+
+**Datoen var riktig. Ordet var det ikke.** «Sist inne» leses som aktivitet,
+og aktivitet er nettopp det vi ikke registrerer
+([ADR 0004](adr/0004-ingen-statistikk.md)). Fristelsen var å gjøre tallet
+sant ved å begynne å telle besøk — altså å bygge sporingen ADR-en forbyr,
+for å redde en overskrift. Den riktige rettelsen gikk andre veien:
+kolonnen heter «Sist pålogget», og et avsnitt over tabellen sier i klartekst
+at det ikke er sist bruk.
+
+**Fanget av:** en leser som var innlogget mens han leste sin egen rad. Ingen
+test kunne sett dette — koden gjorde nøyaktig det den skulle. Det var
+etiketten som løy, og en etikett måles mot virkeligheten, ikke mot feltet.
+
+To vakter i `run.mjs` holder ordlyden nå: overskriften må si «Sist
+pålogget» og aldri «Sist inne», og seksjonen må forklare forskjellen.
+Begge ble sabotert og slår ut.
+
+---
+
 ## 16. september 2026 — «Lagre» lå tre seksjoner fra det den lagret
 
 **Meldt som:** «lagre under admin og der en pub kan få lagt til en kamp er

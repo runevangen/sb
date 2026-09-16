@@ -491,7 +491,7 @@ liste; den ser aldri nøkkelen og aldri noen PIN.
 
 | Kan | Kan ikke |
 | --- | --- |
-| Se hvem som har logget inn, første gang og sist inne | Se noens PIN — de ligger hashet hos Supabase |
+| Se hvem som har logget inn, første gang og sist pålogget | Se noens PIN — de ligger hashet hos Supabase |
 | Sette en ny PIN på en som har glemt sin | Lese den gamle |
 | Slette en konto, med alle «jeg blir med»-svarene | Angre slettingen |
 
@@ -499,6 +499,13 @@ Tidene kommer fra Supabase selv: `created_at` og `last_sign_in_at`. Vi
 teller ikke — en teller vi fører selv ville kunne gli fra virkeligheten
 uten at noen merket det. Kontoen lages ved første innlogging, så
 `created_at` *er* første gang noen logget på.
+
+`last_sign_in_at` er sist noen **tastet PIN-en**, ikke sist de brukte
+appen. Appen holder telefonen innlogget med roterende fornyere, og en
+fornying er ingen ny pålogging — feltet står stille. En som er innom
+hver dag kan derfor ha en dato flere uker tilbake. Portalen kaller
+kolonnen «Sist pålogget» og sier det i klartekst over tabellen; alt annet
+ville vært en brukstelling vi ikke fører.
 
 En ny PIN settes med `PIN_PEPPER` på, som alle andre PIN-er. Står
 pepperet feil her, kommer ikke personen inn med PIN-en admin nettopp ga

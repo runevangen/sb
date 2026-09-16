@@ -1975,6 +1975,22 @@ const SAK_15 = await kjor("admin", `
           ok("en ISO-streng star aldri pa skjermen",
              document.getElementById("brukere").textContent.indexOf("T10:00:00Z") === -1,
              document.getElementById("brukere").textContent.slice(0, 120));
+          // Kolonnen er last_sign_in_at: sist noen tastet PIN-en. En fornyet
+          // okt rorer ikke feltet, sa «Sist inne» pastod bruk vi ikke maler —
+          // og en som var innlogget i det oyeblikket leste «2 dager siden».
+          // Overskriften ma si palogging, og siden ma forklare forskjellen.
+          var hoder = document.querySelectorAll("#brukere thead th");
+          var hodetekst = Array.prototype.map.call(hoder, function (h) {
+            return h.textContent.trim();
+          }).join("|");
+          ok("kolonnen heter det feltet faktisk er",
+             hodetekst.indexOf("Sist pålogget") !== -1 &&
+             hodetekst.indexOf("Sist inne") === -1, hodetekst);
+          var brukerAvsnitt = document.querySelectorAll("#brukere");
+          var seksjon = brukerAvsnitt[0].closest("section").textContent;
+          ok("og siden sier at det ikke er sist bruk",
+             seksjon.indexOf("tastet PIN-en") !== -1 &&
+             seksjon.indexOf("ikke") !== -1, seksjon.slice(0, 200));
 
           // Ny PIN. En for kort PIN skal stoppes her, ikke hos tjenesten.
           var pinFelt = rader[0].querySelector("input");
