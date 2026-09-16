@@ -9,6 +9,11 @@ blir stående for hen alene (#80).
 Lista er samtidig appens beste kort når Overpass er nede: «Kjent for å vise
 fotball» står også da, fordi vurderingen ligger i koden.
 
+> **Utvidet av [ADR 0020](0020-stedene-i-portalen.md), 16. september 2026.**
+> Regelen under står: et forslag fra en leser blir aldri en rad av seg
+> selv. Det som endret seg er hvor admin limer — i portalen framfor i en
+> koderedigerer, og oppå fila framfor inni den.
+
 ## Beslutning
 Et forslag går i en **kø**, ikke i lista. Tabellen `pub_forslag` i Supabase
 tar imot; adminportalen viser køen og gir raden ferdig formet. **Ingenting

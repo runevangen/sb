@@ -24,11 +24,23 @@
 // som faktisk holder er databasens.
 
 import { PUBER_OSLO } from "../../puber-oslo.js";
+import { slaSammenPuber, tolkPubRader } from "../../pub-data.js";
 import {
   sjekkVisninger, slaSammen, tolkVisninger, visningRad, kampIderFor,
 } from "../../visning-data.js";
 
 const TABELL = "visninger";
+// Stedene admin har rettet i portalen ligger her (#80). «Ukjent pub» ma
+// sporre den sammensatte lista, ikke fila alene: et sted som ble lagt inn
+// i editoren for fem minutter siden, star ikke i fila — og en lagring som
+// ble avvist med «Ukjent pub» pa et sted som star i velgeren, ville vaert
+// ubegripelig.
+const PUBTABELL = "puber";
+// Hele raden, ikke bare navnet. slaSammenPuber bytter ut hele raden fra
+// fila, sa en halv rad herfra ville gjort en rettet pub til et navn uten
+// koordinat. Her trengs bare navnene — men en liste som ikke er hel, er
+// en felle for neste som leser den.
+const PUBFELT = "nokkel,navn,bydel,adresse,lat,lon,type,lag,kilde,sikkerhet,sjekket,merknad,fjernet";
 const FELT = "pub,kamp_id,kamp,dato,satt";
 // Rader for kamper som er spilt for lenge siden har ingen verdi, og lista
 // ville vokst uten ende. Ryddes hver gang admin lagrer, som for.
@@ -96,13 +108,15 @@ async function lagre(inn) {
   const kamper = Array.isArray(inn.kamper) ? inn.kamper : [];
   const valgte = Array.isArray(inn.kampIder) ? inn.kampIder : [];
   if (!pub || !kamper.length) return svar({ feil: "Mangler pub eller kamper" }, 400);
-  if (!PUBER_OSLO.some((p) => p.navn === pub)) return svar({ feil: "Ukjent pub" }, 400);
+
+  const puber = await kjentePuber();
+  if (!puber.some((p) => p.navn === pub)) return svar({ feil: "Ukjent pub" }, 400);
 
   // Radene for denne puben og disse kampene. Tom liste inn: slaSammen gir
   // da noyaktig de nye radene, og den samme regnemaskinen som for avgjor
   // hvilken kamp-id en avkrysning betyr.
   const nye = slaSammen([], pub, valgte, kamper);
-  const problemer = sjekkVisninger(nye, PUBER_OSLO.map((p) => p.navn));
+  const problemer = sjekkVisninger(nye, puber.map((p) => p.navn));
   if (problemer.length) return svar({ feil: "Ugyldige visninger", problemer }, 400);
 
   const ider = kampIderFor(kamper);
@@ -152,6 +166,19 @@ async function lagre(inn) {
     merknad: "Lagret. Endringen er ute for leserne med det samme — ingen"
       + " utrulling å vente på lenger.",
   }, 200);
+}
+
+// Fila nederst, rettelsene oppa. Svikter oppslaget, star fila alene — og
+// da er det verste som skjer at et sted lagt inn i dag ikke kan velges
+// enda. Det er bedre enn at ingen kan lagre noe.
+async function kjentePuber() {
+  const r = await hosSupabase("GET",
+    "/rest/v1/" + PUBTABELL + "?select=" + PUBFELT + "&limit=500", null, null);
+  if (!r.ok) {
+    console.error("[visninger] publiste " + r.status + ": " + (r.melding || ""));
+    return PUBER_OSLO;
+  }
+  return slaSammenPuber(PUBER_OSLO, tolkPubRader(r.json));
 }
 
 /* ---------- tjenesten ---------- */

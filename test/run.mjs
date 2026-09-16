@@ -2003,6 +2003,170 @@ const SAK_15 = await kjor("admin", `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 600); });
 `, null, adminSide);
 
+/* ---------------- 15B. stedredigeringen i portalen ---------------- */
+
+// Egen side framfor flere lag inni SAK_15: det som testes her er en annen
+// seksjon, og en test som ligger sju tilbakekall dypt er ikke til a rette.
+//
+// Fila er grunnfjellet. Editoren skriver rettelsene oppa, og portalen skal
+// vise begge deler — hva som star i puber-oslo.js, og hva som er rettet
+// herfra (#80, ADR 0020).
+const SAK_15B = await kjor("admin-steder", `
+  try {
+    localStorage.setItem("sb-konto", JSON.stringify({
+      token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
+      utloper: Date.now() + 3600000,
+    }));
+  } catch (e) { /* privat modus */ }
+
+  var stedKall = [];
+  var lagret = [];
+  // Basen barer én rettelse fra for: Scotsman er tatt ut av lista.
+  var iBasen = [{ nokkel: "scotsman", navn: "Scotsman", fjernet: true }];
+
+  function svar(status, kropp) {
+    return Promise.resolve({ ok: status < 400, status: status, text: function () {
+      return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("/api/pub-liste") === 0) {
+      var k = JSON.parse(opt.body);
+      stedKall.push(k);
+      if (k.handling === "liste") return svar(200, { puber: iBasen, klar: true });
+      if (k.handling === "sok") {
+        return svar(200, { kilde: "OpenStreetMap", treff: [
+          { navn: "Bar Boca", adresse: "Thorvald Meyers gate 30", lat: 59.9231,
+            lon: 10.7588, slag: "bar", nettsted: "https://barboca.no/" }
+        ] });
+      }
+      lagret.push(k.pub);
+      iBasen = iBasen.concat([Object.assign({ nokkel: k.pub.navn.toLowerCase() }, k.pub)]);
+      return svar(200, { ok: true, pub: k.pub, merknad: "Lagret." });
+    }
+    if (u.indexOf("/api/visninger") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [] });
+      return svar(200, { ok: true });
+    }
+    if (u.indexOf("/api/brukere") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [] });
+      return svar(200, { brukere: [] });
+    }
+    if (u.indexOf("/api/pub-forslag") === 0) return svar(200, { forslag: [] });
+    if (u.indexOf("/api/fotball") === 0) {
+      return svar(200, { liga: "Eliteserien", kamper: [], runder: [] });
+    }
+    return svar(200, {});
+  };
+
+  function felt(id) { return document.getElementById(id); }
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    felt("passord").value = "hemmelig";
+    felt("loggInn").click();
+
+    setTimeout(function () { try {
+      var rader = felt("stedListe").querySelectorAll("li");
+      ok("stedene star i portalen", rader.length > 20, rader.length);
+      ok("og hinten sier hvor mange som er rettet herfra",
+         felt("stedHint").textContent.indexOf("1 er rettet herfra") > -1,
+         felt("stedHint").textContent);
+
+      // Fila nederst, basen oppa. Scotsman er tatt ut, men raden skal
+      // fortsatt kunne apnes — ellers er det ingen vei tilbake.
+      var tekst = felt("stedListe").textContent;
+      ok("et sted som er tatt ut er merket", tekst.indexOf("tatt ut") > -1, tekst.slice(0, 200));
+      ok("og det star bare én gang",
+         tekst.split("Scotsman").length - 1 === 1, tekst.split("Scotsman").length - 1);
+
+      // Pubvelgeren over skal si det samme som lista: et sted som er tatt
+      // ut kan ikke velges. To lister som er uenige er verre enn én.
+      var velger = felt("pub");
+      var navnene = Array.prototype.map.call(velger.options, function (o) { return o.value; });
+      ok("pubvelgeren mister stedet som er tatt ut",
+         navnene.indexOf("Scotsman") === -1, navnene.slice(0, 5).join(", "));
+      ok("men beholder resten av lista", navnene.length > 20, navnene.length);
+
+      // Skjemaet star ikke framme uoppfordret.
+      ok("skjemaet er skjult til man ber om det", felt("stedSkjema").hidden === true);
+      felt("stedNytt").click();
+      ok("nytt sted apner skjemaet", felt("stedSkjema").hidden === false);
+      ok("og feltene er tomme", felt("stedNavn").value === "" && felt("stedKilde").value === "");
+      // Ser du pa stedet i dag, er det i dag du har sjekket det.
+      ok("men datoen star pa i dag",
+         felt("stedSjekket").value === new Date().toISOString().slice(0, 10),
+         felt("stedSjekket").value);
+
+      // Kilde og dato er ikke pynt: en udatert rad er verre enn ingen rad.
+      felt("stedNavn").value = "Bar Boca";
+      felt("stedBydel").value = "Gr\u00fcnerl\u00f8kka";
+      felt("stedLagre").click();
+
+      setTimeout(function () { try {
+        ok("en rad uten kilde lagres ikke", lagret.length === 0, JSON.stringify(lagret));
+        ok("og det star hva som mangler",
+           felt("stedMelding").textContent.indexOf("kilde") > -1,
+           felt("stedMelding").textContent);
+        ok("meldinga er merket som feil",
+           felt("stedMelding").className.indexOf("feil") > -1, felt("stedMelding").className);
+
+        // Oppslaget i OpenStreetMap. Koordinatet er det vi kom for.
+        felt("stedSok").click();
+        setTimeout(function () { try {
+          var treff = felt("stedTreff").querySelectorAll("button");
+          ok("navnesoket gir treff", treff.length === 1, treff.length);
+          ok("og soket gikk med navnet fra feltet",
+             stedKall.filter(function (k) { return k.handling === "sok"; })[0].navn === "Bar Boca");
+
+          treff[0].click();
+          ok("treffet fyller koordinatene",
+             felt("stedLat").value === "59.9231" && felt("stedLon").value === "10.7588",
+             felt("stedLat").value + ", " + felt("stedLon").value);
+          ok("og adressen", felt("stedAdresse").value === "Thorvald Meyers gate 30",
+             felt("stedAdresse").value);
+          // Navnet er nokkelen. OSM skriver ikke alltid det vi skriver, og
+          // et navn som endrer seg her ville laget en ny rad.
+          ok("men rorer ikke navnet", felt("stedNavn").value === "Bar Boca", felt("stedNavn").value);
+
+          felt("stedKilde").value = "https://barboca.no/";
+          felt("stedLagre").click();
+          setTimeout(function () { try {
+            ok("en hel rad lagres", lagret.length === 1, JSON.stringify(lagret));
+            ok("med kilde og dato",
+               lagret[0].kilde === "https://barboca.no/" && !!lagret[0].sjekket,
+               JSON.stringify(lagret[0]));
+            ok("og med lista tegnet pa nytt etterpa",
+               stedKall.filter(function (k) { return k.handling === "liste"; }).length === 2,
+               stedKall.length);
+            ok("skjemaet lukkes nar raden er lagret", felt("stedSkjema").hidden === true);
+            // Det som kommer over nettet, lander etter at visningen star
+            // ferdig: det nye stedet skal vaere valgbart uten en ny apning.
+            var etter = Array.prototype.map.call(felt("pub").options, function (o) { return o.value; });
+            ok("og det nye stedet kan velges med det samme",
+               etter.indexOf("Bar Boca") > -1, etter.slice(-3).join(", "));
+
+            // Navnet er nokkelen. Endres det pa en rad som finnes, blir
+            // raden en ny rad — og den gamle star igjen.
+            var forsok = lagret.length;
+            var knapper = felt("stedListe").querySelectorAll("button");
+            knapper[0].click();
+            felt("stedNavn").value = "Et helt annet navn";
+            felt("stedLagre").click();
+            setTimeout(function () { try {
+              ok("et nytt navn pa en rad som finnes lagres ikke",
+                 lagret.length === forsok, JSON.stringify(lagret));
+              ok("og det star hvorfor",
+                 felt("stedMelding").textContent.indexOf("nøkkelen") > -1,
+                 felt("stedMelding").textContent);
+              ferdig();
+            } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 200);
+          } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+        } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 200);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
+`, null, adminSide);
+
 /* ---------------- 16. puben bekrefter kampen ---------------- */
 
 // Visningene admin setter skal treffe leseren: pubene som viser nettopp
@@ -2022,6 +2186,102 @@ const VISNINGER_FRA_TJENESTEN = [
   { pub: "Carls", kampId: "4", kamp: "Molde – Rosenborg",
     dato: "2026-09-21T17:00:00+00:00", satt: "2026-09-11T10:00:00.000Z" },
 ];
+
+/* ------- 16B. rettelsene fra portalen treffer leseren ------- */
+
+// Det som kommer over nettet, lander etter at visningen star ferdig.
+// Stedene er tredje datakilde som gjor det (#80), og de to forste kostet
+// hver sin feil: raden som aldri fikk «vises pa», og kortet som sto med
+// gamle svar. Derfor svarer /api/pub-liste her **for sent med vilje** —
+// etter at kortet er tegnet — og testen ser om kortet tegnes om.
+const SAK_16B = await kjor("pub-rettelser", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
+  // Leseren star midt i Kvadraturen. The Toucan star i puber-oslo.js
+  // 463 meter unna; Nystedet finnes bare i basen.
+  navigator.geolocation.getCurrentPosition = function (ok) {
+    ok({ coords: { latitude: 59.9165, longitude: 10.7530 } });
+  };
+  var pubListeSvart = false;
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("/api/pub-liste") === 0) {
+      // Sent nok til at kortet rekker a bli tegnet forst.
+      return new Promise(function (los) {
+        setTimeout(function () {
+          pubListeSvart = true;
+          los({ ok: true, status: 200, statusText: "OK", text: function () {
+            return Promise.resolve(JSON.stringify({ klar: true, puber: [
+              // Nokkelen star ikke her med vilje: tabellen garanterer at
+              // den er navnet foldet, og en handskrevet nokkel ville
+              // modellert det jeg trodde koden gjor framfor det basen
+              // faktisk barer. Den feilen kostet en runde her.
+              { navn: "Nystedet", bydel: "Sentrum",
+                adresse: "Kirkegata 1", lat: 59.9163, lon: 10.7528,
+                type: "sportsbar", lag: [], kilde: "https://nystedet.no/",
+                sikkerhet: "bekreftet", sjekket: "2026-09-16", fjernet: false },
+              { navn: "The Toucan Public House", fjernet: true }
+            ] })); } });
+        }, 1500);
+      });
+    }
+    if (u.indexOf("overpass") > -1 || u.indexOf("/api/puber?") === 0 ||
+        u.indexOf("/api/vaer?") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ svar: [], visninger: [] })); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var rad = document.querySelector(".kamp.delbar");
+    var del = rad && rad.querySelector(".kamp-del");
+    if (del) del.click();
+    // Forslagene ligger bak en lenke i kortet, og ingenting hentes for
+    // den apnes. Ingen hermetegn i en selektor her: en bakoverstrek i en
+    // template-streng er borte for nettleseren ser den, og da dor sida.
+    var apne = document.querySelector(".pub-apne");
+    if (apne) apne.click();
+
+    setTimeout(function () { try {
+      var boks = document.querySelector(".pub-forslag");
+      ok("kortet star med kjente steder for rettelsene har landet",
+         !!boks && !pubListeSvart, String(!!boks) + " " + pubListeSvart);
+      var for_ = boks ? boks.textContent : "";
+      ok("og The Toucan er ett av dem", for_.indexOf("Toucan") > -1, for_.slice(0, 200));
+      ok("mens Nystedet ikke finnes enda", for_.indexOf("Nystedet") === -1);
+
+      // Na lander rettelsene, pa et kort som alt star ferdig.
+      setTimeout(function () { try {
+        ok("rettelsene har landet", pubListeSvart);
+        var etter = document.querySelector(".pub-forslag");
+        var tekst = etter ? etter.textContent : "";
+        ok("stedet som bare star i basen dukker opp pa kortet",
+           tekst.indexOf("Nystedet") > -1, tekst.slice(0, 300));
+        // Et sted som la ned skal forsvinne, ogsa fra et kort som alt er
+        // tegnet. Ellers star det til kortet lukkes.
+        ok("og stedet som er tatt ut forsvinner fra det",
+           tekst.indexOf("Toucan") === -1, tekst.slice(0, 300));
+        ferdig();
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500); });
+`);
 
 const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
   var saker = lagSaker(12);
@@ -3622,7 +3882,7 @@ const SAK_22B = await kjor("pub-forslag-utlogget", FELLES + FOTBALL + `
 
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_16, ...SAK_17, ...SAK_18, ...SAK_18B, ...SAK_19, ...SAK_19A, ...SAK_19B, ...SAK_19C, ...SAK_20, ...SAK_20B, ...SAK_21, ...SAK_22, ...SAK_22B];
+const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_15B, ...SAK_16, ...SAK_16B, ...SAK_17, ...SAK_18, ...SAK_18B, ...SAK_19, ...SAK_19A, ...SAK_19B, ...SAK_19C, ...SAK_20, ...SAK_20B, ...SAK_21, ...SAK_22, ...SAK_22B];
 let feilet = 0;
 
 for (const t of alle) {

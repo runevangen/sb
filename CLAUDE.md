@@ -29,6 +29,7 @@ der — ikke her.
     vaer-data.js / netlify/functions/vaer.mjs
     pub-data.js / puber-oslo.js / puber-kontakt.js / netlify/functions/puber.mjs
     pub-forslag-data.js / netlify/functions/pub-forslag.mjs
+    netlify/functions/pub-liste.mjs   rettelsene admin gjør i portalen
     kanaler.js      hvilken kanal som sender ligaen — tom til noen har sjekket
     konto-data.js / pin-data.js / netlify/functions/konto.mjs
     svar-data.js / netlify/functions/svar.mjs
@@ -76,9 +77,15 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   nøkler og uten adresser, så det kan leses fra nettleseren.
 - **Et forslag fra en leser er ikke en rad i lista.** `puber-oslo.js` er
   kode fordi den bærer en redaksjonell vurdering. Innsendinger går i
-  `pub_forslag`, og portalen gir deg raden ferdig formet — men limer den
-  aldri inn selv. Det finnes ingen vei fra et skjema på nettet og rett inn
-  i det leseren ser. [ADR 0019](docs/adr/0019-pubforslag.md)
+  `pub_forslag`, og et menneske gjør raden ferdig. Det finnes ingen vei fra
+  et skjema på nettet og rett inn i det leseren ser.
+  [ADR 0019](docs/adr/0019-pubforslag.md)
+- **`puber-oslo.js` er grunnfjellet; `puber` i Supabase er rettelsene
+  oppå.** Admin retter i portalen, appen slår sammen med `slaSammenPuber()`
+  — hele rader, aldri felt for felt. Fila skrives aldri fra nettet, og den
+  er det leseren ser når Supabase er nede. Et sted som har lagt ned tas ut
+  med `fjernet`, ikke ved å la være å skrive. Nøkkelen er navnet foldet.
+  [ADR 0020](docs/adr/0020-stedene-i-portalen.md)
 - **Opplysninger om virkeligheten trenger kilde og dato.** Pubenes
   kontaktfelt (`kontaktFor`) og kanalen som sender ligaen (`kanalFor`)
   slipper bare gjennom når begge står. Voktere i `unit.mjs` kjører mot de
@@ -112,7 +119,9 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 - **Det som kommer over nettet, lander etter at visningen står ferdig.**
   Alt som tegnes av data fra `/api/svar` må tegnes på nytt i `tegnSvar()`
   — kampraden, den åpne kampen og linjene under. Tre feil i dette
-  prosjektet har vært den samme.
+  prosjektet har vært den samme. Det samme gjelder stedene fra
+  `/api/pub-liste`: `KJENTE` er ingen `const`, og et kort som alt står
+  åpent tegnes om i `tegnKjenteIgjen()`.
 - **«Kommende» viser hele vinduet**, ikke én runde, med en overskrift per
   runde. Taket på tjue id-er mot `/api/svar` holdes av buntingen i
   `hentSvarFor()`, ikke av at lista kappes i forkant.

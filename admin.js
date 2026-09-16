@@ -24,10 +24,19 @@ import { oktGyldig, kanFornyes } from "./konto-data.js";
 import { LIGAER, kampNokkel } from "./fotball-data.js";
 import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
 import { publisteRad, alleredeILista } from "./pub-forslag-data.js";
+import { PUBTYPER, PUBSIKKERHET, pubNokkel, sjekkPubRad, slaSammenPuber }
+  from "./pub-data.js";
 
 const felt = (id) => document.getElementById(id);
 let kamper = [];
 let passord = "";
+
+// Rettelsene som ligger oppa puber-oslo.js, slik de sist ble lest (#80).
+// Den sammensatte lista regnes av denne og fila, aldri lagret for seg: to
+// lister som kan gli fra hverandre er nettopp det ett sted skal slippe.
+// Star her framfor nede hos editoren fordi pubvelgeren leses av den for
+// portalen er apnet, og en `let` lenger nede ville vaert i dodsonen da.
+let pubRettelser = [];
 
 // Visningene som alt star lagret. La i visninger.js og fulgte med
 // utrullingen til 15. september 2026 (#79); na hentes de ved apning.
@@ -55,16 +64,34 @@ function lesOkt() {
 /* ---------- pubvelgeren ---------- */
 
 // «usikker» vises ikke i appen, og skal da ikke kunne settes her heller.
-const PUBER = PUBER_OSLO.filter((p) => p.sikkerhet !== "usikker")
-  .slice()
-  .sort((a, b) => a.navn.localeCompare(b.navn, "nb"));
+//
+// Velgeren tegnes to ganger: en gang av fila alene, sa den star der med
+// det samme, og en gang til nar rettelsene fra basen har landet (#80).
+// Ellers kunne et sted du nettopp la inn, ikke velges — og et sted du tok
+// ut, fortsatt velges.
+let PUBER = [];
 
-PUBER.forEach((p) => {
-  const valg = document.createElement("option");
-  valg.value = p.navn;
-  valg.textContent = p.navn + " (" + p.bydel + ")";
-  felt("pub").appendChild(valg);
-});
+function tegnPubvelger() {
+  const valgt = felt("pub").value;
+  PUBER = slaSammenPuber(PUBER_OSLO, pubRettelser)
+    .filter((p) => p.sikkerhet !== "usikker")
+    .slice()
+    .sort((a, b) => a.navn.localeCompare(b.navn, "nb"));
+
+  felt("pub").textContent = "";
+  PUBER.forEach((p) => {
+    const valg = document.createElement("option");
+    valg.value = p.navn;
+    valg.textContent = p.navn + (p.bydel ? " (" + p.bydel + ")" : "");
+    felt("pub").appendChild(valg);
+  });
+  // Puben admin sto pa skal bli staende. Er den tatt ut av lista, faller
+  // valget til den forste — og da er det riktig at kampene tegnes pa nytt.
+  if (valgt && PUBER.some((p) => p.navn === valgt)) felt("pub").value = valgt;
+  else if (valgt) tegnKamper();
+}
+
+tegnPubvelger();
 felt("pub").addEventListener("change", tegnKamper);
 
 /* ---------- ligavelgeren ---------- */
@@ -144,6 +171,7 @@ async function loggInn() {
   hentKamper();
   hentBrukere();
   hentForslag();
+  hentSteder();
 }
 
 function visAdgang(tekst, art) {
@@ -265,8 +293,12 @@ function tegnForslag(liste) {
       + (f.merknad ? " · " + f.merknad : "");
     rad.appendChild(under);
 
-    // Raden ferdig formet. lat/lon og kilde star tomme med vilje: de ma
-    // slas opp, og oppdiktede tall ville vaert verre enn ingen rad.
+    // Raden ferdig formet, for den som vil flytte stedet helt inn i
+    // puber-oslo.js. lat/lon og kilde star tomme med vilje: de ma slas
+    // opp, og oppdiktede tall ville vaert verre enn ingen rad.
+    //
+    // Editoren under er den korte veien, og den vanlige. Fila er for det
+    // som skal sta ogsa nar Supabase er nede.
     const kode = document.createElement("pre");
     kode.className = "forslag-kode";
     kode.textContent = publisteRad(f);
@@ -274,6 +306,26 @@ function tegnForslag(liste) {
 
     const knapper = document.createElement("div");
     knapper.className = "forslag-knapper";
+
+    // Forslaget rett inn i skjemaet, med navn og adresse fylt ut. Dette
+    // er det eneste stedet et forslag og lista motes — og det er et
+    // menneske som trykker, med koordinater og kilde igjen a fylle.
+    // ADR 0019 star: det finnes ingen vei fra skjemaet pa nettet og rett
+    // inn i det leseren ser.
+    const iEditor = document.createElement("button");
+    iEditor.className = "lenke";
+    iEditor.type = "button";
+    iEditor.textContent = "Åpne i editoren";
+    iEditor.addEventListener("click", () => {
+      apneSted({
+        navn: f.navn,
+        adresse: f.adresse,
+        type: f.viserFotball ? "sportsbar" : "pub",
+        merknad: f.merknad,
+      }, "");
+      felt("stedSkjema").scrollIntoView({ block: "center" });
+    });
+    knapper.appendChild(iEditor);
 
     const lagtInn = document.createElement("button");
     lagtInn.className = "lenke";
@@ -301,8 +353,9 @@ async function behandleForslag(f, status) {
   try {
     await forslagKall({ handling: "behandle", id: f.id, status });
     m.textContent = status === "lagt-inn"
-      ? "«" + f.navn + "» er merket som lagt inn. Husk å lime raden inn i"
-        + " puber-oslo.js — den havner ikke der av seg selv."
+      ? "«" + f.navn + "» er merket som lagt inn. Sjekk at stedet står under"
+        + " Steder — merket forsvinner herfra uansett, og det er ikke det"
+        + " samme som at raden finnes."
       : "«" + f.navn + "» er avvist.";
     m.className = "melding ok";
     hentForslag();
@@ -605,3 +658,277 @@ function vis(tekst, art) {
   m.textContent = tekst;
   m.className = "melding" + (art ? " " + art : "");
 }
+
+/* ---------- stedene (#80) ---------- */
+
+// **Fila er grunnfjellet.** puber-oslo.js ligger i koden, virker uten
+// nettverk, og er det leseren ser om Supabase er nede. Editoren skriver
+// aldri i den. Det som lagres her er rettelsene oppa — et nytt sted, en
+// adresse som flyttet, et sted som la ned — og appen slar dem sammen
+// selv. ADR 0020.
+//
+// Regelen fra ADR 0019 star: et forslag fra en leser er ikke en rad.
+// Koen over er fortsatt koen, og ingen rad flytter seg derfra og hit av
+// seg selv. Det som endret seg er hvor du limer.
+
+// Nøkkelen til raden som redigeres, eller "" for et nytt sted.
+let stedRedigeres = "";
+
+function stedFelt() {
+  return {
+    navn: felt("stedNavn").value,
+    bydel: felt("stedBydel").value,
+    adresse: felt("stedAdresse").value,
+    lat: felt("stedLat").value === "" ? NaN : Number(felt("stedLat").value),
+    lon: felt("stedLon").value === "" ? NaN : Number(felt("stedLon").value),
+    type: felt("stedType").value,
+    lag: felt("stedLag").value.split(",").map((l) => l.trim()).filter(Boolean),
+    kilde: felt("stedKilde").value,
+    sikkerhet: felt("stedSikkerhet").value,
+    sjekket: felt("stedSjekket").value,
+    merknad: felt("stedMerknad").value,
+    fjernet: felt("stedFjernet").checked,
+  };
+}
+
+function fyllSted(p) {
+  felt("stedNavn").value = (p && p.navn) || "";
+  felt("stedBydel").value = (p && p.bydel) || "";
+  felt("stedAdresse").value = (p && p.adresse) || "";
+  felt("stedLat").value = (p && Number.isFinite(p.lat) && p.lat) ? p.lat : "";
+  felt("stedLon").value = (p && Number.isFinite(p.lon) && p.lon) ? p.lon : "";
+  felt("stedType").value = (p && p.type) || "pub";
+  felt("stedLag").value = ((p && p.lag) || []).join(", ");
+  felt("stedKilde").value = (p && p.kilde) || "";
+  felt("stedSikkerhet").value = (p && p.sikkerhet) || "bekreftet";
+  // Datoen er den som skal rettes oftest, og den skal si *na* — ikke
+  // datoen raden ble skrevet forrige gang. Ser du pa stedet i dag, er
+  // det i dag du har sjekket det.
+  felt("stedSjekket").value = new Date().toISOString().slice(0, 10);
+  felt("stedMerknad").value = (p && p.merknad) || "";
+  felt("stedFjernet").checked = !!(p && p.fjernet);
+  felt("stedTreff").textContent = "";
+  felt("stedSokHint").hidden = true;
+}
+
+// PUBTYPER og PUBSIKKERHET kommer fra pub-data.js, ikke fra en liste her:
+// blir de to uenige, kan portalen lagre en type appen ikke tegner.
+PUBTYPER.forEach((t) => {
+  const valg = document.createElement("option");
+  valg.value = t;
+  valg.textContent = t;
+  felt("stedType").appendChild(valg);
+});
+PUBSIKKERHET.forEach((sk) => {
+  const valg = document.createElement("option");
+  valg.value = sk;
+  valg.textContent = sk + (sk === "usikker" ? " (vises ikke i appen)" : "");
+  felt("stedSikkerhet").appendChild(valg);
+});
+
+function apneSted(p, nokkel) {
+  stedRedigeres = nokkel || "";
+  fyllSted(p);
+  felt("stedSkjema").hidden = false;
+  felt("stedAvbryt").hidden = false;
+  stedMelding("", "");
+  felt("stedNavn").focus();
+}
+
+function lukkSted() {
+  stedRedigeres = "";
+  felt("stedSkjema").hidden = true;
+  felt("stedAvbryt").hidden = true;
+}
+
+function stedMelding(tekst, art) {
+  const m = felt("stedMelding");
+  m.textContent = tekst;
+  m.className = "melding" + (art ? " " + art : "");
+}
+
+async function stedKall(kropp) {
+  const okt = lesOkt();
+  if (!okt || !okt.token) {
+    throw new Error("Logg inn i appen først. Lagringen går med din egen økt.");
+  }
+  const respons = await fetch("/api/pub-liste", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(Object.assign({ passord, token: okt.token }, kropp)),
+  });
+  const data = JSON.parse(await respons.text());
+  if (!respons.ok || !data || data.feil) {
+    throw new Error((data && data.feil) || ("Tjenesten svarte " + respons.status + "."));
+  }
+  return data;
+}
+
+async function hentSteder() {
+  felt("stedHint").textContent = "Henter stedene …";
+  felt("stedHint").hidden = false;
+  try {
+    const data = await stedKall({ handling: "liste" });
+    pubRettelser = data.puber || [];
+    tegnSteder();
+    tegnPubvelger();
+  } catch (err) {
+    // Fila star uansett, sa lista tegnes med det vi har. Men det skal sta
+    // at rettelsene ikke kom: en liste som ser komplett ut mens den ikke
+    // er det, er verre enn en som sier ifra.
+    pubRettelser = [];
+    tegnSteder();
+    felt("stedHint").hidden = false;
+    felt("stedHint").textContent = "Viser bare puber-oslo.js: " + err.message;
+  }
+}
+
+function tegnSteder() {
+  const liste = felt("stedListe");
+  liste.textContent = "";
+
+  const rettet = new Map();
+  pubRettelser.forEach((p) => rettet.set(p.nokkel, p));
+
+  // Fila forst, i sin egen rekkefolge, sa det admin alt kjenner igjen
+  // star der det pleier. Nye steder legges bakerst av slaSammenPuber.
+  const sammen = slaSammenPuber(PUBER_OSLO, pubRettelser);
+  const skjulte = pubRettelser.filter((p) => p.fjernet);
+
+  sammen.concat(skjulte).forEach((p) => {
+    const nokkel = pubNokkel(p.navn);
+    liste.appendChild(stedRad(p, nokkel, rettet.get(nokkel)));
+  });
+
+  felt("stedHint").hidden = false;
+  felt("stedHint").textContent = sammen.length + " steder i lista. "
+    + (pubRettelser.length
+      ? pubRettelser.length + " er rettet herfra; resten står i puber-oslo.js."
+      : "Alle står i puber-oslo.js. Ingenting er rettet herfra ennå.");
+}
+
+function stedRad(p, nokkel, rettelse) {
+  const rad = document.createElement("li");
+
+  const navn = document.createElement("span");
+  navn.className = "sted-navn";
+  navn.textContent = p.navn;
+
+  if (rettelse) {
+    const merke = document.createElement("span");
+    merke.className = "sted-merke" + (rettelse.fjernet ? " skjult" : "");
+    merke.textContent = rettelse.fjernet ? " tatt ut" : " rettet her";
+    navn.appendChild(merke);
+  }
+
+  const under = document.createElement("span");
+  under.className = "sted-under";
+  under.textContent = [p.bydel, p.type, p.sikkerhet,
+    p.sjekket ? "sjekket " + p.sjekket : "uten dato"].filter(Boolean).join(" · ");
+  navn.appendChild(under);
+  rad.appendChild(navn);
+
+  const rediger = document.createElement("button");
+  rediger.className = "lenke";
+  rediger.type = "button";
+  rediger.textContent = "Rediger";
+  rediger.addEventListener("click", () => apneSted(rettelse || p, nokkel));
+  rad.appendChild(rediger);
+
+  return rad;
+}
+
+async function lagreSted() {
+  const p = stedFelt();
+  const problemer = sjekkPubRad(p);
+  if (problemer.length) {
+    stedMelding(problemer[0], "feil");
+    return;
+  }
+
+  // Navnet er nokkelen. Endres det pa en rad som alt finnes, blir raden
+  // en ny rad — og den gamle star igjen. Det skal sies for det skjer, ikke
+  // oppdages etterpa.
+  if (stedRedigeres && pubNokkel(p.navn) !== stedRedigeres) {
+    stedMelding("Navnet er nøkkelen. Endrer du det, blir dette et nytt sted,"
+      + " og det gamle står igjen. Ta det gamle ut av lista først.", "feil");
+    return;
+  }
+
+  felt("stedLagre").disabled = true;
+  stedMelding("Lagrer …", "");
+  try {
+    const data = await stedKall({ pub: p });
+    stedMelding(data.merknad || "Lagret.", "ok");
+    lukkSted();
+    await hentSteder();
+  } catch (err) {
+    stedMelding(err.message, "feil");
+  }
+  felt("stedLagre").disabled = false;
+}
+
+// Oppslaget i OpenStreetMap. Kommentaren i puber-oslo.js har alltid sagt
+// at OSMs koordinat brukes nar navnet stemmer — dette er akkurat det,
+// bare gjort av maskinen framfor for hand. Treffet fyller feltene; det
+// avgjor ingenting.
+async function sokSted() {
+  const navn = felt("stedNavn").value.trim();
+  felt("stedTreff").textContent = "";
+  felt("stedSokHint").hidden = false;
+  felt("stedSokHint").textContent = "Søker i OpenStreetMap …";
+
+  let data;
+  try {
+    data = await stedKall({ handling: "sok", navn });
+  } catch (err) {
+    felt("stedSokHint").textContent = err.message + " Tast koordinatene selv.";
+    return;
+  }
+
+  const treff = data.treff || [];
+  if (!treff.length) {
+    felt("stedSokHint").textContent = "Ingen treff på «" + navn
+      + "» i Oslo. Tast koordinatene selv.";
+    return;
+  }
+
+  felt("stedSokHint").textContent = treff.length === 1
+    ? "Ett treff. Trykk for å fylle inn."
+    : treff.length + " treff. Trykk på det som er riktig.";
+
+  treff.forEach((t) => {
+    const rad = document.createElement("li");
+    const knapp = document.createElement("button");
+    knapp.type = "button";
+    knapp.textContent = t.navn;
+
+    const under = document.createElement("span");
+    under.className = "sted-under";
+    under.textContent = [t.adresse, t.slag,
+      t.lat.toFixed(4) + ", " + t.lon.toFixed(4)].filter(Boolean).join(" · ");
+    knapp.appendChild(under);
+
+    knapp.addEventListener("click", () => {
+      // Navnet rores ikke: OSM skriver «O'Learys» der vi skriver «O'Learys
+      // Vika», og navnet er nokkelen. Koordinatet er det vi kom for.
+      felt("stedLat").value = t.lat.toFixed(4);
+      felt("stedLon").value = t.lon.toFixed(4);
+      if (t.adresse && !felt("stedAdresse").value) felt("stedAdresse").value = t.adresse;
+      if (t.nettsted && !felt("stedKilde").value) felt("stedKilde").value = t.nettsted;
+      felt("stedTreff").textContent = "";
+      felt("stedSokHint").textContent = "Hentet fra OpenStreetMap. Sjekk at det stemmer.";
+    });
+
+    rad.appendChild(knapp);
+    felt("stedTreff").appendChild(rad);
+  });
+}
+
+felt("stedNytt").addEventListener("click", () => apneSted(null, ""));
+felt("stedAvbryt").addEventListener("click", lukkSted);
+felt("stedLagre").addEventListener("click", lagreSted);
+felt("stedSok").addEventListener("click", sokSted);
+// Enter i et felt skal ikke sende skjemaet noe sted: det finnes ingen
+// action, og en navigasjon her ville mistet alt som er tastet.
+felt("stedSkjema").addEventListener("submit", (e) => e.preventDefault());

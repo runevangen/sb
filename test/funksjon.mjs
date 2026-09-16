@@ -14,6 +14,7 @@ import puber from "../netlify/functions/puber.mjs";
 import { OVERPASS_SPEIL } from "../pub-data.js";
 import visninger from "../netlify/functions/visninger.mjs";
 import pubForslag from "../netlify/functions/pub-forslag.mjs";
+import pubListe from "../netlify/functions/pub-liste.mjs";
 import konto from "../netlify/functions/konto.mjs";
 import brukere from "../netlify/functions/brukere.mjs";
 import svarfunksjon from "../netlify/functions/svar.mjs";
@@ -637,6 +638,25 @@ function stubVisninger(rader, status, skrivRader) {
   return kall;
 }
 
+// Som stubVisninger, men den skiller de to tabellene fra hverandre:
+// visninger og puber leses begge med GET, og en stubb som svarer det
+// samme pa begge ville ikke vist at det er to kall.
+function stubMedPubtabell(pubRader, pubFeiler) {
+  const kall = [];
+  global.fetch = async (url, opsjoner) => {
+    const o = opsjoner || {};
+    kall.push({ url: String(url), metode: o.method || "GET", opsjoner: o });
+    if (String(url).indexOf("/puber?") > -1) {
+      if (pubFeiler) return new Response(JSON.stringify({ message: "nei" }), { status: 500 });
+      return new Response(JSON.stringify(pubRader || []), { status: 200 });
+    }
+    if (o.method === "DELETE") return new Response(null, { status: 204 });
+    if (o.method === "POST") return new Response(o.body, { status: 201 });
+    return new Response(JSON.stringify([]), { status: 200 });
+  };
+  return kall;
+}
+
 function adminBe(kropp, metode) {
   return new Request("https://mvp-sb.netlify.app/api/visninger", {
     method: metode || "POST",
@@ -723,6 +743,29 @@ ok("uten a rore Supabase", kall.length === 0, kall.length);
 kall = stubVisninger([]);
 r = await visninger(lagre({ pub: "Utepils AS" }));
 ok("en pub som ikke star i publista avvises", r.status === 400, r.status);
+
+// Et sted admin la inn i editoren i dag star ikke i fila (#80). «Ukjent
+// pub» ma sporre den sammensatte lista — ellers ville en lagring pa et
+// sted som star i velgeren, blitt avvist med en melding ingen forstar.
+kall = stubMedPubtabell([{ nokkel: "utepils as", navn: "Utepils AS",
+  bydel: "Sentrum", adresse: "Storgata 1", lat: 59.913, lon: 10.74,
+  type: "pub", lag: [], kilde: "https://utepils.no/", sikkerhet: "bekreftet",
+  sjekket: "2026-09-16", fjernet: false }]);
+r = await visninger(lagre({ pub: "Utepils AS" }));
+ok("men et sted som bare star i basen slipper gjennom", r.status === 200, r.status);
+// Med ?. og ikke uten: en test som kaster, river hele suiten med seg, og
+// da star alt etter den ukjort. Gront pa en test som aldri kjorte er
+// verre enn rodt — og en test som drepte de neste to hundre er verst.
+const pubOppslag = kall.find((k) => k.url.indexOf("/puber?") > -1);
+ok("og publista leses uten okt, som alt annet som kan leses uten konto",
+   !!pubOppslag && !pubOppslag.opsjoner.headers["Authorization"],
+   JSON.stringify(pubOppslag && pubOppslag.opsjoner.headers));
+
+// Svikter oppslaget, star fila alene. Da er det verste som skjer at et
+// sted lagt inn i dag ikke kan velges enda — bedre enn at ingen kan lagre.
+kall = stubMedPubtabell(null, true);
+r = await visninger(lagre());
+ok("en pub fra fila lagres selv om publista ikke svarer", r.status === 200, r.status);
 
 kall = stubVisninger([]);
 r = await visninger(lagre());
@@ -1605,6 +1648,204 @@ r = await svarfunksjon(svarBe({ token: "gammel", kampId: 7, navn: "Ola" }));
 ok("en utlopt okt sier at man ma logge inn pa nytt",
    r.status === 401 && (await r.json()).feil.indexOf("Logg inn") > -1, r.status);
 
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_ANON_KEY;
+
+/* ---------------- /api/pub-liste: stedene admin retter (#80) ------------ */
+
+// Fila er grunnfjellet. Funksjonen svarer med rettelsene *alene*, ikke med
+// en ferdig liste — et svar som var hele lista ville gjort funksjonen til
+// det skjoreste leddet i noe som i dag ikke kan ryke.
+
+const STED_OKT = "admins-okt-token";
+const EN_RAD = {
+  nokkel: "andys pub", navn: "Andy\u0027s Pub", bydel: "Sentrum",
+  adresse: "Stortingsgata 8", lat: 59.9135, lon: 10.734, type: "sportsbar",
+  lag: [], kilde: "https://www.andyspub.no/", sikkerhet: "bekreftet",
+  sjekket: "2026-09-16", merknad: null, fjernet: false,
+};
+const ET_STED = {
+  navn: "Andy\u0027s Pub", bydel: "Sentrum", adresse: "Stortingsgata 8",
+  lat: 59.9135, lon: 10.734, type: "sportsbar", lag: [],
+  kilde: "https://www.andyspub.no/", sikkerhet: "bekreftet", sjekket: "2026-09-16",
+};
+
+function stubSteder(rader, status) {
+  const kall = [];
+  global.fetch = async (url, opsjoner) => {
+    const o = opsjoner || {};
+    kall.push({ url: String(url), metode: o.method || "GET", opsjoner: o });
+    if (String(url).indexOf("overpass") > -1) {
+      return new Response(JSON.stringify({ elements: [
+        { type: "node", lat: 59.9135, lon: 10.734,
+          tags: { name: "Andy\u0027s Pub", amenity: "bar" } },
+      ] }), { status: 200 });
+    }
+    if (status && status !== 200) {
+      return new Response(JSON.stringify({ message: "nei", code: status === 503 ? "42P01" : "x" }),
+        { status: status === 503 ? 400 : status });
+    }
+    return new Response(JSON.stringify(rader === undefined ? [EN_RAD] : rader),
+      { status: o.method === "POST" ? 201 : 200 });
+  };
+  return kall;
+}
+
+function stedBe(kropp) {
+  return new Request("https://mvp-sb.netlify.app/api/pub-liste", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(kropp),
+  });
+}
+
+function stedGet() {
+  return new Request("https://mvp-sb.netlify.app/api/pub-liste");
+}
+
+delete process.env.ADMIN_PASSORD;
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_ANON_KEY;
+
+// Uten oppsett: tom liste, ikke feil. Da star fila alene, som for — og det
+// er noyaktig den egenskapen ved fila som er verdt mest.
+kall = stubSteder();
+r = await pubListe(stedGet());
+let stedSvar = await r.json();
+ok("uten oppsett svarer lesingen 200 med tom liste",
+   r.status === 200 && stedSvar.puber.length === 0 && stedSvar.klar === false,
+   r.status + " " + JSON.stringify(stedSvar));
+ok("og ingenting ble sporret", kall.length === 0, kall.length);
+
+process.env.ADMIN_PASSORD = PASSORD;
+process.env.SUPABASE_URL = "https://prosjekt.supabase.co";
+process.env.SUPABASE_ANON_KEY = "anon-nokkel";
+
+kall = stubSteder();
+r = await pubListe(stedGet());
+stedSvar = await r.json();
+ok("lesingen gir rettelsene, ikke en ferdig liste",
+   r.status === 200 && stedSvar.puber.length === 1 &&
+   stedSvar.puber[0].navn === "Andy\u0027s Pub", JSON.stringify(stedSvar));
+// Ingenting i appen er last bak innlogging, og lista er det appen viser.
+ok("og den leses uten okt",
+   !kall[0].opsjoner.headers["Authorization"], JSON.stringify(kall[0].opsjoner.headers));
+ok("lesingen caches i kanten, kort",
+   /s-maxage=120/.test(r.headers.get("Netlify-CDN-Cache-Control") || "") &&
+   /durable/.test(r.headers.get("Netlify-CDN-Cache-Control") || ""),
+   r.headers.get("Netlify-CDN-Cache-Control"));
+
+// Feilsvar caches aldri: ellers laser et blaff seg fast i kanten.
+kall = stubSteder(null, 500);
+r = await pubListe(stedGet());
+stedSvar = await r.json();
+ok("en feil mot basen gir tom liste og en forklaring",
+   r.status === 200 && stedSvar.puber.length === 0 && !!stedSvar.feil,
+   JSON.stringify(stedSvar));
+ok("og den caches aldri",
+   (r.headers.get("Cache-Control") || "").indexOf("no-store") > -1,
+   r.headers.get("Cache-Control"));
+
+// Passordet forst, og det nar aldri Supabase nar det er feil.
+kall = stubSteder();
+r = await pubListe(stedBe({ passord: "feil", token: STED_OKT, pub: ET_STED }));
+ok("feil passord lagrer ingenting", r.status === 401, r.status);
+ok("og nar aldri Supabase", kall.length === 0, kall.length);
+
+// Passordet er doren til skjemaet. Skrivingen er databasens.
+kall = stubSteder();
+r = await pubListe(stedBe({ passord: PASSORD, token: "", pub: ET_STED }));
+stedSvar = await r.json();
+ok("riktig passord uten okt lagrer heller ingenting", r.status === 401, r.status);
+ok("og meldinga sier at okten er det som mangler",
+   stedSvar.feil.indexOf("din egen økt") > -1, stedSvar.feil);
+ok("og heller ikke det nar Supabase", kall.length === 0, kall.length);
+
+// Kilde og dato er ikke pynt. Samme sjekk som appen gjor, fra samme fil.
+kall = stubSteder();
+r = await pubListe(stedBe({ passord: PASSORD, token: STED_OKT,
+  pub: Object.assign({}, ET_STED, { kilde: "" }) }));
+ok("en rad uten kilde avvises", r.status === 400, r.status);
+ok("og den nar ikke basen", kall.length === 0, kall.length);
+
+kall = stubSteder();
+r = await pubListe(stedBe({ passord: PASSORD, token: STED_OKT,
+  pub: Object.assign({}, ET_STED, { sjekket: "" }) }));
+ok("en rad uten dato avvises ogsa", r.status === 400, r.status);
+
+kall = stubSteder();
+r = await pubListe(stedBe({ passord: PASSORD, token: STED_OKT, pub: ET_STED }));
+stedSvar = await r.json();
+ok("en hel rad lagres", r.status === 200 && stedSvar.ok === true,
+   r.status + " " + JSON.stringify(stedSvar));
+let stedSkriv = kall.find((k) => k.metode === "POST");
+ok("skrivingen gar med admins egen okt",
+   stedSkriv.opsjoner.headers["Authorization"] === "Bearer " + STED_OKT,
+   stedSkriv.opsjoner.headers["Authorization"]);
+// Adminpassordet er vart. Supabase vet ikke hva det er, og skal ikke fa
+// vite det heller.
+ok("adminpassordet nar aldri Supabase",
+   kall.every((k) => JSON.stringify(k.opsjoner).indexOf(PASSORD) === -1));
+ok("og raden sender aldri endret_av eller endret",
+   !("endret_av" in JSON.parse(stedSkriv.opsjoner.body)[0]) &&
+   !("endret" in JSON.parse(stedSkriv.opsjoner.body)[0]), stedSkriv.opsjoner.body);
+// Nokkelen er navnet foldet. Uten upsert pa den blir en rettelse en ny rad.
+ok("skrivingen er en upsert pa nokkelen",
+   stedSkriv.url.indexOf("on_conflict=nokkel") > -1 &&
+   /merge-duplicates/.test(stedSkriv.opsjoner.headers["Prefer"] || ""),
+   stedSkriv.url + " " + stedSkriv.opsjoner.headers["Prefer"]);
+ok("og lagringen caches aldri",
+   (r.headers.get("Cache-Control") || "").indexOf("no-store") > -1);
+
+// En skriving som svarer 200 er ikke bevis pa at raden ligger der.
+kall = stubSteder([]);
+r = await pubListe(stedBe({ passord: PASSORD, token: STED_OKT, pub: ET_STED }));
+stedSvar = await r.json();
+ok("et tomt svar pa skrivingen meldes som feil", r.status === 502, r.status);
+ok("og meldinga peker pa visning_skrivere",
+   stedSvar.feil.indexOf("visning_skrivere") > -1, stedSvar.feil);
+
+// Et sted som la ned skal kunne tas ut. Raden i fila star; den skjules.
+kall = stubSteder([Object.assign({}, EN_RAD, { fjernet: true })]);
+r = await pubListe(stedBe({ passord: PASSORD, token: STED_OKT,
+  pub: { navn: "Andy\u0027s Pub", fjernet: true } }));
+stedSvar = await r.json();
+ok("en fjernet rad lagres med navnet alene", r.status === 200 && stedSvar.ok === true,
+   r.status + " " + JSON.stringify(stedSvar));
+ok("og svaret sier at fila star urort",
+   stedSvar.merknad.indexOf("puber-oslo.js") > -1, stedSvar.merknad);
+
+// Mangler tabellen, star det hva som mangler — og hvor SQL-en er.
+kall = stubSteder(null, 503);
+r = await pubListe(stedBe({ passord: PASSORD, token: STED_OKT, pub: ET_STED }));
+stedSvar = await r.json();
+ok("mangler tabellen, star det hvor SQL-en er",
+   r.status === 503 && stedSvar.feil.indexOf("oppsett.sql") > -1, stedSvar.feil);
+
+// Oppslaget i OpenStreetMap ligger bak passordet: Overpass ber om fair
+// use, og et sok hvem som helst kunne kjort er et sok noen kjorer tusen
+// ganger.
+kall = stubSteder();
+r = await pubListe(stedBe({ handling: "sok", passord: "feil", navn: "Andy" }));
+ok("navnesoket ligger bak passordet", r.status === 401, r.status);
+ok("og nar aldri Overpass", kall.length === 0, kall.length);
+
+kall = stubSteder();
+r = await pubListe(stedBe({ handling: "sok", passord: PASSORD, navn: "a" }));
+ok("et navn uten noe a soke pa avvises", r.status === 400, r.status);
+ok("og nar heller ikke Overpass", kall.length === 0, kall.length);
+
+kall = stubSteder();
+r = await pubListe(stedBe({ handling: "sok", passord: PASSORD, navn: "Andys Pub" }));
+stedSvar = await r.json();
+ok("et navnesok gir treff med koordinat",
+   r.status === 200 && stedSvar.treff.length === 1 &&
+   stedSvar.treff[0].lat === 59.9135, JSON.stringify(stedSvar));
+ok("alle speilene sporres samtidig",
+   kall.length === OVERPASS_SPEIL.length, kall.length);
+ok("og svaret krediterer OpenStreetMap", stedSvar.kilde === "OpenStreetMap");
+
+delete process.env.ADMIN_PASSORD;
 delete process.env.SUPABASE_URL;
 delete process.env.SUPABASE_ANON_KEY;
 
