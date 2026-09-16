@@ -310,10 +310,23 @@
 
   <section>
     <h2>Brukere</h2>
+    <!-- «Sist palogget», ikke «Sist inne». Feltet er last_sign_in_at fra
+         Supabase: naar noen sist TASTET PIN-en. Appen holder telefonen
+         innlogget med roterende fornyere (ADR 0009), og en fornying er
+         ingen palogging — sa en som bruker appen hver dag kan sta med en
+         dato flere uker tilbake. «Sist inne» pastod aktivitet vi ikke
+         maler. Meldt fra portalen 16. september 2026: «Jeg er inne na og
+         det star 2 dager siden.» Datoen var riktig; ordet var ikke. -->
+    <p class="hint">
+      <strong>Sist pålogget</strong> er sist personen tastet PIN-en — ikke
+      sist de brukte appen. Appen holder telefonen innlogget, så en som er
+      innom daglig kan stå med en dato uker tilbake. Vi måler ikke bruk, og
+      det er med vilje.
+    </p>
     <p class="hint" id="brukerHint">Henter brukerne …</p>
     <table class="brukere" id="brukere" hidden>
       <thead>
-        <tr><th>Navn</th><th>Første gang</th><th>Sist inne</th><th></th></tr>
+        <tr><th>Navn</th><th>Første gang</th><th>Sist pålogget</th><th></th></tr>
       </thead>
       <tbody id="brukerRader"></tbody>
     </table>
