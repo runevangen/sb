@@ -17,6 +17,27 @@ import konto from "../netlify/functions/konto.mjs";
 import brukere from "../netlify/functions/brukere.mjs";
 import svarfunksjon from "../netlify/functions/svar.mjs";
 
+// SUITEN SETTER SITT EGET MILJO, framfor a arve maskinens.
+//
+// Flere tester dekker veien NAR en nokkel mangler — testnokkelen «3» mot
+// TheSportsDB, 503 uten adminpassord, 503 uten Supabase-oppsett. De satte
+// ikke variablene til noe; de stolte pa at de var tomme, og det holdt sa
+// lenge suiten kjorte lokalt og i CI, der ingen av dem finnes.
+//
+// Det holdt ikke i Netlifys byggemilje, der alle de ekte nokkelene er satt.
+// Tre tester feilet: de ba om v1 med testnokkelen og fikk v2 med den ekte,
+// fordi THESPORTSDB_KEY sto der. Oppdaget da de to raske suitene ble gjort
+// til byggekommando (#77) — en port som feiler av miljoet den star i, er
+// verre enn ingen port.
+//
+// Tester som trenger en variabel satt, setter den selv. Derfor er
+// baselinja tom, og den er nodt til a settes her, for den forste testen.
+[
+  "THESPORTSDB_KEY", "API_FOOTBALL_KEY", "api_football_key",
+  "ADMIN_PASSORD", "PIN_PEPPER", "MET_KONTAKT", "GITHUB_TOKEN",
+  "SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_KEY",
+].forEach((navn) => { delete process.env[navn]; });
+
 let feilet = 0;
 let kjort = 0;
 

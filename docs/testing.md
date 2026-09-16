@@ -8,6 +8,15 @@ Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
 hele tatt starter.
 
+**Suitene setter sitt eget miljø, og det er ikke pedanteri.** Flere
+funksjonstester dekker veien *når en nøkkel mangler*, og de stolte på at
+`process.env` var tom framfor å tømme den. Det holdt lokalt og i CI, der
+ingen av nøklene finnes — men Netlifys byggemiljø har dem alle satt, og da
+feilet tre tester fordi `THESPORTSDB_KEY` sto der. `funksjon.mjs` sletter
+derfor variablene den bryr seg om **før første test**; de som trenger en
+satt, setter den selv. Samme tanke som tidssonesjekken: en test som er
+avhengig av maskinen den kjører på, sier ingenting om koden.
+
 **De to raske er porten foran prod.** `netlify.toml` kjører
 `node test/unit.mjs && node test/funksjon.mjs` som byggekommando, så en rød
 test publiserer ingenting (#77). De er sjekket å være maskinuavhengige —
