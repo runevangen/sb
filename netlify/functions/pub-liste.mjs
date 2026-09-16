@@ -19,6 +19,7 @@
 import {
   tolkPubRader, pubRadTilBase, sjekkPubRad,
   osmNavnSporring, tolkNavnTreff, OVERPASS_SPEIL, overpassHeadere,
+  osmAdresseSporring, tolkAdresseTreff, delAdresse, SOK_SEKUNDER,
 } from "../../pub-data.js";
 
 const TABELL = "puber";
@@ -27,7 +28,12 @@ const FELT = "nokkel,navn,bydel,adresse,lat,lon,type,lag,kilde,sikkerhet,sjekket
 // sitter med portalen apen; et dogn — som pubene rundt arenaen har — ville
 // gjort «lagret» til en pastand admin ikke kunne etterprove.
 export const LEVETID_PUBLISTE = 120;
-const SOK_FRIST = 6000;
+// Fristen folger sporringens egen timeout, med et halvt sekund pa toppen
+// for reise og oppkobling. De sto som to tall for, og de sa ikke det
+// samme: sporringen ba om tolv sekunder mens vi la pa etter seks. Da var
+// det vi som ga opp — men meldingen sa «Fikk ikke svar fra
+// OpenStreetMap», og pekte pa feil part.
+const SOK_FRIST = SOK_SEKUNDER * 1000 + 500;
 
 export default async (req) => {
   const mangler = manglerIOppsettet();
@@ -52,6 +58,7 @@ export default async (req) => {
 
   if (inn.handling === "liste") return hentListe(mangler, true);
   if (inn.handling === "sok") return sokNavn(inn);
+  if (inn.handling === "sok-adresse") return sokAdresse(inn);
   return lagre(inn);
 };
 
@@ -123,12 +130,32 @@ async function sokNavn(inn) {
   if (!sporring) {
     return svar({ feil: "Skriv minst ett ord på tre bokstaver å søke etter." }, 400, 0);
   }
+  return kjorSok(sporring, tolkNavnTreff);
+}
 
+// Adressesoket. Navnesoket finner ikke et sted OSM ikke kjenner navnet
+// pa — og det er de sma stedene, nettopp de admin ma foere inn for hand.
+// Huset star der likevel: norske adresser i OSM kommer fra Kartverket.
+async function sokAdresse(inn) {
+  const sporring = osmAdresseSporring(inn.adresse);
+  if (!sporring) {
+    return svar({ feil: "Skriv en gate, gjerne med husnummer — «Berglyveien 4J»." }, 400, 0);
+  }
+  // Uten husnummer kan en gate gi mange hus, og da er det ikke soket som
+  // er darlig — det er sporsmalet. Det skal sies, ikke gjettes rundt.
+  const delt = delAdresse(inn.adresse);
+  return kjorSok(sporring, tolkAdresseTreff, { utenNummer: !delt.nummer });
+}
+
+// En sporring mot alle speilene samtidig. Den forste som svarer vinner;
+// resten forklares i `forsok`, som er det eneste stedet admin kan se
+// HVORFOR et sok ikke ga noe.
+async function kjorSok(sporring, tolk, ekstra) {
   const styring = new AbortController();
   const vakt = setTimeout(() => styring.abort(), SOK_FRIST);
   const kropp = "data=" + encodeURIComponent(sporring);
   const forsok = [];
-  const alle = OVERPASS_SPEIL.map((adresse) => enTjener(adresse, kropp, styring.signal));
+  const alle = OVERPASS_SPEIL.map((adresse) => enTjener(adresse, kropp, styring.signal, tolk));
 
   let vinner = null;
   try {
@@ -145,12 +172,14 @@ async function sokNavn(inn) {
   });
 
   if (!vinner) {
-    return svar({ feil: "Fikk ikke svar fra OpenStreetMap. Tast koordinatene selv.", forsok }, 502, 0);
+    return svar({ feil: "Fikk ikke svar fra OpenStreetMap. Tast koordinatene selv,"
+      + " eller lim inn en kartlenke.", forsok }, 502, 0);
   }
-  return svar({ treff: vinner.treff, kilde: "OpenStreetMap", forsok }, 200, 0);
+  return svar(Object.assign({ treff: vinner.treff, kilde: "OpenStreetMap", forsok },
+    ekstra || {}), 200, 0);
 }
 
-function enTjener(adresse, kropp, signal) {
+function enTjener(adresse, kropp, signal, tolk) {
   const vert = new URL(adresse).host;
   const notat = { kilde: "Overpass " + vert };
   const startet = Date.now();
@@ -164,7 +193,7 @@ function enTjener(adresse, kropp, signal) {
       if (tekst) notat.melding = tekst.slice(0, 80);
       throw new Error("HTTP " + respons.status);
     }
-    const treff = tolkNavnTreff(await respons.json(), 8);
+    const treff = (tolk || tolkNavnTreff)(await respons.json(), 8);
     notat.antall = treff.length;
     notat.ms = Date.now() - startet;
     return { notat, treff };

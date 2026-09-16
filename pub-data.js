@@ -567,9 +567,26 @@ export function osmNavnVask(navn) {
 // treffsikker, og «The Dubliner Folk Pub» skal finne «Dubliner Folk Pub».
 const SOK_MIN = 4;
 
+// Hvor mange sekunder Overpass far. Tallet star ETT sted fordi det gjorde
+// det i to: sporringen ba om «[timeout:12]» mens tjenesten la pa etter
+// seks sekunder. Da svarte portalen «Fikk ikke svar fra OpenStreetMap»
+// om en tjener som holdt pa a svare — vi var den som ga opp, og
+// meldingen la skylda et annet sted. Netlify gir funksjonen ti sekunder
+// i alt, sa dette tallet kan ikke opp uten at den grensa vurderes.
+export const SOK_SEKUNDER = 6;
+
 // Oslo-ramma, den samme sjekkPubliste bruker. Et sok som treffer en pub i
 // Bergen hjelper ingen her.
 export const OSLO_RAMME = { lat: [59.80, 60.05], lon: [10.45, 10.95] };
+
+function osmHode() {
+  return "[out:json][timeout:" + SOK_SEKUNDER + "];";
+}
+
+function osmBoks(ramme) {
+  const r = ramme || OSLO_RAMME;
+  return "(" + r.lat[0] + "," + r.lon[0] + "," + r.lat[1] + "," + r.lon[1] + ")";
+}
 
 export function osmNavnSporring(navn, ramme) {
   const r = ramme || OSLO_RAMME;
@@ -587,13 +604,13 @@ export function osmNavnSporring(navn, ramme) {
   // Folk Pub» skal treffe «The Dubliner», og «Andy's Pub» skal ikke
   // treffe hver eneste pub i byen.
   const monster = ord.map((o) => "(?=.*" + o + ")").join("");
-  const boks = "(" + r.lat[0] + "," + r.lon[0] + "," + r.lat[1] + "," + r.lon[1] + ")";
-  return '[out:json][timeout:12];nwr["name"~"' + monster + '",i]' + boks + ";out center;";
+  const boks = osmBoks(r);
+  return osmHode() + 'nwr["name"~"' + monster + '",i]' + boks + ";out center;";
 }
 
 // Treffene, formet som portalen vil ha dem: navn, koordinat og adressen
 // OSM har, hvis den har en. Nummeret star etter gata, som i lista.
-export function tolkNavnTreff(json, maks) {
+function osmRader(json) {
   const rader = (json && Array.isArray(json.elements)) ? json.elements : [];
   return rader.map((e) => {
     const t = e.tags || {};
@@ -611,6 +628,103 @@ export function tolkNavnTreff(json, maks) {
       slag: String(t.amenity || t.shop || "").trim(),
       nettsted: String(t.website || t["contact:website"] || "").trim(),
     };
-  }).filter((p) => p.navn && Number.isFinite(p.lat) && Number.isFinite(p.lon))
+  }).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
+}
+
+export function tolkNavnTreff(json, maks) {
+  return osmRader(json).filter((p) => p.navn).slice(0, maks || 8);
+}
+
+/* ---------- sla opp en adresse ---------- */
+
+// Navnesoket finner ikke et sted OpenStreetMap ikke kjenner navnet pa, og
+// det er de sma stedene — nettopp de admin ma foere inn for hand. Men
+// adressen star i OSM likevel: norske adresser er importert fra
+// Kartverket, og huset finnes selv om puben i forste etasje ikke gjor
+// det. «Berglyveien 4J» gir da koordinatet, og admin skriver navnet selv.
+//
+// Nummeret skilles fra gata fordi OSM har dem i to tagger. Bokstaven
+// hoerer til nummeret: «4J» er husnummeret, ikke «4» pluss noe.
+export function delAdresse(adresse) {
+  const vasket = osmNavnVask(adresse);
+  if (!vasket) return null;
+  const biter = vasket.split(" ").filter(Boolean);
+  // Nummeret star sist i norske adresser. Er siste bit et tall, eventuelt
+  // med en bokstav bak, er det nummeret — ellers har vi bare en gate.
+  const siste = biter[biter.length - 1] || "";
+  const erNummer = biter.length > 1 && /^[0-9]+[A-Za-z\u00C6\u00D8\u00C5\u00E6\u00F8\u00E5]?$/.test(siste);
+  const gate = (erNummer ? biter.slice(0, -1) : biter).join(" ");
+  // Bare et husnummer er ingen adresse. Uten dette ville «4J» blitt slatt
+  // opp som gatenavn, og et tomt svar ser ut som «huset finnes ikke».
+  // Sjekken ma kjenne igjen nummerformen, ikke bare lete etter en
+  // bokstav: «4J» har en.
+  const BARE_NUMMER = /^[0-9]+[A-Za-z\u00C6\u00D8\u00C5\u00E6\u00F8\u00E5]?$/;
+  if (!gate || BARE_NUMMER.test(gate)) return null;
+  return { gate, nummer: erNummer ? siste : "" };
+}
+
+export function osmAdresseSporring(adresse, ramme) {
+  const delt = delAdresse(adresse);
+  if (!delt) return "";
+  const boks = osmBoks(ramme);
+  // Forankret med ^$: «Berglyveien» skal ikke treffe «Berglyveien
+  // Terrasse». Uten nummer star gata alene, og da kan det bli mange hus —
+  // lista kappes, og portalen sier at nummeret gjor soket smalere.
+  let filter = 'nwr["addr:street"~"^' + delt.gate + '$",i]';
+  if (delt.nummer) filter += '["addr:housenumber"~"^' + delt.nummer + '$",i]';
+  return osmHode() + filter + boks + ";out center;";
+}
+
+// Et hus har som regel ingen `name`. Navnesoket kaster de radene; her er
+// de hele poenget, sa adressen star som overskrift nar navnet mangler.
+export function tolkAdresseTreff(json, maks) {
+  return osmRader(json)
+    .filter((p) => p.adresse || p.navn)
+    .map((p) => Object.assign({}, p, { navn: p.navn || p.adresse }))
     .slice(0, maks || 8);
+}
+
+/* ---------- koordinat fra en kartlenke ---------- */
+
+// Siste utvei, og den eneste som ikke trenger at OpenStreetMap svarer:
+// admin apner stedet i det kartet hen alt bruker og limer inn lenka.
+//
+// Google legger stedets eget punkt i «!3d…!4d…» og kartets midtpunkt i
+// «@…». De er ikke det samme — star du zoomet ut, er midtpunktet et
+// stykke unna huset — sa stedets punkt leses forst.
+//
+// En kortlenke (maps.app.goo.gl) baerer ingen koordinater i det hele
+// tatt. Den ma sies ifra om, ikke tolkes som «fant ingenting»: det ene er
+// «apne lenka og kopier den lange», det andre er «dette er feil lenke».
+export function koordinatFraLenke(tekst) {
+  const t = String(tekst || "").trim();
+  if (!t) return null;
+  if (/(goo\.gl|maps\.app\.goo\.gl|g\.co)\//i.test(t)) {
+    return { feil: "Kortlenker bærer ingen koordinater. Åpne den i kartet"
+      + " først, og kopier adressen fra adressefeltet." };
+  }
+
+  const tall = "(-?\\d{1,3}\\.\\d{3,})";
+  const monstre = [
+    // Google: stedets eget punkt.
+    new RegExp("!3d" + tall + "!4d" + tall),
+    // OpenStreetMap: markoren.
+    new RegExp("[?&]mlat=" + tall + "&mlon=" + tall, "i"),
+    // OpenStreetMap: kartutsnittet, «#map=17/59.91/10.75».
+    new RegExp("#map=\\d+/" + tall + "/" + tall, "i"),
+    // Google: kartets midtpunkt.
+    new RegExp("@" + tall + "," + tall),
+    // «geo:», og et par tall limt inn rett fra et kart.
+    new RegExp("(?:geo:|[?&]q=|^)\\s*" + tall + "\\s*[,\\s]\\s*" + tall, "i"),
+  ];
+
+  for (const m of monstre) {
+    const traff = t.match(m);
+    if (traff) {
+      const lat = Number(traff[1]);
+      const lon = Number(traff[2]);
+      if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
+    }
+  }
+  return { feil: "Fant ingen koordinater i det du limte inn." };
 }

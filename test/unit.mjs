@@ -45,6 +45,8 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
          sjekkKontaktliste, kontaktFor, finnKontakt, KONTAKT_FELT, kildeHolder,
          pubNokkel, tolkPubRader, pubRadTilBase, slaSammenPuber, sjekkPubRad,
          osmNavnVask, osmNavnSporring, tolkNavnTreff, PUBTYPER, PUBSIKKERHET,
+         delAdresse, osmAdresseSporring, tolkAdresseTreff, koordinatFraLenke,
+         SOK_SEKUNDER,
          OSLO_RAMME } from "../pub-data.js";
 import { PUBER_KONTAKT } from "../puber-kontakt.js";
 import { KANALER } from "../kanaler.js";
@@ -2140,6 +2142,91 @@ ok("slaget fra OSM oversettes ikke til var egen type",
 ok("taket pa antall treff holdes",
    tolkNavnTreff({ elements: PUBTREFF.concat(PUBTREFF).map((t) =>
      ({ lat: t.lat, lon: t.lon, tags: { name: t.navn } })) }, 3).length === 3);
+
+/* ---------------- adressen som vei til koordinatet ---------------- */
+
+// Navnesoket finner ikke et sted OSM ikke kjenner navnet pa, og det er
+// de sma stedene — nettopp de admin ma foere inn for hand. Meldt 16.
+// september 2026: «Berglyveien 4J», ingen koordinater, ingen vei videre.
+ok("husnummeret skilles fra gata",
+   JSON.stringify(delAdresse("Berglyveien 4J")) === '{"gate":"Berglyveien","nummer":"4J"}',
+   JSON.stringify(delAdresse("Berglyveien 4J")));
+ok("en gate med flere ord holder sammen",
+   delAdresse("Karl Johans gate 1").gate === "Karl Johans gate",
+   JSON.stringify(delAdresse("Karl Johans gate 1")));
+ok("en gate uten nummer er en gate",
+   delAdresse("Grensen").gate === "Grensen" && delAdresse("Grensen").nummer === "");
+// «4J» alene er ikke en adresse. Uten denne ville den blitt slatt opp som
+// gatenavn, og et tomt svar ser ut som «huset finnes ikke».
+ok("et husnummer alene er ingen adresse",
+   delAdresse("4J") === null && delAdresse("12") === null && delAdresse("") === null);
+
+const ADRSPOR = osmAdresseSporring("Berglyveien 4J");
+ok("adressesporringen sporr pa begge taggene",
+   ADRSPOR.indexOf('["addr:street"~"^Berglyveien$",i]') > -1 &&
+   ADRSPOR.indexOf('["addr:housenumber"~"^4J$",i]') > -1, ADRSPOR);
+// Forankret med ^$: «Berglyveien» skal ikke dra med seg «Berglyveien
+// Terrasse», som er en annen gate.
+ok("gata er forankret, ikke bare et delstreng-sok",
+   ADRSPOR.indexOf('"^Berglyveien$"') > -1, ADRSPOR);
+ok("og sporringen holder seg innenfor Oslo",
+   ADRSPOR.indexOf("(59.8,10.45,60.05,10.95)") > -1, ADRSPOR);
+ok("uten nummer star gata alene",
+   osmAdresseSporring("Grensen").indexOf("addr:housenumber") === -1,
+   osmAdresseSporring("Grensen"));
+ok("en adresse uten gate gir ingen sporring",
+   osmAdresseSporring("4J") === "" && osmAdresseSporring("") === "");
+
+// Et hus har som regel ingen `name`. Navnesoket kaster de radene — her er
+// de hele poenget.
+const HUS = { elements: [
+  { lat: 59.84, lon: 10.79, tags: { "addr:street": "Berglyveien", "addr:housenumber": "4J" } },
+  { lat: 59.85, lon: 10.78, tags: { name: "Puben", "addr:street": "Grensen" } },
+] };
+ok("et hus uten navn faller ikke ut av adressesoket",
+   tolkAdresseTreff(HUS).length === 2, tolkAdresseTreff(HUS).length);
+ok("og adressen star som overskrift nar navnet mangler",
+   tolkAdresseTreff(HUS)[0].navn === "Berglyveien 4J",
+   tolkAdresseTreff(HUS)[0].navn);
+ok("mens et navn som finnes blir staende",
+   tolkAdresseTreff(HUS)[1].navn === "Puben", tolkAdresseTreff(HUS)[1].navn);
+// Navnesoket skal fortsatt kaste dem: der er en rad uten navn stoy.
+ok("navnesoket kaster den samme raden",
+   tolkNavnTreff(HUS).length === 1, tolkNavnTreff(HUS).length);
+
+/* ---------------- koordinat fra en kartlenke ---------------- */
+
+// Den eneste veien til et koordinat som ikke trenger at noen svarer.
+ok("google-lenka gir stedets eget punkt, ikke kartets midtpunkt",
+   JSON.stringify(koordinatFraLenke(
+     "https://www.google.com/maps/place/Pub/@59.91111,10.71111,15z/data=!3m1!4b1!4m6!3d59.92222!4d10.72222"))
+   === '{"lat":59.92222,"lon":10.72222}',
+   JSON.stringify(koordinatFraLenke(
+     "https://www.google.com/maps/place/Pub/@59.91111,10.71111,15z/data=!3m1!4b1!4m6!3d59.92222!4d10.72222")));
+ok("uten stedspunkt duger kartets midtpunkt",
+   koordinatFraLenke("https://www.google.com/maps/@59.91111,10.71111,17z").lat === 59.91111);
+ok("openstreetmap sin markor leses",
+   koordinatFraLenke("https://www.openstreetmap.org/?mlat=59.9139&mlon=10.7522").lon === 10.7522);
+ok("og kartutsnittet nar markoren mangler",
+   koordinatFraLenke("https://www.openstreetmap.org/#map=19/59.9139/10.7522").lat === 59.9139);
+ok("to tall limt inn rett fra et kart duger ogsa",
+   koordinatFraLenke("59.9139, 10.7522").lon === 10.7522);
+// En kortlenke baerer ingen koordinater i det hele tatt. «Fant ingenting»
+// ville sendt admin ut for a lete etter noe som ikke er der.
+ok("en kortlenke sier hva som er galt med den",
+   (koordinatFraLenke("https://maps.app.goo.gl/abc123").feil || "").indexOf("Kortlenker") === 0,
+   JSON.stringify(koordinatFraLenke("https://maps.app.goo.gl/abc123")));
+ok("og noe som ikke er en lenke sier det ogsa",
+   !!koordinatFraLenke("hei").feil && !koordinatFraLenke("hei").lat);
+ok("tomt inn gir ingenting ut", koordinatFraLenke("") === null);
+
+// Fristen og sporringens egen timeout var to tall, og de sa ikke det
+// samme: vi la pa etter seks sekunder mens sporringen ba om tolv. Da var
+// det vi som ga opp — men meldingen sa «Fikk ikke svar fra OpenStreetMap».
+ok("sporringen ber om den tida tjenesten faktisk venter",
+   osmNavnSporring("Dubliner").indexOf("[timeout:" + SOK_SEKUNDER + "]") > -1 &&
+   osmAdresseSporring("Grensen").indexOf("[timeout:" + SOK_SEKUNDER + "]") > -1,
+   osmNavnSporring("Dubliner").slice(0, 30));
 
 /* ---------------- rapport ---------------- */
 

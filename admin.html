@@ -233,6 +233,11 @@
           <input type="text" id="stedAdresse" autocomplete="off" maxlength="120">
         </div>
       </div>
+      <div class="rad">
+        <button class="lenke" id="stedSokAdresse" type="button">Slå opp adressen</button>
+      </div>
+      <p class="hint" id="stedAdresseHint" hidden></p>
+      <ul class="treff" id="stedAdresseTreff"></ul>
 
       <div class="felt-blokk felt-par">
         <div>
@@ -243,6 +248,24 @@
           <label for="stedLon">Lengdegrad</label>
           <input type="number" id="stedLon" step="0.0001" inputmode="decimal">
         </div>
+      </div>
+
+      <!-- Siste utvei, og den eneste som star seg nar OpenStreetMap ikke
+           svarer: admin apner stedet i kartet hen alt bruker, og limer
+           inn lenka. Ingen tjeneste spoerres — koordinatet star i lenka. -->
+      <div class="felt-blokk">
+        <label for="stedLenke">… eller lim inn en kartlenke</label>
+        <div class="rad">
+          <input type="text" id="stedLenke" autocomplete="off" maxlength="500"
+                 placeholder="https://www.google.com/maps/…"
+                 style="flex: 1 1 180px; width: auto;">
+          <button class="lenke" id="stedLenkeLes" type="button">Hent koordinat</button>
+        </div>
+        <p class="hint" id="stedLenkeHint">
+          Fra Google Maps, OpenStreetMap eller et par tall. Virker også når
+          oppslaget over ikke svarer — lenka bærer koordinatet selv.
+        </p>
+        <p class="hint" id="stedLenkeSvar" hidden></p>
       </div>
 
       <div class="felt-blokk felt-par">

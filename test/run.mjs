@@ -2280,6 +2280,168 @@ const SAK_15B = await kjor("admin-steder", `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
 `, null, adminSide);
 
+/* ---------------- 15C. veien til et koordinat ---------------- */
+
+// Meldt 16. september 2026: «Far ikke svar, dermed ikke lagret da vi ikke
+// har koordinater.» Navnesoket var den eneste veien, og det finner ikke
+// et sted OpenStreetMap ikke kjenner navnet pa — som er de sma stedene,
+// nettopp de admin ma foere inn for hand. Na er det tre veier, og den
+// siste av dem spor ingen.
+//
+// Egen side, som 15B: en test sju tilbakekall dypt er ikke til a rette.
+const SAK_15C = await kjor("admin-koordinat", `
+  try {
+    localStorage.setItem("sb-konto", JSON.stringify({
+      token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
+      utloper: Date.now() + 3600000,
+    }));
+  } catch (e) { /* privat modus */ }
+
+  var stedKall = [];
+  // Huset slik Overpass gir det: ingen name, bare addr-taggene. Det er
+  // nettopp den raden navnesoket kaster.
+  var HUSET = { navn: "Berglyveien 4J", adresse: "Berglyveien 4J",
+                lat: 59.8432, lon: 10.7988, slag: "" };
+  var adresseSvar = { kode: 200, kropp: { kilde: "OpenStreetMap", treff: [HUSET] } };
+
+  function svar(status, kropp) {
+    return Promise.resolve({ ok: status < 400, status: status, text: function () {
+      return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("/api/pub-liste") === 0) {
+      var k = JSON.parse(opt.body);
+      stedKall.push(k);
+      if (k.handling === "liste") return svar(200, { puber: [], klar: true });
+      if (k.handling === "sok") {
+        // Navnesoket finner ingenting: stedet star ikke i OSM med navn.
+        return svar(200, { kilde: "OpenStreetMap", treff: [] });
+      }
+      if (k.handling === "sok-adresse") return svar(adresseSvar.kode, adresseSvar.kropp);
+      return svar(200, { ok: true, pub: k.pub, merknad: "Lagret." });
+    }
+    if (u.indexOf("/api/visninger") === 0) return svar(200, { klar: true, mangler: [] });
+    if (u.indexOf("/api/brukere") === 0) return svar(200, { klar: true, mangler: [] });
+    if (u.indexOf("/api/pub-forslag") === 0) return svar(200, { forslag: [] });
+    if (u.indexOf("/api/fotball") === 0) {
+      return svar(200, { liga: "Eliteserien", kamper: [], runder: [] });
+    }
+    return svar(200, {});
+  };
+
+  function felt(id) { return document.getElementById(id); }
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    felt("passord").value = "hemmelig";
+    felt("loggInn").click();
+
+    setTimeout(function () { try {
+      felt("stedNytt").click();
+      felt("stedNavn").value = "RBK. Pøbb og sånt";
+      felt("stedAdresse").value = "Berglyveien 4J";
+
+      // 1. Kartlenka. Den spor ingen, og virker ogsa nar Overpass er nede
+      //    — det er hele grunnen til at den finnes.
+      var forLenke = stedKall.length;
+      felt("stedLenke").value =
+        "https://www.google.com/maps/place/X/@59.9,10.7,15z/data=!3m1!4b1!4m6!3d59.84321!4d10.79876";
+      felt("stedLenkeLes").click();
+      ok("en kartlenke fyller koordinatene",
+         felt("stedLat").value === "59.8432" && felt("stedLon").value === "10.7988",
+         felt("stedLat").value + ", " + felt("stedLon").value);
+      ok("og gjorde det uten a sporre noen",
+         stedKall.length === forLenke, stedKall.length + " mot " + forLenke);
+      ok("svaret sier hva som ble hentet",
+         felt("stedLenkeSvar").textContent.indexOf("59.8432") > -1,
+         felt("stedLenkeSvar").textContent);
+      // Forklaringen ma sta igjen: den sier hvilke lenker som virker.
+      ok("og forklaringen star fortsatt",
+         felt("stedLenkeHint").textContent.indexOf("Google Maps") > -1,
+         felt("stedLenkeHint").textContent);
+
+      var kort = felt("stedLenke");
+      kort.value = "https://maps.app.goo.gl/abc123";
+      felt("stedLenkeLes").click();
+      ok("en kortlenke sier hva som er galt med den",
+         felt("stedLenkeSvar").textContent.indexOf("Kortlenker") === 0,
+         felt("stedLenkeSvar").textContent);
+
+      // 2. Navnesoket: ingen treff, og det skal sies med utveiene.
+      felt("stedLat").value = "";
+      felt("stedLon").value = "";
+      felt("stedSok").click();
+      setTimeout(function () { try {
+        ok("navnesoket sier at det ikke fant noe",
+           felt("stedSokHint").textContent.indexOf("Ingen treff") === 0,
+           felt("stedSokHint").textContent);
+        ok("og peker pa kartlenka som utvei",
+           felt("stedSokHint").textContent.indexOf("kartlenke") > -1,
+           felt("stedSokHint").textContent);
+
+        // 3. Adressesoket. Huset star i OSM selv om puben ikke gjor det.
+        felt("stedSokAdresse").click();
+        setTimeout(function () { try {
+          var sendt = stedKall.filter(function (k) { return k.handling === "sok-adresse"; });
+          ok("adressesoket gikk med adressen fra feltet",
+             sendt.length === 1 && sendt[0].adresse === "Berglyveien 4J",
+             JSON.stringify(sendt));
+          var treff = felt("stedAdresseTreff").querySelectorAll("button");
+          ok("og gir et treff", treff.length === 1, treff.length);
+
+          treff[0].click();
+          ok("treffet fyller koordinatene",
+             felt("stedLat").value === "59.8432" && felt("stedLon").value === "10.7988",
+             felt("stedLat").value + ", " + felt("stedLon").value);
+          // Navnet er nokkelen. Huset heter «Berglyveien 4J» i OSM, og et
+          // navn som endret seg her ville laget en helt annen rad.
+          ok("men rorer ikke navnet",
+             felt("stedNavn").value === "RBK. Pøbb og sånt", felt("stedNavn").value);
+
+          // 4. Det admin faktisk motte: alle speilene feilet. Da er
+          //    tjenestens egne ord om hvert speil det eneste sporet.
+          adresseSvar = { kode: 502, kropp: {
+            feil: "Fikk ikke svar fra OpenStreetMap. Tast koordinatene selv, eller lim inn en kartlenke.",
+            forsok: [
+              { kilde: "Overpass overpass-api.de", utfall: "This operation was aborted", ms: 6003 },
+              { kilde: "Overpass overpass.kumi.systems", status: 504, ms: 1200 },
+            ],
+          } };
+          felt("stedSokAdresse").click();
+          setTimeout(function () { try {
+            ok("en feil vises med tjenestens egen melding",
+               felt("stedAdresseHint").textContent.indexOf("Fikk ikke svar") === 0,
+               felt("stedAdresseHint").textContent);
+            var linjer = felt("stedAdresseTreff").textContent;
+            ok("og hvert speil star med sitt eget utfall",
+               linjer.indexOf("overpass-api.de") > -1 &&
+               linjer.indexOf("kumi.systems") > -1, linjer);
+            ok("aborten star med sine egne ord",
+               linjer.indexOf("aborted") > -1, linjer);
+            ok("og statuskoden fra det andre speilet",
+               linjer.indexOf("504") > -1, linjer);
+            // Uten dette er «Fikk ikke svar» like forenlig med at Overpass
+            // er nede som med at var egen frist lop ut, og den forskjellen
+            // er hele diagnosen.
+            ok("de gamle treffene star ikke igjen under feilmeldinga",
+               felt("stedAdresseTreff").querySelectorAll("button").length === 0,
+               felt("stedAdresseTreff").querySelectorAll("button").length);
+
+            // Et nytt sted skal ikke arve forrige steds oppslag.
+            felt("stedNytt").click();
+            ok("et nytt sted starter uten treffene fra det forrige",
+               felt("stedAdresseTreff").textContent === "" &&
+               felt("stedAdresseHint").hidden === true &&
+               felt("stedLenke").value === "",
+               felt("stedAdresseTreff").textContent);
+            ferdig();
+          } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+        } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
+`, null, adminSide);
+
 /* ---------------- 16. puben bekrefter kampen ---------------- */
 
 // Visningene admin setter skal treffe leseren: pubene som viser nettopp
@@ -4087,7 +4249,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_15B, ...SAK_16, ...SAK_16B, ...SAK_17, ...SAK_18, ...SAK_18B, ...SAK_19, ...SAK_19A, ...SAK_19B, ...SAK_19C, ...SAK_20, ...SAK_20B, ...SAK_21, ...SAK_22, ...SAK_22B, ...SAK_23];
+const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_15B, ...SAK_15C, ...SAK_16, ...SAK_16B, ...SAK_17, ...SAK_18, ...SAK_18B, ...SAK_19, ...SAK_19A, ...SAK_19B, ...SAK_19C, ...SAK_20, ...SAK_20B, ...SAK_21, ...SAK_22, ...SAK_22B, ...SAK_23];
 let feilet = 0;
 
 for (const t of alle) {
