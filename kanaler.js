@@ -41,7 +41,10 @@
 
 
 export const KANALER = {
-  eliteserien: { kanal: "TV 2 Play", kilde: "https://www.tv2.no/sport/eliteserien", sjekket: "2026-09-14" },
+  // Bekreftet mot TV 2s egen programoversikt 16. september 2026: hele
+  // neste runde, atte av atte kamper. Datoen er derfor flyttet — den sier
+  // nar noen sist SA etter, og det er halve opplysningen.
+  eliteserien: { kanal: "TV 2 Play", kilde: "https://www.tv2.no/sport/eliteserien", sjekket: "2026-09-16" },
   premier:     { kanal: "Viaplay", kilde: "https://viaplay.no/sport/fotball/premier-league", sjekket: "2026-09-14" },
   laliga:      { kanal: "TV 2 Play", kilde: "https://www.tv2.no/sport/fotball/la-liga", sjekket: "2026-09-14" },
   bundesliga:  { kanal: "Viaplay", kilde: "https://viaplay.no/sport/fotball/bundesliga", sjekket: "2026-09-14" },
