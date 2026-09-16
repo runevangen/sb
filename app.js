@@ -433,19 +433,24 @@ const ADS_EVERY = 4;
 // knapp som ikke går noe sted er verre enn ingen knapp.
 const MESSENGER = "premern";
 
-// Plassholdere. Annonsørene her er oppdiktede (#25). Når ekte annonser
-// skal inn, erstattes denne listen av data fra annonsesystemet — formatet
-// er det samme, og rekkefølgen i listen bestemmer blandingen.
+// **Ingen av annonsørene her er oppdiktet lenger.** Fram til 16. september
+// 2026 sto NORDBANE, PADELHUSET, SPRINTA og TRIBUNE i feeden, tydelig
+// merket «Reklame» og fullstendig oppfunnet (#25). Ingen ble lurt — men
+// en oppdiktet annonsør i prod er en påstand om et samarbeid som ikke
+// finnes, og det er nøyaktig den slags påstand appen ellers er nøye på å
+// ikke fortelle.
 //
-// «ledig» er ikke reklame fra noen andre — den er vår egen, og selger
-// plassen den står i. Derfor sier den «Ledig plass» og ikke «Reklame».
-// Å merke vår egen tekst som reklame fra en annonsør ville vært å lyve i
-// akkurat den merkingen appen ellers er nøye på.
+// Nå er hver plass enten vår egen («Ledig plass») eller en spøk («Spøk»).
+// Når en ekte annonse skal inn, får raden en `brand` og ingen `merke` —
+// da sier den «Reklame», og formatet er det samme som står her.
 //
-// Den ledige plassen står i tre former — `form` — og de er spredt utover
-// lista med vilje: annonseplassene kommer etter hver fjerde sak, så to av
-// dem kan stå på samme skjerm. Tre like bokser etter hverandre leses som
-// støy; tre ulike leses som tre plasser.
+// De fire som ble tomme var `banner` og `stripe`, de to tekstformatene.
+// De ble ikke slettet: de er fasongene en ekte annonsør kan kjøpe, og en
+// fasong ingen bruker er en fasong ingen ser. Nå selger de seg selv.
+//
+// Rekkefølgen i lista bestemmer blandingen: plassene kommer etter hver
+// fjerde sak, så to kan stå på samme skjerm. Tre like bokser etter
+// hverandre leses som støy; tre ulike leses som tre plasser.
 //
 // Ansiktet er poenget. Det er en person man skal sende en melding til,
 // ikke et skjema — og da skal man se hvem.
@@ -457,9 +462,9 @@ const ADS = [
   // sted som ikke har kjøpt noe som helst. Knappen går til Prem, som er
   // den som må svare for påstanden.
   {
-    format: "spok",
+    merke: "spok",
+    format: "kort",
     form: "hoy",
-    brand: "SPØK",
     bilde: "/bilder/skilt-hoy.jpg",
     bredde: 800,
     hoyde: 1000,
@@ -469,9 +474,9 @@ const ADS = [
     cta: "Si imot"
   },
   {
-    format: "spok",
+    merke: "spok",
+    format: "kort",
     form: "bred",
-    brand: "SPØK",
     bilde: "/bilder/tur-bred.jpg",
     bredde: 1000,
     hoyde: 562,
@@ -481,9 +486,9 @@ const ADS = [
     cta: "Ta det med Prem"
   },
   {
-    format: "ledig",
+    merke: "ledig",
+    format: "kort",
     form: "portrett",
-    brand: "LEDIG PLASS",
     bilde: "/bilder/prem-portrett.jpg",
     bredde: 400,
     hoyde: 400,
@@ -492,9 +497,9 @@ const ADS = [
     cta: "Ta en prat med Prem"
   },
   {
-    format: "spok",
+    merke: "spok",
+    format: "kort",
     form: "hoy",
-    brand: "SPØK",
     bilde: "/bilder/tur-hoy.jpg",
     bredde: 800,
     hoyde: 1000,
@@ -504,9 +509,9 @@ const ADS = [
     cta: "Sett imot"
   },
   {
-    format: "spok",
+    merke: "spok",
+    format: "kort",
     form: "portrett",
-    brand: "SPØK",
     bilde: "/bilder/tur-portrett.jpg",
     bredde: 400,
     hoyde: 400,
@@ -516,9 +521,9 @@ const ADS = [
     cta: "Ikke spør"
   },
   {
-    format: "ledig",
+    merke: "ledig",
+    format: "kort",
     form: "bred",
-    brand: "LEDIG PLASS",
     bilde: "/bilder/prem-bred.jpg",
     bredde: 1000,
     hoyde: 562,
@@ -527,9 +532,9 @@ const ADS = [
     cta: "Snakk med Prem"
   },
   {
-    format: "spok",
+    merke: "spok",
+    format: "kort",
     form: "bred",
-    brand: "SPØK",
     bilde: "/bilder/prem-bred.jpg",
     bredde: 1000,
     hoyde: 562,
@@ -539,15 +544,15 @@ const ADS = [
     cta: "Ta det med Prem"
   },
   {
+    merke: "ledig",
     format: "banner",
-    brand: "NORDBANE",
-    headline: "Tre måneder trening. Ingen binding.",
-    cta: "Se tilbudet"
+    headline: "Her kunne annonsen din stått.",
+    cta: "Ta en prat med Prem"
   },
   {
-    format: "spok",
+    merke: "spok",
+    format: "kort",
     form: "hoy",
-    brand: "SPØK",
     bilde: "/bilder/prem-hoy.jpg",
     bredde: 800,
     hoyde: 1000,
@@ -557,9 +562,9 @@ const ADS = [
     cta: "Ta det med Prem"
   },
   {
-    format: "ledig",
+    merke: "ledig",
+    format: "kort",
     form: "hoy",
-    brand: "LEDIG PLASS",
     bilde: "/bilder/prem-hoy.jpg",
     bredde: 800,
     hoyde: 1000,
@@ -568,9 +573,9 @@ const ADS = [
     cta: "Send Prem en melding"
   },
   {
-    format: "spok",
+    merke: "spok",
+    format: "kort",
     form: "portrett",
-    brand: "SPØK",
     bilde: "/bilder/prem-portrett.jpg",
     bredde: 400,
     hoyde: 400,
@@ -580,53 +585,69 @@ const ADS = [
     cta: "Ta det med Prem"
   },
   {
+    merke: "ledig",
     format: "stripe",
-    brand: "PADELHUSET",
-    headline: "Fire nye baner åpner i Bergen i oktober",
-    sub: "Book time · padelhuset.no"
+    headline: "Denne linja er til salgs.",
+    sub: "Smalt format, midt i lesingen"
   },
   {
+    merke: "ledig",
     format: "banner",
-    brand: "SPRINTA",
-    headline: "Nye Sprinta Terreng. Bygget for norsk høst.",
-    cta: "Se skoene"
+    headline: "Vil du nå folk som leser om norsk fotball?",
+    cta: "Snakk med Prem"
   },
   {
+    merke: "ledig",
     format: "stripe",
-    brand: "TRIBUNE",
-    headline: "Billetter til høstens toppkamper",
-    sub: "tribune.no"
+    headline: "Ett hakk mindre enn et kort, ett hakk mer enn ingenting.",
+    sub: "Ta en prat om plassen"
   }
 ];
 
+// **Hva plassen ER står i `merke`; hvilken FASONG den har står i
+// `format`.** De to var ett felt til 16. september 2026, og da kunne ikke
+// en ledig plass ha bannerets fasong: «ledig» betydde både «vår egen» og
+// «bildekort». Det holdt så lenge de oppdiktede annonsørene fylte de to
+// tekstformatene — og i det de gikk ut (#25), sto fasongene uten noen som
+// kunne bruke dem.
+//
+// `merke` uten treff i EGNE_MERKER er en ekte annonsør: da står det
+// «Reklame», og `brand` er navnet deres.
 function buildAd(ad, slot) {
+  const merking = EGNE_MERKER[ad.merke];
+  if (ad.format === "kort") return egenPlass(ad, merking, slot);
+
   const box = el("div", "ad-" + ad.format);
   box.setAttribute("role", "group");
   // Merkingen må også nå skjermlesere, ikke bare øyet — og den må si
   // sant: «ledig» er vår egen plass, ikke en annonsørs.
-  box.setAttribute("aria-label", ad.format === "ledig"
-    ? "Ledig annonseplass" : "Reklame fra " + ad.brand);
-
-  if (EGNE_MERKER[ad.format]) return egenPlass(ad, slot);
+  box.setAttribute("aria-label", merking ? merking.lest : "Reklame fra " + ad.brand);
+  const etikett = merking ? merking.merke : "Reklame";
 
   if (ad.format === "stripe") {
     const top = el("div", "ad-top");
-    top.appendChild(el("span", "ad-label", "Reklame"));
-    top.appendChild(el("span", "ad-brand", ad.brand));
+    top.appendChild(el("span", "ad-label", etikett));
+    // Annonsørens navn står bare når det finnes en annonsør. På vår egen
+    // plass er det ingen å navngi, og «LEDIG PLASS» to ganger på samme
+    // linje sier ikke mer enn én gang.
+    if (ad.brand) top.appendChild(el("span", "ad-brand", ad.brand));
     box.appendChild(top);
     box.appendChild(el("p", "ad-headline", ad.headline));
     if (ad.sub) box.appendChild(el("span", "ad-sub", ad.sub));
   } else {
-    box.appendChild(el("span", "ad-label", "Reklame"));
-    // Plassholder-flate. Ekte annonsemateriell settes inn her.
-    box.appendChild(el("div", "ad-creative", ad.brand));
+    box.appendChild(el("span", "ad-label", etikett));
+    // Plassholder-flate. Ekte annonsemateriell settes inn her — og på vår
+    // egen plass er det nettopp den flata som er varen.
+    box.appendChild(el("div", "ad-creative", ad.brand || "DIN ANNONSE HER"));
     const body = el("div", "ad-body");
     body.appendChild(el("p", "ad-headline", ad.headline));
-    if (ad.cta) body.appendChild(el("span", "ad-cta", ad.cta));
+    // Vår egen plass får en ekte knapp, som bildekortene. En annonsørs
+    // oppfordring er deres tekst, ikke en lenke til oss.
+    if (ad.cta) body.appendChild(merking ? messengerKnapp(ad.cta) : el("span", "ad-cta", ad.cta));
     box.appendChild(body);
   }
 
-  track("Annonse vist", { annonsor: ad.brand, plass: String(slot) });
+  track("Annonse vist", { annonsor: ad.brand || etikett, plass: String(slot) });
   return box;
 }
 
@@ -641,6 +662,10 @@ function buildAd(ad, slot) {
 // det én linje her — og da er det umulig å legge til en plass uten å ta
 // stilling til hva den sier at den er.
 //
+// Oppslaget går på `merke`, ikke på `format`. En plass kan være vår egen i
+// hvilken som helst fasong — bildekort, banner eller stripe — og en rad
+// uten `merke` er en ekte annonsør.
+//
 // «Spøk» er ikke pedanteri. Ullevålseter er et ekte sted, og en tulle-
 // annonse merket «Reklame» ville påstått at de har kjøpt plassen. Det er
 // nøyaktig løgnen appen ellers er nøye på å ikke fortelle — og vitsen
@@ -650,10 +675,9 @@ const EGNE_MERKER = {
   spok: { merke: "Spøk", lest: "Spøk, ikke en ekte annonse" }
 };
 
-function egenPlass(ad, slot) {
-  const merking = EGNE_MERKER[ad.format];
+function egenPlass(ad, merking, slot) {
   const boks = el("div", "ad-ledig ad-ledig-" + ad.form);
-  if (ad.format === "spok") boks.classList.add("ad-spok");
+  if (ad.merke === "spok") boks.classList.add("ad-spok");
   boks.setAttribute("role", "group");
   boks.setAttribute("aria-label", merking.lest);
   boks.appendChild(annonseBilde(ad));
@@ -668,7 +692,7 @@ function egenPlass(ad, slot) {
   kropp.appendChild(messengerKnapp(ad.cta));
   boks.appendChild(kropp);
 
-  track("Annonse vist", { annonsor: ad.brand, plass: String(slot) });
+  track("Annonse vist", { annonsor: merking.merke, plass: String(slot) });
   return boks;
 }
 
