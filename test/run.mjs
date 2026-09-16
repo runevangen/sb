@@ -1871,7 +1871,49 @@ const SAK_15 = await kjor("admin", `
            document.getElementById("kampHint").textContent.indexOf("Runde 21") > -1,
            document.getElementById("kampHint").textContent);
 
+        // BRUKERVENNLIGHET (meldt 16. september 2026): «Lagre» la i en egen
+        // seksjon nederst, etter Foreslatte steder, Steder og Brukere — tre
+        // seksjoner som ikke har noe med den a gjore — mens den lagret
+        // kampene her oppe. «Kryss av alle» la samme sted: en knapp som
+        // opererer pa en liste du ikke ser mens du trykker den.
+        var kampSeksjon = document.getElementById("kamper").closest("section");
+        ok("lagreknappen star i seksjonen den lagrer",
+           kampSeksjon.contains(document.getElementById("lagre")));
+        ok("og kryss-av-knappene ved lista de krysser av",
+           kampSeksjon.contains(document.getElementById("merkAlle")) &&
+           kampSeksjon.contains(document.getElementById("merkIngen")));
+        // Klebrig: med tjue kamper er knappen ute av syne nar du er ferdig.
+        ok("handlingsraden folger med nar lista ruller",
+           getComputedStyle(document.querySelector(".handling")).position === "sticky",
+           getComputedStyle(document.querySelector(".handling")).position);
+
+        // Feil pub valgt er den ene feilen som ellers er usynlig til etter
+        // lagring: pub-velgeren er en egen seksjon over lista.
+        ok("overskrifta sier hvilken pub du krysser av for",
+           document.getElementById("kampTittel").textContent === "Kamper " + puber.value + " viser",
+           document.getElementById("kampTittel").textContent);
+
         bokser[0].checked = true;
+        bokser[0].dispatchEvent(new Event("change", { bubbles: true }));
+        // «Lagre» alene sier ikke hva den lagrer.
+        ok("knappen sier hvor mange og for hvem",
+           document.getElementById("lagre").textContent === "Lagre 1 kamp for " + puber.value,
+           document.getElementById("lagre").textContent);
+        bokser[1].checked = true;
+        bokser[1].dispatchEvent(new Event("change", { bubbles: true }));
+        ok("og teller riktig i flertall",
+           document.getElementById("lagre").textContent === "Lagre 2 kamper for " + puber.value,
+           document.getElementById("lagre").textContent);
+        bokser[1].checked = false;
+        bokser[1].dispatchEvent(new Event("change", { bubbles: true }));
+        // Null avkrysset er ikke «lagre ingenting» — det er a fjerne dem.
+        document.getElementById("merkIngen").click();
+        ok("uten kryss sier den at den fjerner",
+           document.getElementById("lagre").textContent === "Fjern alle kamper for " + puber.value,
+           document.getElementById("lagre").textContent);
+
+        bokser[0].checked = true;
+        bokser[0].dispatchEvent(new Event("change", { bubbles: true }));
         document.getElementById("lagre").click();
 
     setTimeout(function () { try {

@@ -9,6 +9,37 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 16. september 2026 — «Lagre» lå tre seksjoner fra det den lagret
+
+**Meldt som:** «lagre under admin og der en pub kan få lagt til en kamp er
+ikke lett å se.»
+
+Adminportalen er én lang rulling med seks seksjoner. «Lagre» lå i sin egen
+seksjon **nederst** — etter *Foreslåtte steder*, *Steder* (et stort skjema)
+og *Brukere* — mens den lagrer **Kamper**, som ligger nær toppen. «Kryss av
+alle» og «Fjern alle» lå samme sted: knapper som opererer på en liste du
+ikke ser mens du trykker dem.
+
+**Tre feil, ingen av dem smak:**
+
+- Handlingen var skilt fra det den handler på.
+- Ingenting sa hvilken pub du lagret for. Pub-velgeren er en egen seksjon
+  over, så du kunne krysse av ti kamper med feil pub valgt uten at noe på
+  skjermen fanget det før det var lagret.
+- «Lagre» sa ikke hva den lagrer — hverken antall eller pub.
+
+Handlingsraden står nå i Kamper-seksjonen, klebrig mot bunnen så den følger
+med mens du krysser av. Overskriften sier «Kamper Lincoln Pub viser», og
+knappen «Lagre 3 kamper for Lincoln Pub» — eller «Fjern alle kamper for
+Lincoln Pub» når ingen er krysset av, for null avkrysset er ikke *lagre
+ingenting*, det er *fjern dem*.
+
+Overskriften settes **over** den tidlige returnen i `tegnKamper()`: den
+handler om puben, ikke om hvorvidt ligaen har kamper. Under den ville den
+stått igjen med forrige pub i en liga uten kommende kamper.
+
+---
+
 ## 16. september 2026 — poengkolonnen sto utenfor skjermen
 
 **Meldt som:** «Må scrolle skjermen til siden for å se poeng. Alt burde få
