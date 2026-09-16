@@ -14,12 +14,16 @@ deployer på push til `main`.
 
 ```sh
 git clone https://github.com/runevangen/sb.git && cd sb
-node test/unit.mjs        # 510 tester, ~90 ms
-node test/funksjon.mjs    # 247 tester, ~250 ms
-node test/run.mjs         # 438 tester, krever Chromium
+node test/unit.mjs        # rene funksjoner, ~90 ms
+node test/funksjon.mjs    # Netlify-funksjonene, ~250 ms
+node test/run.mjs         # DOM-testene, ~200 s, krever Chromium
 ```
 
-Node 20 (som CI). Ingen `npm install` — det finnes ingenting å installere.
+Node 22 (som CI og som byggeporten). Ingen `npm install` — det finnes
+ingenting å installere.
+
+Hvor mange tester hver suite har står i
+[`docs/testing.md`](docs/testing.md), som er det ene stedet tallene bor.
 
 Vil du se appen, server mappa over HTTP. **Ikke `file://`** — modul-script
 blokkeres av CORS på file-opphav, og appen laster aldri:

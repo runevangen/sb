@@ -126,9 +126,16 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 
 ## Testing
 
-    node test/unit.mjs      531 tester
-    node test/funksjon.mjs  272 tester
-    node test/run.mjs       453 tester, ~200 s, headless Chromium
+    node test/unit.mjs      rene funksjoner, ingen nettleser, millisekunder
+    node test/funksjon.mjs  Netlify-funksjonene med stubbet fetch
+    node test/run.mjs       alt som trenger DOM, headless Chromium
+
+**Antallet står i [`docs/testing.md`](docs/testing.md), og bare der.** Det
+sto i tre filer og glei fire ganger på to dager — to økter som lander
+arbeid samme time treffer dem i ulik rekkefølge, og da ligger minst én
+bak. Et tall som ligger bak sier «ingen nye tester» om en kjøring som la
+til tre, og det er nøyaktig det tallet finnes for å avsløre. Ett sted kan
+ikke gli fra seg selv.
 
 Tre regler, og de har alle kostet noe:
 
