@@ -182,9 +182,13 @@ function visAdgang(tekst, art) {
 
 /* ---------- brukerne ---------- */
 
-// Hvem har logget inn, nar kom de forst, og nar var de sist inne.
+// Hvem har logget inn, nar kom de forst, og nar logget de sist inn.
 // Tallene kommer fra Supabase selv, ikke fra noe vi teller: en teller vi
 // forer selv ville kunne gli fra virkeligheten uten at noen merket det.
+//
+// Det gjor at kolonnen er PALOGGING og ikke bruk: appen holder telefonen
+// innlogget med roterende fornyere, og en fornying rorer ikke
+// last_sign_in_at. Derfor heter kolonnen «Sist palogget» i portalen.
 //
 // Nokkelen som trengs for a se og endre andres kontoer ligger bare i
 // /api/brukere. Portalen sender passordet og far en liste; den ser aldri

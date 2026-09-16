@@ -129,7 +129,11 @@ export function tolkPinOkt(json, navn, naa = Date.now()) {
 // er slugen fra adressen det naermeste vi kommer: «bjoernaage» er ikke
 // pent, men det er riktig, og det er bedre enn en tom rad.
 //
-// Forste og siste palogging er `created_at` og `last_sign_in_at`.
+// Forste og siste PALOGGING er `created_at` og `last_sign_in_at` — ikke
+// forste og siste BRUK. Appen holder telefonen innlogget med roterende
+// fornyere, og en fornying oppdaterer ikke last_sign_in_at: den som er
+// innom daglig uten a taste PIN-en pa nytt, star med en gammel dato.
+// Portalen kaller kolonnen «Sist palogget» av nettopp den grunn.
 // Kontoen lages ved forste innlogging, sa de to er nyaktig det de ser ut
 // som. En konto som aldri har logget inn finnes ikke.
 export function tolkBrukere(rader, domene = PIN_DOMENE) {
