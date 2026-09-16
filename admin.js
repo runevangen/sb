@@ -24,8 +24,8 @@ import { oktGyldig, kanFornyes } from "./konto-data.js";
 import { LIGAER, kampNokkel } from "./fotball-data.js";
 import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
 import { publisteRad, alleredeILista } from "./pub-forslag-data.js";
-import { PUBTYPER, PUBSIKKERHET, pubNokkel, sjekkPubRad, slaSammenPuber }
-  from "./pub-data.js";
+import { PUBTYPER, PUBSIKKERHET, pubNokkel, sjekkPubRad, slaSammenPuber,
+  koordinatFraLenke } from "./pub-data.js";
 
 const felt = (id) => document.getElementById(id);
 let kamper = [];
@@ -242,7 +242,14 @@ async function forslagKall(kropp) {
   });
   const data = JSON.parse(await respons.text());
   if (!respons.ok || !data || data.feil) {
-    throw new Error((data && data.feil) || ("Tjenesten svarte " + respons.status + "."));
+    const err = new Error((data && data.feil)
+      || ("Tjenesten svarte " + respons.status + "."));
+    // `forsok` er tjenestens egne ord om hvem som svarte hva. Den ble
+    // kastet her for, og da sto admin igjen med «Fikk ikke svar fra
+    // OpenStreetMap» uten a kunne se om det var en tjener som var nede,
+    // en sporring som ble avvist, eller var egen frist som lop ut.
+    err.forsok = (data && data.forsok) || [];
+    throw err;
   }
   return data;
 }
@@ -769,7 +776,19 @@ function apneSted(p, nokkel) {
   felt("stedSkjema").hidden = false;
   felt("stedAvbryt").hidden = false;
   stedMelding("", "");
+  // Oppslagene hoerer til stedet som var apent. Uten dette ville treffene
+  // fra forrige sted statt igjen under et nytt navn.
+  nullstillOppslag();
   felt("stedNavn").focus();
+}
+
+function nullstillOppslag() {
+  ["stedSokHint", "stedAdresseHint", "stedLenkeSvar"].forEach((id) => {
+    felt(id).textContent = "";
+    felt(id).hidden = true;
+  });
+  ["stedTreff", "stedAdresseTreff"].forEach((id) => { felt(id).textContent = ""; });
+  felt("stedLenke").value = "";
 }
 
 function lukkSted() {
@@ -796,7 +815,14 @@ async function stedKall(kropp) {
   });
   const data = JSON.parse(await respons.text());
   if (!respons.ok || !data || data.feil) {
-    throw new Error((data && data.feil) || ("Tjenesten svarte " + respons.status + "."));
+    const err = new Error((data && data.feil)
+      || ("Tjenesten svarte " + respons.status + "."));
+    // `forsok` er tjenestens egne ord om hvem som svarte hva. Den ble
+    // kastet her for, og da sto admin igjen med «Fikk ikke svar fra
+    // OpenStreetMap» uten a kunne se om det var en tjener som var nede,
+    // en sporring som ble avvist, eller var egen frist som lop ut.
+    err.forsok = (data && data.forsok) || [];
+    throw err;
   }
   return data;
 }
@@ -909,30 +935,60 @@ async function lagreSted() {
 // at OSMs koordinat brukes nar navnet stemmer — dette er akkurat det,
 // bare gjort av maskinen framfor for hand. Treffet fyller feltene; det
 // avgjor ingenting.
+//
+// To innganger, fordi navnet ikke alltid finnes: OSM kjenner «Berglyveien
+// 4J» selv om hen ikke kjenner puben i forste etasje. Norske adresser i
+// OSM er importert fra Kartverket, sa huset star der ogsa nar stedet ikke
+// gjor det.
 async function sokSted() {
   const navn = felt("stedNavn").value.trim();
-  felt("stedTreff").textContent = "";
-  felt("stedSokHint").hidden = false;
-  felt("stedSokHint").textContent = "Søker i OpenStreetMap …";
+  await kjorOppslag({
+    hint: "stedSokHint", liste: "stedTreff",
+    kropp: { handling: "sok", navn },
+    tomt: "Ingen treff på «" + navn + "» i Oslo.",
+  });
+}
+
+async function sokAdresseSted() {
+  const adresse = felt("stedAdresse").value.trim();
+  await kjorOppslag({
+    hint: "stedAdresseHint", liste: "stedAdresseTreff",
+    kropp: { handling: "sok-adresse", adresse },
+    tomt: "Ingen treff på «" + adresse + "» i Oslo.",
+  });
+}
+
+async function kjorOppslag(oppsett) {
+  const hint = felt(oppsett.hint);
+  const liste = felt(oppsett.liste);
+  liste.textContent = "";
+  hint.hidden = false;
+  hint.textContent = "Søker i OpenStreetMap …";
 
   let data;
   try {
-    data = await stedKall({ handling: "sok", navn });
+    data = await stedKall(oppsett.kropp);
   } catch (err) {
-    felt("stedSokHint").textContent = err.message + " Tast koordinatene selv.";
+    hint.textContent = err.message;
+    // Tjenestens egne ord om hvert speil. Uten dem er «Fikk ikke svar fra
+    // OpenStreetMap» like forenlig med at Overpass er nede som med at var
+    // egen frist lop ut — og admin kan ikke vite hvilken det var.
+    visForsok(liste, err.forsok);
     return;
   }
 
   const treff = data.treff || [];
   if (!treff.length) {
-    felt("stedSokHint").textContent = "Ingen treff på «" + navn
-      + "» i Oslo. Tast koordinatene selv.";
+    hint.textContent = oppsett.tomt + " Tast koordinatene selv,"
+      + " eller lim inn en kartlenke.";
+    visForsok(liste, data.forsok);
     return;
   }
 
-  felt("stedSokHint").textContent = treff.length === 1
+  hint.textContent = (treff.length === 1
     ? "Ett treff. Trykk for å fylle inn."
-    : treff.length + " treff. Trykk på det som er riktig.";
+    : treff.length + " treff. Trykk på det som er riktig.")
+    + (data.utenNummer ? " Med husnummer blir søket smalere." : "");
 
   treff.forEach((t) => {
     const rad = document.createElement("li");
@@ -953,19 +1009,60 @@ async function sokSted() {
       felt("stedLon").value = t.lon.toFixed(4);
       if (t.adresse && !felt("stedAdresse").value) felt("stedAdresse").value = t.adresse;
       if (t.nettsted && !felt("stedKilde").value) felt("stedKilde").value = t.nettsted;
-      felt("stedTreff").textContent = "";
-      felt("stedSokHint").textContent = "Hentet fra OpenStreetMap. Sjekk at det stemmer.";
+      liste.textContent = "";
+      hint.textContent = "Hentet fra OpenStreetMap. Sjekk at det stemmer.";
     });
 
     rad.appendChild(knapp);
-    felt("stedTreff").appendChild(rad);
+    liste.appendChild(rad);
   });
+}
+
+// Hvert speil med sitt eget utfall. Rene opplysninger, ingen knapper: de
+// er her for a leses, og for at neste melding om «fikk ikke svar» skal
+// kunne besvares uten a gjette.
+function visForsok(liste, forsok) {
+  if (!Array.isArray(forsok) || !forsok.length) return;
+  forsok.forEach((f) => {
+    const rad = document.createElement("li");
+    const linje = document.createElement("span");
+    linje.className = "sted-under";
+    const deler = [f.kilde];
+    if (f.status) deler.push("HTTP " + f.status);
+    if (f.utfall) deler.push(f.utfall);
+    if (f.melding) deler.push(f.melding);
+    if (f.ms !== undefined) deler.push(f.ms + " ms");
+    linje.textContent = deler.filter(Boolean).join(" · ");
+    rad.appendChild(linje);
+    liste.appendChild(rad);
+  });
+}
+
+// Utveien som ikke spor noen: koordinatet star i lenka admin limer inn.
+// Den virker ogsa nar Overpass er nede, og det er hele poenget med den.
+function lesKartlenke() {
+  // Svaret star i sitt eget felt. Skrev vi over forklaringen, ville den
+  // vaert borte for neste sted — og det er den som sier hvilke lenker som
+  // virker.
+  const ut = felt("stedLenkeSvar");
+  ut.hidden = false;
+  const punkt = koordinatFraLenke(felt("stedLenke").value);
+  if (!punkt || punkt.feil) {
+    ut.textContent = (punkt && punkt.feil) || "Lim inn en kartlenke først.";
+    return;
+  }
+  felt("stedLat").value = punkt.lat.toFixed(4);
+  felt("stedLon").value = punkt.lon.toFixed(4);
+  ut.textContent = "Hentet " + punkt.lat.toFixed(4) + ", " + punkt.lon.toFixed(4)
+    + " fra lenka. Sjekk at det stemmer.";
 }
 
 felt("stedNytt").addEventListener("click", () => apneSted(null, ""));
 felt("stedAvbryt").addEventListener("click", lukkSted);
 felt("stedLagre").addEventListener("click", lagreSted);
 felt("stedSok").addEventListener("click", sokSted);
+felt("stedSokAdresse").addEventListener("click", sokAdresseSted);
+felt("stedLenkeLes").addEventListener("click", lesKartlenke);
 // Enter i et felt skal ikke sende skjemaet noe sted: det finnes ingen
 // action, og en navigasjon her ville mistet alt som er tastet.
 felt("stedSkjema").addEventListener("submit", (e) => e.preventDefault());

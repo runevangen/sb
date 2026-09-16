@@ -9,6 +9,59 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 16. september 2026 — Navnesøket var den eneste veien til et koordinat
+
+**Meldt som:** «Får ikke svar, dermed ikke lagret da vi ikke har
+koordinater.» Skjemaet sto med navn, bydel, adresse, type og kilde — og
+to tomme koordinatfelt.
+
+Portalen kunne slå opp et sted i OpenStreetMap **på navn**. Det hjelper
+for «The Dubliner». Det hjelper ikke for et lite sted OSM ikke kjenner
+navnet på — og det er nettopp de stedene admin må føre inn for hånd.
+Uten koordinat stopper lagringen, for `sjekkPubliste` krever et punkt
+innenfor Oslo-ramma. Blindvei.
+
+**Men den viktigste feilen var at vi ikke visste hvilken feil det var.**
+Tjenesten svarte «Fikk ikke svar fra OpenStreetMap» — og la ved `forsok`,
+som er nettopp den lista som sier hvem som svarte hva.
+`stedKall()` kastet den. Det samme gjorde `forslagKall()`. Så admin
+kunne ikke vite om Overpass var nede, om spørringen ble avvist, eller om
+vi selv la på før svaret kom — og de tre krever tre ulike ting.
+
+Det var det siste. Spørringen ba Overpass om `[timeout:12]` mens
+tjenesten avbrøt etter seks sekunder. **Vi var den som ga opp**, og
+meldinga la skylda på OpenStreetMap. To tall som skulle si det samme og
+ikke gjorde det. Nå er det ett tall, `SOK_SEKUNDER`, og en test slår ut
+hvis spørringen ber om noe annet enn det tjenesten venter.
+
+**Tre veier nå, og den siste spør ingen:**
+
+1. Navn, som før.
+2. **Adresse.** «Berglyveien 4J» finnes i OSM selv om puben i første
+   etasje ikke gjør det — norske adresser er importert fra Kartverket.
+   Et hus har ingen `name`, så navnesøkets parser kastet nettopp den
+   raden; adressesøket har sin egen.
+3. **En kartlenke limt inn.** Koordinatet står i lenka. Ingen tjeneste
+   spørres, så den virker også når Overpass er nede.
+
+To feller i lenketolkinga: Google legger stedets eget punkt i `!3d…!4d…`
+og kartets midtpunkt i `@…`, og står du zoomet ut er de langt fra
+hverandre — stedets punkt leses først. Og en kortlenke
+(`maps.app.goo.gl`) bærer ingen koordinater i det hele tatt; den får sin
+egen melding, for «fant ingenting» ville sendt admin ut for å lete etter
+noe som ikke er der.
+
+**Fanget av:** en admin som prøvde å føre inn et sted. Alle testene var
+grønne — de testet navnesøket, og navnesøket virket. Det var ingen test
+for «hva gjør admin når det ikke gir noe», fordi det ikke fantes et svar
+å teste.
+
+Fem sabotasjer: `[timeout:12]` tilbake, `@` foran `!3d`, `forsok` kastet
+igjen, ruta til adressesøket fjernet, og huset uten navn filtrert bort.
+Alle fem slår ut.
+
+---
+
 ## 16. september 2026 — «Sist inne» talte noe vi ikke måler
 
 **Meldt som:** «Sist inne-loggen av brukere er feil. Jeg er inne nå og det

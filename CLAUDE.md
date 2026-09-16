@@ -77,7 +77,14 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   et kall der lista *er* hele visningen, si det. Er lista et tillegg til
   noe annet, ti — men da får den som handlet beskjed.
 - **Feilmeldinger bærer tjenestens egne ord.** `forsok` i svaret, uten
-  nøkler og uten adresser, så det kan leses fra nettleseren.
+  nøkler og uten adresser, så det kan leses fra nettleseren. **Og den som
+  kaller, viser den:** en `forsok` klienten kaster er like god som ingen.
+  «Fikk ikke svar fra OpenStreetMap» er like forenlig med at tjeneren er
+  nede som med at vi selv la på — og de to krever ulike ting.
+- **En frist som er kortere enn den vi ba om, gjør oss til den som ga
+  opp.** `SOK_SEKUNDER` står ett sted og går både i spørringen og i
+  fristen. Sto de hver for seg, ba vi om tolv sekunder og la på etter
+  seks, mens meldinga la skylda på den andre parten.
 - **Et forslag fra en leser er ikke en rad i lista.** `puber-oslo.js` er
   kode fordi den bærer en redaksjonell vurdering. Innsendinger går i
   `pub_forslag`, og et menneske gjør raden ferdig. Det finnes ingen vei fra

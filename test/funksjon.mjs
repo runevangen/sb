@@ -1691,6 +1691,25 @@ function stubSteder(rader, status) {
   return kall;
 }
 
+// Egen stubb for Overpass. Den modellerer svaret Overpass gir — et hus
+// uten `name`, med addr-taggene — ikke koden som leser det. Stubben over
+// gir alltid en navngitt pub, og en pub er akkurat det adressesoket IKKE
+// finner: hadde vi brukt den, ville testen vaert enig med feilen.
+function stubOverpass(elementer, utfall) {
+  const kall = [];
+  global.fetch = async (url, opsjoner) => {
+    const o = opsjoner || {};
+    kall.push({ url: String(url), metode: o.method || "GET", opsjoner: o });
+    if (String(url).indexOf("overpass") > -1) {
+      if (utfall === "nede") return new Response("Gateway Timeout", { status: 504 });
+      if (utfall === "kastet") throw new Error("fetch failed");
+      return new Response(JSON.stringify({ elements: elementer || [] }), { status: 200 });
+    }
+    return new Response(JSON.stringify([EN_RAD]), { status: 200 });
+  };
+  return kall;
+}
+
 function stedBe(kropp) {
   return new Request("https://mvp-sb.netlify.app/api/pub-liste", {
     method: "POST",
@@ -1867,6 +1886,89 @@ ok("et navnesok gir treff med koordinat",
 ok("alle speilene sporres samtidig",
    kall.length === OVERPASS_SPEIL.length, kall.length);
 ok("og svaret krediterer OpenStreetMap", stedSvar.kilde === "OpenStreetMap");
+
+// Adressesoket. Navnesoket finner ikke et sted OSM ikke kjenner navnet pa,
+// og det er de sma stedene — nettopp de admin ma foere inn for hand.
+// Meldt 16. september 2026: «Berglyveien 4J», ingen vei til koordinatet.
+const ET_HUS = [{ type: "node", lat: 59.8432, lon: 10.7988,
+  tags: { "addr:street": "Berglyveien", "addr:housenumber": "4J" } }];
+
+kall = stubOverpass(ET_HUS);
+r = await pubListe(stedBe({ handling: "sok-adresse", passord: "feil", adresse: "Berglyveien 4J" }));
+ok("adressesoket ligger bak passordet", r.status === 401, r.status);
+ok("og nar aldri Overpass", kall.length === 0, kall.length);
+
+kall = stubOverpass(ET_HUS);
+r = await pubListe(stedBe({ handling: "sok-adresse", passord: PASSORD, adresse: "4J" }));
+ok("et husnummer uten gate avvises", r.status === 400, r.status);
+ok("og nar heller ikke Overpass", kall.length === 0, kall.length);
+
+kall = stubOverpass(ET_HUS);
+r = await pubListe(stedBe({ handling: "sok-adresse", passord: PASSORD,
+  adresse: "Berglyveien 4J" }));
+stedSvar = await r.json();
+ok("et adressesok gir treff med koordinat",
+   r.status === 200 && stedSvar.treff.length === 1 &&
+   stedSvar.treff[0].lat === 59.8432, JSON.stringify(stedSvar));
+// Huset har ingen `name`. Navnesoket kaster den raden; her er den svaret.
+ok("huset uten navn overlever adressesoket",
+   stedSvar.treff[0].navn === "Berglyveien 4J", JSON.stringify(stedSvar.treff[0]));
+ok("og sporringen spurte pa begge adressetaggene",
+   decodeURIComponent(kall[0].opsjoner.body).indexOf('"addr:housenumber"~"^4J$"') > -1,
+   decodeURIComponent(kall[0].opsjoner.body));
+
+// Uten husnummer kan en gate gi mange hus. Det er ikke soket som er
+// darlig — det er sporsmalet, og det skal sies.
+kall = stubOverpass(ET_HUS);
+r = await pubListe(stedBe({ handling: "sok-adresse", passord: PASSORD, adresse: "Berglyveien" }));
+stedSvar = await r.json();
+ok("en gate uten nummer sier ifra om at soket er vidt",
+   stedSvar.utenNummer === true, JSON.stringify(stedSvar));
+r = await pubListe(stedBe({ handling: "sok-adresse", passord: PASSORD,
+  adresse: "Berglyveien 4J" }));
+ok("mens en full adresse ikke gjor det",
+   (await r.json()).utenNummer === false);
+
+// Det admin faktisk motte: alle fire speilene feilet. Meldinga sa «Fikk
+// ikke svar fra OpenStreetMap» — uten et ord om hvem som svarte hva. Uten
+// `forsok` er det umulig a vite om Overpass var nede eller om var egen
+// frist lop ut, og den forskjellen er hele diagnosen.
+kall = stubOverpass(null, "nede");
+r = await pubListe(stedBe({ handling: "sok", passord: PASSORD, navn: "Andys Pub" }));
+stedSvar = await r.json();
+ok("alle speilene nede gir 502", r.status === 502, r.status);
+ok("og meldinga peker pa utveiene som finnes",
+   stedSvar.feil.indexOf("kartlenke") > -1, stedSvar.feil);
+ok("svaret forklarer hvert speil for seg",
+   stedSvar.forsok.length === OVERPASS_SPEIL.length, JSON.stringify(stedSvar.forsok));
+ok("med tjenestens egen statuskode",
+   stedSvar.forsok.every((f) => f.status === 504), JSON.stringify(stedSvar.forsok));
+ok("og med navnet pa speilet som feilet",
+   stedSvar.forsok.some((f) => f.kilde.indexOf("overpass-api.de") > -1),
+   JSON.stringify(stedSvar.forsok));
+// En nokkel eller en adresse i forsok-lista ville vaert en lekkasje: den
+// leses av hvem som helst som apner portalen.
+ok("forsok baerer ingen nokkel",
+   JSON.stringify(stedSvar.forsok).indexOf(PASSORD) === -1,
+   JSON.stringify(stedSvar.forsok));
+
+// Kastet oppkobling, ikke en statuskode: da er `utfall` det eneste
+// sporet, og det ma vaere med.
+kall = stubOverpass(null, "kastet");
+r = await pubListe(stedBe({ handling: "sok-adresse", passord: PASSORD,
+  adresse: "Berglyveien 4J" }));
+stedSvar = await r.json();
+ok("en kastet oppkobling forklares ogsa",
+   r.status === 502 && stedSvar.forsok.every((f) => f.utfall),
+   JSON.stringify(stedSvar.forsok));
+
+// Et tomt svar er ikke en feil: huset finnes bare ikke i OSM.
+kall = stubOverpass([]);
+r = await pubListe(stedBe({ handling: "sok-adresse", passord: PASSORD,
+  adresse: "Berglyveien 4J" }));
+stedSvar = await r.json();
+ok("ingen treff er 200 med tom liste, ikke en feil",
+   r.status === 200 && stedSvar.treff.length === 0, r.status + " " + JSON.stringify(stedSvar));
 
 delete process.env.ADMIN_PASSORD;
 delete process.env.SUPABASE_URL;
