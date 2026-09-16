@@ -274,6 +274,11 @@ create table if not exists puber (
   -- udatert rad er verre enn ingen rad. sjekkPubRad() i appen slipper
   -- ingen rad gjennom uten dem; sjekken her er den som holder når noen
   -- skriver rett mot basen.
+  --
+  -- Kilden er en lenke ELLER en setning. Den måtte være en URL til
+  -- 16. september 2026, og det stengte ute den lille puben uten nettside.
+  -- Feltet vises aldri for leseren — det svarer på «hvordan vet vi det»,
+  -- og «Var innom 16.09.2026, storskjerm i baren» svarer på det.
   kilde      text not null default '',
   sikkerhet  text not null default 'bekreftet'
              check (sikkerhet in ('bekreftet', 'sannsynlig', 'usikker')),
@@ -282,8 +287,18 @@ create table if not exists puber (
   -- Et sted som har lagt ned skal kunne forsvinne fra portalen. Raden i
   -- fila står, så det holder ikke å la være å skrive — den må skjules.
   fjernet    boolean not null default false,
-  check (fjernet or (kilde like 'http%' and sjekket is not null
-                     and lat is not null and lon is not null)),
+  -- Baksteget. kildeHolder() i pub-data.js er den ekte regelen, og den
+  -- kjøres av både portalen og tjenesten fra samme fil. Denne er litt
+  -- løsere med vilje: '% % %' teller mellomrom, ikke ord. Et baksteg som
+  -- er strengere enn appen, avviser rader appen nettopp godtok — og da
+  -- får den som lagret en feilmelding som ikke stemmer.
+  constraint puber_kilde_og_dato check (
+    fjernet or (
+      sjekket is not null and lat is not null and lon is not null
+      and (kilde like 'http%'
+           or (char_length(kilde) >= 12 and kilde like '% % %'))
+    )
+  ),
   endret     timestamptz not null default now(),
   -- Settes av databasen fra økten, som satt_av i visninger.
   endret_av  uuid default auth.uid() references auth.users (id) on delete set null
@@ -336,3 +351,16 @@ $$;
 drop trigger if exists puber_endret_trigger on puber;
 create trigger puber_endret_trigger before insert or update on puber
   for each row execute function puber_endret();
+
+
+-- For baser som fikk tabellen 16. september 2026, da kilden måtte være en
+-- URL. Trygg å kjøre om igjen.
+alter table puber drop constraint if exists puber_check;
+alter table puber drop constraint if exists puber_kilde_og_dato;
+alter table puber add constraint puber_kilde_og_dato check (
+  fjernet or (
+    sjekket is not null and lat is not null and lon is not null
+    and (kilde like 'http%'
+         or (char_length(kilde) >= 12 and kilde like '% % %'))
+  )
+);

@@ -65,6 +65,31 @@ portalen og tjenesten — fra den samme fila, så de to ikke kan bli uenige.
 `check`-en i `docs/oppsett.sql` er den som holder når noen skriver rett mot
 basen.
 
+**Men kilden er ikke en URL lenger.** Den var det til editoren hadde vært
+i bruk en dag, og da viste det seg at kravet stengte ute nettopp de
+stedene lista er til for: den lille puben i Torggata med storskjerm og
+ingen nettside.
+
+Regelen har alltid sagt «kilde og dato», ikke «lenke og dato». URL-en var
+en tilnærming, og en dårlig en — en nettside fra 2019 ser ut som en kilde
+uten å være det, mens «Var innom 16.09.2026, storskjerm i baren» er en
+kilde uten å se ut som en.
+
+Feltet vises aldri for leseren. Det er et revisjonsfelt for den som skal
+sjekke raden om et år, og da trenger det ikke være klikkbart — det trenger
+å svare på *hvordan vet vi det*.
+
+`kildeHolder()` godtar en lenke, eller minst tre ord og tolv tegn. Formen
+kan ikke skille en god kilde fra en dårlig; den kan skille et svar fra et
+ikke-svar. «ok» faller, «så en venn» faller, en setning står.
+
+Én regel for fila og for basen. To lister som er uenige om hva en gyldig
+rad er, er akkurat det sammenslåingen skal slippe — og en rad skal kunne
+flyttes fra basen og inn i fila uten å sjekkes på nytt. `check`-en i SQL-en
+er med vilje litt løsere (den teller mellomrom, ikke ord): et bakstegg som
+er strengere enn appen, avviser rader appen nettopp godtok, og da får den
+som lagret en feilmelding som ikke stemmer.
+
 En **fjernet** rad slipper med navnet alene. Det eneste den sier er at
 stedet ikke skal vises, og da er det ingen opplysning om virkeligheten å
 sette en kilde bak.

@@ -1773,6 +1773,29 @@ r = await pubListe(stedBe({ passord: PASSORD, token: STED_OKT,
   pub: Object.assign({}, ET_STED, { sjekket: "" }) }));
 ok("en rad uten dato avvises ogsa", r.status === 400, r.status);
 
+// Kilden er en lenke ELLER en setning. Den matte vaere en URL til
+// 16. september 2026, og det stengte ute den lille puben uten nettside.
+kall = stubSteder();
+r = await pubListe(stedBe({ passord: PASSORD, token: STED_OKT,
+  pub: Object.assign({}, ET_STED,
+    { kilde: "Var innom 16.09.2026, storskjerm i baren" }) }));
+ok("men en setning som kilde slipper gjennom", r.status === 200, r.status);
+const setningSkriv = kall.find((k) => k.metode === "POST");
+ok("og setningen star i raden som lagres",
+   !!setningSkriv &&
+   JSON.parse(setningSkriv.opsjoner.body)[0].kilde.indexOf("storskjerm") > -1,
+   setningSkriv && setningSkriv.opsjoner.body);
+
+// Et ikke-svar er fortsatt et ikke-svar.
+kall = stubSteder();
+r = await pubListe(stedBe({ passord: PASSORD, token: STED_OKT,
+  pub: Object.assign({}, ET_STED, { kilde: "ok" }) }));
+stedSvar = await r.json();
+ok("en kilde som ikke sier noe avvises", r.status === 400, r.status);
+ok("og meldinga sier hva som mangler",
+   stedSvar.feil.indexOf("hvordan vi vet det") > -1, stedSvar.feil);
+ok("uten a na basen", kall.length === 0, kall.length);
+
 kall = stubSteder();
 r = await pubListe(stedBe({ passord: PASSORD, token: STED_OKT, pub: ET_STED }));
 stedSvar = await r.json();

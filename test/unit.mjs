@@ -42,7 +42,7 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
          rangerForslag, FORSLAG_MAKS,
          OVERPASS_SPEIL, overpassHeadere, restTid,
          sjekkPubliste, kuraterteNaer, merkKuraterte,
-         sjekkKontaktliste, kontaktFor, finnKontakt, KONTAKT_FELT,
+         sjekkKontaktliste, kontaktFor, finnKontakt, KONTAKT_FELT, kildeHolder,
          pubNokkel, tolkPubRader, pubRadTilBase, slaSammenPuber, sjekkPubRad,
          osmNavnVask, osmNavnSporring, tolkNavnTreff, PUBTYPER, PUBSIKKERHET,
          OSLO_RAMME } from "../pub-data.js";
@@ -647,8 +647,12 @@ ok("den kuraterte lista holder formen", sjekkPubliste(PUBER_OSLO).length === 0,
 ok("lista har innhold og er datert",
    PUBER_OSLO.length >= 20 && PUBER_OSLO.every((p) => p.sjekket >= "2026-01-01"),
    PUBER_OSLO.length);
-ok("hver rad har en kilde som faktisk er en lenke",
-   PUBER_OSLO.every((p) => /^https?:\/\//.test(p.kilde)));
+// Én regel for fila og for basen. Den var «ma vaere en URL» til
+// 16. september 2026, og det stengte ute den lille puben uten nettside.
+// Na er den «si hvordan vi vet det» — en lenke, eller en setning.
+ok("hver rad sier hvordan vi vet det",
+   PUBER_OSLO.every((p) => kildeHolder(p.kilde)),
+   PUBER_OSLO.filter((p) => !kildeHolder(p.kilde)).map((p) => p.navn).join(", "));
 
 function rad(endring) {
   return Object.assign({ navn: "Testpuben", bydel: "Sentrum", adresse: "Gata 1",
@@ -666,8 +670,25 @@ ok("ukjent type og sikkerhet fanges",
 // En udatert rad er verre enn ingen rad: Oslos uteliv flytter seg fort.
 ok("dato som ikke er en dato fanges",
    sjekkPubliste([rad({ sjekket: "i fjor" })])[0].indexOf("ikke en dato") > -1);
-ok("kilde uten lenke fanges",
-   sjekkPubliste([rad({ kilde: "sa en venn" })])[0].indexOf("ikke en lenke") > -1);
+// Et ikke-svar fanges, et svar slipper gjennom. Formen kan ikke skille en
+// god kilde fra en darlig — men den kan skille et svar fra et ikke-svar.
+// join(), ikke [0]: en assertion som plukker fra en tom liste kaster, og
+// da river den de neste to hundre med seg framfor a bli rod. Samme felle
+// som ble lagt i hendelsesloggen 16. september — og skrevet pa nytt her
+// samme dag, sa den star igjen.
+ok("en kilde som ikke sier noe fanges",
+   sjekkPubliste([rad({ kilde: "ok" })]).join(" | ").indexOf("hvordan vi vet det") > -1,
+   sjekkPubliste([rad({ kilde: "ok" })]).join(" | "));
+ok("og en kilde pa to ord er fortsatt for lite",
+   sjekkPubliste([rad({ kilde: "sa en venn" })]).length === 1);
+ok("men en setning som sier hvordan holder",
+   sjekkPubliste([rad({ kilde: "Var innom 16.09.2026, storskjerm i baren" })]).length === 0,
+   sjekkPubliste([rad({ kilde: "Var innom 16.09.2026, storskjerm i baren" })]).join(" | "));
+ok("en lenke holder som for", kildeHolder("https://eksempel.no"));
+ok("og tom kilde melder «mangler», ikke «hvordan»",
+   sjekkPubliste([rad({ kilde: "" })]).length === 1 &&
+   sjekkPubliste([rad({ kilde: "" })]).join(" | ").indexOf("mangler kilde") > -1,
+   sjekkPubliste([rad({ kilde: "" })]).join(" | "));
 ok("samme sted to ganger fanges",
    sjekkPubliste([rad(), rad({ navn: "testpuben" })]).some((f) => f.indexOf("to ganger") > -1));
 ok("noe annet enn en liste fanges", sjekkPubliste("nei").length === 1);
@@ -2027,6 +2048,13 @@ ok("en rad uten navn faller ut", tolkPubRader([{ navn: "" }, null]).length === 0
 ok("en rad uten kilde slipper ikke gjennom",
    sjekkPubRad(Object.assign({}, PUBBASE[0], { kilde: "" })).length > 0,
    sjekkPubRad(Object.assign({}, PUBBASE[0], { kilde: "" })).join(" | "));
+// Den lille puben uten nettside skal kunne foeres inn. Editoren og fila
+// bruker samme vokter, sa de kan ikke bli uenige om hva som holder.
+ok("men en rad med en setning som kilde gjor det",
+   sjekkPubRad(Object.assign({}, PUBBASE[0],
+     { kilde: "Var innom 16.09.2026, storskjerm i baren" })).length === 0,
+   sjekkPubRad(Object.assign({}, PUBBASE[0],
+     { kilde: "Var innom 16.09.2026, storskjerm i baren" })).join(" | "));
 ok("en rad uten dato slipper ikke gjennom",
    sjekkPubRad(Object.assign({}, PUBBASE[0], { sjekket: "" })).length > 0);
 ok("en rad utenfor Oslo slipper ikke gjennom",
@@ -2044,8 +2072,8 @@ ok("men en fjernet rad uten navn gjor ikke det",
    sjekkPubRad({ navn: "", fjernet: true }).length === 1);
 // Feilen skal kunne leses av et menneske i portalen, ikke bare av koden.
 ok("feilen sier hva som mangler, uten radnummer",
-   sjekkPubRad(Object.assign({}, PUBBASE[0], { kilde: "" }))[0] === "mangler kilde",
-   sjekkPubRad(Object.assign({}, PUBBASE[0], { kilde: "" }))[0]);
+   sjekkPubRad(Object.assign({}, PUBBASE[0], { kilde: "" })).join(" | ") === "mangler kilde",
+   sjekkPubRad(Object.assign({}, PUBBASE[0], { kilde: "" })).join(" | "));
 
 ok("raden til basen barer verken endret_av eller endret",
    pubRadTilBase(PUBBASE[0]).endret_av === undefined &&

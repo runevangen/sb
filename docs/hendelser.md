@@ -116,6 +116,31 @@ som treffer på grensen forteller deg bare hvilken font runneren din har.**
 
 ---
 
+## 16. september 2026 — samme felle, samme dag, i en test jeg nettopp skrev
+
+**Hva som skjedde.** Kilden på en pubrad måtte være en URL. Den regelen
+stengte ute nettopp de stedene lista er til for — den lille puben med
+storskjerm og ingen nettside — så den ble løsnet til «en lenke eller en
+setning». Den nye testen for at «ok» fortsatt avvises, så grønn ut.
+
+**Hva som faktisk var årsaken.** Den var skrevet
+`sjekkPubliste([...])[0].indexOf("hvordan vi vet det") > -1`. Under
+sabotasjen ble lista tom, `[0]` ble `undefined`, og `.indexOf` kastet. Da
+døde hele unit.mjs midt i kjøringen framfor å melde ett rødt punkt — og
+resten av suiten sto ukjørt.
+
+**Hva som fanget det.** Sabotasjesjekken, men først på andre forsøk: første
+gang leste jeg `grep`-utdata der krasjen ikke synes, og tok tallet fra en
+senere kjøring i samme kommando som bevis på at alt var grønt.
+
+**Regelen det ble til.** To ting, og begge sto i loggen fra før. En
+assertion som plukker fra en liste, må tåle at lista er tom — `join(" | ")`
+framfor `[0]`. Og et testtall er bare et bevis når du ser det i den samme
+kjøringen som testen. Loggen hjelper ikke om den ikke leses før man
+skriver, og den ble skrevet samme dag som dette.
+
+---
+
 ## 16. september 2026 — stubben modellerte koden, ikke basen
 
 **Hva som skjedde.** Testen for at rettelsene fra portalen treffer leseren

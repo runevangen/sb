@@ -91,6 +91,12 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   slipper bare gjennom når begge står. Voktere i `unit.mjs` kjører mot de
   ekte filene, og et navn uten kilde slår ut der framfor i appen.
   [ADR 0016](docs/adr/0016-kanalen-som-sender.md)
+- **Kilde betyr «hvordan vet vi det», ikke «en URL».** For en pubrad
+  godtar `kildeHolder()` en lenke *eller* en setning — små steder har
+  ingen nettside, og «Var innom 16.09.2026, storskjerm i baren» er bedre
+  dokumentasjon enn en side fra 2019. Feltet vises aldri for leseren.
+  Kontaktfeltene og kanalene krever fortsatt lenke: de siterer en
+  nettside, og sitatet skal kunne slås opp.
 
 ### Form
 - Farger er CSS-variabler i `:root`; et tema overstyrer **kun** variabler.
