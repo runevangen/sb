@@ -16,7 +16,7 @@ deployer på push til `main`.
 git clone https://github.com/runevangen/sb.git && cd sb
 node test/unit.mjs        # rene funksjoner, ~90 ms
 node test/funksjon.mjs    # Netlify-funksjonene, ~250 ms
-node test/run.mjs         # DOM-testene, ~200 s, krever Chromium
+node test/run.mjs         # DOM-testene, sekunder, krever Chromium
 ```
 
 Node 22 (som CI og som byggeporten). Ingen `npm install` — det finnes
