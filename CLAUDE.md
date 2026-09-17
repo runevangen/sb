@@ -186,7 +186,7 @@ byggekommando i `netlify.toml`; feiler de, publiseres ingenting og forrige
 deploy står. Ingen bundler og ingen `node_modules` — kommandoen kjører to
 filer og ser på exit-koden.
 
-**Men `test/run.mjs` er ikke med.** Den tar ~200 s og trenger Chromium, som
+**Men `test/run.mjs` er ikke med.** Den trenger Chromium, som
 ikke er noe å regne med i Netlifys byggemiljø. En DOM-regresjon kan fortsatt
 rulle ut, og fanges bare av CI — etterpå. Halv port, med vilje.
 

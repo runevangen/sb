@@ -6,14 +6,18 @@
 // Ingen avhengigheter. Testene lastes inn i en kopi av index.html med et
 // mocket window.fetch, kjores i headless Chromium og rapporterer via
 // exit-kode. Sett CHROME hvis nettleseren ligger et annet sted.
+//
+// Scenene kjores flere om gangen — hver er sin egen nettleserprosess med
+// sin egen tjener, sa de kan ikke se hverandre. SAMTIDIG styrer hvor
+// mange; SAMTIDIG=1 kjorer dem etter tur, som for.
 
-import { readFileSync, writeFileSync, mkdtempSync, existsSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, existsSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
 import { promisify } from "node:util";
 
 const kjorProsess = promisify(execFile);
-import { tmpdir } from "node:os";
+import { tmpdir, availableParallelism } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -36,16 +40,17 @@ const MIME = {
   ".json": "application/json; charset=utf-8", ".webmanifest": "application/manifest+json",
 };
 
-function startTjener() {
+// En tjener per scene, med scenens egen mappe foran repoet. Da kan en
+// scene legge sin egen utgave av en modul der — slik kanaler.js fylles i
+// kanal-testen — uten at noen annen scene som kjorer samtidig ser den.
+function startTjener(mappe) {
   const tjener = createServer((req, res) => {
     const sti = decodeURIComponent(req.url.split("?")[0]);
-    // Testsidene ligger i temp; alt annet hentes fra repoet. En test kan
-    // ogsa legge sin egen utgave av en modul i temp — da vinner den. Det
-    // er slik en datafil som kanaler.js kan fylles i en test uten at
-    // det som star i repoet endres.
+    // Testsiden og scenens egne filer ligger i mappa; alt annet hentes
+    // fra repoet.
     const rel = sti.replace(/^\/+/, "");
-    const iTmp = join(tmp, rel);
-    const fil = existsSync(iTmp) ? iTmp : join(root, rel);
+    const iMappa = join(mappe, rel);
+    const fil = existsSync(iMappa) ? iMappa : join(root, rel);
     try {
       const innhold = readFileSync(fil);
       const type = MIME[fil.slice(fil.lastIndexOf("."))] || "application/octet-stream";
@@ -131,19 +136,70 @@ function avkod(s) {
           .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
 }
 
+// Hvor mange scener som kjorer samtidig. Hver scene er en egen
+// Chromium-prosess, og det er oppstarten av den som koster — ikke den
+// virtuelle tida, som hopper over all venting. Fire til seks om gangen
+// gir nesten like mange ganger raskere pa en maskin med kjerner nok;
+// GitHub-runneren har fire.
+const SAMTIDIG = Number(process.env.SAMTIDIG) || Math.max(2, Math.min(6, availableParallelism()));
+let opptatt = 0;
+const koen = [];
+function ledigPlass() {
+  if (opptatt < SAMTIDIG) { opptatt += 1; return Promise.resolve(); }
+  return new Promise((ok) => koen.push(ok));
+}
+function frigiPlass() {
+  const neste = koen.shift();
+  if (neste) neste(); else opptatt -= 1;
+}
+
 // storrelse settes der vindushoyden er en del av det som testes. Standard
 // er nettleserens eget vindu; hoydetesten trenger et telefonformat for at
 // taket pa kortet i det hele tatt skal binde.
-async function kjor(navn, skript, storrelse, kilde) {
-  const fil = join(tmp, navn + ".html");
+//
+// filer er scenens egne utgaver av moduler, {"kanaler.js": innhold}, og
+// serveres bare til denne scenen.
+//
+// Kallet returnerer med en gang; selve kjoringen venter pa ledig plass,
+// og rapporten nederst venter pa alle. Ingenting mellom to scener kan
+// derfor regne med at den forrige er ferdig — det en scene trenger,
+// sendes inn.
+async function kjor(navn, skript, storrelse, kilde, filer) {
+  await ledigPlass();
+  try {
+    return await kjorScene(navn, skript, storrelse, kilde, filer || {});
+  } finally {
+    frigiPlass();
+  }
+}
+
+async function kjorScene(navn, skript, storrelse, kilde, filer) {
+  const mappe = join(tmp, navn);
+  mkdirSync(mappe, { recursive: true });
+  const fil = join(mappe, navn + ".html");
   // Standard er appen selv; admin-portalen er en egen side og sendes inn.
-  const side = kilde || app;
+  let side = kilde || app;
+  // Fontene fra Google hentes pa nytt i hver ferske nettleserprofil, og
+  // det er ekte nettverk: virtuell tid star stille mens de lastes, sa de
+  // kostet mer enn selve testen. Ingen test ser pa fonter. Lenkene tas ut
+  // av testkopien; reservefontene i app.css gjelder.
+  side = side.replace(/^[ \t]*<link[^>]*fonts\.g(oogleapis|static)\.com[^>]*>[ \t]*\n?/gim, "");
   // Skriptet legges etter <meta charset>, sa tegnsettet star forst i fila
   // ogsa for den som leser den uten headeren.
   const meta = side.match(/<meta charset="utf-8">/i);
   const merke = meta ? meta[0] : "<head>";
   writeFileSync(fil, side.replace(merke, merke + "\n<script>" + HARNESS + skript + "<\/script>"));
+  Object.keys(filer).forEach((rel) => writeFileSync(join(mappe, rel), filer[rel]));
 
+  const tjener = await startTjener(mappe);
+  try {
+    return await iNettleseren(navn, storrelse, tjener.address().port);
+  } finally {
+    tjener.close();
+  }
+}
+
+async function iNettleseren(navn, storrelse, PORT) {
   const argv = [
     // --dump-dom virker bare i hodelos modus. Lokalt er binaerfila ofte
     // headless_shell, som alltid er hodelos, men pa en CI-runner er det en
@@ -167,9 +223,6 @@ async function kjor(navn, skript, storrelse, kilde) {
   if (!treff) throw new Error(navn + ": testsiden rapporterte ingenting");
   return JSON.parse(avkod(treff[1]));
 }
-
-const tjener = await startTjener();
-const PORT = tjener.address().port;
 
 /* ---------------- felles testdata ---------------- */
 
@@ -221,7 +274,7 @@ function mockFetch(saker) {
 
 /* ---------------- 1. feed, tidsstempler, annonser, XSS i tittel ---------------- */
 
-const SAK_1 = await kjor("feed", FELLES + `
+const SAK_1 = kjor("feed", FELLES + `
   var saker = lagSaker(12);
   // Slik WordPress returnerer en tittel som bokstavelig inneholder en img-tag.
   saker[0].title.rendered = "&lt;img src=x onerror=&quot;document.body.setAttribute('pwned','ja')&quot;&gt; Toppsak";
@@ -314,7 +367,7 @@ const SAK_1 = await kjor("feed", FELLES + `
 // Annonseplassene kommer etter hver fjerde sak, sa to av dem kan sta pa
 // samme skjerm. Tre like bokser leses som stoy; tre ulike leses som tre
 // plasser. Testen blar gjennom feeden til alle tre har vaert innom.
-const SAK_1B = await kjor("annonse-varianter", FELLES + `
+const SAK_1B = kjor("annonse-varianter", FELLES + `
   // Hver side gir tolv nye saker, sa «Vis flere» kan trykkes sa mange
   // ganger vi trenger for a komme forbi alle annonseplassene.
   var side = 0;
@@ -516,7 +569,7 @@ const SAK_1B = await kjor("annonse-varianter", FELLES + `
 
 /* ---------------- 2. rensing av artikkel-HTML ---------------- */
 
-const SAK_2 = await kjor("artikkel", FELLES + `
+const SAK_2 = kjor("artikkel", FELLES + `
   var saker = lagSaker(3);
   saker[0].content.rendered =
     "<h2>Mellomtittel</h2><p>Brann <strong>2-0</strong>.</p>" +
@@ -563,7 +616,7 @@ const SAK_2 = await kjor("artikkel", FELLES + `
 
 /* ---------------- 3. rulling og endringssjekk ---------------- */
 
-const SAK_3 = await kjor("oppdatering", FELLES + `
+const SAK_3 = kjor("oppdatering", FELLES + `
   var saker = lagSaker(12);
   ` + mockFetch("saker") + `
   window.addEventListener("load", function () { setTimeout(function () {
@@ -638,7 +691,7 @@ const SAK_3 = await kjor("oppdatering", FELLES + `
 
 /* ---------------- 4. ruting, paginering og interne lenker ---------------- */
 
-const SAK_4 = await kjor("ruting", FELLES + `
+const SAK_4 = kjor("ruting", FELLES + `
   var saker = lagSaker(12);
   saker[0].content.rendered =
     "<p>Se ogsa <a href=\\"https://sportsbibelen.no/annen-sak/\\">denne saken</a> " +
@@ -713,7 +766,7 @@ const SAK_4 = await kjor("ruting", FELLES + `
 
 /* ---------------- 5. visningsvalg ---------------- */
 
-const SAK_5 = await kjor("visning", FELLES + `
+const SAK_5 = kjor("visning", FELLES + `
   var saker = lagSaker(12);
   ` + mockFetch("saker") + `
   function aktiv(id) { return document.getElementById(id).getAttribute("aria-current") === "true"; }
@@ -928,7 +981,7 @@ function mockAlt(saker, fotballFeil) {
   };`;
 }
 
-const SAK_6 = await kjor("fotball", FELLES + FOTBALL + `
+const SAK_6 = kjor("fotball", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   ` + mockAlt("saker") + `
 
@@ -1157,7 +1210,7 @@ const SAK_6 = await kjor("fotball", FELLES + FOTBALL + `
 
 /* ---------------- 7. fotball: dyplenke og feil ---------------- */
 
-const SAK_7 = await kjor("fotball-lenke", FELLES + FOTBALL + `
+const SAK_7 = kjor("fotball-lenke", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   ` + mockAlt("saker") + `
   location.hash = "#/fotball/premier/neste";
@@ -1186,7 +1239,7 @@ const SAK_7 = await kjor("fotball-lenke", FELLES + FOTBALL + `
   }, 900); });
 `);
 
-const SAK_8 = await kjor("fotball-feil", FELLES + FOTBALL + `
+const SAK_8 = kjor("fotball-feil", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   ` + mockAlt("saker", true) + `
 
@@ -1204,7 +1257,7 @@ const SAK_8 = await kjor("fotball-feil", FELLES + FOTBALL + `
 
 /* ---------------- 9. lag i tabellen soker i nyhetene ---------------- */
 
-const SAK_9 = await kjor("fotball-lagsok", FELLES + FOTBALL + `
+const SAK_9 = kjor("fotball-lagsok", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   // En sak lenger nede i feeden handler faktisk om laget. Etter et lagsok
   // skal den sta overst — som toppsak — ikke der datoen tilfeldigvis
@@ -1278,7 +1331,7 @@ const SAK_9 = await kjor("fotball-lagsok", FELLES + FOTBALL + `
 
 // Gratisnivaet gir en sesong som er over. Da har den ingen neste runde, og
 // «ingen kamper er satt opp» ville sett ut som en feil hos oss.
-const SAK_10 = await kjor("fotball-ferdig", FELLES + FOTBALL + `
+const SAK_10 = kjor("fotball-ferdig", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   window.fetch = function (u) {
     u = String(u);
@@ -1309,7 +1362,7 @@ const SAK_10 = await kjor("fotball-ferdig", FELLES + FOTBALL + `
 
 // Stjernen i tabellen velger laget; valget lagres lokalt og lofter sakene
 // om laget i feeden bak fanen — men bare saker som handler om det.
-const SAK_11 = await kjor("favorittlag", FELLES + FOTBALL + `
+const SAK_11 = kjor("favorittlag", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   saker[7].title.rendered = "Brann-jubel i Bergen";
   // Nevnes bare i forbifarten. Skal ikke skyve dagens toppsak nedover.
@@ -1370,7 +1423,7 @@ const SAK_11 = await kjor("favorittlag", FELLES + FOTBALL + `
 
 // Arets neste runde (fra TheSportsDB) kan deles: velg sted, del inn i
 // gruppechatten. Delingsmenyen stubbes, sa teksten kan kontrolleres.
-const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
+const SAK_12 = kjor("kamp-deling", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   // Kampene har arena, sa vaeret hentes og star under dem.
   var ARETS = KOMMENDE.map(function (k, i) {
@@ -1674,7 +1727,7 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
 
 /* ---------------- 13. fjorarets runde kan ikke deles ---------------- */
 
-const SAK_13 = await kjor("kamp-deling-gammel", FELLES + FOTBALL + `
+const SAK_13 = kjor("kamp-deling-gammel", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   ` + mockAlt("saker") + `
   location.hash = "#/fotball/eliteserien/neste";
@@ -1696,7 +1749,7 @@ const SAK_13 = await kjor("kamp-deling-gammel", FELLES + FOTBALL + `
 // Og det viktigste: den kuraterte lista ligger i koden, sa kjente
 // fotballpuber i naerheten star der ogsa nar bade Overpass og var egen
 // funksjon er nede. Det var nettopp Overpass som sviktet i prod.
-const SAK_14 = await kjor("pub-feil", FELLES + FOTBALL + `
+const SAK_14 = kjor("pub-feil", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
   // Leseren star ved Oslo S. Overpass svarer ikke.
@@ -1770,7 +1823,7 @@ const SAK_14 = await kjor("pub-feil", FELLES + FOTBALL + `
 
 // Portalen er en egen side. Den skriver ingenting selv: testen fanger
 // POST-en og sjekker at det som sendes er det samme som sto pa skjermen.
-const SAK_15 = await kjor("admin", `
+const SAK_15 = kjor("admin", `
   // Skrivingen gar med admins egen okt na (#79), ikke med en nokkel:
   // RLS slar opp uid-en i visning_skrivere, og ADMIN_PASSORD betyr
   // ingenting for Supabase. Uten en okt i localStorage skal portalen si
@@ -2124,7 +2177,7 @@ const SAK_15 = await kjor("admin", `
 // Fila er grunnfjellet. Editoren skriver rettelsene oppa, og portalen skal
 // vise begge deler — hva som star i puber-oslo.js, og hva som er rettet
 // herfra (#80, ADR 0020).
-const SAK_15B = await kjor("admin-steder", `
+const SAK_15B = kjor("admin-steder", `
   try {
     localStorage.setItem("sb-konto", JSON.stringify({
       token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
@@ -2289,7 +2342,7 @@ const SAK_15B = await kjor("admin-steder", `
 // siste av dem spor ingen.
 //
 // Egen side, som 15B: en test sju tilbakekall dypt er ikke til a rette.
-const SAK_15C = await kjor("admin-koordinat", `
+const SAK_15C = kjor("admin-koordinat", `
   try {
     localStorage.setItem("sb-konto", JSON.stringify({
       token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
@@ -2469,7 +2522,7 @@ const VISNINGER_FRA_TJENESTEN = [
 // hver sin feil: raden som aldri fikk «vises pa», og kortet som sto med
 // gamle svar. Derfor svarer /api/pub-liste her **for sent med vilje** —
 // etter at kortet er tegnet — og testen ser om kortet tegnes om.
-const SAK_16B = await kjor("pub-rettelser", FELLES + FOTBALL + `
+const SAK_16B = kjor("pub-rettelser", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
   // Leseren star midt i Kvadraturen. The Toucan star i puber-oslo.js
@@ -2558,7 +2611,7 @@ const SAK_16B = await kjor("pub-rettelser", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500); });
 `);
 
-const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
+const SAK_16 = kjor("pub-bekreftet", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   var VISNINGER = ${JSON.stringify(VISNINGER_FRA_TJENESTEN)};`  + `
   var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
@@ -2724,7 +2777,7 @@ const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
 
 /* ---------------- 17. lenka apner kampen som ble delt ---------------- */
 
-const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
+const SAK_17 = kjor("kamp-lenke", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
   window.fetch = function (u) {
@@ -2840,7 +2893,7 @@ const SAK_17 = await kjor("kamp-lenke", FELLES + FOTBALL + `
 
 /* ---------------- 18. innlogging med fornavn og PIN ---------------- */
 
-const SAK_18 = await kjor("innlogging", FELLES + `
+const SAK_18 = kjor("innlogging", FELLES + `
   var saker = lagSaker(12);
   window.__konto = [];
   function svarMed(kropp, status) {
@@ -3094,7 +3147,7 @@ const SAK_18 = await kjor("innlogging", FELLES + `
 
 /* ---------------- 19. jeg blir med ---------------- */
 
-const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
+const SAK_19 = kjor("blir-med", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
   // Innlogget for appen starter: okta ligger der en tidligere innlogging
@@ -3374,7 +3427,7 @@ const SAK_19 = await kjor("blir-med", FELLES + FOTBALL + `
 // «Navnet vennene ser» la i nettleseren og ble ikke tomt ved utlogging.
 // Logget man inn som en annen i samme nettleser, skrev den nye kontoen
 // raden sin med forrige persons navn: to kontoer, to rader, ett navn.
-const SAK_18B = await kjor("navn-per-konto", FELLES + FOTBALL + `
+const SAK_18B = kjor("navn-per-konto", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
   // Ola er logget inn og har svart fra for — navnet ligger i nettleseren.
@@ -3471,7 +3524,7 @@ const SAK_18B = await kjor("navn-per-konto", FELLES + FOTBALL + `
 // samme — som man gjor nar man apner appen for a sjekke hvor man skal —
 // var kortet ferdig tegnet for svarene kom, og ingenting tegnet det pa
 // nytt. Stedet sto umerket, og kortet sa ingenting om hvor man skulle.
-const SAK_19A = await kjor("kort-for-svar", FELLES + FOTBALL + `
+const SAK_19A = kjor("kort-for-svar", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
   localStorage.setItem("sb-konto", JSON.stringify({ token: "okt-1", navn: "Ola",
@@ -3582,7 +3635,7 @@ function fornySide(fornyerSvar) {
 `;
 }
 
-const SAK_19B = await kjor("fornying", fornySide(`function () {
+const SAK_19B = kjor("fornying", fornySide(`function () {
   // Uten bruker-id i svaret: Supabase trenger ikke sende brukerobjektet
   // med pa en fornying, og da ma appen beholde den den hadde.
   // (Ingen bakflutt her: den avslutter template-literalen rundt.)
@@ -3628,7 +3681,7 @@ const SAK_19B = await kjor("fornying", fornySide(`function () {
 // En avvist fornyer er noe annet enn et nettverksblaff: den er brukt,
 // trukket tilbake eller utlopt, og da hjelper det ikke a prove igjen.
 // Appen skal logge ut framfor a sta og prove.
-const SAK_19C = await kjor("fornying-avvist", fornySide(`function () {
+const SAK_19C = kjor("fornying-avvist", fornySide(`function () {
   return Promise.resolve({ ok: false, status: 401, statusText: "Unauthorized",
     text: function () { return Promise.resolve(JSON.stringify({
       feil: "Innloggingen er utløpt. Logg inn på nytt.", utlogget: true })); } });
@@ -3653,7 +3706,7 @@ const SAK_19C = await kjor("fornying-avvist", fornySide(`function () {
 // Kampene noen blir med pa, pa tvers av ligaer. Loftingen i Kommende
 // svarer innenfor én liga; denne fanen finnes for det som ligger i en
 // annen.
-const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
+const SAK_20 = kjor("venner", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
   var PL = [{ id: 901, hjemme: "Arsenal", borte: "Liverpool",
@@ -3779,7 +3832,7 @@ const SAK_20 = await kjor("venner", FELLES + FOTBALL + `
 // Og feiler kallet, sto det «ingen har sagt at de blir med ennå» — en
 // pastand om noe vi ikke vet. I rundevisningen er lista et tillegg til
 // kampen og tausheten riktig; her er lista hele visningen.
-const SAK_20B = await kjor("venner-tak", FELLES + FOTBALL + `
+const SAK_20B = kjor("venner-tak", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   // Uten rundetall, som TheSportsDB gir dem: tjue kamper i ett vindu.
   var VINDU = [];
@@ -3863,22 +3916,22 @@ const SAK_20B = await kjor("venner-tak", FELLES + FOTBALL + `
 /* ---------------- 21. kanalen som sender kampen ---------------- */
 
 // kanaler.js star tom i repoet: ingen rad har kilde og dato, sa
-// ingenting skal vises. Testen legger sin egen utgave i temp, som
-// tjeneren serverer framfor den i repoet.
+// ingenting skal vises. Testen sender med sin egen utgave, som scenens
+// tjener serverer framfor den i repoet — bare til denne scenen.
 //
 // To ligaer med vilje: én verifisert og én uten dato. Da ser testen
 // bade at en verifisert rad vises, og at en udatert IKKE gjor det — og
 // den andre halvdelen er den viktigste.
-writeFileSync(join(tmp, "kanaler.js"),
+const KANALER_TEST =
   'export const KANALER = {\n' +
   '  eliteserien: { kanal: "TV 2 Play", kilde: "https://www.tv2.no/", sjekket: "2026-09-14" },\n' +
   '  premier: { kanal: "Viaplay", kilde: null, sjekket: null },\n' +
   '  laliga: { kanal: null, kilde: null, sjekket: null },\n' +
   '  bundesliga: { kanal: null, kilde: null, sjekket: null },\n' +
   '  seriea: { kanal: null, kilde: null, sjekket: null }\n' +
-  '};\n');
+  '};\n';
 
-const SAK_21 = await kjor("kanal", FELLES + FOTBALL + `
+const SAK_21 = kjor("kanal", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
   var bedtOm = [];
@@ -3964,16 +4017,14 @@ const SAK_21 = await kjor("kanal", FELLES + FOTBALL + `
       ferdig();
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
-`);
-
-rmSync(join(tmp, "kanaler.js"));
+`, null, null, { "kanaler.js": KANALER_TEST });
 
 /* ---------------- 22. foreslatte steder (#80) ---------------- */
 
 // Star du pa en pub som ikke finnes i lista, hadde du til na ingen vei til
 // a si fra. Skjemaet ligger nederst i pubdelen av kortet — der man alt har
 // skrevet et navn selv, og der stedet mangler.
-const SAK_22 = await kjor("pub-forslag", FELLES + FOTBALL + `
+const SAK_22 = kjor("pub-forslag", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
   window.__forslag = [];
@@ -4087,7 +4138,7 @@ const SAK_22 = await kjor("pub-forslag", FELLES + FOTBALL + `
 // slette den fra localStorage midt i en test er ingen utlogging — den
 // oversatte bare til at konto.okt() fortsatt svarte. Testen sto rodt pa
 // noe som virker, og det var testen som var feil.
-const SAK_22B = await kjor("pub-forslag-utlogget", FELLES + FOTBALL + `
+const SAK_22B = kjor("pub-forslag-utlogget", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
   window.__forslag = [];
@@ -4183,7 +4234,7 @@ const ELITESERIEN = [
   "Fredrikstad", "Sandefjord", "KFUM Oslo", "Haugesund", "Bryne",
 ];
 
-const SAK_23 = await kjor("tabell-iphone", FELLES + `
+const SAK_23 = kjor("tabell-iphone", FELLES + `
   var TABELL = [
 ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)}, kamper: 30, seier: ${21 - i}, uavgjort: 5,\n      tap: ${4 + i}, scoret: ${74 - i * 3}, sluppet: ${33 + i}, differanse: ${41 - i * 4}, poeng: ${68 - i * 3},\n      merke: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" },`).join("\n")}
   ];
@@ -4249,7 +4300,9 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 /* ---------------- rapport ---------------- */
 
-const alle = [...SAK_1, ...SAK_1B, ...SAK_2, ...SAK_3, ...SAK_4, ...SAK_5, ...SAK_6, ...SAK_7, ...SAK_8, ...SAK_9, ...SAK_10, ...SAK_11, ...SAK_12, ...SAK_13, ...SAK_14, ...SAK_15, ...SAK_15B, ...SAK_15C, ...SAK_16, ...SAK_16B, ...SAK_17, ...SAK_18, ...SAK_18B, ...SAK_19, ...SAK_19A, ...SAK_19B, ...SAK_19C, ...SAK_20, ...SAK_20B, ...SAK_21, ...SAK_22, ...SAK_22B, ...SAK_23];
+// Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
+// rapporten er filas, uansett hvilken som ble ferdig forst.
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_13, SAK_14, SAK_15, SAK_15B, SAK_15C, SAK_16, SAK_16B, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
 let feilet = 0;
 
 for (const t of alle) {
@@ -4262,5 +4315,4 @@ for (const t of alle) {
 }
 
 console.log("\n" + (alle.length - feilet) + " av " + alle.length + " tester passerte");
-tjener.close();
 process.exit(feilet ? 1 : 0);

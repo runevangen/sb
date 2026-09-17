@@ -6,7 +6,7 @@ dager. Legger du til tester, er det denne fila som skal rettes.
 
     node test/unit.mjs      606 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  343 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       522 tester, ~200 s, headless Chromium
+    node test/run.mjs       522 tester, 3–20 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
@@ -34,11 +34,23 @@ ikke har noe med koden å gjøre.
 stakksporene fra feilstitestene også når alt går bra — det er `console.error`
 i funksjonene, ikke en feil.
 
-**De ~200 sekundene er en treg maskin, ikke et fast tall.** På
-GitHub-runneren tar hele jobben rundt 35 sekunder. Et grønt CI-resultat på
-under et minutt er altså normalt — det betyr *ikke* at nettlesertestene
-ble hoppet over. Sjekk antallet i loggen framfor å lese klokka; det er
-tallet som sier at de kjørte.
+**Nettlesertestene koster oppstart, ikke ventetid.** Hver scene er en
+egen Chromium-prosess, og `--virtual-time-budget` hopper over all
+`setTimeout`-venting: en scene som venter tolv sekunder er like rask som
+en som venter ett. Det som stanser den virtuelle klokka er ekte
+ressurslasting — og Google-fontene i `index.html` ble hentet på nytt i
+hver ferske profil, uten cache, så de kostet mer enn selve testen.
+`kjor()` tar derfor fontlenkene ut av testkopien (ingen test ser på
+fonter), og scenene kjøres flere om gangen, hver med sin egen tjener og
+sin egen mappe, så ingen scene kan se en annens filer. `SAMTIDIG=1`
+kjører dem etter tur, som før.
+
+Målt på fire kjerner, 33 scener: `headless_shell` rundt 3 s parallelt og
+8 s etter tur; full Chromium rundt 10 s og 17 s. Før var det 13–27 s her,
+og rundt 200 s på en Mac med full Chrome. Et grønt CI-resultat på under et
+minutt er altså normalt — det betyr *ikke* at nettlesertestene ble hoppet
+over. Sjekk antallet i loggen framfor å lese klokka; det er tallet som
+sier at de kjørte.
 
 ## De tre reglene
 
