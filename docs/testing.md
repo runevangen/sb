@@ -6,7 +6,7 @@ dager. Legger du til tester, er det denne fila som skal rettes.
 
     node test/unit.mjs      606 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  343 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       522 tester, 3–20 s, headless Chromium
+    node test/run.mjs       525 tester, 3–20 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
@@ -118,6 +118,18 @@ til angring, og hele fotballmodulen.
 
 ## Feller i testrammen
 
+- **`getComputedStyle()` gir et *levende* objekt.** Vil du vite hva en
+  klasse faktisk gjør, må verdiene kopieres til vanlige strenger **før**
+  klassen fjernes. Leser du samme deklarasjon etterpå, sammenlikner du
+  elementet med seg selv — og får «ingenting endres» uansett. Kostet en
+  feil konklusjon 16. september 2026.
+- **De genererte sidene i `tmp` kjører sitt eget scenario.** Injiserer du
+  et eget skript i `pub-bekreftet.html` for å måle noe, klikker sidas egen
+  test videre samtidig — og du måler en blandet tilstand. Samme dag ble
+  «Carls har stjerne på feil kamp» meldt som en feil; det var proben som
+  leste kortet fra kamp 1 mens sida alt hadde åpnet kamp 2. Bygg en egen
+  side fra `index.html` når du skal måle, eller les assertionene som
+  finnes fra før.
 - **Testsidene serveres over HTTP**, ikke fra `file://` — modul-script
   blokkeres av CORS på file-opphav, og appen ville aldri lastet.
   Tegnsettet står i HTTP-headeren, ikke bare i `<meta charset>`: det
