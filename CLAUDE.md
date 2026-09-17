@@ -88,6 +88,15 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   kaller, viser den:** en `forsok` klienten kaster er like god som ingen.
   «Fikk ikke svar fra OpenStreetMap» er like forenlig med at tjeneren er
   nede som med at vi selv la på — og de to krever ulike ting.
+- **Bokstaver er `\p{L}`, ikke en håndskrevet liste.** `osmNavnVask()`
+  hadde `A-Za-zæøå` og gjorde «Grünerløkka» til «Gr nerløkka». En liste
+  over hvilke tegn som er bokstaver, mangler alltid noen. Vask bort det
+  som faktisk er farlig — hermetegn, apostrof, bakoverstrek — ikke alt du
+  ikke kom på.
+- **Husnummeret står rett etter gata, ikke sist.** Folk skriver poststed
+  etter adressen, og et innsendt forslag gjør det nesten alltid.
+  `delAdresse()` kaster alt som kommer etter nummeret; leste den siste
+  bit, ble «Torggata 11, Oslo» til gata «Torggata 11 Oslo» og null treff.
 - **En frist som er kortere enn den vi ba om, gjør oss til den som ga
   opp.** `SOK_SEKUNDER` står ett sted og går både i spørringen og i
   fristen. Sto de hver for seg, ba vi om tolv sekunder og la på etter

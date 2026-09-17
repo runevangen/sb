@@ -9,6 +9,38 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 17. september 2026 — adressesøket fant ingenting, og bokstavene var halve
+
+**Meldt som:** «Feilmelding når jeg legger inn bydel og adresse på foreslått
+pub», med `forsok`-lista limt inn — ett speil svarte 200, resten 406 eller
+avbrutt.
+
+**Hva som faktisk var årsaken.** To ting, og ingen av dem var Overpass.
+
+`delAdresse()` leste husnummeret som **siste** bit. Folk skriver poststed
+etter adressen, og et innsendt forslag gjør det nesten alltid: «Torggata
+11, Oslo» ble da gata «Torggata 11 Oslo», forankret med `^$`, og null
+treff. Nummeret står rett etter gata, ikke sist — nå kastes alt som kommer
+etter det.
+
+`osmNavnVask()` hadde en **håndskrevet** bokstavliste: `A-Za-z` pluss æøå.
+Alt annet ble mellomrom. «Grünerløkka» ble «Gr nerløkka» og «Café Sara»
+ble «Caf Sara» — to ekte steder i Oslo, begge usøkbare. Klassen er
+`\p{L}` nå: en bokstav, uansett språk. Hermetegn, apostrof og
+bakoverstrek slipper like lite gjennom som før — det var dem vasken
+fantes for.
+
+**Hva som fanget det.** `forsok`-lista. Uten den ville meldinga vært «ingen
+treff», og ingen ville visst at ett speil faktisk svarte 200 — altså at
+spørringen var stilt og besvart, og at det var *spørsmålet* som var feil.
+Regelen fra #100 tjente inn seg selv på to dager.
+
+**Regelen det ble til.** En håndskrevet liste over hvilke tegn som er
+bokstaver, er en liste som kommer til å mangle noen. Bruk `\p{L}` og vask
+bort det som faktisk er farlig.
+
+---
+
 ## 17. september 2026 — «Fikk ikke puber ved Stadio Pierluigi Penzo»
 
 **Meldt som:** «Finner ikke puber nær stadion er vel litt rart å si. Her må

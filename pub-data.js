@@ -585,8 +585,14 @@ export function sjekkPubRad(p, ramme) {
 // Norske bokstaver blir staende. De gjorde det ikke da fila her foldet
 // dem forst: «Bla Gronland» er verken det ene eller det andre.
 export function osmNavnVask(navn) {
+  // \p{L} er «en bokstav, uansett sprak». Klassen var en handskrevet liste
+  // med AEOA og norske tegn til 17. september 2026, og da falt alt annet
+  // ut som mellomrom: «Grunerlokka» ble «Gr nerlokka» og «Cafe Sara» ble
+  // «Caf Sara» — to steder i Oslo, begge usokbare. Det som ma vaske bort
+  // er hermetegn, apostrof og bakoverstrek, og dem slipper \p{L} like lite
+  // gjennom som lista gjorde.
   return String(navn || "")
-    .replace(/[^0-9A-Za-zAEOAaeoa\u00C6\u00D8\u00C5\u00E6\u00F8\u00E5]+/g, " ")
+    .replace(/[^0-9\p{L}]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 60);
@@ -697,16 +703,27 @@ export function delAdresse(adresse) {
   const vasket = osmNavnVask(adresse);
   if (!vasket) return null;
   const biter = vasket.split(" ").filter(Boolean);
-  // Nummeret star sist i norske adresser. Er siste bit et tall, eventuelt
-  // med en bokstav bak, er det nummeret — ellers har vi bare en gate.
-  const siste = biter[biter.length - 1] || "";
-  const erNummer = biter.length > 1 && /^[0-9]+[A-Za-z\u00C6\u00D8\u00C5\u00E6\u00F8\u00E5]?$/.test(siste);
-  const gate = (erNummer ? biter.slice(0, -1) : biter).join(" ");
+  // Nummeret star **rett etter gata**, ikke sist. Det sto «sist» til
+  // 17. september 2026, og da veltet alt som kom etter: «Torggata 11,
+  // Oslo» ble slatt opp som gata «Torggata 11 Oslo», forankret med ^$, og
+  // ga null treff. Et innsendt forslag baerer nesten alltid et poststed
+  // eller et postnummer — det er slik folk skriver en adresse.
+  //
+  // Sa: forste bit pa nummerform avslutter gata, og alt etter den er
+  // poststed, postnummer eller «Oslo» og kastes.
+  const NUMMER = /^[0-9]+\p{L}?$/u;
+  let nummerPa = -1;
+  for (let i = 1; i < biter.length; i += 1) {
+    if (NUMMER.test(biter[i])) { nummerPa = i; break; }
+  }
+  const erNummer = nummerPa > -1;
+  const gate = (erNummer ? biter.slice(0, nummerPa) : biter).join(" ");
+  const siste = erNummer ? biter[nummerPa] : "";
   // Bare et husnummer er ingen adresse. Uten dette ville «4J» blitt slatt
   // opp som gatenavn, og et tomt svar ser ut som «huset finnes ikke».
   // Sjekken ma kjenne igjen nummerformen, ikke bare lete etter en
   // bokstav: «4J» har en.
-  const BARE_NUMMER = /^[0-9]+[A-Za-z\u00C6\u00D8\u00C5\u00E6\u00F8\u00E5]?$/;
+  const BARE_NUMMER = NUMMER;
   if (!gate || BARE_NUMMER.test(gate)) return null;
   return { gate, nummer: erNummer ? siste : "" };
 }
