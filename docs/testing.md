@@ -6,7 +6,7 @@ dager. Legger du til tester, er det denne fila som skal rettes.
 
     node test/unit.mjs      620 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  343 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       543 tester, 3–20 s, headless Chromium
+    node test/run.mjs       559 tester, 3–20 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
@@ -82,6 +82,21 @@ feltet testen leser.
 **Og en sabotasje kan avsløre at stubben er feil, ikke bare at koden er
 det.** Det var sabotasjen som fant dette — testen var grønn både før og
 etter fiksen, og sa dermed ingenting.
+
+**Sabotér hver linje for seg, ikke fiksen under ett.** 17. september 2026
+ble en rettelse satt to steder: når lista tegnes, og etter en vellykket
+lagring. Begge fjernet samtidig felte to tester, og det så ut som dekning.
+Bare den ene fjernet — den som gjaldt *nettopp det som var meldt* — felte
+ingen av dem. Vakta for den ekte rundturen fantes ikke, og ble skrevet
+etterpå. En fiks med to inngangspunkter trenger en sabotasje per
+inngangspunkt.
+
+**En regel som ser på vinduet kan ikke voktes her.** `--window-size`
+binder ikke likt lokalt og på CI, så bredder måles i en boks med kjent
+bredde — og da fyrer ikke en `@media`. Samme dag ble brukerlista først
+fikset med `@media (max-width: 560px)`, og vakta viste 542 px som før.
+Fiksen gjelder nå i enhver bredde, uten spørring. Trenger du likevel en
+media query, må den voktes et annet sted enn her.
 
 ## Hva hver suite dekker
 

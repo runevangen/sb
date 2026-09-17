@@ -32,6 +32,21 @@ const felt = (id) => document.getElementById(id);
 let kamper = [];
 let passord = "";
 
+// Avkryssingene slik de sist ble lagret, som en signatur. Meldt 17.
+// september 2026: «Jeg trykker lagre, far beskjed at de er lagret, sa
+// dukker lagre-knappen opp igjen.» Den gjorde det: boksene sto uroert, og
+// knappen sa fortsatt «Lagre 5 kamper». En knapp som ser ut som den har
+// arbeid a gjore, nar den ikke har det, er en kvittering som trekker seg
+// selv tilbake.
+//
+// Signaturen settes to steder: etter en vellykket lagring, og nar lista
+// tegnes — det som star der da, kom fra basen og ER det lagrede.
+let lagretSignatur = null;
+
+function valgtSignatur() {
+  return alleBokser().filter((b) => b.checked).map((b) => b.value).sort().join("|");
+}
+
 // Rettelsene som ligger oppa puber-oslo.js, slik de sist ble lest (#80).
 // Den sammensatte lista regnes av denne og fila, aldri lagret for seg: to
 // lister som kan gli fra hverandre er nettopp det ett sted skal slippe.
@@ -402,8 +417,31 @@ function brukerRad(b) {
   const rad = document.createElement("tr");
 
   rad.appendChild(celle("td", "navn", b.navn));
-  rad.appendChild(celle("td", "tid", sistInneTekst(b.forst)));
-  rad.appendChild(celle("td", "tid", sistInneTekst(b.sist)));
+  // Etiketten folger cella. Under 560 px faller `thead` bort og hver
+  // bruker blir et kort — da er «12. sep. 2026» uten et ord foran seg to
+  // datoer uten navn.
+  const forst = celle("td", "tid", sistInneTekst(b.forst));
+  forst.setAttribute("data-merke", "Første gang");
+  rad.appendChild(forst);
+  const sist = celle("td", "tid", sistInneTekst(b.sist));
+  sist.setAttribute("data-merke", "Sist pålogget");
+  // «Jeg er inne men det star 2 dager siden.» Begge deler er sant, og det
+  // er nettopp forvirringen: du er innlogget na, og feltet ved siden av er
+  // sist du TASTET PIN-en. Appen holder telefonen innlogget med roterende
+  // fornyere, og en fornying rorer ikke last_sign_in_at.
+  //
+  // Vi begynner ikke a telle bruk for a gjore tallet til noe annet — det
+  // ville vaert sporingen ADR 0004 forbyr. Men den ene raden vi kan si noe
+  // sant om uten a maale noe, er din egen: okta ligger i denne
+  // nettleseren, og uid-en i den er den samme som i lista.
+  const okt = lesOkt();
+  if (okt && okt.bruker && String(okt.bruker) === String(b.id)) {
+    const deg = document.createElement("span");
+    deg.className = "deg";
+    deg.textContent = " — det er deg, innlogget nå";
+    sist.appendChild(deg);
+  }
+  rad.appendChild(sist);
 
   const valg = celle("td", "valg", "");
 
@@ -578,7 +616,8 @@ function tegnKamper() {
     rad.appendChild(merke);
     liste.appendChild(rad);
   });
-  felt("lagre").disabled = false;
+  // Det som star avkrysset na, kom fra basen. Da er det ogsa det lagrede.
+  lagretSignatur = valgtSignatur();
   oppdaterLagreknapp();
 }
 
@@ -619,8 +658,24 @@ function oppdaterLagreknapp() {
   oppdaterRundetall();
   const knapp = felt("lagre");
   const pub = felt("pub").value;
-  const antall = alleBokser().filter((b) => b.checked).length;
-  if (!pub || !alleBokser().length) { knapp.textContent = "Lagre"; return; }
+  const bokser = alleBokser();
+  const antall = bokser.filter((b) => b.checked).length;
+  if (!pub || !bokser.length) {
+    knapp.textContent = "Lagre";
+    knapp.disabled = true;
+    return;
+  }
+  // Star boksene som de ble lagret, er det ingenting a lagre — og da skal
+  // knappen si det framfor a be om et trykk som ikke ville endret noe.
+  //
+  // Tomt og lagret er ikke det samme som lagret: har puben ingen kamper,
+  // ville «Lagret for Andy's Pub» pastatt at noe ligger der.
+  if (lagretSignatur !== null && valgtSignatur() === lagretSignatur) {
+    knapp.textContent = antall ? "Lagret for " + pub : "Ingen kamper satt for " + pub;
+    knapp.disabled = true;
+    return;
+  }
+  knapp.disabled = false;
   knapp.textContent = antall
     ? "Lagre " + antall + (antall === 1 ? " kamp" : " kamper") + " for " + pub
     : "Fjern alle kamper for " + pub;
@@ -725,12 +780,18 @@ felt("lagre").addEventListener("click", async () => {
           .filter((v) => v.pub !== pubNa || rort.indexOf(String(v.kampId)) === -1)
           .concat(data.visninger);
       }
+      // Det som nettopp gikk gjennom er det lagrede. Uten denne linja star
+      // knappen igjen og ber om et trykk til, rett under kvitteringen som
+      // sier at den er ferdig.
+      lagretSignatur = valgtSignatur();
       vis(data.merknad || "Lagret.", "ok");
     }
   } catch (err) {
     vis("Fikk ikke lagret: " + err.message, "feil");
   }
-  felt("lagre").disabled = false;
+  // Ikke `disabled = false` rett ut: da ville knappen bedt om et trykk
+  // den nettopp har fatt. oppdaterLagreknapp avgjor ut fra signaturen.
+  oppdaterLagreknapp();
 });
 
 function vis(tekst, art) {

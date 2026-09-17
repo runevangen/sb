@@ -1940,9 +1940,13 @@ const SAK_15 = kjor("admin", `
   // RLS slar opp uid-en i visning_skrivere, og ADMIN_PASSORD betyr
   // ingenting for Supabase. Uten en okt i localStorage skal portalen si
   // fra framfor a sende noe — det testes lenger nede.
+  // Uid-en er den samme som Kari sin i brukerlista under: den raden er
+  // «deg», og portalen skal si det ved siden av «Sist palogget». En uid
+  // som ikke likner en ekte ville gjort merket umulig a teste.
   try {
     localStorage.setItem("sb-konto", JSON.stringify({
-      token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
+      token: "okt-token", fornyer: "fornyer",
+      bruker: "11111111-2222-3333-4444-555555555555", navn: "Rune",
       utloper: Date.now() + 3600000,
     }));
   } catch (e) { /* privat modus */ }
@@ -2129,10 +2133,17 @@ const SAK_15 = kjor("admin", `
            document.getElementById("lagre").textContent);
         bokser[1].checked = false;
         bokser[1].dispatchEvent(new Event("change", { bubbles: true }));
-        // Null avkrysset er ikke «lagre ingenting» — det er a fjerne dem.
+        // Denne puben har ingenting lagret fra for. Da er null avkrysset
+        // det samme som det som star i basen, og «Fjern alle kamper» ville
+        // lovet en fjerning som ikke ville fjernet noe.
+        //
+        // Har puben kamper lagret, betyr null avkrysset noe annet — a ta
+        // dem bort — og da sier knappen nettopp det. Den tilstanden er
+        // voktet i 15D, som har visninger fra for.
         document.getElementById("merkIngen").click();
-        ok("uten kryss sier den at den fjerner",
-           document.getElementById("lagre").textContent === "Fjern alle kamper for " + puber.value,
+        ok("uten kryss og uten noe lagret er det ingenting a gjore",
+           document.getElementById("lagre").textContent === "Ingen kamper satt for " + puber.value &&
+           document.getElementById("lagre").disabled === true,
            document.getElementById("lagre").textContent);
 
         bokser[0].checked = true;
@@ -2215,6 +2226,71 @@ const SAK_15 = kjor("admin", `
              seksjon.indexOf("tastet PIN-en") !== -1 &&
              seksjon.indexOf("ikke") !== -1, seksjon.slice(0, 200));
 
+          // «Jeg er inne men det star 2 dager siden.» Begge deler er sant:
+          // du er innlogget na, og feltet er sist du TASTET PIN-en. Den ene
+          // raden vi kan si noe sant om uten a male noe, er din egen —
+          // okta ligger i denne nettleseren, og uid-en er den samme.
+          var deg = document.querySelectorAll("#brukere .deg");
+          ok("din egen rad sier at det er deg", deg.length === 1, deg.length);
+          ok("og at du er innlogget na",
+             !!deg[0] && deg[0].textContent.indexOf("innlogget nå") > -1,
+             deg[0] && deg[0].textContent);
+          // Den ma sta ved siden av datoen den svarer pa, ikke ved navnet.
+          ok("merket star i palogget-cella, ikke ved navnet",
+             !!deg[0] && deg[0].closest("td").className === "tid" &&
+             deg[0].closest("td").getAttribute("data-merke") === "Sist pålogget",
+             deg[0] && deg[0].closest("td").className);
+          // Bare din egen: et merke pa alles rader ville pastatt at alle er
+          // innlogget, og det vet vi ingenting om.
+          ok("og bare pa din egen rad",
+             rader[0].querySelectorAll(".deg").length +
+             rader[1].querySelectorAll(".deg").length === 1,
+             rader[0].querySelectorAll(".deg").length + " og " +
+             rader[1].querySelectorAll(".deg").length);
+
+          // Sida heter «Admin», ikke noe lengre.
+          ok("sida heter Admin", document.title === "Admin", document.title);
+          ok("og overskrifta ogsa",
+             document.querySelector("h1").textContent === "Admin",
+             document.querySelector("h1").textContent);
+          // To pastander sto i undertittelen og var ikke sanne lenger.
+          var under = document.querySelector(".undertittel").textContent;
+          ok("undertittelen lover ikke a vise PIN-er",
+             under.indexOf("PIN-en deres") === -1, under);
+          ok("og lover ingen utrulling a vente pa",
+             under.indexOf("utrullingen") === -1, under);
+
+          // Sida skal fa plass pa en telefon. Meldt 17. september 2026:
+          // «Den er los pa mobil, dvs jeg kan scrolle hele skjermen til
+          // venstre og hoyre.» Brukertabellen trengte 457 px; en iPhone 13
+          // mini gir 343.
+          //
+          // Males i en boks med kjent bredde, ikke mot viewporten:
+          // --window-size binder ikke likt lokalt og pa CI, og en test som
+          // maler et vindu den ikke styrer, maler ingenting. 320 px er
+          // smalere enn noen iPhone i bruk, sa det er margin i tallet.
+          var maleboks = document.createElement("div");
+          maleboks.style.cssText = "width:320px;position:absolute;left:0;top:0;" +
+            "visibility:hidden;overflow:visible;";
+          var kopi = document.querySelector("main").cloneNode(true);
+          kopi.style.maxWidth = "320px";
+          maleboks.appendChild(kopi);
+          document.body.appendChild(maleboks);
+          var trengs = kopi.scrollWidth;
+          // Hva som er for bredt, ikke bare at noe er det: uten navnet er
+          // meldinga et tall uten et sted a lete.
+          var verstinger = [];
+          Array.prototype.forEach.call(kopi.querySelectorAll("*"), function (e) {
+            var r = e.getBoundingClientRect();
+            if (r.width > 321) {
+              verstinger.push(e.tagName + (e.id ? "#" + e.id : "") +
+                " (" + Math.round(r.width) + " px)");
+            }
+          });
+          maleboks.remove();
+          ok("hele portalen far plass i 320 px, uten a rulle sidelengs",
+             trengs <= 320, trengs + " px: " + verstinger.slice(0, 4).join(", "));
+
           // Ny PIN. En for kort PIN skal stoppes her, ikke hos tjenesten.
           var pinFelt = rader[0].querySelector("input");
           var settKnapp = rader[0].querySelectorAll("button")[0];
@@ -2266,6 +2342,13 @@ const SAK_15 = kjor("admin", `
               // avvist med 401 pa noe som ser ut som passordet.
               try { localStorage.removeItem("sb-konto"); } catch (e) { /* privat modus */ }
               sendt = null;
+              // Knappen er avslatt sa lenge boksene star som de ble lagret.
+              // Et kryss forst, sa det faktisk finnes noe a lagre — ellers
+              // tester vi at en avslatt knapp ikke sender, og det er en
+              // annen sak enn at vakta mot manglende okt virker.
+              var enBoks = document.querySelectorAll(".kamp input")[0];
+              enBoks.checked = !enBoks.checked;
+              enBoks.dispatchEvent(new Event("change", { bubbles: true }));
               document.getElementById("lagre").click();
               setTimeout(function () { try {
                 ok("uten innlogging i appen sendes ingen lagring", !sendt, JSON.stringify(sendt));
@@ -2715,11 +2798,57 @@ const SAK_15D = kjor("admin-lagret-star", `
       felt("merkIngen").click();
       ok("null valgt star som null, ikke som tomt",
          rundeTekst().indexOf("0 av 2 valgt") > -1, rundeTekst());
+      // Denne puben HAR kamper lagret. Da er null avkrysset ikke «lagre
+      // ingenting» — det er a ta dem bort, og knappen ma si det.
+      ok("uten kryss sier den at den fjerner, nar det er noe a fjerne",
+         felt("lagre").textContent === "Fjern alle kamper for Andy's Pub" &&
+         felt("lagre").disabled === false, felt("lagre").textContent);
 
       felt("merkAlle").click();
       ok("og «kryss av alle» fyller dem igjen",
          rundeTekst().indexOf("2 av 2 valgt") > -1, rundeTekst());
+      // Tilbake til det som sto lagret: da er det ingenting a lagre, og
+      // knappen skal si det framfor a be om et trykk som ikke endrer noe.
+      // Meldt 17. september 2026: «Jeg trykker lagre, far beskjed at de er
+      // lagret, sa dukker lagre-knappen opp igjen.»
+      ok("boksene som de ble lagret gir en knapp som sier lagret",
+         felt("lagre").textContent === "Lagret for Andy's Pub" &&
+         felt("lagre").disabled === true, felt("lagre").textContent);
 
+      // Og etter en EKTE lagring, ikke bare et kryss tilbake til
+      // utgangspunktet. Det var dette som ble meldt 17. september 2026:
+      // «Jeg trykker lagre 5 kamper, far beskjed at de er lagret, sa
+      // dukker lagre-knappen opp igjen.» Kvitteringen og knappen sa to
+      // ulike ting om den samme handlingen.
+      var enBoks = felt("kamper").querySelectorAll(".kamp input")[0];
+      enBoks.checked = false;
+      felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
+      ok("et kryss fjernet gir en knapp som ber om lagring",
+         felt("lagre").disabled === false &&
+         felt("lagre").textContent.indexOf("Lagre 2 kamper") === 0,
+         felt("lagre").textContent);
+      felt("lagre").click();
+      setTimeout(function () { try {
+        ok("lagringen gikk gjennom",
+           felt("melding").textContent.indexOf("Lagret") > -1, felt("melding").textContent);
+        ok("og knappen sier det samme som kvitteringen",
+           felt("lagre").textContent === "Lagret for Andy's Pub",
+           felt("lagre").textContent);
+        ok("den ber ikke om et trykk til",
+           felt("lagre").disabled === true, felt("lagre").disabled);
+
+        // Endrer du noe etterpa, er det noe a lagre igjen.
+        enBoks.checked = true;
+        felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
+        ok("en ny endring vekker knappen igjen",
+           felt("lagre").disabled === false &&
+           felt("lagre").textContent.indexOf("Lagre 3 kamper") === 0,
+           felt("lagre").textContent);
+        videre();
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
+
+    function videre() { try {
       // En pub uten noe satt skal si nettopp det.
       var andre = null;
       var valg = felt("pub").options;
@@ -2735,7 +2864,7 @@ const SAK_15D = kjor("admin-lagret-star", `
          !Array.prototype.some.call(felt("kamper").querySelectorAll(".kamp input"),
            function (b) { return b.checked; }));
       ferdig();
-    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
 `, null, adminSide);
 
