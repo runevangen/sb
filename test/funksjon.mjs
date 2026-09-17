@@ -11,10 +11,10 @@
 import fotball from "../netlify/functions/fotball.mjs";
 import vaer from "../netlify/functions/vaer.mjs";
 import puber from "../netlify/functions/puber.mjs";
-import { OVERPASS_SPEIL } from "../pub-data.js";
+import { OVERPASS_SPEIL, SOK_TAK } from "../pub-data.js";
 import visninger from "../netlify/functions/visninger.mjs";
 import pubForslag from "../netlify/functions/pub-forslag.mjs";
-import pubListe from "../netlify/functions/pub-liste.mjs";
+import pubListe, { SOK_FRIST } from "../netlify/functions/pub-liste.mjs";
 import konto from "../netlify/functions/konto.mjs";
 import brukere from "../netlify/functions/brukere.mjs";
 import svarfunksjon from "../netlify/functions/svar.mjs";
@@ -511,9 +511,11 @@ ok("Entur far ET-Client-Name", entur && entur.opsjoner.headers["ET-Client-Name"]
 ok("Overpass sporres rundt arenaen med 1200 m",
    overpass && decodeURIComponent(overpass.opsjoner.body).indexOf("around:1200,63.413,10.406") > -1,
    overpass && decodeURIComponent(overpass.opsjoner.body));
-// Uten Accept svarer hovedtjeneren 406 og vi far ingen puber.
-ok("Overpass far Accept og identifiserer oss",
-   overpass.opsjoner.headers["Accept"] === "application/json" &&
+// «application/json» var grunnen til 406-en, ikke botemidlet: Overpass
+// merker ikke svaret som JSON pa HTTP-niva, og strengt om JSON er a be om
+// noe den ikke har. Formatet bestemmes av sporringen.
+ok("Overpass hevder ingenting om formatet, og vi identifiserer oss",
+   overpass.opsjoner.headers["Accept"] === "*/*" &&
    String(overpass.opsjoner.headers["User-Agent"]).indexOf("sportsbibelen") === 0,
    JSON.stringify(overpass.opsjoner.headers));
 // Alle sporres samtidig; den forste som svarer vinner.
@@ -550,6 +552,33 @@ ok("feil hos alle tjenerne gir 502 uten cache og med melding",
    utenOsm.forsok.some((f) => f.kilde.indexOf("Overpass") === 0 && f.status === 504 && f.melding.indexOf("Too busy") > -1),
    JSON.stringify(utenOsm.forsok));
 ok("alle tjenerne ble provd", osmKall(kall).length === OVERPASS_SPEIL.length, osmKall(kall).length);
+
+// Avbrutt, ikke avvist med en kode: da avviser AbortController ALLE
+// kallene med det SAMME feilobjektet. Notatene ble hentet derfra for, og
+// da skrev hvert speil over det forrige — lista sto med ett speil to
+// ganger og et annet ikke i det hele tatt. Meldt fra portalen 17.
+// september 2026, og den samme feilen lever her, i den leserne treffer.
+const DELT_ABORT = Object.assign(new Error("This operation was aborted"),
+  { name: "AbortError" });
+kall = [];
+global.fetch = async (url, opsjoner) => {
+  kall.push({ url: String(url), opsjoner: opsjoner || {} });
+  if (String(url).indexOf("entur.io") > -1) {
+    return new Response(JSON.stringify(ENTUR_SVAR), { status: 200 });
+  }
+  throw DELT_ABORT;
+};
+r = await puber(be("/api/puber?arena=Lerkendal"));
+const avbrutt = await r.json();
+const OSM_KILDER = avbrutt.forsok.filter((f) => f.kilde.indexOf("Overpass") === 0)
+  .map((f) => f.kilde);
+ok("en avbrutt runde gir ett notat per speil",
+   OSM_KILDER.length === OVERPASS_SPEIL.length, JSON.stringify(OSM_KILDER));
+ok("og ingen tjener star oppfort to ganger",
+   new Set(OSM_KILDER).size === OVERPASS_SPEIL.length, OSM_KILDER.join(" | "));
+ok("rekkefolgen folger speillista ogsa nar alle ble avbrutt",
+   OSM_KILDER.join("|") === OVERPASS_SPEIL.map((u) => "Overpass " + new URL(u).host).join("|"),
+   OSM_KILDER.join(" | "));
 
 // Hovedtjeneren svarer 406, speilet svarer. Det var dette som skjedde i prod.
 kall = [];
@@ -1697,12 +1726,34 @@ function stubSteder(rader, status) {
 // finner: hadde vi brukt den, ville testen vaert enig med feilen.
 function stubOverpass(elementer, utfall) {
   const kall = [];
+  // Ett feilobjekt, delt av alle kallene. Det er ikke en forenkling — det
+  // er slik en AbortController faktisk avviser: signalets `reason` er ett
+  // objekt, og hvert eneste fetch avvises med nettopp det. Stubben
+  // modellerer svaret, ikke koden som leser det.
+  const enDeltAbort = Object.assign(new Error("This operation was aborted"),
+    { name: "AbortError" });
   global.fetch = async (url, opsjoner) => {
     const o = opsjoner || {};
     kall.push({ url: String(url), metode: o.method || "GET", opsjoner: o });
     if (String(url).indexOf("overpass") > -1) {
       if (utfall === "nede") return new Response("Gateway Timeout", { status: 504 });
       if (utfall === "kastet") throw new Error("fetch failed");
+      if (utfall === "avbrutt") throw enDeltAbort;
+      if (utfall === "feilside") {
+        // Hele sida, ikke bare feillinja. Preamblet er poenget: det er
+        // det som fyller de forste 80 tegnene, og som gjorde at admin sa
+        // «<!DOCTYPE HTML PUBLIC …» der grunnen skulle statt. En kortere
+        // stubb ville overlevd nettopp den feilen.
+        return new Response('<?xml version="1.0" encoding="UTF-8"?>\n'
+          + '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"'
+          + ' "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">\n'
+          + '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">\n'
+          + "<head><title>OSM3S Response</title></head>\n<body>\n"
+          + "<p>The data included in this document is from www.openstreetmap.org."
+          + " The data is made available under ODbL.</p>\n"
+          + '<p><strong style="color:#FF0000">Error</strong>: line 1: parse error:'
+          + ' Unknown type "(?=" </p>\n</body>\n</html>', { status: 400 });
+      }
       return new Response(JSON.stringify({ elements: elementer || [] }), { status: 200 });
     }
     return new Response(JSON.stringify([EN_RAD]), { status: 200 });
@@ -1969,6 +2020,66 @@ r = await pubListe(stedBe({ handling: "sok-adresse", passord: PASSORD,
 stedSvar = await r.json();
 ok("ingen treff er 200 med tom liste, ikke en feil",
    r.status === 200 && stedSvar.treff.length === 0, r.status + " " + JSON.stringify(stedSvar));
+
+// Meldt 17. september 2026: forsok-lista sto med fire linjer, men
+// «overpass.private.coffee» to ganger — med samme tid pa begge — og
+// «overpass.kumi.systems» ikke i det hele tatt.
+//
+// Arsaken: notatene ble hentet fra avvisningene, og en AbortController
+// avviser ALLE kallene med det SAMME feilobjektet. `Object.assign(err,
+// {notat})` skrev da over det forrige speilets notat, og det siste som
+// kom vant — to ganger. En diagnostikk som forveksler to tjenere er
+// verre enn ingen: den peker pa feil sted.
+kall = stubOverpass(null, "avbrutt");
+r = await pubListe(stedBe({ handling: "sok-adresse", passord: PASSORD,
+  adresse: "Berglyveien 4J" }));
+stedSvar = await r.json();
+ok("hvert speil star i forsok-lista", stedSvar.forsok.length === OVERPASS_SPEIL.length,
+   JSON.stringify(stedSvar.forsok));
+const KILDER = stedSvar.forsok.map((f) => f.kilde);
+ok("og ingen star der to ganger",
+   new Set(KILDER).size === OVERPASS_SPEIL.length, KILDER.join(" | "));
+ok("alle fire vertene er med, hver med sitt navn",
+   OVERPASS_SPEIL.every((a) => KILDER.indexOf("Overpass " + new URL(a).host) > -1),
+   KILDER.join(" | "));
+// Rekkefolgen folger OVERPASS_SPEIL, ikke hvem som ble ferdig forst: en
+// liste som stokker om seg selv er ikke til a sammenlikne mellom to sok.
+ok("rekkefolgen folger speillista",
+   KILDER.join("|") === OVERPASS_SPEIL.map((a) => "Overpass " + new URL(a).host).join("|"),
+   KILDER.join(" | "));
+
+// Feilsiden er HTML. De forste 80 tegnene er alltid doctypen — altsa det
+// samme uansett hva som feilet. Grunnen star lenger nede.
+kall = stubOverpass(null, "feilside");
+r = await pubListe(stedBe({ handling: "sok", passord: PASSORD, navn: "Andys Pub" }));
+stedSvar = await r.json();
+ok("en feilside gir grunnen, ikke doctypen",
+   stedSvar.forsok.every((f) => (f.melding || "").indexOf("parse error") > -1),
+   JSON.stringify(stedSvar.forsok[0]));
+ok("og doctypen star ikke i meldinga",
+   JSON.stringify(stedSvar.forsok).indexOf("DOCTYPE") === -1,
+   JSON.stringify(stedSvar.forsok[0]));
+ok("statuskoden star ved siden av",
+   stedSvar.forsok.every((f) => f.status === 400), JSON.stringify(stedSvar.forsok[0]));
+
+// «application/json» ga 406 fra hovedtjeneren pa hvert eneste kall.
+// Formatet bestemmes av sporringen, ikke av denne headeren.
+kall = stubOverpass(ET_HUS);
+r = await pubListe(stedBe({ handling: "sok-adresse", passord: PASSORD,
+  adresse: "Berglyveien 4J" }));
+ok("soket hevder ingenting om formatet i Accept",
+   kall.every((k) => (k.opsjoner.headers || {})["Accept"] === "*/*"),
+   JSON.stringify((kall[0].opsjoner.headers || {})));
+ok("og identifiserer seg med User-Agent",
+   kall.every((k) => ((k.opsjoner.headers || {})["User-Agent"] || "")
+     .indexOf("sportsbibelen") === 0),
+   JSON.stringify((kall[0].opsjoner.headers || {})));
+
+// Fristen ma sta under Netlifys ti sekunder: sprenger vi den, far admin
+// Netlifys egen feilside framfor var — uten et ord om hvem som sviktet,
+// som er nettopp det forsok-lista finnes for.
+ok("fristen holder seg innenfor det Netlify gir, med margin",
+   SOK_FRIST <= SOK_TAK - 1000, SOK_FRIST + " mot " + SOK_TAK);
 
 delete process.env.ADMIN_PASSORD;
 delete process.env.SUPABASE_URL;

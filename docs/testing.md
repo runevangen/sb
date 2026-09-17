@@ -4,8 +4,8 @@
 kommandoene, men ikke tallene: de sto i tre filer og glei fire ganger på to
 dager. Legger du til tester, er det denne fila som skal rettes.
 
-    node test/unit.mjs      597 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  330 tester, ~250 ms, ingen nettleser
+    node test/unit.mjs      606 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  343 tester, ~250 ms, ingen nettleser
     node test/run.mjs       525 tester, ~200 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
@@ -57,6 +57,19 @@ avsløre den. Det skjulte en feil som gjorde «blir med»-lista usynlig for
 alle, i tre dager og gjennom 412 tester. `somTjenesten()` i testrammen
 finnes derfor: den gjør omformingen tjenesten gjør, mens `__lagret` står
 igjen som basen.
+
+**En stubb kan også være for *kort*.** 17. september 2026 skrev jeg en
+test på at Overpass' feilside skal gi grunnen framfor doctypen — og lot
+stubben returnere en tre linjers feilside. Den overlevde sabotasjen der
+teksten kappes på 80 tegn, for etter at taggene var strippet var hele
+stubben under 80 tegn. Den ekte sida har et avsnitt om ODbL-lisensen
+først, og det er *nettopp* det avsnittet som fyller de 80 tegnene og
+skjuler feilen. Stubben må bære det som gjør feilen mulig, ikke bare det
+feltet testen leser.
+
+**Og en sabotasje kan avsløre at stubben er feil, ikke bare at koden er
+det.** Det var sabotasjen som fant dette — testen var grønn både før og
+etter fiksen, og sa dermed ingenting.
 
 ## Hva hver suite dekker
 

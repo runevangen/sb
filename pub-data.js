@@ -23,9 +23,16 @@ export const OVERPASS_SPEIL = [
 ];
 
 // Hovedtjeneren svarer 406 «Not Acceptable» nar den ikke liker headerne:
-// den vil ha et Accept som sier hva vi tar imot, og en User-Agent som
-// sier hvem vi er. Nettleseren forbyr oss a sette User-Agent, sa den
-// settes bare serverside.
+// den vil ha en User-Agent som sier hvem vi er. Nettleseren forbyr oss a
+// sette User-Agent, sa den settes bare serverside.
+//
+// Accept er «*/*», ikke «application/json». Det sto som application/json
+// i to uker, og overpass-api.de svarte 406 pa hvert eneste kall — 472 ms,
+// hver gang, sa raskt at det aldri sa ut som en nedetid. Overpass
+// forhandler innhold pa HTTP-niva og merker ikke svaret som JSON selv om
+// «[out:json]» star i sporringen; ber vi strengt om JSON, er det ingenting
+// den kan gi oss. Formatet bestemmes av sporringen, ikke av denne
+// headeren, sa det er ingenting a hevde her.
 //
 // Accept-Encoding settes ikke: setter vi den selv, slutter Node a pakke
 // ut svaret for oss, og da feiler json(). Bade Node og nettleseren
@@ -33,10 +40,27 @@ export const OVERPASS_SPEIL = [
 export function overpassHeadere(serverside) {
   const h = {
     "Content-Type": "application/x-www-form-urlencoded",
-    "Accept": "application/json",
+    "Accept": "*/*",
   };
   if (serverside) h["User-Agent"] = "sportsbibelen-app/1.0 https://mvp-sb.netlify.app";
   return h;
+}
+
+// Overpass svarer med en HTML-side nar noe er galt, og den ekte grunnen
+// star et stykke ned i den. De forste 80 tegnene er alltid «<!DOCTYPE
+// html PUBLIC …» — altsa det samme uansett hva som feilet, og dermed
+// ingenting. Her hentes teksten ut, og feilsetningen framfor resten.
+export function overpassFeiltekst(tekst, maks) {
+  const ren = String(tekst || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&(?:quot|apos|amp|lt|gt|nbsp);/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!ren) return "";
+  // «Error: line 1: parse error» er det vi er ute etter. Star det der,
+  // droppes alt foran — resten er den samme standardteksten hver gang.
+  const traff = ren.match(/Error\s*:?\s*(.+)$/i);
+  return (traff ? traff[1] : ren).slice(0, maks || 120).trim();
 }
 
 // Netlify gir en funksjon ti sekunder. Tre tjenere etter hverandre uten
@@ -51,8 +75,14 @@ export function restTid(frist, naa, tak) {
 // «out center» gir tagger og koordinater, og ett punkt ogsa for bygninger
 // tegnet som flater. «out center tags» — som sto her forst — avviser
 // Overpass med 406, og «tags» ville uansett droppet koordinatene.
-export function overpassSporring(lat, lon, radius) {
-  return '[out:json][timeout:12];nwr["amenity"~"^(pub|bar)$"](around:' +
+//
+// Sekundene sier hvor lenge den som kaller faktisk venter. De sto som en
+// fast tolv her mens tjenesten la pa etter 7,5 og appen etter 8 — vi ba
+// om noe vi ikke tenkte a vente pa, og da var det vi som ga opp mens
+// meldingen pekte pa Overpass.
+export function overpassSporring(lat, lon, radius, sekunder) {
+  return "[out:json][timeout:" + Math.max(1, Math.floor(sekunder || 8)) +
+    '];nwr["amenity"~"^(pub|bar)$"](around:' +
     Math.round(radius) + "," + Number(lat).toFixed(3) + "," + Number(lon).toFixed(3) +
     ");out center;";
 }
@@ -571,9 +601,19 @@ const SOK_MIN = 4;
 // det i to: sporringen ba om «[timeout:12]» mens tjenesten la pa etter
 // seks sekunder. Da svarte portalen «Fikk ikke svar fra OpenStreetMap»
 // om en tjener som holdt pa a svare — vi var den som ga opp, og
-// meldingen la skylda et annet sted. Netlify gir funksjonen ti sekunder
-// i alt, sa dette tallet kan ikke opp uten at den grensa vurderes.
-export const SOK_SEKUNDER = 6;
+// meldingen la skylda et annet sted.
+//
+// Atte, ikke seks. Seks var malt for lavt: to av fire speil ble avbrutt
+// midt i arbeidet pa 6480 ms mens de to andre svarte med feil. Netlify
+// gir funksjonen ti sekunder i alt, sa fristen kan ikke opp uten a spise
+// av marginen — SOK_TAK vokter den grensa, og en test slar ut hvis noen
+// setter tallet forbi den.
+export const SOK_SEKUNDER = 8;
+
+// Netlifys tak for en synkron funksjon. Sprenger vi det, far admin
+// Netlifys egen feilside framfor svaret vart — uten et ord om hvem som
+// sviktet, som er nettopp det `forsok` finnes for a fortelle.
+export const SOK_TAK = 10000;
 
 // Oslo-ramma, den samme sjekkPubliste bruker. Et sok som treffer en pub i
 // Bergen hjelper ingen her.
@@ -603,9 +643,17 @@ export function osmNavnSporring(navn, ramme) {
   // Alle ordene ma finnes, i hvilken som helst rekkefolge: «Dubliner
   // Folk Pub» skal treffe «The Dubliner», og «Andy's Pub» skal ikke
   // treffe hver eneste pub i byen.
-  const monster = ord.map((o) => "(?=.*" + o + ")").join("");
+  //
+  // Ett filter per ord, ikke ett regex med lookahead. Overpass ANDer
+  // flere filtre pa samme nokkel, sa de to formene betyr det samme — men
+  // «(?=.*ord)» krever et regex-bygg som stotter lookahead, og
+  // overpass.osm.ch svarte HTTP 400 pa hvert eneste sok. Et speil som
+  // ikke kan lese sporringen var er et speil vi ikke har. Her er det
+  // ingenting a vinne pa den formen: den var kortere a skrive, og det er
+  // alt.
+  const filtre = ord.map((o) => '["name"~"' + o + '",i]').join("");
   const boks = osmBoks(r);
-  return osmHode() + 'nwr["name"~"' + monster + '",i]' + boks + ";out center;";
+  return osmHode() + "nwr" + filtre + boks + ";out center;";
 }
 
 // Treffene, formet som portalen vil ha dem: navn, koordinat og adressen
