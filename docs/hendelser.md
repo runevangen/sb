@@ -69,6 +69,114 @@ og de sto der hele tiden, under en linje som sa at noe var galt.
 
 ---
 
+## 17. september 2026 — Fire ting i portalen, meldt i én melding
+
+### Sida var løs på mobil
+
+«Jeg kan scrolle hele skjermen til venstre og høyre.»
+
+Brukertabellen trengte **457 px**: fire kolonner, to av dem `white-space:
+nowrap`, og en med et tekstfelt og to knapper. En iPhone 13 mini gir 343.
+Hele sida ble dratt bred etter den.
+
+**Samme feil som poengkolonnen 16. september**, i en annen tabell. Og
+første forsøk på fiksen gjentok feilen i testen: en `@media (max-width:
+560px)` ser på **vinduet**, og testen måler i en boks med kjent bredde —
+fordi `--window-size` ikke binder likt lokalt og på CI. Regelen ville
+altså stått uvoktet. Lista er derfor kort-per-person i **enhver** bredde,
+uten spørring, og vakta måler `main` i en 320 px-boks.
+
+### «Sist pålogget» var fortsatt feil — for leseren
+
+«Jeg er inne men det står 2 dager siden.»
+
+Datoen var riktig, og etiketten var riktig etter omdøpingen dagen før:
+feltet er sist personen **tastet PIN-en**, og en fornyet økt rører det
+ikke. Men to sanne ting ved siden av hverandre kan fortsatt lese som en
+selvmotsigelse.
+
+Vi begynner ikke å telle bruk for å gjøre tallet til noe annet — det er
+sporingen [ADR 0004](adr/0004-ingen-statistikk.md) forbyr. Men den ene
+raden vi kan si noe sant om **uten å måle noe**, er din egen: økta ligger
+i denne nettleseren, og uid-en i den er den samme som i lista. Raden din
+sier nå «— det er deg, innlogget nå» rett ved siden av datoen.
+
+### Knappen trakk tilbake sin egen kvittering
+
+«Jeg trykker lagre 5 kamper, får beskjed at de er lagret, så dukker
+lagre-knappen opp igjen.»
+
+Den gjorde det: boksene sto urørt, så knappen sa fortsatt «Lagre 5
+kamper». En knapp som ser ut som den har arbeid å gjøre, rett under en
+melding som sier at den er ferdig, motsier kvitteringen.
+
+Avkryssingene har nå en signatur, satt to steder: etter en vellykket
+lagring, og når lista tegnes — det som står der da, kom fra basen og *er*
+det lagrede. Er de like, sier knappen «Lagret for Andy's Pub» og er
+avslått.
+
+Og et skille som måtte håndteres: **tomt er ikke det samme som lagret.**
+Har puben ingenting satt, ville «Lagret for Andy's Pub» påstått at noe
+ligger der; den sier «Ingen kamper satt for Andy's Pub». Har puben kamper
+og du fjerner alle, betyr null avkrysset noe — å ta dem bort — og da sier
+knappen nettopp det. En eksisterende test voktet den andre tilstanden i en
+scene som var i den første; begge er voktet nå, hver i sin scene.
+
+### Undertittelen løy om to ting
+
+Den sa at PIN-ene ligger i portalen (admin kan sette en ny, aldri lese den
+gamle) og at endringen venter på en utrulling (visningene gikk til Supabase
+15. september, og lagremeldingen sier nettopp at det ikke er noe å vente
+på). En undertittel som motsier kvitteringen to seksjoner ned er verre enn
+ingen. Sida heter «Admin» nå.
+
+**En vakt som ikke voktet:** sabotasjen av *bare* linja som settes etter en
+vellykket lagring felte ingen av mine nye tester — bare en urelatert. Den
+lokale veien var dekket, den som faktisk ble meldt var det ikke. Testen for
+den ekte rundturen kom til etter den sabotasjen, ikke før.
+
+---
+
+## 17. september 2026 — «Viser 5 kamper fra før» var sant og ubrukelig
+
+**Meldt som:** «Når jeg kommer tilbake på admin ser det sånn ut. Selv om
+jeg lagret sist gang.» Skjermbildet viste tre avkryssinger. Hinten over
+sa fem.
+
+**Ingenting var borte.** De to siste sto lenger ned enn skjermen rakk, og
+lagringen hadde gjort nøyaktig det den skulle: slettingen er avgrenset til
+kampene som sto på skjermen, og lista i minnet holdes i takt med det som
+faktisk ble skrevet. Et ligabytte tar ikke med seg en annen ligas kamper.
+
+Feilen var at **skjermen ikke svarte på spørsmålet**. Admin lurer ikke på
+*hvor mange*; admin lurer på *ble det jeg lagret stående?* «Viser 5 kamper
+fra før» er sant, og sier ingenting om det. Tre synlige avkryssinger av
+fem ser da ut som tap — og den eneste måten å vite bedre på, var å rulle
+gjennom hele lista og telle selv.
+
+**Og tallet talte på tvers av ligaer** mens boksene under viste én:
+`visninger.filter((v) => v.pub === pub)`, uten filter på liga. Har puben
+to kamper i Premier League, sier hinten fem der Eliteserien kan vise tre.
+Da er forskjellen ekte, og ser ut som akkurat det samme tapet.
+
+To rettelser, begge om å si hvor ting er framfor hvor mange:
+
+- Hinten sier nå «Andy's Pub viser 5 kamper fra før, alle i lista under»
+  — eller «3 i denne ligaen, 2 i en annen» når det er sant. Den navngir
+  puben, så feil pub valgt synes her også.
+- Hver rundeoverskrift bærer «2 av 2 valgt», talt av boksene selv og
+  oppdatert på hvert kryss. Da svarer et blikk på det lista ellers krever
+  rulling for.
+
+**Fanget av:** admin, som trodde arbeidet var tapt. Det er den dyreste
+formen for uklarhet — den koster tillit til lagringen, ikke bare tid.
+
+**En grønn test brøt på riktig måte:** «hver runde får sin egen
+overskrift» sammenliknet `textContent` med «Runde 21» og falt da tallet
+kom til. Den sjekker nå at navnet står først, og tallet har sin egen test.
+
+---
+
 ## 17. september 2026 — Fire linjer diagnostikk, tre feil i dem
 
 Dagen før fikk portalen vise `forsok` — tjenestens egne ord om hvert

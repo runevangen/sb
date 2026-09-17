@@ -54,7 +54,8 @@ import { PUBER_OSLO } from "../puber-oslo.js";
 import { sjekkForslag, forslagRad, tolkForslag, alleredeILista, publisteRad }
   from "../pub-forslag-data.js";
 import { sjekkVisninger, visningerFor, slaSammen, utenGamle, tolkVisninger, visningRad, kampIderFor,
-         bekreftetFor, merkBekreftet } from "../visning-data.js";
+         bekreftetFor, merkBekreftet, visningsHint, rundeTall }
+         from "../visning-data.js";
 
 let feilet = 0;
 let kjort = 0;
@@ -2289,6 +2290,42 @@ ok("sporringen ber om den tida tjenesten faktisk venter",
    osmNavnSporring("Dubliner").indexOf("[timeout:" + SOK_SEKUNDER + "]") > -1 &&
    osmAdresseSporring("Grensen").indexOf("[timeout:" + SOK_SEKUNDER + "]") > -1,
    osmNavnSporring("Dubliner").slice(0, 30));
+
+/* ---------------- hva portalen sier om det som alt er satt ---------------- */
+
+// Meldt 17. september 2026: admin sa tre avkryssinger, hinten sa fem, og
+// sluttet at to var borte. Ingenting var borte — de to sto lenger ned enn
+// skjermen rakk. «Viser 5 kamper fra for» var sant og ubrukelig pa samme
+// tid: den svarte ikke pa sporsmalet admin faktisk hadde, *ble det jeg
+// lagret staende?*
+ok("star alle i lista, sies det",
+   visningsHint(5, 5, "Andys Pub") === "Andys Pub viser 5 kamper fra før, alle i lista under.",
+   visningsHint(5, 5, "Andys Pub"));
+// Det gamle tallet talte pa tvers av ligaer mens boksene viste én. Har
+// puben to kamper i Premier League, sa hinten fem der Eliteserien kunne
+// vise tre — og forskjellen sa ut som tap.
+ok("ligger noen i en annen liga, star det hvor mange",
+   visningsHint(5, 3, "Andys Pub").indexOf("3 i denne ligaen, 2 i en annen") > -1,
+   visningsHint(5, 3, "Andys Pub"));
+ok("ingen i denne ligaen sies uten a telle til null",
+   visningsHint(2, 0, "Andys Pub").indexOf("ingen av dem i denne ligaen") > -1 &&
+   visningsHint(2, 0, "Andys Pub").indexOf("0 i denne") === -1,
+   visningsHint(2, 0, "Andys Pub"));
+ok("ingenting satt sier nettopp det",
+   visningsHint(0, 0, "Andys Pub") === "Ingen kamper satt på denne puben ennå.",
+   visningsHint(0, 0, "Andys Pub"));
+ok("én kamp boyes som én",
+   visningsHint(1, 1, "Andys Pub").indexOf("1 kamp fra") > -1 &&
+   visningsHint(1, 1, "Andys Pub").indexOf("kamper") === -1,
+   visningsHint(1, 1, "Andys Pub"));
+// Uten pub star setningen fortsatt: pubvelgeren kan vaere tom.
+ok("uten pubnavn star setningen likevel",
+   visningsHint(3, 3, "").indexOf("Viser 3 kamper") === 0, visningsHint(3, 3, ""));
+
+// Tallet over hver runde. Uten det ma admin rulle gjennom hele lista for
+// a vite om noe er krysset av lenger nede.
+ok("rundetallet sier valgt av totalt", rundeTall(3, 6) === "3 av 6 valgt", rundeTall(3, 6));
+ok("en runde uten kamper far ingen tekst", rundeTall(0, 0) === "", rundeTall(0, 0));
 
 /* ---------------- det Overpass faktisk sier nar den nekter ---------------- */
 

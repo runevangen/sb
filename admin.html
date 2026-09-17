@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex">
-<title>Sportsbibelen — admin</title>
+<title>Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -76,7 +76,15 @@
   .kamper li { border-bottom: 1px solid var(--ramme); }
   /* Runden star som en overskrift i lista, ikke som en egen boks: den
      deler kampene uten a se ut som noe man kan krysse av. */
+  /* display: flex slar [hidden] fra nettleserens eget stilark. Ingen
+     rundeoverskrift skjules i dag, men regelen ma si hva den betyr — et
+     element som star framme mens koden tror den har skjult det, er en
+     feil som ikke ser ut som en. */
   .runde-skille {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
     border-bottom: 0 !important;
     padding: 14px 2px 4px;
     font-size: 11px;
@@ -85,6 +93,10 @@
     text-transform: uppercase;
     color: var(--tekst-svak);
   }
+  .runde-skille[hidden] { display: none; }
+  /* Tallet er ikke en overskrift: det teller, og skal leses som en
+     opplysning ved siden av — ikke som en del av rundenavnet. */
+  .runde-tall { font-weight: 400; letter-spacing: 0.02em; text-transform: none; }
   .kamper li:first-child.runde-skille { padding-top: 6px; }
   .kamper li:last-child { border-bottom: 0; }
   .kamp { display: flex; align-items: center; gap: 12px; padding: 11px 2px; cursor: pointer; }
@@ -104,23 +116,44 @@
   .hint { font-size: 12px; color: var(--tekst-svak); margin: 8px 0 0; }
   .rad { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .rad input[type="password"] { flex: 1 1 180px; width: auto; }
-  /* Brukerlista. Fire kolonner er nok: hvem, nar de kom, nar de sist var
-     inne, og hva man kan gjore med dem. */
+  /* Brukerlista. Ett kort per person framfor fire kolonner.
+     Som tabell trengte den 457 px — fire kolonner, to av dem `nowrap`, og
+     en med et felt og to knapper. En iPhone 13 mini gir 343, og da ble
+     hele sida dratt bred: du kunne rulle den sidelengs. Meldt 17.
+     september 2026.
+     Ingen media query, og det er med vilje: en regel som ser pa VINDUET
+     kan ikke males av en test som maler i en boks med kjent bredde, og da
+     star fiksen uvoktet. Dette gjelder i enhver bredde.
+     `thead` faller bort, sa hver celle barer etiketten sin i `data-merke`
+     og viser den med ::before — teksten leses ogsa av en skjermleser. */
   .brukere { width: 100%; border-collapse: collapse; font-size: 14px; }
-  .brukere th, .brukere td { text-align: left; padding: 8px 8px 8px 0; border-bottom: 1px solid var(--ramme); vertical-align: middle; }
-  .brukere th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--tekst-svak); font-weight: 600; }
-  .brukere tr:last-child td { border-bottom: 0; }
-  .brukere .navn { font-weight: 600; }
-  .brukere .tid { color: var(--tekst-dim); white-space: nowrap; }
-  .brukere td.valg { text-align: right; white-space: nowrap; }
+  .brukere, .brukere tbody, .brukere tr, .brukere td { display: block; width: 100%; }
+  .brukere thead { display: none; }
+  .brukere tr { padding: 12px 0; border-bottom: 1px solid var(--ramme); }
+  .brukere tr:last-child { border-bottom: 0; }
+  .brukere td { padding: 1px 0; border-bottom: 0; text-align: left; }
+  .brukere .navn { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+  /* Datoene bryter om de ma: `nowrap` var halve grunnen til at tabellen
+     ikke fikk plass. */
+  .brukere .tid { color: var(--tekst-dim); white-space: normal; font-size: 13px; }
+  .brukere .tid::before { content: attr(data-merke) ": "; color: var(--tekst-svak); }
+  .brukere td.valg {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding-top: 8px; white-space: normal;
+  }
   .brukere input[type="text"] {
-    width: 78px; padding: 7px 8px; border: 1px solid var(--ramme-sterk);
+    width: 90px; padding: 7px 8px; border: 1px solid var(--ramme-sterk);
     border-radius: 6px; background: #fff; color: var(--tekst); font: inherit; font-size: 13px;
   }
   .brukere button { padding: 7px 10px; font-size: 13px; }
   /* Sletting star som tekst til den er trykket en gang — da blir den rod
      og sier hva den kommer til a gjore. Samme grep som i appen. */
   .brukere button.slett { background: none; color: var(--tekst-dim); text-decoration: underline; font-weight: 500; }
+  /* Raden som sier «det er deg». Den star ved siden av datoen fordi det
+     er datoen den svarer pa: du er innlogget na, og feltet ved siden av
+     er sist du tastet PIN-en. To ulike ting, og begge sanne. */
+  .brukere .deg { color: var(--ok); font-weight: 600; font-size: 12px; }
+
   .brukere button.slett[data-sikker="ja"] { background: var(--feil); color: #fff; text-decoration: none; font-weight: 600; }
   /* Portalen ligger skjult til passordet er godtatt. display: none med
      !important, sa en seksjon med egen display ikke smetter fram. */
@@ -134,12 +167,18 @@
 </head>
 <body>
 <main>
-  <h1>Hvem viser kampen</h1>
+  <h1>Admin</h1>
+  <!-- To pastander sto her og var ikke lenger sanne: at PIN-ene ligger
+       her (admin kan sette en ny, aldri lese den gamle — de ligger hashet
+       hos Supabase), og at endringen venter pa en utrulling (visningene
+       gikk til Supabase 15. september 2026, og lagremeldingen sier
+       nettopp at det ikke er noe a vente pa). En undertittel som motsier
+       kvitteringen to seksjoner ned er verre enn ingen. -->
   <p class="undertittel">
     Logg inn, velg en pub, velg liga, kryss av kampene de viser, lagre.
-    Her ligger også brukerne: hvem som har logget inn, når, og PIN-en deres.
-    Kampene er de samme kommende kampene som fotballfanen viser. Endringen er ute i
-    appen når utrullingen er ferdig, om et minutt eller to.
+    Endringen er ute for leserne med det samme. Her ligger også brukerne:
+    hvem som har logget inn og når — og du kan gi noen en ny PIN, men
+    ingen kan lese den gamle.
   </p>
 
   <section>
