@@ -151,3 +151,39 @@ export function visningRad(v) {
     satt: v.satt || new Date().toISOString(),
   };
 }
+
+/* ---------- hva portalen sier om det som alt er satt ---------- */
+
+// «Viser 5 kamper fra for» var sant og ubrukelig pa samme tid. Meldt 17.
+// september 2026: admin sa tre avkryssinger, hinten sa fem, og sluttet at
+// to var borte. De to sto lenger ned enn skjermen rakk.
+//
+// Tallet alene svarer ikke pa sporsmalet admin faktisk har — *ble det jeg
+// lagret staende?* Det gjor et tall som sier hvor de er.
+//
+// Og det gamle tallet talte pa tvers av ligaer mens boksene under viste
+// én. Har puben to kamper i Premier League, sa hinten fem der Eliteserien
+// kunne vise tre — og forskjellen sa ut som tap.
+export function visningsHint(antall, iLista, pub) {
+  const hvem = pub ? pub + " viser " : "Viser ";
+  if (!antall) return "Ingen kamper satt på denne puben ennå.";
+  const kamp = (n) => n + (n === 1 ? " kamp" : " kamper");
+  if (iLista >= antall) {
+    return hvem + kamp(antall) + " fra før, "
+      + (antall === 1 ? "og den står" : "alle i lista") + " under.";
+  }
+  const andre = antall - iLista;
+  // Star ingen av dem i denne ligaen, er «0 i denne ligaen» en omvei.
+  if (!iLista) {
+    return hvem + kamp(antall) + " fra før, ingen av dem i denne ligaen.";
+  }
+  return hvem + kamp(antall) + " fra før — " + iLista + " i denne ligaen, "
+    + andre + " i en annen.";
+}
+
+// Antall valgte i en runde, til overskrifta over den. Uten dette ma admin
+// rulle gjennom hele lista for a vite om noe er krysset av lenger nede.
+export function rundeTall(valgt, alle) {
+  if (!alle) return "";
+  return valgt + " av " + alle + " valgt";
+}

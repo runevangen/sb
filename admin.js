@@ -26,6 +26,7 @@ import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
 import { publisteRad, alleredeILista } from "./pub-forslag-data.js";
 import { PUBTYPER, PUBSIKKERHET, pubNokkel, sjekkPubRad, slaSammenPuber,
   koordinatFraLenke } from "./pub-data.js";
+import { visningsHint, rundeTall } from "./visning-data.js";
 
 const felt = (id) => document.getElementById(id);
 let kamper = [];
@@ -534,9 +535,12 @@ function tegnKamper() {
   }
   const pub = felt("pub").value;
   const alt = visninger.filter((v) => v.pub === pub).map((v) => String(v.kampId));
-  felt("pubHint").textContent = alt.length
-    ? "Viser " + alt.length + " kamper fra før."
-    : "Ingen kamper satt på denne puben ennå.";
+  // Hvor mange av dem som faktisk star i lista under. Totalen alene svarte
+  // ikke pa sporsmalet admin har — *ble det jeg lagret staende?* — og den
+  // talte pa tvers av ligaer mens boksene viste én.
+  const iLista = kamper.filter((k) => alt.indexOf(String(kampNokkel(k))) > -1
+    || alt.indexOf(String(k.id)) > -1).length;
+  felt("pubHint").textContent = visningsHint(alt.length, iLista, pub);
 
   let sisteRunde = null;
   kamper.forEach((k) => {
@@ -547,6 +551,12 @@ function tegnKamper() {
       const skille = document.createElement("li");
       skille.className = "runde-skille";
       skille.textContent = k.runde;
+      // Tallet star her fordi lista er lengre enn skjermen. Uten det ma
+      // admin rulle gjennom hele for a vite om noe er krysset av lenger
+      // nede — og tre synlige avkryssinger av fem ser ut som tap.
+      const tall = document.createElement("span");
+      tall.className = "runde-tall";
+      skille.appendChild(tall);
       liste.appendChild(skille);
     }
     const rad = document.createElement("li");
@@ -580,7 +590,33 @@ function settKamptittel() {
   felt("kampTittel").textContent = pub ? "Kamper " + pub + " viser" : "Kamper";
 }
 
+// Tallene per runde regnes av boksene selv, ikke av et tall vi forer:
+// en teller ved siden av sannheten glir fra den.
+function oppdaterRundetall() {
+  let skille = null;
+  let valgt = 0;
+  let alle = 0;
+  const skriv = () => {
+    if (skille) skille.querySelector(".runde-tall").textContent = rundeTall(valgt, alle);
+  };
+  Array.from(felt("kamper").children).forEach((rad) => {
+    if (rad.classList.contains("runde-skille")) {
+      skriv();
+      skille = rad;
+      valgt = 0;
+      alle = 0;
+      return;
+    }
+    const boks = rad.querySelector(".kamp input");
+    if (!boks) return;
+    alle += 1;
+    if (boks.checked) valgt += 1;
+  });
+  skriv();
+}
+
 function oppdaterLagreknapp() {
+  oppdaterRundetall();
   const knapp = felt("lagre");
   const pub = felt("pub").value;
   const antall = alleBokser().filter((b) => b.checked).length;

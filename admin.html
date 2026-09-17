@@ -76,7 +76,15 @@
   .kamper li { border-bottom: 1px solid var(--ramme); }
   /* Runden star som en overskrift i lista, ikke som en egen boks: den
      deler kampene uten a se ut som noe man kan krysse av. */
+  /* display: flex slar [hidden] fra nettleserens eget stilark. Ingen
+     rundeoverskrift skjules i dag, men regelen ma si hva den betyr — et
+     element som star framme mens koden tror den har skjult det, er en
+     feil som ikke ser ut som en. */
   .runde-skille {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
     border-bottom: 0 !important;
     padding: 14px 2px 4px;
     font-size: 11px;
@@ -85,6 +93,10 @@
     text-transform: uppercase;
     color: var(--tekst-svak);
   }
+  .runde-skille[hidden] { display: none; }
+  /* Tallet er ikke en overskrift: det teller, og skal leses som en
+     opplysning ved siden av — ikke som en del av rundenavnet. */
+  .runde-tall { font-weight: 400; letter-spacing: 0.02em; text-transform: none; }
   .kamper li:first-child.runde-skille { padding-top: 6px; }
   .kamper li:last-child { border-bottom: 0; }
   .kamp { display: flex; align-items: center; gap: 12px; padding: 11px 2px; cursor: pointer; }

@@ -37,6 +37,46 @@ og de sto der hele tiden, under en linje som sa at noe var galt.
 
 ---
 
+## 17. september 2026 — «Viser 5 kamper fra før» var sant og ubrukelig
+
+**Meldt som:** «Når jeg kommer tilbake på admin ser det sånn ut. Selv om
+jeg lagret sist gang.» Skjermbildet viste tre avkryssinger. Hinten over
+sa fem.
+
+**Ingenting var borte.** De to siste sto lenger ned enn skjermen rakk, og
+lagringen hadde gjort nøyaktig det den skulle: slettingen er avgrenset til
+kampene som sto på skjermen, og lista i minnet holdes i takt med det som
+faktisk ble skrevet. Et ligabytte tar ikke med seg en annen ligas kamper.
+
+Feilen var at **skjermen ikke svarte på spørsmålet**. Admin lurer ikke på
+*hvor mange*; admin lurer på *ble det jeg lagret stående?* «Viser 5 kamper
+fra før» er sant, og sier ingenting om det. Tre synlige avkryssinger av
+fem ser da ut som tap — og den eneste måten å vite bedre på, var å rulle
+gjennom hele lista og telle selv.
+
+**Og tallet talte på tvers av ligaer** mens boksene under viste én:
+`visninger.filter((v) => v.pub === pub)`, uten filter på liga. Har puben
+to kamper i Premier League, sier hinten fem der Eliteserien kan vise tre.
+Da er forskjellen ekte, og ser ut som akkurat det samme tapet.
+
+To rettelser, begge om å si hvor ting er framfor hvor mange:
+
+- Hinten sier nå «Andy's Pub viser 5 kamper fra før, alle i lista under»
+  — eller «3 i denne ligaen, 2 i en annen» når det er sant. Den navngir
+  puben, så feil pub valgt synes her også.
+- Hver rundeoverskrift bærer «2 av 2 valgt», talt av boksene selv og
+  oppdatert på hvert kryss. Da svarer et blikk på det lista ellers krever
+  rulling for.
+
+**Fanget av:** admin, som trodde arbeidet var tapt. Det er den dyreste
+formen for uklarhet — den koster tillit til lagringen, ikke bare tid.
+
+**En grønn test brøt på riktig måte:** «hver runde får sin egen
+overskrift» sammenliknet `textContent` med «Runde 21» og falt da tallet
+kom til. Den sjekker nå at navnet står først, og tallet har sin egen test.
+
+---
+
 ## 17. september 2026 — Fire linjer diagnostikk, tre feil i dem
 
 Dagen før fikk portalen vise `forsok` — tjenestens egne ord om hvert
