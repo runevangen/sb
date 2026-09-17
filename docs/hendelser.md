@@ -9,6 +9,34 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 17. september 2026 — «Fikk ikke puber ved Stadio Pierluigi Penzo»
+
+**Meldt som:** «Finner ikke puber nær stadion er vel litt rart å si. Her må
+vi vel søke etter nær bruker.»
+
+**Hva som skjedde.** Hver eneste Serie A-kamp — og hver Premier League-,
+La Liga- og Bundesliga-kamp — viste ei linje i kampkortet om at vi ikke
+fikk puber ved stadion. Den hadde stått siden ligaene ble lagt til.
+
+**Hva som faktisk var årsaken.** `ARENAER` i `vaer-data.js` er tretti
+norske stadion, og `/api/puber` svarer `400 Ukjent arena` på alt annet.
+Den kuraterte lista ved arenaen var riktig vaktet med
+`arenaFor(kamp.arena)` — men nettkallet sto på `if (kamp.arena)`, altså på
+at *navnet* fantes. To vakter på samme spørsmål, og bare den ene stilte
+det riktige.
+
+**Hva som fanget det.** Ingenting. En leser så det i appen. Testene dekket
+norske arenaer og arenaer uten navn; en arena med et navn vi ikke kjenner
+var hullet mellom de to.
+
+**Regelen det ble til.** Vakta står på `arenaFor()`, ikke på at navnet
+finnes. Og mer generelt: **en feilmelding om noe vi aldri burde spurt om,
+er verre enn ingen melding.** Den ser ut som at tjenesten svikter, mens
+det som svikter er spørsmålet. For de kampene er stedene nær deg svaret —
+og de sto der hele tiden, under en linje som sa at noe var galt.
+
+---
+
 ## 17. september 2026 — Fire linjer diagnostikk, tre feil i dem
 
 Dagen før fikk portalen vise `forsok` — tjenestens egne ord om hvert

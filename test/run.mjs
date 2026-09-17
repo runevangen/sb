@@ -1734,6 +1734,109 @@ const SAK_12 = kjor("kamp-deling", FELLES + FOTBALL + `
   }, 1200); });
 `);
 
+/* ------- 12B. en utenlandsk arena er ingen feil ------- */
+
+// «Fikk ikke puber ved Stadio Pierluigi Penzo» sto i kortet pa hver eneste
+// Serie A-kamp til 17. september 2026. Ingenting hadde sviktet: vaer-data
+// kjenner tretti norske stadion, /api/puber svarer «Ukjent arena» pa alt
+// annet, og vakta sto pa at *navnet* fantes framfor pa at vi kjente det.
+//
+// En leser i Oslo skal uansett ikke pa pub i Venezia. For de kampene er
+// det stedene naer deg som er svaret.
+const SAK_12C = kjor("utenlandsk-arena", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) {
+    return Object.assign({}, k, { arena: "Stadio Pierluigi Penzo" });
+  });
+  window.__puberKall = 0;
+  window.__puberArena = "";
+  // Leseren star i Oslo sentrum, ikke i Venezia.
+  navigator.geolocation.getCurrentPosition = function (ok) {
+    ok({ coords: { latitude: 59.9139, longitude: 10.7522 } });
+  };
+  window.fetch = function (u, o) {
+    u = String(u);
+    if (u.indexOf("overpass-api.de") > -1) {
+      return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve({ elements: [
+        { type: "node", id: 9, lat: 59.9142, lon: 10.7530, tags: { amenity: "pub", name: "Kvadraturkroa" } } ] }); } });
+    }
+    if (u.indexOf("/api/puber?") === 0) {
+      window.__puberKall += 1;
+      window.__puberArena = u;
+      // Det ekte svaret pa en arena funksjonen ikke kjenner.
+      return Promise.resolve({ ok: false, status: 400, statusText: "Bad Request",
+        text: function () { return Promise.resolve(JSON.stringify({ feil: "Ukjent arena" })); } });
+    }
+    if (u.indexOf("/api/vaer?") === 0) {
+      return Promise.resolve({ ok: false, status: 400, statusText: "Bad Request",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/pub-liste") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ klar: true, puber: [] })); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ svar: [], visninger: [] })); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Serie A", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 5" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/seriea/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var rad = document.querySelector(".kamp.delbar");
+    var del = rad && rad.querySelector(".kamp-del");
+    if (del) del.click();
+    var panel = document.querySelector(".kamp-panel");
+    ok("kampen kan apnes", !!panel);
+    if (!panel) { ferdig(); return; }
+
+    // Stadionraden blir staende: kampen spilles et sted, og det er en
+    // opplysning. Den er bare ikke noe vi kan lete etter puber rundt.
+    var steder = Array.prototype.map.call(panel.querySelectorAll(".sted-navn"),
+      function (n) { return n.textContent; });
+    ok("stadion star som et sted man kan dra til",
+       steder.indexOf("Stadio Pierluigi Penzo") > -1, steder.join("|"));
+
+    var apne = panel.querySelector(".pub-apne");
+    if (apne) apne.click();
+    setTimeout(function () { try {
+      var forslag = panel.querySelector(".pub-forslag");
+      var tekst = forslag ? forslag.textContent : "";
+      // Kjernen: kallet gjores ikke, sa det finnes ingen feil a melde.
+      ok("funksjonen spores aldri om en arena vi ikke kjenner",
+         window.__puberKall === 0, window.__puberKall + " " + window.__puberArena);
+      ok("og kortet pastar ikke at noe sviktet",
+         tekst.indexOf("Fikk ikke puber") === -1, tekst.slice(0, 160));
+      // Det som *er* svaret pa en utenlandsk kamp: stedene naer deg. De
+      // kuraterte Oslo-pubene rangerer over treffene fra kartet, sa de
+      // seks som star framme er dem — kartreffet ligger bak «Flere
+      // forslag», og taket er der for at lista skal kunne leses.
+      ok("de kuraterte pubene naer deg star framme",
+         tekst.indexOf("Toucan") > -1, tekst.slice(0, 200));
+      var mer = forslag && forslag.querySelector(".pub-mer");
+      if (mer) mer.click();
+      var alt = forslag ? forslag.textContent : "";
+      ok("og treffet fra kartet ligger bak «Flere forslag»",
+         alt.indexOf("Kvadraturkroa") > -1, alt.slice(0, 260));
+      // Lisensen krever kreditering der treff fra kartet vises.
+      ok("OpenStreetMap krediteres nar kartet ga noe",
+         alt.indexOf("© OpenStreetMap-bidragsytere") > -1, alt.slice(-120));
+      ferdig();
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700); });
+`);
+
 /* ---------------- 13. fjorarets runde kan ikke deles ---------------- */
 
 const SAK_13 = kjor("kamp-deling-gammel", FELLES + FOTBALL + `
@@ -4319,7 +4422,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_13, SAK_14, SAK_15, SAK_15B, SAK_15C, SAK_16, SAK_16B, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_15, SAK_15B, SAK_15C, SAK_16, SAK_16B, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
 let feilet = 0;
 
 for (const t of alle) {

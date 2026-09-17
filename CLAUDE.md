@@ -73,6 +73,13 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 - **En knapp som ser ut som den gir noe den ikke gir, er verre enn en som
   sier hva den er.** Gjelder «Venner», «Meldt inn til oss», og
   «Valgt for deling» utlogget.
+- **Puber ved arenaen bare for arenaer vi kjenner.** `arenaFor()` kjenner
+  tretti norske stadion; `/api/puber` svarer «Ukjent arena» på alt annet.
+  Vakta står på `arenaFor(kamp.arena)`, ikke på at navnet finnes — ellers
+  blir hver utenlandske kamp ett bortkastet kall og ei linje om at noe
+  sviktet. For de kampene er stedene **nær deg** svaret, og det er de vi
+  leter etter. Stadionraden blir stående: hvor kampen spilles er en
+  opplysning, ikke et søk.
 - **En stille tom liste er ikke til å skille fra «ingen svarte».** Feiler
   et kall der lista *er* hele visningen, si det. Er lista et tillegg til
   noe annet, ti — men da får den som handlet beskjed.
