@@ -1549,6 +1549,15 @@ const SAK_12 = await kjor("kamp-deling", FELLES + FOTBALL + `
     ok("pubene som pleier a vise fotball ligger bak en lenke",
        apne && utvidet.hidden && apne.getAttribute("aria-expanded") === "false",
        apne && apne.textContent);
+    // Har ingen meldt inn noe, er det ingen a vaere «andre» enn — da sier
+    // lenka hva som ligger bak framfor a telle noe som ikke finnes.
+    ok("og uten en bekreftet pub heter den ikke «andre» noe",
+       apne && apne.textContent === "Puber som pleier å vise fotball",
+       apne && apne.textContent);
+    // Klassen .sted-rad-annet la her til 17. september 2026 og gjorde
+    // ingenting: .pub-apne vant hver egenskap. Den skal ikke tilbake.
+    ok("lenka barer ingen klasse fra det gamle raddesignet",
+       apne && apne.className === "pub-apne", apne && apne.className);
     ok("og ingen puber hentes for lenka apnes",
        window.__overpassKall === 0 && window.__puberKall === 0,
        window.__overpassKall + "/" + window.__puberKall);
@@ -2654,6 +2663,14 @@ const SAK_16 = await kjor("pub-bekreftet", FELLES + FOTBALL + `
     // Forste kamp: Brann – Bodo/Glimt, som Lincoln Pub viser.
     document.querySelectorAll(".kamp-del")[0].click();
     var panel = document.querySelectorAll(".kamp-panel")[0];
+
+    // Etiketten sto «Et annet sted» til 17. september 2026, og det hortes
+    // ut som feltet der du skriver noe selv. Det som apner seg er
+    // fotballpuber som ikke har meldt inn denne kampen — og «andre» star
+    // bare fordi Lincoln Pub alt star over med stjerne.
+    var lenka = panel.querySelector(".pub-apne");
+    ok("med en bekreftet pub heter lenka «Andre fotballpuber»",
+       lenka.textContent === "Andre fotballpuber", lenka.textContent);
     panel.querySelector(".pub-apne").click();
     var forslag = panel.querySelector(".pub-forslag");
     setTimeout(function () { try {

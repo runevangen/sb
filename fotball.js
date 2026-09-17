@@ -688,11 +688,20 @@ function delPanel(kamp) {
   // Lenka ut til pubene som pleier a vise fotball. Har ingen meldt inn
   // noe pa denne kampen, er det den eneste veien videre — da sier lenka
   // det, og listen star apen med en gang.
-  const apne = el("button", "pub-apne sted-rad-annet");
+  //
+  // Sto «Et annet sted» til 17. september 2026, og det var feil ord.
+  // «Et annet sted» hoeres ut som feltet der du skriver noe selv. Det
+  // som apner seg er en liste over **fotballpuber som ikke har meldt inn
+  // denne kampen** — steder du kan regne med a fa se fotball, bare uten
+  // at noen har sagt noe om akkurat denne. Etiketten skal si det.
+  //
+  // «Andre» star bare nar det finnes en forste: har ingen bekreftet noe,
+  // er det ingen a vaere annen enn.
+  const apne = el("button", "pub-apne");
   apne.type = "button";
   apne.setAttribute("aria-expanded", "false");
   const apneTekst = () => (bekreftede().length
-    ? "Et annet sted" : "Puber som pleier å vise fotball");
+    ? "Andre fotballpuber" : "Puber som pleier å vise fotball");
   apne.textContent = apneTekst();
   const vis = (pa) => {
     utvidet.hidden = !pa;

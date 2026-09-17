@@ -2062,7 +2062,7 @@ a.ad-cta:focus-visible {
   gap: 6px;
 }
 
-.sted-rad-kort, .sted-rad-annet {
+.sted-rad-kort {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2160,19 +2160,6 @@ a.ad-cta:focus-visible {
 
 .sted-merke { font-size: 11px; line-height: 1; }
 
-/* «Et annet sted» staar som en rad i lista, ikke som en tekstlenke under:
-   det er et sted til, bare et vi ikke kjenner navnet paa enda. Men den er
-   ingen .sted-rad-kort: den har verken et stedsnavn eller folk, og alt som
-   leter etter stedene i kortet ville faatt den med paa kjopet. */
-.sted-rad-annet {
-  justify-content: center;
-  font-family: inherit;
-  font-size: calc(13px * var(--fs));
-  font-weight: 600;
-  cursor: pointer;
-  border-style: dashed;
-}
-
 .sted-knapp:focus-visible, .pub-apne:focus-visible, .sted-egen:focus-visible,
 .kamp-send:focus-visible, .kamp-pub:focus-visible {
   outline: 2px solid var(--accent);
@@ -2182,7 +2169,15 @@ a.ad-cta:focus-visible {
 /* Veien til pubene som pleier a vise fotball. En lenke, ikke en knapp
    blant stedene: den apner noe, den svarer ikke pa noe. Har ingen meldt
    inn noe pa kampen, er den den eneste veien videre — da star lista
-   apen med en gang, og lenka sier hva den er. */
+   apen med en gang, og lenka sier hva den er.
+
+   Knappen bar ogsa .sted-rad-annet til 17. september 2026, fra den gangen
+   den var tenkt som en stiplet rad i lista. Den klassen sa det motsatte
+   av denne — «en rad i lista, ikke en tekstlenke under» — og tapte hver
+   eneste egenskap til reglene her, som star senere i fila med lik
+   spesifisitet. Malt: knappen var 181x18 px bade med og uten den. To
+   kommentarer som sier motsatt om samme element er verre enn ingen: den
+   som ikke lenger stemte er den som gikk. */
 .pub-apne {
   align-self: flex-start;
   padding: 2px 0;
