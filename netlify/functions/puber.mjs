@@ -12,7 +12,7 @@
 import { arenaFor } from "../../vaer-data.js";
 import {
   overpassSporring, tolkPuber, enturNaermest, tolkHoldeplasser, grupperPuber,
-  OVERPASS_SPEIL, overpassHeadere, restTid,
+  OVERPASS_SPEIL, overpassHeadere, restTid, overpassFeiltekst,
 } from "../../pub-data.js";
 
 const ENTUR = "https://api.entur.io/journey-planner/v3/graphql";
@@ -22,6 +22,10 @@ const IDENTITET = "sportsbibelen-app/1.0 https://mvp-sb.netlify.app";
 // Netlify avbryter funksjonen etter ti sekunder. Vi holder oss godt
 // innenfor, sa svaret vart — og forsok-lista i det — rekker ut.
 const SAMLET_FRIST = 7500;
+// Sporringen ber Overpass om nettopp den tida vi tenker a vente. Ba vi om
+// mer, ville vi vaert den som la pa — med en melding som pekte pa den
+// andre parten.
+const SOK_SEKUNDER = Math.floor(SAMLET_FRIST / 1000);
 const PER_TJENER = 3000;
 
 function medFrist(ms) {
@@ -96,10 +100,19 @@ async function hentHoldeplasser(arena, forsok, frist) {
 // og resten avbrytes — da settler de med en gang, sa forsok-lista blir
 // komplett uten a vente pa de trege. null nar ingen svarte.
 async function hentPuber(arena, forsok, frist) {
-  const sporring = "data=" + encodeURIComponent(overpassSporring(arena.lat, arena.lon, 1200));
+  const sporring = "data=" + encodeURIComponent(overpassSporring(arena.lat, arena.lon, 1200, SOK_SEKUNDER));
   const vakt = medFrist(restTid(frist, Date.now(), SAMLET_FRIST));
-  const alle = OVERPASS_SPEIL.map((adresse) =>
-    enTjener(adresse, sporring, arena, vakt.signal));
+  // Notatene eies her, ett per speil, og fylles pa plass.
+  //
+  // De ble hentet fra avvisningene for, og det loy: nar AbortController
+  // avbryter, avvises ALLE kallene med det samme feilobjektet. Et notat
+  // hengt pa det ble overskrevet av neste, og lista sto da med ett speil
+  // to ganger og et annet ikke i det hele tatt — med samme tid pa begge.
+  // En diagnostikk som forveksler to tjenere er verre enn ingen.
+  const notater = OVERPASS_SPEIL.map((adresse) =>
+    ({ kilde: "Overpass " + new URL(adresse).host }));
+  const alle = OVERPASS_SPEIL.map((adresse, i) =>
+    enTjener(adresse, sporring, arena, vakt.signal, notater[i]));
 
   let vinner = null;
   try {
@@ -111,16 +124,13 @@ async function hentPuber(arena, forsok, frist) {
   vakt.stopp();
 
   // Rekkefolgen folger OVERPASS_SPEIL, ikke hvem som ble ferdig forst.
-  (await Promise.allSettled(alle)).forEach((r) => {
-    forsok.push(r.status === "fulfilled" ? r.value.notat
-      : (r.reason && r.reason.notat) || { kilde: "Overpass", utfall: "ukjent" });
-  });
+  await Promise.allSettled(alle);
+  notater.forEach((n) => forsok.push(n));
   return vinner ? vinner.liste : null;
 }
 
-function enTjener(adresse, sporring, arena, signal) {
+function enTjener(adresse, sporring, arena, signal, notat) {
   const vert = new URL(adresse).host;
-  const notat = { kilde: "Overpass " + vert };
   const startet = Date.now();
   return (async () => {
     const respons = await fetch(adresse, {
@@ -128,8 +138,9 @@ function enTjener(adresse, sporring, arena, signal) {
     });
     notat.status = respons.status;
     if (!respons.ok) {
-      const kropp = (await respons.text().catch(() => "")).replace(/\s+/g, " ").trim();
-      if (kropp) notat.melding = kropp.slice(0, 80);
+      const kropp = await respons.text().catch(() => "");
+      const melding = overpassFeiltekst(kropp);
+      if (melding) notat.melding = melding;
       throw new Error("HTTP " + respons.status);
     }
     const liste = tolkPuber(await respons.json(), arena);
@@ -140,7 +151,7 @@ function enTjener(adresse, sporring, arena, signal) {
     console.error("[puber] Overpass " + vert + " feilet:", err);
     notat.utfall = String(err && err.message || err).slice(0, 80);
     notat.ms = Date.now() - startet;
-    throw Object.assign(err instanceof Error ? err : new Error(String(err)), { notat });
+    throw err instanceof Error ? err : new Error(String(err));
   });
 }
 

@@ -9,6 +9,77 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 17. september 2026 — Fire linjer diagnostikk, tre feil i dem
+
+Dagen før fikk portalen vise `forsok` — tjenestens egne ord om hvert
+speil. Første gang de sto på skjermen, sa de dette:
+
+    Overpass overpass-api.de       · HTTP 406 · <!DOCTYPE HTML PUBLIC "-//W3C… · 472 ms
+    Overpass overpass.private.coffee · This operation was aborted · 6480 ms
+    Overpass overpass.private.coffee · This operation was aborted · 6480 ms
+    Overpass overpass.osm.ch       · HTTP 400 · <?xml version="1.0" encoding… · 409 ms
+
+Fire linjer, og **tre feil i dem**.
+
+### 1. `Accept: application/json` var grunnen til 406-en, ikke botemidlet
+
+Kommentaren over `overpassHeadere()` sa at hovedtjeneren svarer 406 uten
+Accept, og en enhetstest slått fast at den skulle stå der. Begge tok
+feil. Overpass merker ikke svaret som JSON på HTTP-nivå selv om
+`[out:json]` står i spørringen — ber vi strengt om JSON, er det
+ingenting den kan gi oss, og 406 er nettopp «jeg har ikke noe du vil ha».
+Formatet bestemmes av spørringen. Her er det ingenting å hevde, og Accept
+er `*/*` nå.
+
+**472 ms, hver gang.** Det er derfor ingen oppdaget det: en feil som
+kommer på under et halvt sekund ser aldri ut som nedetid, og de andre
+speilene dekket over den. Dette gjaldt også pubsøket leserne bruker.
+
+### 2. Diagnostikken forvekslet to tjenere
+
+`private.coffee` sto to ganger — med samme tid på begge — og
+`kumi.systems` sto ikke i det hele tatt.
+
+Notatene ble hentet fra avvisningene: `Object.assign(err, { notat })`.
+Men når en `AbortController` avbryter, avvises **alle** kallene med det
+**samme feilobjektet** — `signal.reason` er én instans. Hvert speil skrev
+da over det forrige, og det siste som kjørte sin `catch` vant, én gang per
+avbrutt kall. Sabotasjen som gjeninnførte dette viser det rent: alle fire
+linjene ble til samme vert.
+
+Notatene eies av den som kaller nå, ett per speil, fylt på plass. Det
+samme gjaldt `puber.mjs`, som leserne treffer.
+
+*En diagnostikk som forveksler to tjenere er verre enn ingen* — den peker
+på feil sted med samme selvsikkerhet som en riktig.
+
+### 3. Feilsiden viste doctypen i stedet for grunnen
+
+Overpass svarer med en HTML-side når noe er galt. Vi tok de første 80
+tegnene av den — altså `<!DOCTYPE html PUBLIC "-//W3C//DTD…`, som er det
+samme uansett hva som feilet. `overpassFeiltekst()` stripper taggene og
+tar feilsetningen framfor resten.
+
+### Og en fjerde, som følger av regelen fra i går
+
+To speil ble avbrutt **midt i arbeidet** på 6480 ms. Fristen var målt for
+lavt, så `SOK_SEKUNDER` er åtte, og `SOK_TAK` vokter Netlifys ti sekunder
+med margin. `overpassSporring()` — radiussøket — hadde samme uoverens-
+stemmelse: den ba om `[timeout:12]` mens tjenesten ventet 7,5 s og appen
+8 s. Den tar sekundene som parameter nå, og hver kaller sier sannheten.
+
+**Fanget av:** `forsok` på skjermen, første gang den sto der. Alt dette
+hadde ligget i produksjon og vært usynlig, fordi et speil som svarte
+dekket over tre som ikke gjorde det.
+
+**Testene var enige med to av feilene.** Enhetstesten slått fast at Accept
+skulle være `application/json`, med en kommentar som forklarte hvorfor —
+begge skrevet ut fra samme antakelse som koden. Og funksjonstesten for
+feilsiden overlevde sin egen sabotasje, fordi stubben min var kortere enn
+80 tegn etter tagstripping. Begge fellene står i `docs/testing.md`.
+
+---
+
 ## 16. september 2026 — Navnesøket var den eneste veien til et koordinat
 
 **Meldt som:** «Får ikke svar, dermed ikke lagret da vi ikke har
