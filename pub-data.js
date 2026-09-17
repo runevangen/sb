@@ -643,9 +643,17 @@ export function osmNavnSporring(navn, ramme) {
   // Alle ordene ma finnes, i hvilken som helst rekkefolge: «Dubliner
   // Folk Pub» skal treffe «The Dubliner», og «Andy's Pub» skal ikke
   // treffe hver eneste pub i byen.
-  const monster = ord.map((o) => "(?=.*" + o + ")").join("");
+  //
+  // Ett filter per ord, ikke ett regex med lookahead. Overpass ANDer
+  // flere filtre pa samme nokkel, sa de to formene betyr det samme — men
+  // «(?=.*ord)» krever et regex-bygg som stotter lookahead, og
+  // overpass.osm.ch svarte HTTP 400 pa hvert eneste sok. Et speil som
+  // ikke kan lese sporringen var er et speil vi ikke har. Her er det
+  // ingenting a vinne pa den formen: den var kortere a skrive, og det er
+  // alt.
+  const filtre = ord.map((o) => '["name"~"' + o + '",i]').join("");
   const boks = osmBoks(r);
-  return osmHode() + 'nwr["name"~"' + monster + '",i]' + boks + ";out center;";
+  return osmHode() + "nwr" + filtre + boks + ";out center;";
 }
 
 // Treffene, formet som portalen vil ha dem: navn, koordinat og adressen

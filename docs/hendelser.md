@@ -60,7 +60,25 @@ tegnene av den — altså `<!DOCTYPE html PUBLIC "-//W3C//DTD…`, som er det
 samme uansett hva som feilet. `overpassFeiltekst()` stripper taggene og
 tar feilsetningen framfor resten.
 
-### Og en fjerde, som følger av regelen fra i går
+### HTTP 400: spørringen krevde et regex-bygg ikke alle har
+
+Spørringen sa `["name"~"(?=.*Dubliner)(?=.*Folk)",i]` — alle ordene må
+finnes, i hvilken som helst rekkefølge. Lookahead krever et regex-bygg
+som `overpass.osm.ch` ikke har, og den svarte HTTP 400 på hvert eneste
+søk.
+
+Overpass ANDer flere filtre på samme nøkkel, så
+`["name"~"Dubliner",i]["name"~"Folk",i]` betyr nøyaktig det samme og
+leses av alle bygg. Lookahead-formen var bare kortere å skrive, og det
+var alt den hadde. *Et speil som ikke kan lese spørringen vår er et speil
+vi ikke har.*
+
+Og en test til som var grønn av feil grunn: «korte biter som «The» og
+«Pub» teller ikke med» søkte etter `(?=.*Pub)`. Med filterformen finnes
+den strengen ikke uansett hva koden gjør — og `"Pub"` alene står inni
+`["name"~"Dubliner",i]`. Sjekken må være på hele filteret.
+
+### Og en femte, som følger av regelen fra i går
 
 To speil ble avbrutt **midt i arbeidet** på 6480 ms. Fristen var målt for
 lavt, så `SOK_SEKUNDER` er åtte, og `SOK_TAK` vokter Netlifys ti sekunder

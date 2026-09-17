@@ -2113,16 +2113,28 @@ ok("hermetegn og apostrof vaskes bort for sporringen",
 ok("og norske bokstaver blir staende", osmNavnVask("Blå Grønland") === "Blå Grønland",
    osmNavnVask("Blå Grønland"));
 const PUBSPOR = osmNavnSporring("The Dubliner Folk Pub");
+// Ett filter per ord. Overpass ANDer flere filtre pa samme nokkel, sa det
+// betyr det samme som et regex med lookahead — men lookahead krever et
+// regex-bygg som ikke alle speilene har, og overpass.osm.ch svarte HTTP
+// 400 pa hvert eneste sok.
 ok("sporringen krever alle ordene, i hvilken som helst rekkefolge",
-   PUBSPOR.indexOf("(?=.*Dubliner)") > -1 && PUBSPOR.indexOf("(?=.*Folk)") > -1,
-   PUBSPOR);
+   PUBSPOR.indexOf('["name"~"Dubliner",i]') > -1 &&
+   PUBSPOR.indexOf('["name"~"Folk",i]') > -1, PUBSPOR);
+// Sjekken ma vaere pa HELE filteret, ikke pa ordet: «Pub» star i
+// «["name"~"Dubliner",i]» ogsa, og en indexOf("Pub") ville vaert gronn
+// uansett hva koden gjorde.
 ok("korte biter som «The» og «Pub» teller ikke med",
-   PUBSPOR.indexOf("(?=.*The)") === -1 && PUBSPOR.indexOf("(?=.*Pub)") === -1, PUBSPOR);
+   PUBSPOR.indexOf('["name"~"The",i]') === -1 &&
+   PUBSPOR.indexOf('["name"~"Pub",i]') === -1, PUBSPOR);
+// Lookahead er ute overalt, ikke bare i det ene ordet vi ser etter.
+ok("og ingen lookahead er igjen i sporringen",
+   PUBSPOR.indexOf("(?=") === -1 &&
+   osmAdresseSporring("Berglyveien 4J").indexOf("(?=") === -1, PUBSPOR);
 // Apostrofen deler framfor a forsvinne: «OLearys» ville ikke truffet
 // «O'Learys» i OpenStreetMap, men «Learys» gjor.
 ok("apostrofen deler navnet framfor a lime det sammen",
-   osmNavnSporring("O'Learys Vika").indexOf("(?=.*Learys)") > -1 &&
-   osmNavnSporring("O'Learys Vika").indexOf("(?=.*OLearys)") === -1,
+   osmNavnSporring("O'Learys Vika").indexOf('["name"~"Learys",i]') > -1 &&
+   osmNavnSporring("O'Learys Vika").indexOf('["name"~"OLearys",i]') === -1,
    osmNavnSporring("O'Learys Vika"));
 ok("et navn med bare korte biter bruker den lengste alene",
    osmNavnSporring("Kro & Co") === osmNavnSporring("Kro"),
