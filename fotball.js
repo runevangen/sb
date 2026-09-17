@@ -1155,7 +1155,17 @@ function fyllForslag(boks, kamp) {
   // et trykk til.
   hentNaerDeg(boks, bekreftede);
 
-  if (kamp.arena) {
+  // **Puber ved arenaen bare der arenaen er en vi kjenner.** `arena` er
+  // null for alt utenfor de tretti norske stadionene i vaer-data.js, og da
+  // svarer /api/puber «Ukjent arena» — hver eneste gang. Til
+  // 17. september 2026 sto vakta pa `kamp.arena`, altsa pa at navnet
+  // fantes, og en Serie A-kamp ga derfor ett bortkastet funksjonskall og
+  // ei linje som sa «Fikk ikke puber ved Stadio Pierluigi Penzo».
+  //
+  // Ingenting sviktet. Vi spurte om et sted vi aldri har hatt koordinater
+  // til — og en leser i Oslo skal uansett ikke pa pub i Venezia. For de
+  // kampene er det stedene *naer deg* som er svaret, og de hentes over.
+  if (arena) {
     boks.venter += 1;
     hentPuberRundt(kamp.arena).then((data) => {
       boks.venter -= 1;
