@@ -1342,8 +1342,12 @@ function hentNaerDeg(boks, bekreftede) {
 // herfra, aldri innom oss.
 async function naerePuber(p) {
   const styring = typeof AbortController === "function" ? new AbortController() : null;
-  const vakt = setTimeout(() => styring && styring.abort(), 8000);
-  const kropp = "data=" + encodeURIComponent(overpassSporring(p.lat, p.lon, 800));
+  // Sporringen ber om den tida vi faktisk venter, ikke mer: ba vi om tolv
+  // og la pa etter atte, var det vi som ga opp.
+  const FRIST = 8000;
+  const vakt = setTimeout(() => styring && styring.abort(), FRIST);
+  const kropp = "data=" + encodeURIComponent(
+    overpassSporring(p.lat, p.lon, 800, FRIST / 1000));
   const alle = OVERPASS_SPEIL.map((adresse) => (async () => {
     const respons = await fetch(adresse, {
       method: "POST",

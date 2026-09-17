@@ -20,6 +20,7 @@ import {
   tolkPubRader, pubRadTilBase, sjekkPubRad,
   osmNavnSporring, tolkNavnTreff, OVERPASS_SPEIL, overpassHeadere,
   osmAdresseSporring, tolkAdresseTreff, delAdresse, SOK_SEKUNDER,
+  overpassFeiltekst,
 } from "../../pub-data.js";
 
 const TABELL = "puber";
@@ -33,7 +34,7 @@ export const LEVETID_PUBLISTE = 120;
 // samme: sporringen ba om tolv sekunder mens vi la pa etter seks. Da var
 // det vi som ga opp — men meldingen sa «Fikk ikke svar fra
 // OpenStreetMap», og pekte pa feil part.
-const SOK_FRIST = SOK_SEKUNDER * 1000 + 500;
+export const SOK_FRIST = SOK_SEKUNDER * 1000 + 500;
 
 export default async (req) => {
   const mangler = manglerIOppsettet();
@@ -154,8 +155,17 @@ async function kjorSok(sporring, tolk, ekstra) {
   const styring = new AbortController();
   const vakt = setTimeout(() => styring.abort(), SOK_FRIST);
   const kropp = "data=" + encodeURIComponent(sporring);
-  const forsok = [];
-  const alle = OVERPASS_SPEIL.map((adresse) => enTjener(adresse, kropp, styring.signal, tolk));
+  // Notatene eies her, ett per speil, og fylles pa plass.
+  //
+  // De ble hentet fra avvisningene for, og det loy: nar AbortController
+  // avbryter, avvises ALLE kallene med det samme feilobjektet. Et notat
+  // hengt pa det ble overskrevet av neste, og lista sto da med ett speil
+  // to ganger og et annet ikke i det hele tatt — med samme tid pa begge.
+  // En diagnostikk som forveksler to tjenere er verre enn ingen.
+  const forsok = OVERPASS_SPEIL.map((adresse) =>
+    ({ kilde: "Overpass " + new URL(adresse).host }));
+  const alle = OVERPASS_SPEIL.map((adresse, i) =>
+    enTjener(adresse, kropp, styring.signal, tolk, forsok[i]));
 
   let vinner = null;
   try {
@@ -165,11 +175,7 @@ async function kjorSok(sporring, tolk, ekstra) {
   }
   clearTimeout(vakt);
   styring.abort();
-
-  (await Promise.allSettled(alle)).forEach((r) => {
-    forsok.push(r.status === "fulfilled" ? r.value.notat
-      : (r.reason && r.reason.notat) || { kilde: "Overpass", utfall: "ukjent" });
-  });
+  await Promise.allSettled(alle);
 
   if (!vinner) {
     return svar({ feil: "Fikk ikke svar fra OpenStreetMap. Tast koordinatene selv,"
@@ -179,9 +185,8 @@ async function kjorSok(sporring, tolk, ekstra) {
     ekstra || {}), 200, 0);
 }
 
-function enTjener(adresse, kropp, signal, tolk) {
+function enTjener(adresse, kropp, signal, tolk, notat) {
   const vert = new URL(adresse).host;
-  const notat = { kilde: "Overpass " + vert };
   const startet = Date.now();
   return (async () => {
     const respons = await fetch(adresse, {
@@ -189,8 +194,10 @@ function enTjener(adresse, kropp, signal, tolk) {
     });
     notat.status = respons.status;
     if (!respons.ok) {
-      const tekst = (await respons.text().catch(() => "")).replace(/\s+/g, " ").trim();
-      if (tekst) notat.melding = tekst.slice(0, 80);
+      // Feilsiden er HTML, og de forste 80 tegnene er alltid «<!DOCTYPE
+      // html PUBLIC …». Grunnen star lenger nede, og det er den vi vil ha.
+      const melding = overpassFeiltekst(await respons.text().catch(() => ""));
+      if (melding) notat.melding = melding;
       throw new Error("HTTP " + respons.status);
     }
     const treff = (tolk || tolkNavnTreff)(await respons.json(), 8);
@@ -201,7 +208,7 @@ function enTjener(adresse, kropp, signal, tolk) {
     console.error("[pub-liste] Overpass " + vert + " feilet:", err);
     notat.utfall = String((err && err.message) || err).slice(0, 80);
     notat.ms = Date.now() - startet;
-    throw Object.assign(err instanceof Error ? err : new Error(String(err)), { notat });
+    throw err instanceof Error ? err : new Error(String(err));
   });
 }
 

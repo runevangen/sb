@@ -46,7 +46,7 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
          pubNokkel, tolkPubRader, pubRadTilBase, slaSammenPuber, sjekkPubRad,
          osmNavnVask, osmNavnSporring, tolkNavnTreff, PUBTYPER, PUBSIKKERHET,
          delAdresse, osmAdresseSporring, tolkAdresseTreff, koordinatFraLenke,
-         SOK_SEKUNDER,
+         SOK_SEKUNDER, SOK_TAK, overpassFeiltekst,
          OSLO_RAMME } from "../pub-data.js";
 import { PUBER_KONTAKT } from "../puber-kontakt.js";
 import { KANALER } from "../kanaler.js";
@@ -550,11 +550,24 @@ ok("uten vaer er teksten som for",
 /* ---------------- puber ---------------- */
 
 ok("Overpass-sporringen har radius og tre desimaler",
-   overpassSporring(63.41264, 10.4, 800) === '[out:json][timeout:12];nwr["amenity"~"^(pub|bar)$"](around:800,63.413,10.400);out center;',
-   overpassSporring(63.41264, 10.4, 800));
-// Hovedtjeneren svarer 406 uten Accept. Uten den headeren far ingen puber.
-ok("Accept sier hva vi tar imot", overpassHeadere(false)["Accept"] === "application/json" &&
-   overpassHeadere(true)["Accept"] === "application/json");
+   overpassSporring(63.41264, 10.4, 800, 7) === '[out:json][timeout:7];nwr["amenity"~"^(pub|bar)$"](around:800,63.413,10.400);out center;',
+   overpassSporring(63.41264, 10.4, 800, 7));
+// Sporringen ber om den tida den som kaller faktisk venter. Sto det en
+// fast tolv her mens tjenesten la pa etter 7,5, var vi den som ga opp —
+// og meldingen pekte pa Overpass.
+ok("sporringen ber om den tida vi faktisk venter",
+   overpassSporring(59.9, 10.7, 800, 7).indexOf("[timeout:7]") > -1 &&
+   overpassSporring(59.9, 10.7, 800, 8).indexOf("[timeout:8]") > -1,
+   overpassSporring(59.9, 10.7, 800, 7).slice(0, 24));
+
+// «application/json» sto her i to uker, med en kommentar som sa at den
+// loste 406-en. Den gjorde det motsatte: overpass-api.de svarte 406 pa
+// hvert eneste kall, pa 472 ms, sa raskt at det aldri sa ut som nedetid.
+// Overpass merker ikke svaret som JSON pa HTTP-niva selv om «[out:json]»
+// star i sporringen, sa strengt om JSON er a be om noe den ikke har.
+// Formatet bestemmes av sporringen; her er det ingenting a hevde.
+ok("Accept hevder ingenting om formatet", overpassHeadere(false)["Accept"] === "*/*" &&
+   overpassHeadere(true)["Accept"] === "*/*", JSON.stringify(overpassHeadere(true)));
 // Nettleseren forbyr oss a sette User-Agent.
 ok("nettleseren far bare det den har lov til a sette",
    !("User-Agent" in overpassHeadere(false)), JSON.stringify(overpassHeadere(false)));
@@ -2100,16 +2113,28 @@ ok("hermetegn og apostrof vaskes bort for sporringen",
 ok("og norske bokstaver blir staende", osmNavnVask("Blå Grønland") === "Blå Grønland",
    osmNavnVask("Blå Grønland"));
 const PUBSPOR = osmNavnSporring("The Dubliner Folk Pub");
+// Ett filter per ord. Overpass ANDer flere filtre pa samme nokkel, sa det
+// betyr det samme som et regex med lookahead — men lookahead krever et
+// regex-bygg som ikke alle speilene har, og overpass.osm.ch svarte HTTP
+// 400 pa hvert eneste sok.
 ok("sporringen krever alle ordene, i hvilken som helst rekkefolge",
-   PUBSPOR.indexOf("(?=.*Dubliner)") > -1 && PUBSPOR.indexOf("(?=.*Folk)") > -1,
-   PUBSPOR);
+   PUBSPOR.indexOf('["name"~"Dubliner",i]') > -1 &&
+   PUBSPOR.indexOf('["name"~"Folk",i]') > -1, PUBSPOR);
+// Sjekken ma vaere pa HELE filteret, ikke pa ordet: «Pub» star i
+// «["name"~"Dubliner",i]» ogsa, og en indexOf("Pub") ville vaert gronn
+// uansett hva koden gjorde.
 ok("korte biter som «The» og «Pub» teller ikke med",
-   PUBSPOR.indexOf("(?=.*The)") === -1 && PUBSPOR.indexOf("(?=.*Pub)") === -1, PUBSPOR);
+   PUBSPOR.indexOf('["name"~"The",i]') === -1 &&
+   PUBSPOR.indexOf('["name"~"Pub",i]') === -1, PUBSPOR);
+// Lookahead er ute overalt, ikke bare i det ene ordet vi ser etter.
+ok("og ingen lookahead er igjen i sporringen",
+   PUBSPOR.indexOf("(?=") === -1 &&
+   osmAdresseSporring("Berglyveien 4J").indexOf("(?=") === -1, PUBSPOR);
 // Apostrofen deler framfor a forsvinne: «OLearys» ville ikke truffet
 // «O'Learys» i OpenStreetMap, men «Learys» gjor.
 ok("apostrofen deler navnet framfor a lime det sammen",
-   osmNavnSporring("O'Learys Vika").indexOf("(?=.*Learys)") > -1 &&
-   osmNavnSporring("O'Learys Vika").indexOf("(?=.*OLearys)") === -1,
+   osmNavnSporring("O'Learys Vika").indexOf('["name"~"Learys",i]') > -1 &&
+   osmNavnSporring("O'Learys Vika").indexOf('["name"~"OLearys",i]') === -1,
    osmNavnSporring("O'Learys Vika"));
 ok("et navn med bare korte biter bruker den lengste alene",
    osmNavnSporring("Kro & Co") === osmNavnSporring("Kro"),
@@ -2227,6 +2252,47 @@ ok("sporringen ber om den tida tjenesten faktisk venter",
    osmNavnSporring("Dubliner").indexOf("[timeout:" + SOK_SEKUNDER + "]") > -1 &&
    osmAdresseSporring("Grensen").indexOf("[timeout:" + SOK_SEKUNDER + "]") > -1,
    osmNavnSporring("Dubliner").slice(0, 30));
+
+/* ---------------- det Overpass faktisk sier nar den nekter ---------------- */
+
+// Meldt 17. september 2026, fra portalen, med linjene under soket:
+//
+//   Overpass overpass-api.de · HTTP 406 · <!DOCTYPE HTML PUBLIC "-//W3C…
+//   Overpass overpass.osm.ch  · HTTP 400 · <?xml version="1.0" encoding…
+//
+// Statuskoden kom fram. Grunnen gjorde det ikke: de forste 80 tegnene av
+// en feilside er alltid doctypen, altsa det samme uansett hva som feilet.
+const OSM_FEILSIDE = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"'
+  + ' "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">\n<html><head>'
+  + "<title>OSM3S Response</title></head><body>\n"
+  + "<p>The data included in this document is from www.openstreetmap.org.</p>\n"
+  + '<p><strong style="color:#FF0000">Error</strong>: line 1: parse error:'
+  + ' Unknown type "(?=" </p>\n</body></html>';
+ok("feilsiden gir grunnen, ikke doctypen",
+   overpassFeiltekst(OSM_FEILSIDE).indexOf("parse error") > -1,
+   overpassFeiltekst(OSM_FEILSIDE));
+ok("og doctypen er ute av den",
+   overpassFeiltekst(OSM_FEILSIDE).indexOf("DOCTYPE") === -1,
+   overpassFeiltekst(OSM_FEILSIDE));
+// Star det ingen «Error:», er hele teksten det beste vi har.
+ok("en side uten feilord gir teksten som star der",
+   overpassFeiltekst("<html><body>Not Acceptable</body></html>") === "Not Acceptable",
+   overpassFeiltekst("<html><body>Not Acceptable</body></html>"));
+ok("et tomt svar gir en tom melding, ikke «undefined»",
+   overpassFeiltekst("") === "" && overpassFeiltekst(null) === "");
+ok("og lengden har et tak",
+   overpassFeiltekst("Error: " + "a".repeat(400)).length === 120,
+   overpassFeiltekst("Error: " + "a".repeat(400)).length);
+
+// Atte sekunder, ikke seks: to av fire speil ble avbrutt midt i arbeidet
+// pa 6480 ms. Men fristen kan ikke ete opp Netlifys ti sekunder heller —
+// da far admin Netlifys feilside framfor var, uten et ord om hvem som
+// sviktet, som er nettopp det `forsok` finnes for.
+ok("fristen ligger under Netlifys tak, med margin",
+   SOK_SEKUNDER * 1000 + 500 <= SOK_TAK - 1000,
+   SOK_SEKUNDER * 1000 + 500 + " mot " + SOK_TAK);
+ok("og den er lang nok til at et speil rekker a svare",
+   SOK_SEKUNDER * 1000 > 6480, SOK_SEKUNDER * 1000);
 
 /* ---------------- rapport ---------------- */
 
