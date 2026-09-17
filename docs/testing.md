@@ -4,7 +4,7 @@
 kommandoene, men ikke tallene: de sto i tre filer og glei fire ganger på to
 dager. Legger du til tester, er det denne fila som skal rettes.
 
-    node test/unit.mjs      614 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      620 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  343 tester, ~250 ms, ingen nettleser
     node test/run.mjs       543 tester, 3–20 s, headless Chromium
 

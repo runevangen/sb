@@ -2113,6 +2113,19 @@ ok("hermetegn og apostrof vaskes bort for sporringen",
    osmNavnVask('O\'Leary\'s "Vika"'));
 ok("og norske bokstaver blir staende", osmNavnVask("Blå Grønland") === "Blå Grønland",
    osmNavnVask("Blå Grønland"));
+// Klassen var en handskrevet liste med norske tegn til 17. september 2026,
+// og da falt alt annet ut som mellomrom. To ekte steder i Oslo ble
+// usokbare: «Grünerløkka» ble «Gr nerløkka», «Café Sara» ble «Caf Sara».
+// Nå er regelen «en bokstav, uansett sprak».
+ok("og bokstaver fra andre sprak ogsa",
+   osmNavnVask("Grünerløkka") === "Grünerløkka" &&
+   osmNavnVask("Café Sara") === "Café Sara",
+   osmNavnVask("Grünerløkka") + " | " + osmNavnVask("Café Sara"));
+// Det som *skal* vaskes bort er det som kan bryte Overpass' egen
+// sporring: hermetegn, apostrof, bakoverstrek.
+ok("men tegnsetting slipper fortsatt ikke gjennom",
+   /^[0-9A-Za-zÀ-ÿ ]+$/.test(osmNavnVask("Grünerløkka \\ \"x\" 'y'")),
+   osmNavnVask("Grünerløkka \\ \"x\" 'y'"));
 const PUBSPOR = osmNavnSporring("The Dubliner Folk Pub");
 // Ett filter per ord. Overpass ANDer flere filtre pa samme nokkel, sa det
 // betyr det samme som et regex med lookahead — men lookahead krever et
@@ -2186,6 +2199,30 @@ ok("en gate uten nummer er en gate",
 // gatenavn, og et tomt svar ser ut som «huset finnes ikke».
 ok("et husnummer alene er ingen adresse",
    delAdresse("4J") === null && delAdresse("12") === null && delAdresse("") === null);
+
+// Meldt 17. september 2026: adressesoket ga null treff pa et innsendt
+// forslag. Nummeret ble lest som *siste* bit, sa alt som kom etter havnet
+// i gatenavnet — og «Torggata 11 Oslo» finnes ikke som gate noe sted.
+// Folk skriver poststed etter adressen; et innsendt forslag gjor det
+// nesten alltid.
+ok("poststed etter adressen kastes",
+   delAdresse("Torggata 11, Oslo").gate === "Torggata" &&
+   delAdresse("Torggata 11, Oslo").nummer === "11",
+   JSON.stringify(delAdresse("Torggata 11, Oslo")));
+ok("og postnummer med poststed ogsa",
+   delAdresse("Torggata 11, 0181 Oslo").gate === "Torggata" &&
+   delAdresse("Torggata 11, 0181 Oslo").nummer === "11",
+   JSON.stringify(delAdresse("Torggata 11, 0181 Oslo")));
+// Nummeret star rett etter gata, og gata kan ha flere ord for det.
+ok("en flerordsgate med poststed holder fortsatt sammen",
+   delAdresse("Thorvald Meyers gate 30, Oslo").gate === "Thorvald Meyers gate",
+   JSON.stringify(delAdresse("Thorvald Meyers gate 30, Oslo")));
+// «Vs» i «Olav Vs gate» er ingen bokstav bak et tall, sa den skal ikke
+// leses som husnummer.
+ok("et ord midt i gatenavnet er ikke et husnummer",
+   delAdresse("Olav Vs gate 1").gate === "Olav Vs gate" &&
+   delAdresse("Olav Vs gate 1").nummer === "1",
+   JSON.stringify(delAdresse("Olav Vs gate 1")));
 
 const ADRSPOR = osmAdresseSporring("Berglyveien 4J");
 ok("adressesporringen sporr pa begge taggene",
