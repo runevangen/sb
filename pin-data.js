@@ -136,9 +136,10 @@ export function tolkPinOkt(json, navn, naa = Date.now()) {
 // Portalen kaller kolonnen «Sist palogget» av nettopp den grunn.
 // Kontoen lages ved forste innlogging, sa de to er nyaktig det de ser ut
 // som. En konto som aldri har logget inn finnes ikke.
-export function tolkBrukere(rader, domene = PIN_DOMENE) {
+export function tolkBrukere(rader, domene = PIN_DOMENE, okter) {
   const liste = Array.isArray(rader) ? rader : (rader && rader.users) || [];
   if (!Array.isArray(liste)) return [];
+  const aktive = (okter && typeof okter === "object") ? okter : {};
 
   return liste
     .filter((r) => r && r.id)
@@ -151,13 +152,24 @@ export function tolkBrukere(rader, domene = PIN_DOMENE) {
         navn: normaliserPinNavn(meta.navn) || slug,
         slug,
         forst: r.created_at || "",
+        // `sist` er palogging: sist noen tastet PIN-en.
         sist: r.last_sign_in_at || "",
+        // `aktiv` er sist okta ble fornyet — sist appen faktisk var i gang
+        // hos denne personen. De to er ikke det samme, og forskjellen var
+        // hele forvirringen: en som er innom hver dag kan ha en `sist` som
+        // er uker gammel. Tom streng nar det ikke finnes en levende okt,
+        // og det er en opplysning i seg selv.
+        aktiv: String(aktive[String(r.id)] || ""),
       };
     })
     // Bare vare egne kontoer. Ligger det noe annet i prosjektet, hoerer
     // det ikke hjemme i denne lista.
     .filter((b) => b.slug)
-    .sort((a, b) => String(b.sist || "").localeCompare(String(a.sist || "")));
+    // Sortert pa hvem som sist var inne, ikke pa hvem som sist tastet
+    // PIN-en: det forste er sporsmalet admin har. Den uten okt faller
+    // nederst, ikke overst — `aktiv` er tom, og tom sorterer sist.
+    .sort((a, b) => String(b.aktiv || "").localeCompare(String(a.aktiv || ""))
+      || String(b.sist || "").localeCompare(String(a.sist || "")));
 }
 
 // «I går 21:04». Admin leser dette for a se hvem som faktisk har vaert

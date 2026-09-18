@@ -364,3 +364,43 @@ alter table puber add constraint puber_kilde_og_dato check (
          or (char_length(kilde) >= 12 and kilde like '% % %'))
   )
 );
+
+
+-- ---------------------------------------------------------------
+-- 8. sist inne — når økta sist ble fornyet
+-- ---------------------------------------------------------------
+--
+-- `last_sign_in_at` er sist noen TASTET PIN-en. Appen holder telefonen
+-- innlogget med roterende fornyere, og en fornying rører ikke det feltet:
+-- en som er innom hver dag kan stå med en dato uker tilbake. Meldt fra
+-- portalen 16. og 17. september 2026, begge gangene av en som var
+-- innlogget i det øyeblikket han leste «2 dager siden».
+--
+-- `auth.sessions.refreshed_at` er det som faktisk beveger seg. Vi fører
+-- ingenting nytt: GoTrue skriver feltet fordi det MÅ for å holde folk
+-- innlogget, og det er den samme grunnen `last_sign_in_at` finnes.
+--
+-- **`refreshed_at` er `timestamp without time zone`.** Verdien er UTC,
+-- men bærer ikke zone. Uten `at time zone 'utc'` bruker Postgres tjenerens
+-- egen sone når den støper om. Målt 17. september er den sonen UTC, så
+-- castingen gir samme verdi i dag — den står der for å gjøre riktigheten
+-- uavhengig av en innstilling ingen av oss eier.
+--
+-- `auth` nås ikke utenfra: PostgREST eksponerer bare `public`. Funksjonen
+-- ligger derfor her, og bare service-nøkkelen slipper til — den samme ene
+-- nøkkelen `brukere.mjs` alt har (ADR 0010). En innlogget bruker skal
+-- ikke kunne spørre når naboen sist var inne.
+create or replace function public.sist_inne()
+returns table (bruker uuid, sist_aktiv timestamptz)
+language sql
+security definer
+set search_path = ''
+as $$
+  select s.user_id,
+         max(coalesce(s.refreshed_at at time zone 'utc', s.created_at))
+  from auth.sessions s
+  group by s.user_id;
+$$;
+
+revoke all on function public.sist_inne() from public, anon, authenticated;
+grant execute on function public.sist_inne() to service_role;

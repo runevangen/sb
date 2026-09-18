@@ -57,14 +57,36 @@ export default async (req) => {
 
 /* ---------- handlingene ---------- */
 
-// Forste og siste palogging kommer rett fra Supabase: `created_at` er
-// den forste (kontoen lages ved forste innlogging, sa de to er samme
-// oyeblikk) og `last_sign_in_at` den siste. Vi teller ikke selv — et
-// tall vi forer selv ville kunne gli fra virkeligheten.
+// Forste palogging kommer rett fra Supabase: `created_at`, og kontoen
+// lages ved forste innlogging, sa de to er samme oyeblikk. Vi teller ikke
+// selv — et tall vi forer selv ville kunne gli fra virkeligheten.
+//
+// «Sist inne» kommer fra oktene, ikke fra `last_sign_in_at`. Det feltet er
+// sist noen TASTET PIN-en, og appen holder telefonen innlogget med
+// roterende fornyere: en som er innom hver dag kan sta med en dato uker
+// tilbake. Meldt fra portalen to dager pa rad, begge gangene av en som var
+// innlogget i det oyeblikket han leste «2 dager siden».
+//
+// Ogsa dette er Supabases eget bokholderi: GoTrue skriver
+// `sessions.refreshed_at` fordi den MA for a holde folk innlogget. Vi
+// begynner ikke a telle noe. ADR 0021.
 async function hentBrukere() {
   const r = await hosSupabase("GET", "/auth/v1/admin/users?page=1&per_page=" + PER_SIDE);
   if (!r.ok) return tjenestefeil(r, "Fikk ikke hentet brukerne");
-  return svar({ brukere: tolkBrukere(r.json) }, 200);
+
+  // Oktene er et TILLEGG: feiler de, star lista der uten «sist inne»
+  // framfor at hele portalen ryker. Men det skal sies at den mangler —
+  // en tom kolonne er ikke til a skille fra «ingen har vaert inne».
+  const okter = await hosSupabase("POST", "/rest/v1/rpc/sist_inne", {});
+  const kart = okter.ok && Array.isArray(okter.json)
+    ? okter.json.reduce((m, r2) => Object.assign(m, { [r2.bruker]: r2.sist_aktiv }), {})
+    : null;
+
+  return svar(Object.assign(
+    { brukere: tolkBrukere(r.json, undefined, kart || {}) },
+    kart ? {} : { oktfeil: "Fikk ikke hentet øktene. «Sist inne» står tomt.",
+                  forsok: okter.forsok },
+  ), 200);
 }
 
 // Ny PIN til en som har glemt sin. Admin far aldri se den gamle — den

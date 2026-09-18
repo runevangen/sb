@@ -69,6 +69,56 @@ og de sto der hele tiden, under en linje som sa at noe var galt.
 
 ---
 
+## 17. september 2026 — Spørsmålet jeg hadde svart nei på to ganger
+
+«Jeg ønsker å kunne se når de var inne med pålogget bruker, ikke bare tastet
+pin kode. Er det mulig?»
+
+To dager på rad hadde jeg forklart hvorfor kolonnen sto som den sto: feltet
+er `last_sign_in_at`, en fornyet økt rører det ikke, og å måle bruk ville
+vært sporingen [ADR 0004](adr/0004-ingen-statistikk.md) forbyr. Først døpte
+jeg kolonnen om. Så satte jeg «det er deg, innlogget nå» ved siden av den.
+Begge gangene gjorde jeg etiketten sannere og lot spørsmålet stå.
+
+**Da jeg endelig slø opp i basen i stedet for å resonnere om den, sto svaret
+der.** Samme konto:
+
+| Felt | Verdi |
+| --- | --- |
+| `users.last_sign_in_at` | 14. september |
+| `sessions.refreshed_at` | 17. september 21:04 |
+
+Supabase fører allerede når økta sist ble fornyet. Den **må** — det er slik
+folk holdes innlogget. Å lese det feltet er ikke å begynne å måle noen; det
+er samme slags oppslag som `last_sign_in_at`, som vi hadde vist hele tiden.
+[ADR 0021](adr/0021-sist-inne-fra-oktene.md).
+
+**Det jeg tok feil av var ikke reglene, men hvor jeg lette.** «Er dette
+mulig uten å bryte ADR 0004» ble besvart fra det jeg visste om koden vår,
+ikke fra det som faktisk lå i databasen. Ett oppslag — fire linjer SQL —
+gjorde to dager med forklaringer unødvendige.
+
+Tre ting måtte stå for at kolonnen ikke skulle bli en ny halvsannhet: at
+det betyr «sist appen var i gang», ikke «sist de så på skjermen»; at
+historikken bare er så lang som øktene lever, så «Ingen økt i live» står
+framfor en tom celle; og at PIN-datoen ikke forsvinner — den ligger i
+hjelpeteksten, for det er den du trenger når noen har glemt PIN-en.
+
+**`personvern.html` sa «når hver av dem logget inn første og siste gang».**
+Den setningen ble usann i det kolonnen skiftet betydning. Rettet — ikke som
+en ny opplysning, men for å holde en gammel sann.
+
+**En stubb som var enig med koden uansett:** funksjonstestene ga det samme
+svaret på hvert endepunkt, så økt-oppslaget fikk brukerlista tilbake som
+«økter». Alt var grønt før jeg skrev en linje med assertions. De to
+endepunktene svarer hver for seg nå, som hos Supabase.
+
+**Og en bakoverfnutt i en kommentar:** ``// `sist` er PIN-datoen`` inne i en
+scene avsluttet malen scenen står i. Feilen kom ut som «missing ) after
+argument list» på en linje flere hundre lenger opp.
+
+---
+
 ## 17. september 2026 — Fire ting i portalen, meldt i én melding
 
 ### Sida var løs på mobil

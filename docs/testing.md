@@ -5,8 +5,8 @@ kommandoene, men ikke tallene: de sto i tre filer og glei fire ganger på to
 dager. Legger du til tester, er det denne fila som skal rettes.
 
     node test/unit.mjs      620 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  343 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       559 tester, 3–20 s, headless Chromium
+    node test/funksjon.mjs  355 tester, ~250 ms, ingen nettleser
+    node test/run.mjs       563 tester, 3–20 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
@@ -90,6 +90,13 @@ Bare den ene fjernet — den som gjaldt *nettopp det som var meldt* — felte
 ingen av dem. Vakta for den ekte rundturen fantes ikke, og ble skrevet
 etterpå. En fiks med to inngangspunkter trenger en sabotasje per
 inngangspunkt.
+
+**En bakoverfnutt i en kommentar sprenger hele fila.** Scenene i
+`run.mjs` er maler (`` ` ``), sa ``// `sist` er PIN-datoen`` avslutter
+malen midt i scenen. Feilen kommer ut som «missing ) after argument list»
+pa `kjor(`-linja hundrevis av linjer tidligere, og peker altsa ikke i
+naerheten av det som er galt. Bruk «hermetegn» i kommentarer der inne.
+Samme familie som bakoverstrekene som blir spist.
 
 **En regel som ser på vinduet kan ikke voktes her.** `--window-size`
 binder ikke likt lokalt og på CI, så bredder måles i en boks med kjent

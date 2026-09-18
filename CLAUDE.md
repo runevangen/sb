@@ -59,7 +59,11 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 - **Ingen funksjon har en `service_role`-nøkkel**, med ett dokumentert
   unntak (`brukere.mjs`). [ADR 0010](docs/adr/0010-ingen-service-role.md)
 - **Ingen sporing, ingen informasjonskapsler, ingen samtykkebanner.**
-  [ADR 0004](docs/adr/0004-ingen-statistikk.md)
+  [ADR 0004](docs/adr/0004-ingen-statistikk.md) — vi **fører** ingen
+  teller. Å lese et felt Supabase skriver uansett, fordi den må for å
+  holde folk innlogget, er noe annet: `sessions.refreshed_at` gir «sist
+  inne» uten at vi har begynt å måle noen.
+  [ADR 0021](docs/adr/0021-sist-inne-fra-oktene.md)
 - **Ingenting er låst bak innlogging.** [ADR 0009](docs/adr/0009-fornavn-og-pin.md)
 - **`PIN_PEPPER` kan ikke endres.** Et nytt pepper låser alle ute.
 

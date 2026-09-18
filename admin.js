@@ -234,6 +234,11 @@ async function hentBrukere() {
   try {
     const data = await brukerKall({ handling: "liste" });
     tegnBrukere(data.brukere || []);
+    // Oktene er et tillegg til lista, sa et feilet oktkall velter ikke
+    // portalen. Men en tom kolonne er ikke til a skille fra «ingen har
+    // vaert inne», og da skal det sta hvorfor.
+    felt("brukerOktfeil").hidden = !data.oktfeil;
+    felt("brukerOktfeil").textContent = data.oktfeil || "";
   } catch (err) {
     felt("brukere").hidden = true;
     felt("brukerHint").textContent = err.message;
@@ -408,9 +413,11 @@ function tegnBrukere(liste) {
   liste.forEach((b) => kropp.appendChild(brukerRad(b)));
   felt("brukere").hidden = false;
   felt("brukerHint").hidden = false;
+  // «Sortert etter hvem som var inne sist» sto her mens lista var sortert
+  // pa PIN-datoen. Na er den sortert pa oktene, og setningen er sann.
   felt("brukerHint").textContent = liste.length === 1
-    ? "Én bruker. Sortert etter hvem som var inne sist."
-    : liste.length + " brukere. Sortert etter hvem som var inne sist.";
+    ? "Én bruker."
+    : liste.length + " brukere. Øverst den som sist hadde appen i gang.";
 }
 
 function brukerRad(b) {
@@ -423,8 +430,19 @@ function brukerRad(b) {
   const forst = celle("td", "tid", sistInneTekst(b.forst));
   forst.setAttribute("data-merke", "Første gang");
   rad.appendChild(forst);
-  const sist = celle("td", "tid", sistInneTekst(b.sist));
-  sist.setAttribute("data-merke", "Sist pålogget");
+  // «Sist inne» er okta, ikke PIN-datoen. Finnes ingen levende okt, star
+  // det ingenting — en tom kolonne med en forklaring er aerligere enn a
+  // fylle den med et tall som betyr noe annet.
+  const sist = celle("td", "tid", b.aktiv
+    ? sistInneTekst(b.aktiv)
+    : "Ingen økt i live");
+  sist.setAttribute("data-merke", "Sist inne");
+  // PIN-datoen er ikke borte, den er bare ikke det kolonnen handler om.
+  // Den er det du trenger nar noen har glemt PIN-en og du lurer pa om de
+  // har vaert innom siden du ga dem en ny.
+  sist.title = b.sist
+    ? "Tastet PIN-en sist: " + sistInneTekst(b.sist)
+    : "Har aldri tastet PIN-en";
   // «Jeg er inne men det star 2 dager siden.» Begge deler er sant, og det
   // er nettopp forvirringen: du er innlogget na, og feltet ved siden av er
   // sist du TASTET PIN-en. Appen holder telefonen innlogget med roterende

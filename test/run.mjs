@@ -1986,11 +1986,15 @@ const SAK_15 = kjor("admin", `
       brukerKall.push(bk);
       if (bk.passord !== "hemmelig") return svar(401, { feil: "Feil passord" });
       if (bk.handling === "liste") {
+        // «sist» er PIN-datoen, «aktiv» er okta. Kari tastet PIN-en for
+        // fem dager siden og har appen i gang na; Ola har ingen levende
+        // okt. Nettopp den forskjellen kolonnen finnes for (ADR 0021).
         return svar(200, { brukere: [
           { id: "11111111-2222-3333-4444-555555555555", navn: "Kari", slug: "kari",
-            forst: "2026-09-01T10:00:00Z", sist: new Date(Date.now() - 3600000).toISOString() },
+            forst: "2026-09-01T10:00:00Z", sist: "2026-09-12T19:00:00Z",
+            aktiv: new Date(Date.now() - 3600000).toISOString() },
           { id: "66666666-7777-8888-9999-000000000000", navn: "Ola", slug: "ola",
-            forst: "2026-08-20T10:00:00Z", sist: "2026-08-20T10:00:00Z" }
+            forst: "2026-08-20T10:00:00Z", sist: "2026-08-20T10:00:00Z", aktiv: "" }
         ] });
       }
       if (bk.handling === "pin") return svar(200, { ok: true });
@@ -2217,14 +2221,36 @@ const SAK_15 = kjor("admin", `
           var hodetekst = Array.prototype.map.call(hoder, function (h) {
             return h.textContent.trim();
           }).join("|");
+          // Fra 17. september er «Sist inne» sant: kolonnen leser oktene,
+          // ikke PIN-datoen (ADR 0021).
           ok("kolonnen heter det feltet faktisk er",
-             hodetekst.indexOf("Sist pålogget") !== -1 &&
-             hodetekst.indexOf("Sist inne") === -1, hodetekst);
+             hodetekst.indexOf("Sist inne") !== -1 &&
+             hodetekst.indexOf("Sist pålogget") === -1, hodetekst);
           var brukerAvsnitt = document.querySelectorAll("#brukere");
           var seksjon = brukerAvsnitt[0].closest("section").textContent;
-          ok("og siden sier at det ikke er sist bruk",
-             seksjon.indexOf("tastet PIN-en") !== -1 &&
-             seksjon.indexOf("ikke") !== -1, seksjon.slice(0, 200));
+          ok("og siden sier hva det er, og hva det ikke er",
+             seksjon.indexOf("sist appen var i gang") !== -1 &&
+             seksjon.indexOf("ikke sist de tastet PIN-en") !== -1,
+             seksjon.slice(0, 260));
+
+          // Timen som gikk er okta, ikke PIN-datoen fra 12. september.
+          // Leste cella «sist», ville det statt en dato flere dager
+          // tilbake — og det var hele feilen som ble meldt to dager pa rad.
+          var inneCelle = rader[0].querySelectorAll(".tid")[1];
+          ok("cella viser okta, ikke PIN-datoen",
+             inneCelle.textContent.indexOf("I dag") === 0, inneCelle.textContent);
+          // PIN-datoen er ikke borte — den trengs nar noen har glemt sin.
+          ok("PIN-datoen ligger i hjelpeteksten",
+             (inneCelle.title || "").indexOf("Tastet PIN-en sist") === 0,
+             inneCelle.title);
+          // Uten en levende okt star det noe, ikke ingenting: en tom celle
+          // er ikke til a skille fra «har aldri vaert inne».
+          var utenOkt = rader[1].querySelectorAll(".tid")[1];
+          ok("uten okt star det at det ikke finnes en",
+             utenOkt.textContent.indexOf("Ingen økt i live") === 0,
+             utenOkt.textContent);
+          ok("og PIN-datoen star likevel i hjelpeteksten",
+             (utenOkt.title || "").indexOf("Tastet PIN-en sist") === 0, utenOkt.title);
 
           // «Jeg er inne men det star 2 dager siden.» Begge deler er sant:
           // du er innlogget na, og feltet er sist du TASTET PIN-en. Den ene
@@ -2238,7 +2264,7 @@ const SAK_15 = kjor("admin", `
           // Den ma sta ved siden av datoen den svarer pa, ikke ved navnet.
           ok("merket star i palogget-cella, ikke ved navnet",
              !!deg[0] && deg[0].closest("td").className === "tid" &&
-             deg[0].closest("td").getAttribute("data-merke") === "Sist pålogget",
+             deg[0].closest("td").getAttribute("data-merke") === "Sist inne",
              deg[0] && deg[0].closest("td").className);
           // Bare din egen: et merke pa alles rader ville pastatt at alle er
           // innlogget, og det vet vi ingenting om.

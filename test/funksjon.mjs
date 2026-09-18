@@ -1408,6 +1408,26 @@ function brukerBe(kropp, metode) {
 const SVC = "hemmelig-service-nokkel";
 const BRUKER_ID = "11111111-2222-3333-4444-555555555555";
 
+// Egen stubb for brukerlista. Den generelle gir det samme svaret pa hvert
+// kall, og da ville okt-oppslaget fatt brukerlista tilbake som «okter» —
+// en stubb som er enig med koden uansett hva den gjor. Her svarer de to
+// endepunktene hver for seg, som hos Supabase.
+function stubBrukere(brukerRader, oktRader, utfall) {
+  const kall = [];
+  global.fetch = async (url, opsjoner) => {
+    const u = String(url);
+    kall.push({ url: u, opsjoner: opsjoner || {} });
+    if (u.indexOf("/rest/v1/rpc/sist_inne") > -1) {
+      if (utfall === "okt-nede") {
+        return new Response(JSON.stringify({ message: "nei" }), { status: 500 });
+      }
+      return new Response(JSON.stringify(oktRader || []), { status: 200 });
+    }
+    return new Response(JSON.stringify(brukerRader || []), { status: 200 });
+  };
+  return kall;
+}
+
 delete process.env.SUPABASE_URL;
 delete process.env.SUPABASE_SERVICE_KEY;
 delete process.env.ADMIN_PASSORD;
@@ -1456,6 +1476,73 @@ ok("med navn, forste og siste palogging",
    JSON.stringify(brukerLista.brukere[0]));
 ok("lista hentes fra admin-endepunktet",
    kall[0].url.indexOf("/auth/v1/admin/users") > -1, kall[0].url);
+
+/* ---- «sist inne» kommer fra oktene, ikke fra PIN-datoen (ADR 0021) ---- */
+
+// last_sign_in_at er sist noen TASTET PIN-en. En fornyet okt rorer ikke
+// feltet, sa en som er innom hver dag kan sta med en dato uker tilbake.
+// Meldt to dager pa rad. sessions.refreshed_at er det som beveger seg.
+const TO_BRUKERE = [
+  { id: BRUKER_ID, email: "ola@pin.mvp-sb.netlify.app",
+    user_metadata: { navn: "Ola" },
+    created_at: "2026-09-01T10:00:00Z", last_sign_in_at: "2026-09-16T10:00:00Z" },
+  { id: "22222222-3333-4444-5555-666666666666", email: "kari@pin.mvp-sb.netlify.app",
+    user_metadata: { navn: "Kari" },
+    created_at: "2026-08-01T10:00:00Z", last_sign_in_at: "2026-09-14T15:14:27Z" },
+];
+// Kari tastet PIN-en for Ola, men har appen i gang na. Det er nettopp den
+// rekkefolgen den gamle kolonnen fikk feil.
+const OKTER = [
+  { bruker: "22222222-3333-4444-5555-666666666666", sist_aktiv: "2026-09-17T21:04:29Z" },
+];
+
+kall = stubBrukere(TO_BRUKERE, OKTER);
+r = await brukere(brukerBe({ passord: "riktig-passord", handling: "liste" }));
+const medOkter = await r.json();
+ok("oktene hentes fra sist_inne",
+   kall.some((k) => k.url.indexOf("/rest/v1/rpc/sist_inne") > -1),
+   JSON.stringify(kall.map((k) => k.url)));
+ok("og med service-nokkelen, som er den eneste som far",
+   kall.filter((k) => k.url.indexOf("sist_inne") > -1)[0]
+     .opsjoner.headers.Authorization === "Bearer " + SVC);
+ok("okta havner pa riktig bruker",
+   medOkter.brukere[0].navn === "Kari" &&
+   medOkter.brukere[0].aktiv === "2026-09-17T21:04:29Z",
+   JSON.stringify(medOkter.brukere[0]));
+// Den uten okt star nederst, og `aktiv` er tom — ikke PIN-datoen. To ulike
+// ting i samme felt er nettopp feilen vi kom fra.
+ok("den uten okt star nederst med tom aktiv",
+   medOkter.brukere[1].navn === "Ola" && medOkter.brukere[1].aktiv === "",
+   JSON.stringify(medOkter.brukere[1]));
+// PIN-datoen blir staende: den trengs nar noen har glemt PIN-en.
+ok("PIN-datoen folger fortsatt med",
+   medOkter.brukere[0].sist === "2026-09-14T15:14:27Z" &&
+   medOkter.brukere[1].sist === "2026-09-16T10:00:00Z",
+   JSON.stringify(medOkter.brukere.map((b) => b.sist)));
+ok("og rekkefolgen er oktene, ikke PIN-datoen",
+   medOkter.brukere.map((b) => b.navn).join(",") === "Kari,Ola",
+   medOkter.brukere.map((b) => b.navn).join(","));
+ok("uten oktfeil nar alt gikk bra", medOkter.oktfeil === undefined,
+   JSON.stringify(medOkter.oktfeil));
+
+// Oktene er et TILLEGG. Feiler de, skal lista sta — men en tom kolonne er
+// ikke til a skille fra «ingen har vaert inne», sa det ma sies.
+kall = stubBrukere(TO_BRUKERE, null, "okt-nede");
+r = await brukere(brukerBe({ passord: "riktig-passord", handling: "liste" }));
+const utenOkter = await r.json();
+ok("et feilet oktkall velter ikke brukerlista",
+   r.status === 200 && utenOkter.brukere.length === 2, r.status);
+ok("men det star at kolonnen mangler",
+   String(utenOkter.oktfeil || "").indexOf("Sist inne") > -1, utenOkter.oktfeil);
+ok("og tjenestens egne ord folger med",
+   Array.isArray(utenOkter.forsok) && utenOkter.forsok.length > 0,
+   JSON.stringify(utenOkter.forsok));
+ok("ingen far en aktiv-dato de ikke har",
+   utenOkter.brukere.every((b) => b.aktiv === ""),
+   JSON.stringify(utenOkter.brukere.map((b) => b.aktiv)));
+// Nokkelen skal aldri ut, heller ikke i oktfeilen.
+ok("service-nokkelen star ikke i feilsvaret",
+   JSON.stringify(utenOkter).indexOf(SVC) === -1);
 // Nokkelen her kan lese og slette hvem som helst. Den skal aldri ut.
 ok("service-nokkelen gar til tjenesten, ikke til admin",
    kall[0].opsjoner.headers.Authorization === "Bearer " + SVC &&
