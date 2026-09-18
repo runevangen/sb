@@ -7,7 +7,7 @@
 // millisekunder framfor de titalls sekundene nettlesertestene bruker.
 // Alt som trenger DOM ligger i test/run.mjs.
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
          foldTekst, treffScore, rangerTreff, listeTekst } from "../lib.js";
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
@@ -2542,6 +2542,53 @@ ok("fristen ligger under Netlifys tak, med margin",
    SOK_SEKUNDER * 1000 + 500 + " mot " + SOK_TAK);
 ok("og den er lang nok til at et speil rekker a svare",
    SOK_SEKUNDER * 1000 > 6480, SOK_SEKUNDER * 1000);
+
+/* ---------------- dokumentasjonen holder folge ---------------- */
+
+// docs/modulene.md er kartet over reglene som gjelder INNE i en fil.
+// Kartet er bare verdt noe sa lenge det dekker terrenget: en ny modul som
+// ikke star der, er en modul ingen vet reglene for.
+//
+// Derfor leses filene fra disken, ikke fra en liste her. En liste ville
+// matte vedlikeholdes ved siden av dokumentet, og da er det to steder som
+// kan ligge etter i stedet for ett — samme feil som testtallene gjorde
+// for de ble talt.
+const dokument = readFileSync(new URL("../docs/modulene.md", import.meta.url), "utf8");
+
+function filerI(mappe, ender) {
+  return readdirSync(new URL("../" + mappe, import.meta.url))
+    .filter((f) => ender.some((e) => f.endsWith(e)))
+    .map((f) => (mappe === "." ? f : mappe + "/" + f));
+}
+
+const SKAL_DOKUMENTERES = filerI(".", [".js", ".css", ".html"])
+  .concat(filerI("netlify/functions", [".mjs"]))
+  .concat(filerI("verktoy", [".mjs"]))
+  .filter((f) => f !== "sw-registrering.js");
+
+const udokumentert = SKAL_DOKUMENTERES.filter((f) => {
+  const navn = f.split("/").pop();
+  return dokument.indexOf(navn) === -1;
+});
+
+ok("hver fil i appen er omtalt i docs/modulene.md",
+   udokumentert.length === 0, "mangler: " + udokumentert.join(", "));
+ok("testen fant faktisk filer a kreve dokumentasjon for",
+   SKAL_DOKUMENTERES.length >= 25, SKAL_DOKUMENTERES.length);
+
+// Den andre veien: dokumentet skal ikke vise til filer som er borte. En
+// regel for en fil som ikke finnes lenger er verre enn ingen regel — den
+// leses som om den fortsatt gjelder.
+const nevnte = new Set(Array.from(
+  dokument.matchAll(/`([a-z0-9./-]+\.(?:js|mjs|css|html|sql|md|toml))`/g), (m) => m[1]));
+// Dokumentet skriver filnavn slik en leser gjor: `run.mjs`, ikke
+// `test/run.mjs`. Et bart navn slas derfor opp i mappene det kan ligge i.
+const MAPPER = ["", "docs/", "netlify/functions/", "verktoy/", "test/"];
+const finnes = (f) => MAPPER.some((m) => existsSync(new URL("../" + m + f, import.meta.url)));
+const borte = [...nevnte].filter((f) => !finnes(f));
+
+ok("og dokumentet viser ikke til filer som er borte",
+   borte.length === 0, "finnes ikke: " + borte.join(", "));
 
 /* ---------------- rapport ---------------- */
 
