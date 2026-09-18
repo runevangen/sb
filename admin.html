@@ -293,16 +293,24 @@
            svarer: admin apner stedet i kartet hen alt bruker, og limer
            inn lenka. Ingen tjeneste spoerres — koordinatet star i lenka. -->
       <div class="felt-blokk">
-        <label for="stedLenke">… eller lim inn en kartlenke</label>
+        <!-- Etiketten sa «en kartlenke» til 18. september 2026. Den som
+             hoyreklikker i Google Maps far et *koordinat*, ikke en lenke,
+             og leste da at feltet ikke var for hen. Begge star i
+             etiketten na, og koordinatet forst: det er den korteste
+             veien, og den eneste som ikke krever at man finner
+             adresselinja. -->
+        <label for="stedLenke">… eller lim inn koordinat eller kartlenke</label>
         <div class="rad">
           <input type="text" id="stedLenke" autocomplete="off" maxlength="500"
-                 placeholder="https://www.google.com/maps/…"
+                 placeholder="59.9139, 10.7522 — eller en kartlenke"
                  style="flex: 1 1 180px; width: auto;">
           <button class="lenke" id="stedLenkeLes" type="button">Hent koordinat</button>
         </div>
         <p class="hint" id="stedLenkeHint">
-          Fra Google Maps, OpenStreetMap eller et par tall. Virker også når
-          oppslaget over ikke svarer — lenka bærer koordinatet selv.
+          Høyreklikk i Google Maps og trykk på koordinatet — da ligger det
+          på utklippstavla. Parenteser rundt gjør ingenting. En lenke fra
+          Google Maps eller OpenStreetMap virker like godt. Virker også når
+          oppslaget over ikke svarer: koordinatet står i det du limer inn.
         </p>
         <p class="hint" id="stedLenkeSvar" hidden></p>
       </div>

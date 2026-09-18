@@ -2611,6 +2611,23 @@ const SAK_15C = kjor("admin-koordinat", `
          felt("stedLenkeHint").textContent.indexOf("Google Maps") > -1,
          felt("stedLenkeHint").textContent);
 
+      // Det som faktisk ligger pa utklippstavla nar man hoyreklikker i
+      // Google Maps er et *koordinat*, ikke en lenke — og fra stedskortet
+      // kommer det med parenteser rundt. Meldt 18. september 2026.
+      felt("stedLat").value = "";
+      felt("stedLon").value = "";
+      felt("stedLenke").value = "(59.8339740, 10.8062285)";
+      felt("stedLenkeLes").click();
+      ok("et koordinat med parenteser rundt fyller feltene",
+         felt("stedLat").value === "59.8340" && felt("stedLon").value === "10.8062",
+         felt("stedLat").value + ", " + felt("stedLon").value);
+      // Etiketten sa «en kartlenke», og den som satt med et koordinat
+      // leste at feltet ikke var for hen.
+      ok("og etiketten sier at koordinat duger",
+         document.querySelector("label[for=stedLenke]").textContent
+           .indexOf("koordinat") > -1,
+         document.querySelector("label[for=stedLenke]").textContent);
+
       var kort = felt("stedLenke");
       kort.value = "https://maps.app.goo.gl/abc123";
       felt("stedLenkeLes").click();
