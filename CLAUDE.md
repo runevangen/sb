@@ -3,11 +3,15 @@
 Viser saker fra sportsbibelen.no, med en fotballmodul. Vanilla ES-moduler,
 ingen byggesteg. Hostes på Netlify som `mvp-sb`.
 
-Denne fila er **reglene som gjelder nå**. Begrunnelsene står i
+Denne fila er **reglene som gjelder nå**, på tvers. Begrunnelsene står i
 [`docs/adr/`](docs/adr/README.md), historien i
 [`docs/hendelser.md`](docs/hendelser.md), testdetaljene i
 [`docs/testing.md`](docs/testing.md). Er du i tvil om *hvorfor*, er svaret
 der — ikke her.
+
+Reglene som gjelder **inne i én fil** — hva hver funksjon bærer, og hva
+som ryker om den flyttes — står i [`docs/modulene.md`](docs/modulene.md),
+modul for modul.
 
 ## Slik vil jeg ha svar
 
@@ -41,7 +45,7 @@ der — ikke her.
 
     personvern.html hva vi lagrer, og hvordan du blir kvitt det
     bilder/         annonsebilder, ett ferdig utsnitt per form
-    docs/           adr/, hendelser.md, testing.md,
+    docs/           adr/, modulene.md, hendelser.md, testing.md,
                     nokler-og-tokens.md, oppsett.sql, kampdag-dypdykk.md
     BACKLOGG.md     peker til issues, som er den ekte backloggen
 
