@@ -779,8 +779,12 @@ export function koordinatFraLenke(tekst) {
     new RegExp("#map=\\d+/" + tall + "/" + tall, "i"),
     // Google: kartets midtpunkt.
     new RegExp("@" + tall + "," + tall),
-    // «geo:», og et par tall limt inn rett fra et kart.
-    new RegExp("(?:geo:|[?&]q=|^)\\s*" + tall + "\\s*[,\\s]\\s*" + tall, "i"),
+    // «geo:», og et par tall limt inn rett fra et kart. Parentesene er
+    // med fordi kartene setter dem der: Google gir «(59.833974,
+    // 10.806229)» nar punktet kopieres fra stedskortet, og uten dem her
+    // sa admin «Fant ingen koordinater» pa et koordinat som sto rett
+    // foran hen. Hakeparentes for den som limer fra en liste.
+    new RegExp("(?:geo:|[?&]q=|^[\\s(\\[]*)\\s*" + tall + "\\s*[,\\s]\\s*" + tall, "i"),
   ];
 
   for (const m of monstre) {
