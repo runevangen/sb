@@ -2044,6 +2044,91 @@ const SAK_14B = kjor("pub-stampub", FELLES + FOTBALL + `
       ok("men ikke stampuber for lag som ikke spiller",
          !navnene.some(function (n) { return n.indexOf("Dr. Jekyll") === 0; }),
          navnene.join(" | "));
+
+      ferdig();
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 600);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
+`);
+
+/* ---------------- 14C. falsk posisjon ---------------- */
+
+// Meldt 18. september 2026: «vi ma finne ut hvordan vi kan teste det sa
+// reelt som mulig uten a ha noen fysisk der.»
+//
+// Scenen star i Bodo. Telefonen sier NEI til posisjon — den falske skal
+// sla gjennom likevel, ellers er den ubrukelig for den som har avslatt
+// stedstjenester en gang og ikke husker hvordan man angrer.
+const SAK_14C = kjor("pub-falsk-posisjon", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "" }); });
+  navigator.geolocation.getCurrentPosition = function (ok, feil) {
+    feil({ code: 1, message: "avslatt" });
+  };
+  history.replaceState(null, "", location.pathname + "?posisjon=bodo");
+  window.__overpassKropp = "";
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("overpass") > -1) {
+      window.__overpassKropp = String((opt && opt.body) || "");
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        json: function () { return Promise.resolve({ elements: [
+          { type: "node", lat: 67.2805, lon: 14.4055,
+            tags: { name: "Bryggerikaia", amenity: "pub" } }
+        ] }); } });
+    }
+    if (u.indexOf("/api/vaer?") === 0 || u.indexOf("/api/puber?") === 0) {
+      return Promise.resolve({ ok: false, status: 400, statusText: "Bad Request",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ svar: [], visninger: [] })); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({
+          liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+          kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+          kamper: ARETS, runde: "Runde 21" })); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    panel.querySelector(".pub-apne").click();
+    var forslag = panel.querySelector(".pub-forslag");
+    setTimeout(function () { try {
+      var navnene = Array.prototype.map.call(
+        forslag.querySelectorAll(".pub-chip"), function (c) { return c.textContent; });
+      // Koordinatet ma reise helt fram til Overpass. Star det ikke i
+      // sporringen, malte vi Oslo og trodde vi malte Bodo.
+      ok("koordinatet reiser helt fram til Overpass",
+         decodeURIComponent(window.__overpassKropp).indexOf("67.28") > -1,
+         decodeURIComponent(window.__overpassKropp).slice(0, 90));
+      ok("og treffet derfra star i lista",
+         navnene.some(function (n) { return n.indexOf("Bryggerikaia") === 0; }),
+         navnene.join(" | ") || "(tom)");
+      // De kuraterte stedene er i Oslo, 1500 km unna. Star de her, brukte
+      // vi ikke den falske posisjonen i det hele tatt.
+      ok("og Oslo-stedene star ikke i Bodo",
+         !navnene.some(function (n) { return n.indexOf("O'Learys") === 0; }),
+         navnene.join(" | "));
+      // Den slar gjennom selv om telefonen sa nei.
+      ok("den virker selv om telefonen avslo posisjon", navnene.length > 0,
+         navnene.join(" | "));
+      // Og den sier det, hele tiden. En app som viser puber et annet sted
+      // enn du er, og tier om det, sier noe usant med sin egen liste.
+      var note = forslag.querySelector(".pub-note").textContent;
+      ok("og skjermen sier at posisjonen er falsk",
+         note.indexOf("Falsk posisjon: Bodø") === 0, note);
+      // Krediteringa star fortsatt: treffene kommer fra kartet.
+      ok("kartet krediteres som ellers",
+         note.indexOf("OpenStreetMap") > -1, note);
       ferdig();
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 600);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
@@ -4918,7 +5003,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
 let feilet = 0;
 
 for (const t of alle) {

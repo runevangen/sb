@@ -90,6 +90,17 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   geografiske kildene i `FORSLAG_KILDER` og **før** de rene karttreffene:
   en stampub tvers over byen er et dårligere svar enn en fotballpub i
   nabogata, men et bedre svar enn en tilfeldig bar Overpass fant.
+  **Og den er en utvei, ikke et tillegg.** Kommer en posisjon, tømmes
+  kilden: `puber-oslo.js` er en *Oslo*-liste, og en Oslo-stampub i en liste
+  for Bodø står der uten avstand, som om den var i nabogata. Er du i Oslo,
+  kommer de samme stedene tilbake gjennom `kjenteNaer`, med avstand på.
+- **`?posisjon=bodo` setter posisjonen, og skjermen sier det.** Pubene
+  «nær deg» kommer fra Overpass, og Overpass svarer på hvor du står — så
+  uten dette kan appen bare prøves i Oslo. `falskPosisjon()` tar et bynavn
+  fra `TESTBYER` eller et rått `lat,lon`. Så lenge den er på, står «Falsk
+  posisjon: Bodø» først i linja under forslagene: en app som viser puber
+  et annet sted enn du er, og tier om det, sier noe usant med sin egen
+  liste. `verktoy/byersjekk.mjs` gjør den samme målingen uten nettleser.
 - **Lagnavn fra API-et og fra redaksjonen foldes strengere enn
   `normaliserLagnavn`.** Kilden skriver «Vaalerenga», fila «Vålerenga», og
   `normaliserLagnavn` gir «vaalerenga» mot «valerenga» — to ulike lag, så

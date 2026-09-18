@@ -40,6 +40,7 @@ import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
 import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, enturNaermest,
          tolkHoldeplasser, grupperPuber, ofteBrukt, noterPub,
          rangerForslag, FORSLAG_MAKS, stampuberFor, FORSLAG_KILDER,
+         falskPosisjon, TESTBYER,
          OVERPASS_SPEIL, overpassHeadere, restTid,
          sjekkPubliste, kuraterteNaer, merkKuraterte,
          sjekkKontaktliste, kontaktFor, finnKontakt, KONTAKT_FELT, kildeHolder,
@@ -2406,6 +2407,44 @@ ok("uten pubnavn star setningen likevel",
 // a vite om noe er krysset av lenger nede.
 ok("rundetallet sier valgt av totalt", rundeTall(3, 6) === "3 av 6 valgt", rundeTall(3, 6));
 ok("en runde uten kamper far ingen tekst", rundeTall(0, 0) === "", rundeTall(0, 0));
+
+/* ---------------- falsk posisjon, for a teste andre byer ---------------- */
+
+// Pubene «naer deg» kommer fra Overpass, og Overpass svarer pa hvor du
+// star. Appen er bygd og prov i Oslo. Meldt 18. september 2026: «vi ma
+// finne ut hvordan vi kan teste det sa reelt som mulig uten a ha noen
+// fysisk der.»
+ok("en by gir koordinatet sitt",
+   falskPosisjon("?posisjon=bodo").navn === "Bodø" &&
+   falskPosisjon("?posisjon=bodo").lat === TESTBYER.bodo.lat,
+   JSON.stringify(falskPosisjon("?posisjon=bodo")));
+// Den som taster dette pa en telefon skal slippe a treffe o-en.
+ok("navnet foldes, sa Bodø og bodo er samme by",
+   falskPosisjon("?posisjon=Bodø").lat === falskPosisjon("?posisjon=bodo").lat);
+ok("og store bokstaver spiller ingen rolle",
+   falskPosisjon("?posisjon=TRONDHEIM").navn === "Trondheim");
+ok("et koordinat gar ogsa",
+   falskPosisjon("?posisjon=67.28,14.40").lat === 67.28 &&
+   falskPosisjon("?posisjon=67.28,14.40").kilde === "koordinat",
+   JSON.stringify(falskPosisjon("?posisjon=67.28,14.40")));
+ok("parameteren finnes ogsa blant andre",
+   falskPosisjon("?a=1&posisjon=bergen&b=2").navn === "Bergen");
+// Null nar det ikke er satt, og null nar det er tull: a late som ville
+// gitt et tomt pubsok uten at noen skjonte hvorfor.
+ok("uten parameteren er det ingen falsk posisjon",
+   falskPosisjon("") === null && falskPosisjon(null) === null &&
+   falskPosisjon("?liga=premier") === null);
+ok("en ukjent by er ingen posisjon", falskPosisjon("?posisjon=maanen") === null);
+ok("og et tall utenfor kloden er det heller ikke",
+   falskPosisjon("?posisjon=999,999") === null &&
+   falskPosisjon("?posisjon=91,0") === null &&
+   falskPosisjon("?posisjon=0,181") === null);
+ok("en tom verdi gir null", falskPosisjon("?posisjon=") === null);
+// Byene ma ha ekte koordinater, ellers maler skriptet feil sted.
+ok("alle testbyene har et koordinat i Norge",
+   Object.values(TESTBYER).every((b) =>
+     b.lat > 57 && b.lat < 72 && b.lon > 4 && b.lon < 32 && b.navn),
+   JSON.stringify(Object.values(TESTBYER).map((b) => b.navn)));
 
 /* ---------------- hva en lagring faktisk endrer ---------------- */
 

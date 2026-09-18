@@ -123,6 +123,24 @@ nå «(tom liste)» når kilden fjernes.
 **Bakoverfnutten i en kommentar sprengte malen igjen**, andre dag på rad.
 Den står i `docs/testing.md`; jeg leste den ikke først.
 
+### Og en tredje gang, i det jeg trodde jeg var ferdig
+
+Falsk posisjon (`?posisjon=bodo`) kom til rett etter, for å kunne prøve
+appen i andre byer. Første kjøring i Bodø viste **Scotsman, O'Learys og
+Carls** — tre Oslo-puber, uten avstand, som om de lå i nabogata.
+
+De kom fra stampub-kilden jeg nettopp hadde lagt inn. `puber-oslo.js` er
+en **Oslo**-liste, og `stampuberFor()` spør ikke hvor du er. For en leser i
+Oslo er det riktig; for en leser i Bodø er det selvsikker støy.
+
+Kilden er en **utvei**, ikke et tillegg: kommer det en posisjon, tømmes
+den. Geografien er svaret der den finnes. Er du i Oslo, kommer de samme
+stedene tilbake gjennom `kjenteNaer` — med avstand på.
+
+Det var testen i Bodø-scenen som fant det, én time etter at kilden ble
+skrevet. Uten den ville feilen ligget i prod og sett helt rimelig ut for
+alle som bor i Oslo.
+
 ---
 
 ## 18. september 2026 — Det var ikke bredden, det var zoomen

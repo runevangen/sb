@@ -16,7 +16,7 @@ import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
          rangerForslag, FORSLAG_MAKS, tolkPubRader, slaSammenPuber,
-         stampuberFor } from "./pub-data.js";
+         stampuberFor, falskPosisjon } from "./pub-data.js";
 import { PUBER_OSLO } from "./puber-oslo.js";
 import { sjekkForslag, alleredeILista, NAVN_MAKS, ADRESSE_MAKS }
   from "./pub-forslag-data.js";
@@ -1236,14 +1236,20 @@ function tegnForslag(boks) {
 // hvorfor. Tre «fant ingen»-linjer, en per kilde, var det som gjorde
 // panelet uleselig.
 function notetekst(boks, topp) {
+  // Star den falske posisjonen pa, skal det sta pa skjermen sa lenge den
+  // gjor det. En app som viser puber et annet sted enn du er, og tier om
+  // det, sier noe usant med sin egen liste.
+  const falsk = boks.falskPosisjon
+    ? "Falsk posisjon: " + boks.falskPosisjon.navn + ". "
+    : "";
   const feil = boks.feil.join(" ");
   if (!topp.length) {
-    if (boks.venter > 0) return "Finner puber …";
-    return feil || "Fant ingen puber i nærheten. Skriv navnet selv.";
+    if (boks.venter > 0) return falsk + "Finner puber …";
+    return falsk + (feil || "Fant ingen puber i nærheten. Skriv navnet selv.");
   }
   // Lisensen (ODbL) krever kreditering der treff fra kartet vises.
   const kreditt = boks.kart ? "© OpenStreetMap-bidragsytere. " : "";
-  return kreditt + (feil || "Står ikke puben her, skriv den selv.");
+  return falsk + kreditt + (feil || "Står ikke puben her, skriv den selv.");
 }
 
 function pubChip(pub, boks, valgt) {
@@ -1325,34 +1331,24 @@ async function hentPuberRundt(arena) {
 const naerHusket = new Map();
 
 function hentNaerDeg(boks, bekreftede) {
+  // «?posisjon=bodo» setter posisjonen framfor a sporre telefonen. Uten
+  // den maler vi bare Oslo: pubene rundt deg kommer fra Overpass, og
+  // Overpass svarer pa hvor du star. Merket under lista sier hele tiden at
+  // den er pa — en app som viser puber et annet sted enn du er, og tier om
+  // det, lyver.
+  const falsk = falskPosisjon(typeof location === "object" ? location.search : "");
+  if (falsk) {
+    boks.falskPosisjon = falsk;
+    boks.venter += 1;
+    naerDegFra(boks, bekreftede, rundPosisjon(falsk.lat, falsk.lon));
+    return;
+  }
   if (!navigator.geolocation) return;
   boks.venter += 1;
 
-  navigator.geolocation.getCurrentPosition(async (pos) => {
-    const p = rundPosisjon(pos.coords.latitude, pos.coords.longitude);
-
-    // Kjente fotballpuber naer deg star der med en gang: lista ligger i
-    // koden, sa den virker ogsa nar Overpass ikke svarer. Det er verdt
-    // mye her, der Overpass har vaert det skjoreste leddet.
-    boks.sistePosisjon = p;
-    boks.kilder.kjenteNaer = merkBekreftet(
-      kuraterteNaer(KJENTE, p, KJENT_RADIUS), bekreftede);
-    tegnForslag(boks);
-
-    const nokkel = p.lat + "," + p.lon;
-    try {
-      if (!naerHusket.has(nokkel)) naerHusket.set(nokkel, naerePuber(p));
-      const liste = await naerHusket.get(nokkel);
-      boks.kilder.naerDeg = merkBekreftet(merkKuraterte(liste, KJENTE), bekreftede);
-      if (liste.length) boks.kart = true;
-    } catch (err) {
-      naerHusket.delete(nokkel);
-      boks.feil.push("Fikk ikke puber nær deg (" +
-        String((err && err.message) || err).slice(0, 60) + ").");
-      boks.proveNaer = true;
-    }
-    boks.venter -= 1;
-    tegnForslag(boks);
+  navigator.geolocation.getCurrentPosition((pos) => {
+    naerDegFra(boks, bekreftede,
+      rundPosisjon(pos.coords.latitude, pos.coords.longitude));
   }, () => {
     // Avslatt posisjon er ikke en feil verdt en linje: resten av lista
     // star der fortsatt, og leseren vet hva hen nettopp sa nei til. Men
@@ -1361,6 +1357,42 @@ function hentNaerDeg(boks, bekreftede) {
     boks.proveNaer = true;
     tegnForslag(boks);
   }, { maximumAge: 300000, timeout: 10000 });
+}
+
+// Selve oppslaget, uavhengig av hvor posisjonen kom fra. Sto den inni
+// tilbakekallet fra geolocation, matte en falsk posisjon ha kopiert hele
+// kroppen — og to kopier av det samme glir fra hverandre.
+async function naerDegFra(boks, bekreftede, p) {
+  // Kjente fotballpuber naer deg star der med en gang: lista ligger i
+  // koden, sa den virker ogsa nar Overpass ikke svarer. Det er verdt
+  // mye her, der Overpass har vaert det skjoreste leddet.
+  boks.sistePosisjon = p;
+  boks.kilder.kjenteNaer = merkBekreftet(
+    kuraterteNaer(KJENTE, p, KJENT_RADIUS), bekreftede);
+
+  // Stampubene er en UTVEI, ikke et tillegg: de finnes for tilfellet der
+  // geografien ikke gir noe. Vet vi hvor du star, er geografien svaret, og
+  // da skal de vike — puber-oslo.js er en Oslo-liste, og en Oslo-stampub i
+  // en liste for Bodo star der uten avstand, som om den var i nabogata.
+  // Er du i Oslo, kommer de samme stedene tilbake gjennom kjenteNaer, med
+  // avstand pa.
+  boks.kilder.stampuber = [];
+  tegnForslag(boks);
+
+  const nokkel = p.lat + "," + p.lon;
+  try {
+    if (!naerHusket.has(nokkel)) naerHusket.set(nokkel, naerePuber(p));
+    const liste = await naerHusket.get(nokkel);
+    boks.kilder.naerDeg = merkBekreftet(merkKuraterte(liste, KJENTE), bekreftede);
+    if (liste.length) boks.kart = true;
+  } catch (err) {
+    naerHusket.delete(nokkel);
+    boks.feil.push("Fikk ikke puber nær deg (" +
+      String((err && err.message) || err).slice(0, 60) + ").");
+    boks.proveNaer = true;
+  }
+  boks.venter -= 1;
+  tegnForslag(boks);
 }
 
 // Samme tjenere som funksjonen bruker, og de sporres samtidig: den

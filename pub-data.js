@@ -844,3 +844,49 @@ export function koordinatFraLenke(tekst) {
   }
   return { feil: "Fant ingen koordinater i det du limte inn." };
 }
+
+/* ---------- falsk posisjon, for a teste andre byer ---------- */
+
+// Pubene rundt deg kommer fra Overpass, og Overpass svarer pa hvor du
+// star. Skal noen se hva appen gir i Bodo uten a reise dit, ma posisjonen
+// kunne settes. Meldt 18. september 2026: «vi ma finne ut hvordan vi kan
+// teste det sa reelt som mulig uten a ha noen fysisk der».
+//
+// Koordinatene er sentrum, ikke stadion: det er der folk star nar de
+// leter etter en pub. Skal du teste rundt en arena, er `arenaFor()` den
+// som kjenner dem — og da tar `?posisjon=67.28,14.40` det ogsa.
+export const TESTBYER = {
+  oslo: { navn: "Oslo", lat: 59.911, lon: 10.750 },
+  bergen: { navn: "Bergen", lat: 60.393, lon: 5.325 },
+  trondheim: { navn: "Trondheim", lat: 63.430, lon: 10.395 },
+  bodo: { navn: "Bodø", lat: 67.280, lon: 14.405 },
+  stavanger: { navn: "Stavanger", lat: 58.970, lon: 5.733 },
+  tromso: { navn: "Tromsø", lat: 69.649, lon: 18.956 },
+};
+
+// «?posisjon=bodo», «?posisjon=Bodø» eller «?posisjon=67.28,14.40».
+//
+// Navnet foldes, sa «Bodø» og «bodo» er samme by — den som taster dette
+// pa en telefon skal slippe a treffe o-en. Ren funksjon: den leser en
+// streng, ikke `location`, sa den kan males uten nettleser.
+//
+// Null nar ingenting er satt, og null nar verdien er tull. Et tall
+// utenfor kloden er ikke en posisjon, og a late som ville gitt et tomt
+// pubsok uten at noen skjonte hvorfor.
+export function falskPosisjon(sok) {
+  const tekst = String(sok || "");
+  const treff = tekst.match(/[?&]posisjon=([^&]*)/);
+  if (!treff) return null;
+  const verdi = decodeURIComponent(treff[1] || "").trim();
+  if (!verdi) return null;
+
+  const by = TESTBYER[normaliserLagnavn(verdi)];
+  if (by) return { navn: by.navn, lat: by.lat, lon: by.lon, kilde: "by" };
+
+  const tall = verdi.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+  if (!tall) return null;
+  const lat = Number(tall[1]);
+  const lon = Number(tall[2]);
+  if (!(lat >= -90 && lat <= 90) || !(lon >= -180 && lon <= 180)) return null;
+  return { navn: lat.toFixed(3) + ", " + lon.toFixed(3), lat, lon, kilde: "koordinat" };
+}
