@@ -1,9 +1,17 @@
-// Puber i Oslo der man kan regne med a fa se fotball.
+// Puber der man kan regne med a fa se fotball.
 //
 // OpenStreetMap vet at et sted er en pub, men ikke om de viser fotball.
 // Det er den vurderingen ingen maskin gir oss, og derfor denne fila.
 // Den ligger i koden og virker uten nettverk — verdt mye her, der
 // Overpass har vaert det skjoreste leddet.
+//
+// HET puber-oslo.js til 18. september 2026, og navnet var grensa. Appen
+// svarte alt i flere byer — `BYER` i pub-data.js er de seks — mens
+// portalen ikke kunne lagre et sted utenfor Oslo i det hele tatt: soket
+// lette i en Oslo-boks, og vakta avviste koordinatet som fulgte. Et
+// forslag om en RBK-pub ble derfor staende i koen som om ingen hadde
+// provd. Radene under er fortsatt nesten alle fra Oslo, og det er en
+// opplysning om hvem som har gjort jobben, ikke en grense i koden.
 //
 // SLIK VEDLIKEHOLDES DEN
 // - kilde: en lenke som faktisk sier at stedet viser fotball. Uten
@@ -17,11 +25,13 @@
 //   sortere etter avstand, ikke godt nok til a navigere etter. Stemmer
 //   navnet med et treff fra OpenStreetMap, brukes OSMs koordinat.
 //
-// Kildene er samlet 11. september 2026 fra stedenes egne sider,
-// VisitOslo, supporterklubbene og lokalpressen. Adressene bor klikkes
+// Oslo-radene er samlet 11. september 2026 fra stedenes egne sider,
+// VisitOslo, supporterklubbene og lokalpressen. En rad i en annen by
+// baerer de samme kravene — kilde, sikkerhet og dato — og ingen andre:
+// kravet har aldri vaert at noen har vaert i Oslo. Adressene bor klikkes
 // gjennom for de regnes som sikre; se merknad der de er omstridte.
 
-export const PUBER_OSLO = [
+export const KURATERTE = [
   /* ---------- sentrum ---------- */
   { navn: "Bohemen Sportspub", bydel: "Sentrum", adresse: "Arbeidergata 2",
     lat: 59.9138, lon: 10.7358, type: "supporterpub", lag: ["Vålerenga", "Tottenham"],

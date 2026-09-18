@@ -1,4 +1,4 @@
-// Rettelsene som ligger oppa puber-oslo.js (#80).
+// Rettelsene som ligger oppa puber.js (#80).
 //
 // **Fila er grunnfjellet.** Den ligger i koden, virker uten nettverk, og
 // er det leseren ser om Supabase er nede. Den ble aldri skrevet herfra og
@@ -20,6 +20,7 @@ import {
   tolkPubRader, pubRadTilBase, sjekkPubRad,
   osmNavnSporring, tolkNavnTreff, OVERPASS_SPEIL, overpassHeadere,
   osmAdresseSporring, tolkAdresseTreff, delAdresse, SOK_SEKUNDER,
+  rammeFor, bynavn,
   overpassFeiltekst,
 } from "../../pub-data.js";
 
@@ -117,7 +118,7 @@ async function lagre(inn) {
     ok: true,
     pub: skrevet[0],
     merknad: rad.fjernet
-      ? "«" + rad.navn + "» er tatt ut av lista. Raden i puber-oslo.js står"
+      ? "«" + rad.navn + "» er tatt ut av lista. Raden i puber.js står"
         + " urørt — den er bare skjult."
       : "Lagret. Endringen er ute for leserne innen " + LEVETID_PUBLISTE
         + " sekunder — ingen utrulling å vente på.",
@@ -126,26 +127,43 @@ async function lagre(inn) {
 
 /* ---------- oppslag i OpenStreetMap ---------- */
 
+// Byen soket skal lete i. Ukjent by er ikke en stille tilbakefall til
+// Oslo: da ville portalen svart «fant ingenting» om et sted som star der,
+// bare i en annen by — og det er nettopp feilen som gjorde at en RBK-pub
+// ikke kunne foeres inn.
+function rammeAv(inn) {
+  const valgt = String((inn && inn.by) || "").trim();
+  if (!valgt) return { ramme: rammeFor("oslo") };
+  const ramme = rammeFor(valgt);
+  if (!ramme) return { feil: "Ukjent by. Velg en av: " + bynavn().join(", ") + "." };
+  return { ramme };
+}
+
 async function sokNavn(inn) {
-  const sporring = osmNavnSporring(inn.navn);
+  const valg = rammeAv(inn);
+  if (valg.feil) return svar({ feil: valg.feil }, 400, 0);
+  const sporring = osmNavnSporring(inn.navn, valg.ramme);
   if (!sporring) {
     return svar({ feil: "Skriv minst ett ord på tre bokstaver å søke etter." }, 400, 0);
   }
-  return kjorSok(sporring, tolkNavnTreff);
+  return kjorSok(sporring, tolkNavnTreff, { by: valg.ramme.navn });
 }
 
 // Adressesoket. Navnesoket finner ikke et sted OSM ikke kjenner navnet
 // pa — og det er de sma stedene, nettopp de admin ma foere inn for hand.
 // Huset star der likevel: norske adresser i OSM kommer fra Kartverket.
 async function sokAdresse(inn) {
-  const sporring = osmAdresseSporring(inn.adresse);
+  const valg = rammeAv(inn);
+  if (valg.feil) return svar({ feil: valg.feil }, 400, 0);
+  const sporring = osmAdresseSporring(inn.adresse, valg.ramme);
   if (!sporring) {
     return svar({ feil: "Skriv en gate, gjerne med husnummer — «Berglyveien 4J»." }, 400, 0);
   }
   // Uten husnummer kan en gate gi mange hus, og da er det ikke soket som
   // er darlig — det er sporsmalet. Det skal sies, ikke gjettes rundt.
   const delt = delAdresse(inn.adresse);
-  return kjorSok(sporring, tolkAdresseTreff, { utenNummer: !delt.nummer });
+  return kjorSok(sporring, tolkAdresseTreff,
+    { utenNummer: !delt.nummer, by: valg.ramme.navn });
 }
 
 // En sporring mot alle speilene samtidig. Den forste som svarer vinner;

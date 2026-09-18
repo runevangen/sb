@@ -1,7 +1,7 @@
 // Steder lesere sender inn: rene funksjoner. Ingen DOM, ingen nettverk,
 // ingen lagring — delt mellom appen, Netlify-funksjonen og testene.
 //
-// Lista i puber-oslo.js er kode, og det er med vilje: den baerer en
+// Lista i puber.js er kode, og det er med vilje: den baerer en
 // redaksjonell vurdering, og «Kjent for a vise fotball» star ogsa nar bade
 // Overpass og var egen funksjon er nede. Et forslag herfra gar derfor i en
 // ko, ikke i lista. Det er forst nar en person har sett pa raden at den
@@ -87,7 +87,7 @@ export function alleredeILista(navn, puber) {
   return (puber || []).some((p) => normaliserLagnavn(p.navn) === leit);
 }
 
-// Raden slik den skal se ut i puber-oslo.js, klar til a limes inn.
+// Raden slik den skal se ut i puber.js, klar til a limes inn.
 //
 // Koen skriver **ikke** til fila. Det er hele poenget: det finnes ingen vei
 // fra et skjema pa nettet og rett inn i det leseren ser, og det er den

@@ -17,7 +17,7 @@ const SKALL = [
   "/vaer-data.js",
   "/pub-data.js",
   "/pub-forslag-data.js",
-  "/puber-oslo.js",
+  "/puber.js",
   "/kanaler.js",
   // Modulene appen importerer ma alle ligge her. Mangler en, feiler hele
   // app.js uten nett — ikke bare den ene visningen.

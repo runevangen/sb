@@ -180,7 +180,7 @@ export function grupperPuber(puber, arena, holdeplasser) {
 /* ---------- kuraterte puber ---------- */
 
 // OpenStreetMap vet at et sted er en pub, men ikke om de viser fotball.
-// Den kuraterte lista i puber-oslo.js er nettopp det OSM ikke kan si.
+// Den kuraterte lista i puber.js er nettopp det OSM ikke kan si.
 // Den ligger i koden, sa den virker uten nettverk — og det er verdt mye
 // her, der Overpass har vist seg a vaere det skjoreste leddet.
 //
@@ -215,10 +215,83 @@ export function kildeHolder(kilde) {
     tekst.split(/\s+/).filter(Boolean).length >= KILDE_MIN_ORD;
 }
 
+// Byene appen kjenner. Lista gjor to jobber, og det er med vilje én
+// liste: den setter en falsk posisjon (`falskPosisjon`), og den er
+// rammene portalen far lagre steder innenfor (`rammeFor`, `byFor`).
+//
+// Het TESTBYER til 18. september 2026, og det navnet ble usant i det
+// portalen begynte a lagre mot den. En RBK-pub i Trondheim er ikke en
+// test.
+//
+// Koordinatene er sentrum, ikke stadion: det er der folk star nar de
+// leter etter en pub. Skal du teste rundt en arena, er `arenaFor()` den
+// som kjenner dem — og da tar `?posisjon=67.28,14.40` det ogsa.
+export const BYER = {
+  oslo: { navn: "Oslo", lat: 59.911, lon: 10.750 },
+  bergen: { navn: "Bergen", lat: 60.393, lon: 5.325 },
+  trondheim: { navn: "Trondheim", lat: 63.430, lon: 10.395 },
+  bodo: { navn: "Bodø", lat: 67.280, lon: 14.405 },
+  stavanger: { navn: "Stavanger", lat: 58.970, lon: 5.733 },
+  tromso: { navn: "Tromsø", lat: 69.649, lon: 18.956 },
+};
+
+// Hvor langt fra sentrum en by strekker seg her. Femten kilometer er
+// omtrent den gamle Oslo-ramma, og den holdt alle radene i fila.
+//
+// Tallet er en vakt mot skrivefeil, ikke en grense for hvor folk bor: et
+// koordinat med lat og lon byttet om havner i Indiahavet, og DET er det
+// som skal stoppes. En pub tjue kilometer ut er et sjeldnere problem enn
+// et koordinat som er tastet feil, og den kan fortsatt foeres inn ved a
+// utvide tallet her — ett sted, for alle byene.
+export const BY_RADIUS_KM = 15;
+
+// Ramma rundt en by, som en boks. Lengdegradene smalner mot polene, sa
+// boksen regnes ut framfor a skrives inn: en fast bredde i grader ville
+// gitt Tromso en boks tre ganger sa bred som Oslos, malt i kilometer.
+export function rammeFor(nokkel, km = BY_RADIUS_KM) {
+  const by = BYER[normaliserLagnavn(nokkel || "")];
+  if (!by) return null;
+  const dLat = km / 111.32;
+  const dLon = km / (111.32 * Math.cos((by.lat * Math.PI) / 180));
+  return {
+    navn: by.navn,
+    lat: [rundNed(by.lat - dLat), rundOpp(by.lat + dLat)],
+    lon: [rundNed(by.lon - dLon), rundOpp(by.lon + dLon)],
+  };
+}
+
+function rundNed(n) { return Math.floor(n * 1000) / 1000; }
+function rundOpp(n) { return Math.ceil(n * 1000) / 1000; }
+
+// Byen et punkt ligger i, eller null. Brukt av vakta: en rad skal ligge i
+// EN av byene, og hvilken trenger ingen a skrive ned — koordinatet sier
+// det. Et felt ved siden av kunne vaert uenig med tallene.
+export function byFor(lat, lon) {
+  return Object.keys(BYER).find((n) => iRamme({ lat, lon }, rammeFor(n))) || null;
+}
+
+function iRamme(p, r) {
+  if (!r || !p) return false;
+  return p.lat >= r.lat[0] && p.lat <= r.lat[1]
+      && p.lon >= r.lon[0] && p.lon <= r.lon[1];
+}
+
+// Navnene, slik de skrives for et menneske: «Oslo, Bergen, Trondheim …».
+export function bynavn() {
+  return Object.keys(BYER).map((n) => BYER[n].navn);
+}
+
+// Ligger punktet innenfor ramma vi fikk — eller, uten en ramme, i noen av
+// byene i det hele tatt?
+function iEnRamme(p, ramme) {
+  if (!p || !Number.isFinite(p.lat) || !Number.isFinite(p.lon)) return false;
+  if (ramme) return iRamme(p, ramme);
+  return byFor(p.lat, p.lon) !== null;
+}
+
 // Vokter formen sa hvem som helst kan redigere lista uten a odelegge
 // appen. Gir en liste med det som er galt; tom liste betyr at alt er bra.
 export function sjekkPubliste(liste, ramme) {
-  const r = ramme || { lat: [59.80, 60.05], lon: [10.45, 10.95] };
   const feil = [];
   if (!Array.isArray(liste)) return ["Lista er ikke en liste"];
   const sett = new Set();
@@ -231,8 +304,20 @@ export function sjekkPubliste(liste, ramme) {
     const nokkel = normaliserLagnavn(p.navn);
     if (nokkel && sett.has(nokkel)) feil.push(hvor + ": samme navn to ganger");
     sett.add(nokkel);
-    if (!(p.lat >= r.lat[0] && p.lat <= r.lat[1]) || !(p.lon >= r.lon[0] && p.lon <= r.lon[1])) {
-      feil.push(hvor + ": koordinatene ligger utenfor omradet");
+    // Uten en ramme skal raden ligge i EN av byene vi kjenner. Med en
+    // ramme gjelder bare den — det er soket i portalen, som leter i én by
+    // om gangen.
+    //
+    // Ramma var Oslo alene til 18. september 2026, og den hardkodede
+    // boksen sto inni denne funksjonen. Da kunne en RBK-pub i Trondheim
+    // ikke lagres i det hele tatt: vakta sa «koordinatene ligger utenfor
+    // omradet» om et koordinat som var helt riktig, og forslaget ble
+    // staende i koen som om ingen hadde provd. Appen svarte alt i flere
+    // byer — `BYER` er den samme lista `falskPosisjon` bruker — og
+    // portalen var det siste stedet som trodde alt var Oslo.
+    if (!iEnRamme(p, ramme)) {
+      feil.push(hvor + ": koordinatene ligger utenfor "
+        + (ramme ? "omradet" : bynavn().join(", ")));
     }
     if (PUBTYPER.indexOf(p.type) === -1) feil.push(hvor + ": ukjent type " + p.type);
     if (PUBSIKKERHET.indexOf(p.sikkerhet) === -1) feil.push(hvor + ": ukjent sikkerhet " + p.sikkerhet);
@@ -274,7 +359,7 @@ export function merkKuraterte(puber, liste) {
 // finnes lista var ikke — selv om den ligger i koden og er det sterkeste
 // redaksjonelle signalet vi har.
 //
-// `lag` i puber-oslo.js svarer pa kampen uten a vite hvor du er: spiller
+// `lag` i puber.js svarer pa kampen uten a vite hvor du er: spiller
 // Brann, er Brann-stampuben et godt forslag enten du star i Oslo eller
 // ikke. Det er den samme opplysningen ⚽-merket alt baerer — den var bare
 // ikke en vei INN i lista.
@@ -408,7 +493,7 @@ export const MATVALG = ["full meny", "enkel mat", "ingen mat"];
 const TELEFONFORM = /^\+47 (\d{2} \d{2} \d{2} \d{2}|\d{3} \d{2} \d{3})$/;
 
 // Vokter formen, som sjekkPubliste gjor for publista. Tom liste betyr at
-// alt er bra. pubnavn er navnene fra puber-oslo.js: kontaktopplysninger
+// alt er bra. pubnavn er navnene fra puber.js: kontaktopplysninger
 // til en pub vi ikke har, er en skrivefeil — eller en pub som er fjernet
 // uten at dette folget med.
 export function sjekkKontaktliste(kontakter, pubnavn) {
@@ -486,7 +571,7 @@ export function finnKontakt(navn, kontakter) {
 /* ---------- lista redigert fra portalen (#80) ---------- */
 
 // Til 16. september 2026 fantes det ingen vei fra et skjema og inn i
-// lista, og det var med vilje: `puber-oslo.js` baerer en redaksjonell
+// lista, og det var med vilje: `puber.js` baerer en redaksjonell
 // vurdering, og et forslag fra en leser er ikke en rad. ADR 0019.
 //
 // Den regelen star. Det som endret seg er *hvem* som limer. Ingen leser
@@ -615,7 +700,7 @@ export function sjekkPubRad(p, ramme) {
 
 /* ---------- sla opp et sted i OpenStreetMap ---------- */
 
-// Portalen skal slippe a gjette koordinater. Kommentaren i puber-oslo.js
+// Portalen skal slippe a gjette koordinater. Kommentaren i puber.js
 // har alltid sagt at OSMs koordinat brukes nar navnet stemmer — dette er
 // akkurat det, bare gjort av maskinen framfor for hand.
 //
@@ -668,9 +753,14 @@ export const SOK_SEKUNDER = 8;
 // sviktet, som er nettopp det `forsok` finnes for a fortelle.
 export const SOK_TAK = 10000;
 
-// Oslo-ramma, den samme sjekkPubliste bruker. Et sok som treffer en pub i
-// Bergen hjelper ingen her.
-export const OSLO_RAMME = { lat: [59.80, 60.05], lon: [10.45, 10.95] };
+// Ramma soket faller tilbake pa nar ingen by er valgt. Oslo er der de
+// fleste radene star, og en boks er palagt: Overpass uten avgrensning
+// leter i hele verden, og «Andy's Pub» finnes i mange land.
+//
+// Sto her som den ENESTE ramma til 18. september 2026, og da kunne
+// portalen ikke finne et sted utenfor Oslo i det hele tatt. `rammeFor()`
+// gir de andre byene; denne er defaulten, ikke grensa.
+export const OSLO_RAMME = rammeFor("oslo");
 
 function osmHode() {
   return "[out:json][timeout:" + SOK_SEKUNDER + "];";
@@ -852,18 +942,6 @@ export function koordinatFraLenke(tekst) {
 // kunne settes. Meldt 18. september 2026: «vi ma finne ut hvordan vi kan
 // teste det sa reelt som mulig uten a ha noen fysisk der».
 //
-// Koordinatene er sentrum, ikke stadion: det er der folk star nar de
-// leter etter en pub. Skal du teste rundt en arena, er `arenaFor()` den
-// som kjenner dem — og da tar `?posisjon=67.28,14.40` det ogsa.
-export const TESTBYER = {
-  oslo: { navn: "Oslo", lat: 59.911, lon: 10.750 },
-  bergen: { navn: "Bergen", lat: 60.393, lon: 5.325 },
-  trondheim: { navn: "Trondheim", lat: 63.430, lon: 10.395 },
-  bodo: { navn: "Bodø", lat: 67.280, lon: 14.405 },
-  stavanger: { navn: "Stavanger", lat: 58.970, lon: 5.733 },
-  tromso: { navn: "Tromsø", lat: 69.649, lon: 18.956 },
-};
-
 // «?posisjon=bodo», «?posisjon=Bodø» eller «?posisjon=67.28,14.40».
 //
 // Navnet foldes, sa «Bodø» og «bodo» er samme by — den som taster dette
@@ -880,7 +958,7 @@ export function falskPosisjon(sok) {
   const verdi = decodeURIComponent(treff[1] || "").trim();
   if (!verdi) return null;
 
-  const by = TESTBYER[normaliserLagnavn(verdi)];
+  const by = BYER[normaliserLagnavn(verdi)];
   if (by) return { navn: by.navn, lat: by.lat, lon: by.lon, kilde: "by" };
 
   const tall = verdi.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
