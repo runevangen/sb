@@ -97,6 +97,11 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   over hvilke tegn som er bokstaver, mangler alltid noen. Vask bort det
   som faktisk er farlig — hermetegn, apostrof, bakoverstrek — ikke alt du
   ikke kom på.
+- **Koordinatfeltet tar det kartet faktisk gir deg.** Høyreklikk i Google
+  Maps gir et *koordinat*, ikke en lenke — og fra stedskortet med
+  parenteser rundt. `koordinatFraLenke()` tåler parenteser, hakeparenteser
+  og mellomrom, og etiketten sier «koordinat eller kartlenke» så den som
+  sitter med tallene ser at feltet er til dem.
 - **Husnummeret står rett etter gata, ikke sist.** Folk skriver poststed
   etter adressen, og et innsendt forslag gjør det nesten alltid.
   `delAdresse()` kaster alt som kommer etter nummeret; leste den siste

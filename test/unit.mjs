@@ -2274,6 +2274,24 @@ ok("og kartutsnittet nar markoren mangler",
    koordinatFraLenke("https://www.openstreetmap.org/#map=19/59.9139/10.7522").lat === 59.9139);
 ok("to tall limt inn rett fra et kart duger ogsa",
    koordinatFraLenke("59.9139, 10.7522").lon === 10.7522);
+// Meldt 18. september 2026: «Googlemaps gir meg denne (59.8339740,
+// 10.8062285)». Parentesene kommer med nar punktet kopieres fra
+// stedskortet, og anker-^-et gjorde dem til «Fant ingen koordinater» —
+// pa et koordinat som sto rett foran den som limte det inn.
+ok("parenteser rundt koordinatet er ingen hindring",
+   koordinatFraLenke("(59.8339740, 10.8062285)").lat === 59.833974 &&
+   koordinatFraLenke("(59.8339740, 10.8062285)").lon === 10.8062285,
+   JSON.stringify(koordinatFraLenke("(59.8339740, 10.8062285)")));
+ok("og hakeparenteser heller ikke",
+   koordinatFraLenke("[59.8339740, 10.8062285]").lat === 59.833974);
+ok("mellomrom rundt det hele gjor ingenting",
+   koordinatFraLenke("  (59.8339740,10.8062285)  ").lon === 10.8062285);
+// Vakta skal fortsatt holde: to tall uten sammenheng er ikke et koordinat
+// bare fordi de star i en tekst.
+ok("men tall midt i en setning er fortsatt ingen koordinater",
+   !!koordinatFraLenke("puben apnet i 1959.9139 og 10.7522 er ikke noe").feil ||
+   koordinatFraLenke("puben apnet i 1959.9139 og 10.7522 er ikke noe").lat === undefined,
+   JSON.stringify(koordinatFraLenke("puben apnet i 1959.9139 og 10.7522 er ikke noe")));
 // En kortlenke baerer ingen koordinater i det hele tatt. «Fant ingenting»
 // ville sendt admin ut for a lete etter noe som ikke er der.
 ok("en kortlenke sier hva som er galt med den",
