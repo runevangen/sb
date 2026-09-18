@@ -37,7 +37,7 @@ Tre ting følger av mønsteret:
 - **Voktere kjøres mot de ekte filene.** `sjekkPubliste`,
   `sjekkKontaktliste`, `sjekkKanalliste`, `sjekkVisninger`, `sjekkForslag`,
   `sjekkPubRad`. Alle gir en **liste** med det som er galt; tom liste
-  betyr at alt er bra. De kjøres av `test/unit.mjs` mot `puber-oslo.js`,
+  betyr at alt er bra. De kjøres av `test/unit.mjs` mot `puber.js`,
   `puber-kontakt.js` og `kanaler.js` selv, så en feilskrevet rad slår ut i
   testene framfor hos leseren.
 - **Tolkere må tåle å kjøres to ganger.** `tolkSvar`, `tolkVisninger`,
@@ -162,7 +162,7 @@ kreditering, og den står der pubene vises.
   ★ og ⚽ bærer det overskriftene sa.
 - **★ og ⚽ er to ulike påstander.** ★ betyr «viser denne kampen» og settes
   av admin; ⚽ betyr «kjent for å vise fotball» og kommer fra
-  `puber-oslo.js`.
+  `puber.js`.
 - **`kildeHolder()` godtar en lenke *eller* en setning.** Regelen er «kilde
   og dato», ikke «lenke og dato»: små steder har ingen nettside, og «Var
   innom 16.09.2026, storskjerm i baren» er bedre dokumentasjon enn en side
@@ -189,7 +189,28 @@ kreditering, og den står der pubene vises.
   [ADR 0020](adr/0020-stedene-i-portalen.md). Nøkkelen er navnet foldet
   (`pubNokkel`). Et sted som har lagt ned tas ut med `fjernet`, ikke ved å
   la være å skrive.
-- **`falskPosisjon()` og `TESTBYER` er testverktøy som virker i prod.**
+- **`BYER` er én liste med to jobber.** Den setter en falsk posisjon
+  (`falskPosisjon`), og den er rammene portalen får lagre steder innenfor
+  (`rammeFor`, `byFor`). Het `TESTBYER` til 18. september 2026, og det
+  navnet ble usant i det portalen begynte å lagre mot den — en RBK-pub i
+  Trondheim er ikke en test.
+- **`rammeFor()` regner boksen ut, den skriver den ikke inn.**
+  Lengdegradene smalner mot polene: en fast bredde i grader ville gitt
+  Tromsø en boks tre ganger så bred som Oslos, målt i kilometer.
+  `BY_RADIUS_KM` er femten, omtrent den gamle Oslo-ramma.
+- **Ramma er en vakt mot skrivefeil, ikke en grense for hvor folk bor.**
+  Den viktigste feilen den fanger er lat og lon byttet om: da havner en
+  Oslo-pub i Somalia, og begge tallene ser fortsatt riktige ut. En pub
+  tjue kilometer ut føres inn ved å utvide `BY_RADIUS_KM` — ett sted, for
+  alle byene.
+- **Byen lagres ikke på raden.** `byFor()` leser den ut av koordinatet. Et
+  felt ved siden av kunne vært uenig med tallene, og da er det to
+  sannheter om ett sted. I portalen styrer byvelgeren bare hvor vi
+  *leter*, og den følger tallene når de endrer seg — aldri motsatt.
+- **`sjekkPubliste()` uten ramme krever at raden ligger i én av byene;
+  med ramme gjelder bare den.** Den siste er søket i portalen, som leter i
+  én by om gangen.
+- **`falskPosisjon()` er et testverktøy som virker i prod.**
   `?posisjon=bodo`. Merket vises på skjermen: «Falsk posisjon: Bodø».
 
 ### `svar-data.js` — «jeg blir med»
@@ -239,7 +260,6 @@ kreditering, og den står der pubene vises.
   teller også per liga, ikke på tvers — boksene under viser én.
 - **`visningRad()` sender ikke `satt_av`.** Databasen setter den fra økta
   med `default auth.uid()`. Uten defaulten sto kolonnen tom i et døgn.
-- **`utenGamle()` rydder spilte kamper hver gang admin lagrer.**
 
 ### `konto-data.js` og `pin-data.js` — innlogging
 
@@ -312,7 +332,7 @@ Tre filer som ligger i koden fordi de bærer en **vurdering**, ikke data.
 De virker uten nettverk, og det er verdt mye der Overpass har vist seg å
 være det skjøreste leddet.
 
-### `puber-oslo.js`
+### `puber.js`
 
 Grunnfjellet. OpenStreetMap vet at et sted er en pub, men ikke om de viser
 fotball.
@@ -327,6 +347,11 @@ fotball.
   fra OpenStreetMap, brukes OSMs koordinat.
 - **Fila skrives aldri fra nettet.** Rettelsene ligger i `puber` i Supabase
   og legges oppå med `slaSammenPuber()`.
+- **Den het puber-oslo.js til 18. september 2026, og navnet var grensa.**
+  Ikke i lesingen — `kuraterteNaer()` har alltid regnet avstand, uansett by
+  — men i portalen: søket lette i en Oslo-boks, og vakta avviste
+  koordinatet som fulgte. Radene er fortsatt nesten alle fra Oslo. Det er
+  en opplysning om hvem som har gjort jobben, ikke en regel i koden.
 
 ### `puber-kontakt.js`
 
@@ -489,6 +514,17 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   tallene skal se at feltet er til dem.
 - **Rettelsene skrives som hele rader.** `slaSammenPuber()` slår sammen
   fila og basen; et sted som har lagt ned tas ut med `fjernet`.
+- **En lagring merker forslaget den svarer på.** `merkForslagLagtInn()`
+  slår opp køen på navnet foldet. Før var lagring og merking to handlinger
+  for én avgjørelse, og den naturlige er den første — så forslaget ble
+  stående i køen etter at stedet var lagt inn. Merkingen henger på
+  lagringen og aldri motsatt: [ADR 0019](adr/0019-pubforslag.md) krever at
+  et menneske gjør raden ferdig, og det er nettopp det som skjedde —
+  koordinater, kilde og dato fylt ut for hånd. «Lagt inn»-knappen står
+  igjen for radene som limes rett inn i fila. Bare `ny` merkes: et avvist
+  forslag skal ikke vekkes av at noen redigerer stedet et halvt år senere.
+- **Byvelgeren styrer søket, ikke raden.** Den følger koordinatet når det
+  endrer seg, og et sted som tas *ut* av lista rører ikke køen.
 
 ### `personvern.html`
 
@@ -574,7 +610,7 @@ Se [`nokler-og-tokens.md`](nokler-og-tokens.md).
 - **`pub-forslag.mjs`** — en kø, ikke lista. Skrivingen går med leserens
   egen økt; lesing av køen krever `ADMIN_PASSORD` **og** en økt i
   `visning_skrivere`.
-- **`pub-liste.mjs`** — rettelsene oppå `puber-oslo.js`. **GET svarer med
+- **`pub-liste.mjs`** — rettelsene oppå `puber.js`. **GET svarer med
   rettelsene alene, ikke med en ferdig liste:** et svar som var hele lista
   ville gjort funksjonen til det skjøreste leddet i noe som i dag ikke kan
   ryke. Oppslaget mot OpenStreetMap ligger også her, bak passordet —

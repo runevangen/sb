@@ -19,13 +19,13 @@
 // Passordet ligger i en variabel her, ikke i sessionStorage: en
 // oppfriskning er billigere enn et passord som blir liggende.
 
-import { PUBER_OSLO } from "./puber-oslo.js";
+import { KURATERTE } from "./puber.js";
 import { oktGyldig, kanFornyes } from "./konto-data.js";
 import { LIGAER, kampNokkel } from "./fotball-data.js";
 import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
 import { publisteRad, alleredeILista } from "./pub-forslag-data.js";
 import { PUBTYPER, PUBSIKKERHET, pubNokkel, sjekkPubRad, slaSammenPuber,
-  koordinatFraLenke } from "./pub-data.js";
+  koordinatFraLenke, BYER, byFor } from "./pub-data.js";
 import { visningsHint, rundeTall, lagreKnappTekst } from "./visning-data.js";
 
 const felt = (id) => document.getElementById(id);
@@ -47,7 +47,7 @@ function valgtSignatur() {
   return alleBokser().filter((b) => b.checked).map((b) => b.value).sort().join("|");
 }
 
-// Rettelsene som ligger oppa puber-oslo.js, slik de sist ble lest (#80).
+// Rettelsene som ligger oppa puber.js, slik de sist ble lest (#80).
 // Den sammensatte lista regnes av denne og fila, aldri lagret for seg: to
 // lister som kan gli fra hverandre er nettopp det ett sted skal slippe.
 // Star her framfor nede hos editoren fordi pubvelgeren leses av den for
@@ -89,7 +89,7 @@ let PUBER = [];
 
 function tegnPubvelger() {
   const valgt = felt("pub").value;
-  PUBER = slaSammenPuber(PUBER_OSLO, pubRettelser)
+  PUBER = slaSammenPuber(KURATERTE, pubRettelser)
     .filter((p) => p.sikkerhet !== "usikker")
     .slice()
     .sort((a, b) => a.navn.localeCompare(b.navn, "nb"));
@@ -247,7 +247,7 @@ async function hentBrukere() {
 
 /* ---------- foreslatte steder (#80) ---------- */
 
-// Koen, ikke lista. puber-oslo.js baerer en redaksjonell vurdering, og
+// Koen, ikke lista. puber.js baerer en redaksjonell vurdering, og
 // hver rad har kilde og sjekket — derfor skriver ingenting her til fila.
 // Portalen gir raden ferdig formet; et menneske limer den inn, slar opp
 // koordinatene og setter kilden.
@@ -287,7 +287,12 @@ async function hentForslag() {
   }
 }
 
+// Koen slik den sist ble hentet. Holdes fordi en lagring i stedskjemaet
+// ma kunne finne forslaget den svarer pa — se merkForslagLagtInn.
+let forslagKo = [];
+
 function tegnForslag(liste) {
+  forslagKo = Array.isArray(liste) ? liste : [];
   const boks = felt("forslagListe");
   boks.textContent = "";
 
@@ -310,7 +315,7 @@ function tegnForslag(liste) {
     const tittel = document.createElement("p");
     tittel.className = "forslag-navn";
     tittel.textContent = f.navn;
-    if (alleredeILista(f.navn, PUBER_OSLO)) {
+    if (alleredeILista(f.navn, KURATERTE)) {
       const merke = document.createElement("span");
       merke.className = "forslag-merke";
       merke.textContent = "står allerede i lista";
@@ -326,7 +331,7 @@ function tegnForslag(liste) {
     rad.appendChild(under);
 
     // Raden ferdig formet, for den som vil flytte stedet helt inn i
-    // puber-oslo.js. lat/lon og kilde star tomme med vilje: de ma slas
+    // puber.js. lat/lon og kilde star tomme med vilje: de ma slas
     // opp, og oppdiktede tall ville vaert verre enn ingen rad.
     //
     // Editoren under er den korte veien, og den vanlige. Fila er for det
@@ -816,7 +821,7 @@ function vis(tekst, art) {
 
 /* ---------- stedene (#80) ---------- */
 
-// **Fila er grunnfjellet.** puber-oslo.js ligger i koden, virker uten
+// **Fila er grunnfjellet.** puber.js ligger i koden, virker uten
 // nettverk, og er det leseren ser om Supabase er nede. Editoren skriver
 // aldri i den. Det som lagres her er rettelsene oppa — et nytt sted, en
 // adresse som flyttet, et sted som la ned — og appen slar dem sammen
@@ -884,6 +889,7 @@ PUBSIKKERHET.forEach((sk) => {
 function apneSted(p, nokkel) {
   stedRedigeres = nokkel || "";
   fyllSted(p);
+  settBy(p);
   felt("stedSkjema").hidden = false;
   felt("stedAvbryt").hidden = false;
   stedMelding("", "");
@@ -891,6 +897,40 @@ function apneSted(p, nokkel) {
   // fra forrige sted statt igjen under et nytt navn.
   nullstillOppslag();
   felt("stedNavn").focus();
+}
+
+// Byene i velgeren kommer fra BYER, ikke fra en liste her: legges en by
+// til der, star den i portalen uten at noen husker dette stedet.
+function fyllByer() {
+  const v = felt("stedBy");
+  if (v.options.length) return;
+  Object.keys(BYER).forEach((n) => {
+    const o = document.createElement("option");
+    o.value = n;
+    o.textContent = BYER[n].navn;
+    v.appendChild(o);
+  });
+}
+
+// Byen soket skal lete i. Har stedet alt et koordinat, er byen gitt av
+// tallene — da skal velgeren si det samme, ellers leter «Sla opp» et
+// annet sted enn raden ligger.
+//
+// Koordinatet er fasiten, ikke velgeren: velgeren styrer bare hvor vi
+// LETER. Derfor folger den tallene nar de endrer seg, og aldri motsatt —
+// to felt som kan si hver sin by ville vaert to sannheter om ett sted.
+function settBy(p) {
+  fyllByer();
+  const fra = p && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon))
+    ? byFor(Number(p.lat), Number(p.lon))
+    : null;
+  if (fra || !felt("stedBy").value) felt("stedBy").value = fra || "oslo";
+}
+
+// Kalles hver gang et koordinat lander i skjemaet — tastet, plukket fra
+// et treff, eller limt inn som en kartlenke.
+function synkBy() {
+  settBy({ lat: felt("stedLat").value, lon: felt("stedLon").value });
 }
 
 function nullstillOppslag() {
@@ -953,7 +993,7 @@ async function hentSteder() {
     pubRettelser = [];
     tegnSteder();
     felt("stedHint").hidden = false;
-    felt("stedHint").textContent = "Viser bare puber-oslo.js: " + err.message;
+    felt("stedHint").textContent = "Viser bare puber.js: " + err.message;
   }
 }
 
@@ -966,7 +1006,7 @@ function tegnSteder() {
 
   // Fila forst, i sin egen rekkefolge, sa det admin alt kjenner igjen
   // star der det pleier. Nye steder legges bakerst av slaSammenPuber.
-  const sammen = slaSammenPuber(PUBER_OSLO, pubRettelser);
+  const sammen = slaSammenPuber(KURATERTE, pubRettelser);
   const skjulte = pubRettelser.filter((p) => p.fjernet);
 
   sammen.concat(skjulte).forEach((p) => {
@@ -977,8 +1017,8 @@ function tegnSteder() {
   felt("stedHint").hidden = false;
   felt("stedHint").textContent = sammen.length + " steder i lista. "
     + (pubRettelser.length
-      ? pubRettelser.length + " er rettet herfra; resten står i puber-oslo.js."
-      : "Alle står i puber-oslo.js. Ingenting er rettet herfra ennå.");
+      ? pubRettelser.length + " er rettet herfra; resten står i puber.js."
+      : "Alle står i puber.js. Ingenting er rettet herfra ennå.");
 }
 
 function stedRad(p, nokkel, rettelse) {
@@ -1012,6 +1052,39 @@ function stedRad(p, nokkel, rettelse) {
   return rad;
 }
 
+// Et sted som nettopp ble lagret svarer pa et forslag i koen. Da skal
+// forslaget merkes, ikke bli staende.
+//
+// Meldt 18. september 2026: «Jeg provde a lagre RBK pobb og sant. Men ser
+// den fortsatt i forslagskasse.» Den gangen var svaret at lagringen ble
+// avvist — men selv nar den gar gjennom, ble forslaget staende til noen
+// trykket «Lagt inn» i tillegg. To handlinger for én avgjorelse, og den
+// naturlige er den forste.
+//
+// Merkingen henger paa lagringen og ikke motsatt, og det er hele poenget:
+// ADR 0019 krever at et menneske gjor raden ferdig, og det er nettopp det
+// som nettopp skjedde — koordinater, kilde og dato fylt ut for hand.
+// «Lagt inn»-knappen star igjen for radene som ble limt rett inn i fila.
+//
+// Bare «ny» merkes. Et forslag som alt er avvist skal ikke vekkes til
+// live av at noen redigerer stedet et halvt ar senere.
+async function merkForslagLagtInn(navn) {
+  const treff = forslagKo.filter((f) => f.status === "ny"
+    && pubNokkel(f.navn) === pubNokkel(navn));
+  if (!treff.length) return null;
+  try {
+    for (const f of treff) {
+      await forslagKall({ handling: "behandle", id: f.id, status: "lagt-inn" });
+    }
+  } catch (err) {
+    // Stedet ER lagret. En feilet merking skal sies, men ikke se ut som at
+    // lagringen gikk galt — da ville admin provd igjen pa noe som sto.
+    return " Forslaget i køen ble ikke merket: " + err.message;
+  }
+  hentForslag();
+  return " Forslaget i køen er merket som lagt inn.";
+}
+
 async function lagreSted() {
   const p = stedFelt();
   const problemer = sjekkPubRad(p);
@@ -1033,7 +1106,10 @@ async function lagreSted() {
   stedMelding("Lagrer …", "");
   try {
     const data = await stedKall({ pub: p });
-    stedMelding(data.merknad || "Lagret.", "ok");
+    // Et sted som er tatt UT av lista svarer ikke pa et forslag om a ta
+    // det inn. Da skal koen sta urort.
+    const merket = p.fjernet ? null : await merkForslagLagtInn(p.navn);
+    stedMelding((data.merknad || "Lagret.") + (merket || ""), "ok");
     lukkSted();
     await hentSteder();
   } catch (err) {
@@ -1042,7 +1118,7 @@ async function lagreSted() {
   felt("stedLagre").disabled = false;
 }
 
-// Oppslaget i OpenStreetMap. Kommentaren i puber-oslo.js har alltid sagt
+// Oppslaget i OpenStreetMap. Kommentaren i puber.js har alltid sagt
 // at OSMs koordinat brukes nar navnet stemmer — dette er akkurat det,
 // bare gjort av maskinen framfor for hand. Treffet fyller feltene; det
 // avgjor ingenting.
@@ -1051,21 +1127,31 @@ async function lagreSted() {
 // 4J» selv om hen ikke kjenner puben i forste etasje. Norske adresser i
 // OSM er importert fra Kartverket, sa huset star der ogsa nar stedet ikke
 // gjor det.
+// Byen star i meldinga, ikke bare i sporringen. «Ingen treff pa RBK Pub»
+// er sant i Oslo og usant i Trondheim, og den som leser den skal se
+// hvilken av dem den gjelder — ellers slutter man at stedet ikke finnes.
+function valgtBy() {
+  const n = felt("stedBy").value || "oslo";
+  return { nokkel: n, navn: (BYER[n] || BYER.oslo).navn };
+}
+
 async function sokSted() {
   const navn = felt("stedNavn").value.trim();
+  const by = valgtBy();
   await kjorOppslag({
     hint: "stedSokHint", liste: "stedTreff",
-    kropp: { handling: "sok", navn },
-    tomt: "Ingen treff på «" + navn + "» i Oslo.",
+    kropp: { handling: "sok", navn, by: by.nokkel },
+    tomt: "Ingen treff på «" + navn + "» i " + by.navn + ".",
   });
 }
 
 async function sokAdresseSted() {
   const adresse = felt("stedAdresse").value.trim();
+  const by = valgtBy();
   await kjorOppslag({
     hint: "stedAdresseHint", liste: "stedAdresseTreff",
-    kropp: { handling: "sok-adresse", adresse },
-    tomt: "Ingen treff på «" + adresse + "» i Oslo.",
+    kropp: { handling: "sok-adresse", adresse, by: by.nokkel },
+    tomt: "Ingen treff på «" + adresse + "» i " + by.navn + ".",
   });
 }
 
@@ -1118,6 +1204,7 @@ async function kjorOppslag(oppsett) {
       // Vika», og navnet er nokkelen. Koordinatet er det vi kom for.
       felt("stedLat").value = t.lat.toFixed(4);
       felt("stedLon").value = t.lon.toFixed(4);
+      synkBy();
       if (t.adresse && !felt("stedAdresse").value) felt("stedAdresse").value = t.adresse;
       if (t.nettsted && !felt("stedKilde").value) felt("stedKilde").value = t.nettsted;
       liste.textContent = "";
@@ -1166,6 +1253,7 @@ function lesKartlenke() {
   }
   felt("stedLat").value = punkt.lat.toFixed(4);
   felt("stedLon").value = punkt.lon.toFixed(4);
+  synkBy();
   // «fra lenka» om et koordinat er en liten losn, men det er en losn: den
   // som limte inn to tall leser at appen tror hen gjorde noe annet, og
   // begynner a lure pa om den forsto det. Feltet tar begge deler, sa
@@ -1178,6 +1266,7 @@ function lesKartlenke() {
 felt("stedNytt").addEventListener("click", () => apneSted(null, ""));
 felt("stedAvbryt").addEventListener("click", lukkSted);
 felt("stedLagre").addEventListener("click", lagreSted);
+["stedLat", "stedLon"].forEach((id) => felt(id).addEventListener("input", synkBy));
 felt("stedSok").addEventListener("click", sokSted);
 felt("stedSokAdresse").addEventListener("click", sokAdresseSted);
 felt("stedLenkeLes").addEventListener("click", lesKartlenke);

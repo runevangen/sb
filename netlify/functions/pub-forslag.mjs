@@ -1,6 +1,6 @@
 // Steder lesere sender inn (#80).
 //
-// **En ko, ikke lista.** puber-oslo.js er kode fordi den baerer en
+// **En ko, ikke lista.** puber.js er kode fordi den baerer en
 // redaksjonell vurdering, og «Kjent for a vise fotball» skal sta ogsa nar
 // bade Overpass og var egen funksjon er nede. Et forslag herfra blir ikke
 // en rad i lista av seg selv — portalen viser koen, og et menneske limer

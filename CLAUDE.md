@@ -31,7 +31,7 @@ modul for modul.
 
     fotball.js / fotball-data.js / netlify/functions/fotball.mjs
     vaer-data.js / netlify/functions/vaer.mjs
-    pub-data.js / puber-oslo.js / puber-kontakt.js / netlify/functions/puber.mjs
+    pub-data.js / puber.js / puber-kontakt.js / netlify/functions/puber.mjs
     pub-forslag-data.js / netlify/functions/pub-forslag.mjs
     netlify/functions/pub-liste.mjs   rettelsene admin gjør i portalen
     kanaler.js      hvilken kanal som sender ligaen — tom til noen har sjekket
@@ -83,7 +83,7 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   «Valgt for deling» utlogget.
 - **«Andre fotballpuber» er stedene i lista som *ikke* har bekreftet.**
   ★ betyr «viser denne kampen» og settes av admin; ⚽ betyr «kjent for å
-  vise fotball» og kommer fra `puber-oslo.js`. De to er ulike påstander,
+  vise fotball» og kommer fra `puber.js`. De to er ulike påstander,
   og merkene holder dem fra hverandre.
   De kuraterte stedene nådde lenge bare fram gjennom et **geografisk
   filter** — `kjenteNaer` krever posisjonen din, `kjenteVedArena` at
@@ -95,16 +95,32 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   en stampub tvers over byen er et dårligere svar enn en fotballpub i
   nabogata, men et bedre svar enn en tilfeldig bar Overpass fant.
   **Og den er en utvei, ikke et tillegg.** Kommer en posisjon, tømmes
-  kilden: `puber-oslo.js` er en *Oslo*-liste, og en Oslo-stampub i en liste
-  for Bodø står der uten avstand, som om den var i nabogata. Er du i Oslo,
-  kommer de samme stedene tilbake gjennom `kjenteNaer`, med avstand på.
+  kilden: et lagtreff bærer ingen avstand, og en stampub i en annen by står
+  da i lista som om den var i nabogata. Er du i byen der den ligger, kommer
+  den tilbake gjennom `kjenteNaer`, med avstand på.
 - **`?posisjon=bodo` setter posisjonen, og skjermen sier det.** Pubene
   «nær deg» kommer fra Overpass, og Overpass svarer på hvor du står — så
   uten dette kan appen bare prøves i Oslo. `falskPosisjon()` tar et bynavn
-  fra `TESTBYER` eller et rått `lat,lon`. Så lenge den er på, står «Falsk
+  fra `BYER` eller et rått `lat,lon`. Så lenge den er på, står «Falsk
   posisjon: Bodø» først i linja under forslagene: en app som viser puber
   et annet sted enn du er, og tier om det, sier noe usant med sin egen
   liste. `verktoy/byersjekk.mjs` gjør den samme målingen uten nettleser.
+- **Byene står i `BYER`, og de er både falsk posisjon og ramme.** Lista
+  gjør to jobber med vilje: `falskPosisjon()` setter en posisjon fra den,
+  og `rammeFor()`/`byFor()` er rammene portalen får lagre steder innenfor.
+  Ramma var **Oslo alene** til 18. september 2026, hardkodet inni
+  `sjekkPubliste`, og da kunne en RBK-pub i Trondheim ikke føres inn i det
+  hele tatt: søket lette i en Oslo-boks, så stedet fantes ikke, og vakta
+  avviste koordinatet som fulgte med «koordinatene ligger utenfor
+  området» — om et koordinat som var helt riktig. Forslaget ble stående i
+  køen som om ingen hadde prøvd.
+  **Ramma er en vakt mot skrivefeil, ikke en grense for hvor folk bor.**
+  Den viktigste feilen den fanger er lat og lon byttet om. En pub lenger
+  ut føres inn ved å utvide `BY_RADIUS_KM` — ett sted, for alle byene.
+  **Byen lagres ikke på raden**: `byFor()` leser den ut av koordinatet, og
+  byvelgeren i portalen styrer bare hvor vi *leter*. Den følger tallene,
+  aldri motsatt — to felt som kan si hver sin by er to sannheter om ett
+  sted.
 - **Lagnavn fra API-et og fra redaksjonen foldes strengere enn
   `normaliserLagnavn`.** Kilden skriver «Vaalerenga», fila «Vålerenga», og
   `normaliserLagnavn` gir «vaalerenga» mot «valerenga» — to ulike lag, så
@@ -146,12 +162,18 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   opp.** `SOK_SEKUNDER` står ett sted og går både i spørringen og i
   fristen. Sto de hver for seg, ba vi om tolv sekunder og la på etter
   seks, mens meldinga la skylda på den andre parten.
-- **Et forslag fra en leser er ikke en rad i lista.** `puber-oslo.js` er
+- **Et forslag fra en leser er ikke en rad i lista.** `puber.js` er
   kode fordi den bærer en redaksjonell vurdering. Innsendinger går i
   `pub_forslag`, og et menneske gjør raden ferdig. Det finnes ingen vei fra
   et skjema på nettet og rett inn i det leseren ser.
   [ADR 0019](docs/adr/0019-pubforslag.md)
-- **`puber-oslo.js` er grunnfjellet; `puber` i Supabase er rettelsene
+  **Men lagringen merker forslaget den svarer på.** Lagring og merking var
+  to handlinger for én avgjørelse, og den naturlige er lagringen — så
+  forslaget ble stående i køen etter at stedet var lagt inn.
+  `merkForslagLagtInn()` henger på lagringen og aldri motsatt: mennesket
+  gjorde nettopp raden ferdig, med koordinater, kilde og dato. «Lagt
+  inn»-knappen står igjen for radene som limes rett inn i fila.
+- **`puber.js` er grunnfjellet; `puber` i Supabase er rettelsene
   oppå.** Admin retter i portalen, appen slår sammen med `slaSammenPuber()`
   — hele rader, aldri felt for felt. Fila skrives aldri fra nettet, og den
   er det leseren ser når Supabase er nede. Et sted som har lagt ned tas ut

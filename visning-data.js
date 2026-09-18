@@ -30,7 +30,7 @@ export function kampIderFor(kamper) {
 
 // Vokter formen, som sjekkPubliste gjor for publista. Gir en liste med
 // det som er galt; tom liste betyr at alt er bra. pubnavn er navnene fra
-// puber-oslo.js: en visning pa en pub vi ikke kjenner, er en skrivefeil.
+// puber.js: en visning pa en pub vi ikke kjenner, er en skrivefeil.
 export function sjekkVisninger(liste, pubnavn) {
   if (!Array.isArray(liste)) return ["Visningene er ikke en liste"];
   const kjent = new Set((pubnavn || []).map(normaliserLagnavn));
