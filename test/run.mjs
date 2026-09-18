@@ -1938,6 +1938,7 @@ const SAK_14 = kjor("pub-feil", FELLES + FOTBALL + `
       ok("de er merket som kjent for fotball", !!forslag.querySelector(".pub-merke"));
       ok("naermest star forst",
          chips[0].textContent.indexOf("O'Learys Oslo Sentralstasjon") === 0, chips[0].textContent);
+
       ok("og det er fortsatt én liste",
          forslag.querySelectorAll(".pub-gruppe-tittel").length === 0);
 
@@ -1962,6 +1963,92 @@ const SAK_14 = kjor("pub-feil", FELLES + FOTBALL + `
 
 // Portalen er en egen side. Den skriver ingenting selv: testen fanger
 // POST-en og sjekker at det som sendes er det samme som sto pa skjermen.
+/* ---------------- 14B. stampuben nar geografien ikke gir noe ---------------- */
+
+// Drodlet fram 18. september 2026: «andre fotballpuber — skulle ikke det
+// vaere puber som ligger i lista men ikke har bekreftet at de viser
+// kampen?»
+//
+// De sto der alt, men bare gjennom et geografisk filter: kjenteNaer
+// krever posisjonen din, kjenteVedArena at arenaen er en vi kjenner. Her
+// er BEGGE stengt — utenlandsk kamp, og posisjon avslatt — og da fantes
+// ikke den kuraterte lista i det hele tatt, enda «lag» i den svarer pa
+// nettopp denne kampen.
+const SAK_14B = kjor("pub-stampub", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  // Tottenham–Chelsea pa et stadion arenaFor() ikke kjenner: ingen norsk
+  // arena, altsa ingen kjenteVedArena.
+  var ARETS = KOMMENDE.map(function (k, i) {
+    return i === 0
+      ? Object.assign({}, k, { hjemme: "Tottenham", borte: "Chelsea",
+                               arena: "Tottenham Hotspur Stadium" })
+      : Object.assign({}, k, { arena: "" });
+  });
+  // Posisjon avslatt. Da er kjenteNaer tom ogsa.
+  navigator.geolocation.getCurrentPosition = function (ok, feil) {
+    feil({ code: 1, message: "avslatt" });
+  };
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: false, status: 504, statusText: "Gateway Timeout",
+        json: function () { return Promise.reject(new Error("nede")); } });
+    }
+    if (u.indexOf("/api/puber?") === 0) {
+      return Promise.resolve({ ok: false, status: 400, statusText: "Bad Request",
+        text: function () { return Promise.resolve(JSON.stringify({ feil: "Ukjent arena" })); } });
+    }
+    if (u.indexOf("/api/vaer?") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ svar: [], visninger: [] })); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({
+          liga: "Premier League", sesong: 2026, sisteSesong: true, del: del,
+          kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+          kamper: ARETS, runde: "Runde 5" })); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/premier/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    panel.querySelector(".pub-apne").click();
+    var forslag = panel.querySelector(".pub-forslag");
+    setTimeout(function () { try {
+      var navnene = Array.prototype.map.call(
+        forslag.querySelectorAll(".pub-chip"), function (c) { return c.textContent; });
+      // Bohemen er stampub for Tottenham. Uten denne kilden star lista tom
+      // her: ingen posisjon, ingen kjent arena, Overpass nede.
+      ok("stampuben for laget star der uten posisjon og uten kjent arena",
+         navnene.some(function (n) { return n.indexOf("Bohemen Sportspub") === 0; }),
+         navnene.join(" | ") || "(tom liste)");
+      // Merket er det samme ⚽ som ellers: «kjent for a vise fotball».
+      // Stjerna ville lovet at stedet har bekreftet nettopp denne kampen,
+      // og det har ingen gjort her.
+      ok("den er merket kjent for fotball, ikke som bekreftet",
+         !!forslag.querySelector(".pub-merke") &&
+         !forslag.querySelector(".pub-bekreftet"),
+         navnene.join(" | "));
+      // Og bare lagene som spiller: en Leeds-stampub svarer ikke pa
+      // Tottenham–Chelsea, og ville vaert stoy i en liste som ellers er tom.
+      ok("men ikke stampuber for lag som ikke spiller",
+         !navnene.some(function (n) { return n.indexOf("Dr. Jekyll") === 0; }),
+         navnene.join(" | "));
+      ferdig();
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 600);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
+`);
+
 const SAK_15 = kjor("admin", `
   // Skrivingen gar med admins egen okt na (#79), ikke med en nokkel:
   // RLS slar opp uid-en i visning_skrivere, og ADMIN_PASSORD betyr
@@ -4831,7 +4918,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
 let feilet = 0;
 
 for (const t of alle) {

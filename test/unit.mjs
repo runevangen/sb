@@ -39,7 +39,7 @@ import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
 
 import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, enturNaermest,
          tolkHoldeplasser, grupperPuber, ofteBrukt, noterPub,
-         rangerForslag, FORSLAG_MAKS,
+         rangerForslag, FORSLAG_MAKS, stampuberFor, FORSLAG_KILDER,
          OVERPASS_SPEIL, overpassHeadere, restTid,
          sjekkPubliste, kuraterteNaer, merkKuraterte,
          sjekkKontaktliste, kontaktFor, finnKontakt, KONTAKT_FELT, kildeHolder,
@@ -1581,6 +1581,68 @@ ok("uten tak kommer alle med",
    rangerForslag({ naerDeg: [{ navn: "a" }, { navn: "b" }, { navn: "c" }] }, 0).topp.length === 3);
 ok("tomt inn gir tomt ut",
    rangerForslag(null).topp.length === 0 && rangerForslag({}).resten.length === 0);
+
+/* ---- stampubene for lagene som spiller ---- */
+
+// De kuraterte stedene nadde bare fram gjennom et geografisk filter:
+// kjenteNaer krever posisjonen din, kjenteVedArena at arenaen er en vi
+// kjenner. Utenlandsk kamp OG nei til posisjon: da fantes ikke lista var,
+// enda `lag` i den svarer pa nettopp den kampen.
+const STAMPUBER = [
+  { navn: "Bohemen Sportspub", lag: ["Vålerenga", "Tottenham"] },
+  { navn: "Scotsman", lag: ["Manchester United", "Bodø/Glimt"] },
+  { navn: "Sofa & Bar", lag: [] },
+  { navn: "Uten lag-felt" },
+];
+ok("hjemmelaget gir treff",
+   stampuberFor({ hjemme: "Tottenham", borte: "Chelsea" }, STAMPUBER)
+     .map((p) => p.navn).join(",") === "Bohemen Sportspub",
+   JSON.stringify(stampuberFor({ hjemme: "Tottenham", borte: "Chelsea" }, STAMPUBER)));
+ok("og bortelaget ogsa",
+   stampuberFor({ hjemme: "Brann", borte: "Bodø/Glimt" }, STAMPUBER)
+     .map((p) => p.navn).join(",") === "Scotsman");
+// «Vaalerenga» fra kilden og «Valerenga» i fila er samme lag. Uten
+// foldingen hadde lista truffet ingenting — og det ville sett ut som om
+// det bare ikke fantes en stampub.
+ok("lagnavnet foldes, sa Vaalerenga treffer Vålerenga",
+   stampuberFor({ hjemme: "Vaalerenga", borte: "Molde" }, STAMPUBER)
+     .map((p) => p.navn).join(",") === "Bohemen Sportspub",
+   JSON.stringify(stampuberFor({ hjemme: "Vaalerenga", borte: "Molde" }, STAMPUBER)));
+ok("en kamp uten stampub gir ingen",
+   stampuberFor({ hjemme: "Molde", borte: "Sandefjord" }, STAMPUBER).length === 0);
+ok("et sted uten lag kommer aldri med",
+   stampuberFor({ hjemme: "Tottenham", borte: "Chelsea" }, STAMPUBER)
+     .every((p) => p.navn !== "Sofa & Bar" && p.navn !== "Uten lag-felt"));
+ok("tull inn kaster ikke",
+   stampuberFor(null, STAMPUBER).length === 0 &&
+   stampuberFor({ hjemme: "Brann" }, null).length === 0 &&
+   stampuberFor({}, STAMPUBER).length === 0);
+
+// Plasseringen er avgjorelsen, ikke bare at kilden finnes: stampubene
+// fyller hullet der geografien ikke gir noe — men gar ikke foran den der
+// den gjor det. En stampub tvers over byen er et darligere svar enn en
+// fotballpub i nabogata.
+ok("stampuber star etter de geografiske kildene",
+   FORSLAG_KILDER.indexOf("stampuber") > FORSLAG_KILDER.indexOf("kjenteNaer") &&
+   FORSLAG_KILDER.indexOf("stampuber") > FORSLAG_KILDER.indexOf("kjenteVedArena"),
+   FORSLAG_KILDER.join(","));
+// Men foran de rene karttreffene: et sted vi har vurdert redaksjonelt og
+// som er kjent for laget, slar en tilfeldig bar Overpass fant.
+ok("og for de rene karttreffene",
+   FORSLAG_KILDER.indexOf("stampuber") < FORSLAG_KILDER.indexOf("naerDeg") &&
+   FORSLAG_KILDER.indexOf("stampuber") < FORSLAG_KILDER.indexOf("vedArena"),
+   FORSLAG_KILDER.join(","));
+
+// Uten posisjon og uten kjent arena er stampuben det eneste som star
+// igjen. Det er nettopp den situasjonen kilden finnes for.
+const UTENLANDSK = rangerForslag({
+  bekreftede: [], dine: [], kjenteNaer: [], kjenteVedArena: [],
+  stampuber: [{ navn: "Scotsman", viserFotball: true }],
+  naerDeg: [], vedArena: [],
+}, 6);
+ok("uten posisjon og uten arena star stampuben igjen",
+   UTENLANDSK.topp.length === 1 && UTENLANDSK.topp[0].navn === "Scotsman",
+   JSON.stringify(UTENLANDSK.topp));
 // En pub uten navn er ingen pub, og ville blitt en tom knapp.
 ok("rader uten navn faller bort",
    rangerForslag({ dine: [{ navn: "" }, { navn: "Ekte pub" }, null] }).topp.length === 1);

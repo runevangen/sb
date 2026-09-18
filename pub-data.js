@@ -266,6 +266,47 @@ export function merkKuraterte(puber, liste) {
   });
 }
 
+/* ---------- stampubene for lagene som spiller ---------- */
+
+// De kuraterte stedene nadde bare fram gjennom et geografisk filter:
+// `kjenteNaer` krever posisjonen din, `kjenteVedArena` krever at arenaen
+// er en vi kjenner. Er kampen utenlandsk OG du sier nei til posisjon,
+// finnes lista var ikke — selv om den ligger i koden og er det sterkeste
+// redaksjonelle signalet vi har.
+//
+// `lag` i puber-oslo.js svarer pa kampen uten a vite hvor du er: spiller
+// Brann, er Brann-stampuben et godt forslag enten du star i Oslo eller
+// ikke. Det er den samme opplysningen ⚽-merket alt baerer — den var bare
+// ikke en vei INN i lista.
+//
+// Navnene foldes med normaliserLagnavn, som ellers: «Vaalerenga» fra
+// kilden og «Valerenga» i fila er samme lag, og en liste som ikke visste
+// det ville truffet ingenting.
+// Foldingen er STRENGERE her enn normaliserLagnavn, og den ekstra biten
+// er «aa» → «a». Grunnen: dette er det forste stedet i appen der lagnavn
+// fra API-et moter lagnavn skrevet av redaksjonen. Kilden sier
+// «Vaalerenga», fila sier «Valerenga», og normaliserLagnavn gir
+// «vaalerenga» mot «valerenga» — to ulike lag, sa vidt den vet.
+// («Bodo/Glimt» mot «Bodo/Glimt» gar bra; o-en foldes alt.)
+//
+// Den ekstra foldingen ligger HER og ikke i normaliserLagnavn, og det er
+// ikke smak: normaliserLagnavn gar inn i kampNokkel(), som er id-en alt
+// lagret, oppslatt og delt star pa (ADR 0008). Endrer vi den, endrer vi
+// nokkelen til hver eneste rad som alt ligger i basen. Et sammenlikning
+// som bare gjelder her, hoerer hjemme her.
+function lagnokkel(navn) {
+  return normaliserLagnavn(navn || "").replace(/aa/g, "a");
+}
+
+export function stampuberFor(kamp, kjente) {
+  if (!kamp) return [];
+  const lagene = [kamp.hjemme, kamp.borte].map(lagnokkel).filter(Boolean);
+  if (!lagene.length) return [];
+  return (Array.isArray(kjente) ? kjente : []).filter((p) =>
+    (p && Array.isArray(p.lag) ? p.lag : [])
+      .some((l) => lagene.indexOf(lagnokkel(l)) > -1));
+}
+
 /* ---------- ett sporsmal, ett svar ---------- */
 
 // Hvor mange forslag som star framme. Resten ligger bak «Flere forslag»,
@@ -276,8 +317,14 @@ export const FORSLAG_MAKS = 6;
 // Rekkefolgen kildene rangeres i. Den er svaret: det som gjelder *denne
 // kampen* forst, sa det du selv har brukt, sa steder vi vet viser
 // fotball, sa resten fra kartet.
+// «stampuber» star ETTER de geografiske kildene og FOR de rene
+// karttreffene. Den fyller hullet der geografien ikke gir noe — ikke
+// foran den der den gjor det: en stampub tvers over byen er et darligere
+// svar enn en fotballpub i nabogata. Sto den forst, gikk den foran, og en
+// test fanget nettopp det.
 export const FORSLAG_KILDER = [
-  "bekreftede", "dine", "kjenteNaer", "kjenteVedArena", "naerDeg", "vedArena",
+  "bekreftede", "dine", "kjenteNaer", "kjenteVedArena",
+  "stampuber", "naerDeg", "vedArena",
 ];
 
 // Én liste, ikke seks grupper.

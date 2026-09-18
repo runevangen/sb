@@ -15,8 +15,8 @@ import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
          stedNokkel, blirMedLinje, mittSted, navnIRad } from "./svar-data.js";
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
-         rangerForslag, FORSLAG_MAKS, tolkPubRader, slaSammenPuber }
-  from "./pub-data.js";
+         rangerForslag, FORSLAG_MAKS, tolkPubRader, slaSammenPuber,
+         stampuberFor } from "./pub-data.js";
 import { PUBER_OSLO } from "./puber-oslo.js";
 import { sjekkForslag, alleredeILista, NAVN_MAKS, ADRESSE_MAKS }
   from "./pub-forslag-data.js";
@@ -1140,6 +1140,14 @@ function fyllForslag(boks, kamp) {
   // et eneste nettkall, ogsa nar Overpass er nede.
   boks.kilder.dine = merkBekreftet(
     puber.liste().map((p) => ({ navn: p.navn })), bekreftede);
+
+  // Stampubene for lagene som spiller. Ogsa denne uten nett og uten
+  // posisjon — og det er hele poenget: `kjenteNaer` krever at du sier ja
+  // til posisjon, `kjenteVedArena` at arenaen er en vi kjenner. For en
+  // utenlandsk kamp der du sier nei til posisjon, var de kuraterte
+  // stedene usynlige, enda `lag` i fila svarer pa nettopp den kampen.
+  boks.kilder.stampuber = merkBekreftet(
+    merkKuraterte(stampuberFor(kamp, KJENTE), KJENTE), bekreftede);
 
   const arena = arenaFor(kamp.arena);
   if (arena) {

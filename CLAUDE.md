@@ -77,6 +77,27 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 - **En knapp som ser ut som den gir noe den ikke gir, er verre enn en som
   sier hva den er.** Gjelder «Venner», «Meldt inn til oss», og
   «Valgt for deling» utlogget.
+- **«Andre fotballpuber» er stedene i lista som *ikke* har bekreftet.**
+  ★ betyr «viser denne kampen» og settes av admin; ⚽ betyr «kjent for å
+  vise fotball» og kommer fra `puber-oslo.js`. De to er ulike påstander,
+  og merkene holder dem fra hverandre.
+  De kuraterte stedene nådde lenge bare fram gjennom et **geografisk
+  filter** — `kjenteNaer` krever posisjonen din, `kjenteVedArena` at
+  arenaen er en vi kjenner. Utenlandsk kamp *og* nei til posisjon ga en
+  tom liste, enda `lag` i fila svarer på nettopp den kampen.
+  `stampuberFor()` er veien inn som manglet: spiller Brann, er
+  Brann-stampuben et svar uansett hvor du står. Den ligger **etter** de
+  geografiske kildene i `FORSLAG_KILDER` og **før** de rene karttreffene:
+  en stampub tvers over byen er et dårligere svar enn en fotballpub i
+  nabogata, men et bedre svar enn en tilfeldig bar Overpass fant.
+- **Lagnavn fra API-et og fra redaksjonen foldes strengere enn
+  `normaliserLagnavn`.** Kilden skriver «Vaalerenga», fila «Vålerenga», og
+  `normaliserLagnavn` gir «vaalerenga» mot «valerenga» — to ulike lag, så
+  vidt den vet. `stampuberFor()` folder i tillegg `aa` → `a`, og den
+  foldingen ligger **der og ikke i `normaliserLagnavn`**: den går inn i
+  `kampNokkel()`, som er id-en alt lagret og delt står på
+  ([ADR 0008](docs/adr/0008-kampnokkel.md)). Endrer vi den, endrer vi
+  nøkkelen til hver rad som alt ligger i basen.
 - **Puber ved arenaen bare for arenaer vi kjenner.** `arenaFor()` kjenner
   tretti norske stadion; `/api/puber` svarer «Ukjent arena» på alt annet.
   Vakta står på `arenaFor(kamp.arena)`, ikke på at navnet finnes — ellers
