@@ -69,6 +69,62 @@ og de sto der hele tiden, under en linje som sa at noe var galt.
 
 ---
 
+## 18. september 2026 — «Egentlig så lagrer bruker 1 da»
+
+**Meldt som:** «Jeg kommer inn i admin, fem kamper er markert. Jeg legger
+til én og da står det 6 lagret. Egentlig så lagrer bruker 1 da. De
+tidligere er lagret fra før.»
+
+Det var sant på to nivåer, og det andre så ingen.
+
+### Knappen talte valget, ikke endringen
+
+«Lagre 6 kamper» er sant om det som ble sendt og usant om det du gjorde.
+Knappen sier nå «Legg til 1 kamp for Andy's Pub» — eller «Fjern 2 kamper»,
+eller «Legg til 1 kamp og fjern 2» når begge deler skjer i samme trykk.
+
+### Og tjenesten skrev dem virkelig alle seks
+
+Lagringen slettet pubens rader for kampene på skjermen og skrev hele
+valget på nytt. De fem som alt lå der fikk dermed **nytt `satt` og ny
+`satt_av`** hver gang noen trykket lagre.
+
+Feltet som skal si *når kampen ble satt*, sa i stedet *sist noen trykket
+lagre* — og i den siste admins navn, siden databasen setter `satt_av` fra
+økta som skriver.
+
+**Ingen så det, fordi `satt` ikke vises noe sted.** Det er nettopp derfor
+det er verre enn en synlig feil: et felt som stille blir usant har
+ingenting som avslører det. Det hadde ligget der og vært galt til noen en
+dag bygde en visning oppe på det og lurte på hvorfor alle kampene var satt
+samme minutt.
+
+Tjenesten leser nå hva som ligger der, regner ut forskjellen med
+`visningsDiff()`, og rører bare den. Uendrede rader beholder sitt
+opprinnelige `satt`.
+
+**Og lesingen tilbake ble sterkere av det.** Før var beviset at
+skrivingen ga rader tilbake; nå leses hele omfanget etterpå, og hver rad
+som skulle legges til må være der. Kvitteringen sier hva som faktisk
+skjedde: «La til 1 kamp. 5 sto fra før.»
+
+### Stubben kunne ikke svare på spørsmålet lenger
+
+Funksjonstestene ga et fast svar på hver GET — den samme lista før og
+etter skrivingen. En tjeneste som leser tilbake for å se hva den gjorde,
+kan ikke testes mot noe slikt. Stubben er nå en liten tabell som forstår
+`pub=eq.`, `kamp_id=in.(…)` og `dato=lt.`: GET gir det som ligger der, POST
+legger til, DELETE fjerner.
+
+At den må forstå filtrene er ikke pedanteri — en stubb som svarte alt
+uansett filter, ville gitt en diff mot andre pubers rader og vært enig med
+en feil vi ikke har.
+
+**Fanget av:** en admin som talte etter. Feilen i knappen var synlig; den i
+databasen var det ikke, og den ble funnet fordi den første ble meldt.
+
+---
+
 ## 17. september 2026 — Spørsmålet jeg hadde svart nei på to ganger
 
 «Jeg ønsker å kunne se når de var inne med pålogget bruker, ikke bare tastet

@@ -2126,14 +2126,18 @@ const SAK_15 = kjor("admin", `
 
         bokser[0].checked = true;
         bokser[0].dispatchEvent(new Event("change", { bubbles: true }));
-        // «Lagre» alene sier ikke hva den lagrer.
-        ok("knappen sier hvor mange og for hvem",
-           document.getElementById("lagre").textContent === "Lagre 1 kamp for " + puber.value,
+        // «Lagre» alene sier ikke hva den lagrer. Og fra 18. september
+        // sier den hva trykket GJOR, ikke hvor mange som star avkrysset:
+        // «Lagre 6 kamper» nar du la til én er sant om det som sendes og
+        // usant om det du gjor. Denne puben har ingenting fra for, sa én
+        // avkrysning er én tilfoyelse.
+        ok("knappen sier hva trykket gjor, og for hvem",
+           document.getElementById("lagre").textContent === "Legg til 1 kamp for " + puber.value,
            document.getElementById("lagre").textContent);
         bokser[1].checked = true;
         bokser[1].dispatchEvent(new Event("change", { bubbles: true }));
         ok("og teller riktig i flertall",
-           document.getElementById("lagre").textContent === "Lagre 2 kamper for " + puber.value,
+           document.getElementById("lagre").textContent === "Legg til 2 kamper for " + puber.value,
            document.getElementById("lagre").textContent);
         bokser[1].checked = false;
         bokser[1].dispatchEvent(new Event("change", { bubbles: true }));
@@ -2742,7 +2746,11 @@ const SAK_15D = kjor("admin-lagret-star", `
     { id: 502, hjemme: "Vaalerenga", borte: "Bodo/Glimt", dato: "2026-09-21T15:00:00+00:00",
       arena: "Intility Arena", runde: "Runde 21" },
     { id: 503, hjemme: "Viking", borte: "Lillestrom", dato: "2026-09-27T16:00:00+00:00",
-      arena: "SR-Bank Arena", runde: "Runde 22" }
+      arena: "SR-Bank Arena", runde: "Runde 22" },
+    // Ikke lagret fra for. Den finnes sa scenen kan gjore det som ble
+    // meldt: komme inn til noen avkryssede, og legge til én.
+    { id: 504, hjemme: "Stromsgodset", borte: "Sarpsborg 08",
+      dato: "2026-09-28T18:00:00+00:00", arena: "Marienlyst", runde: "Runde 22" }
   ];
   var VISNINGER = [
     { pub: "Andy's Pub", kampId: "2026-09-20-rosenborg-brann" },
@@ -2793,10 +2801,33 @@ const SAK_15D = kjor("admin-lagret-star", `
       felt("pub").dispatchEvent(new Event("change"));
 
       var bokser = felt("kamper").querySelectorAll(".kamp input");
-      ok("alle tre kampene er tegnet", bokser.length === 3, bokser.length);
-      ok("og alle tre er krysset av fra for",
-         Array.prototype.every.call(bokser, function (b) { return b.checked; }),
+      ok("alle fire kampene er tegnet", bokser.length === 4, bokser.length);
+      ok("og de tre som er lagret er krysset av",
+         bokser[0].checked && bokser[1].checked && bokser[2].checked && !bokser[3].checked,
          Array.prototype.map.call(bokser, function (b) { return b.checked; }).join(","));
+
+      // Meldt 18. september 2026, i innsenderens egne ord: «Jeg kommer
+      // inn, fem kamper er markert, jeg legger til én, og da star det 6
+      // lagret. Egentlig sa lagrer bruker 1 da.»
+      bokser[3].checked = true;
+      felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
+      ok("én lagt til sier «Legg til 1 kamp», ikke «Lagre 4»",
+         felt("lagre").textContent === "Legg til 1 kamp for Andy's Pub",
+         felt("lagre").textContent);
+      // Og ett vekk i tillegg: to ulike handlinger i samme trykk, og
+      // begge ma sies.
+      bokser[0].checked = false;
+      felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
+      ok("en tilfoyelse og en fjerning sier begge deler",
+         felt("lagre").textContent === "Legg til 1 kamp og fjern 1 for Andy's Pub",
+         felt("lagre").textContent);
+      // Tilbake til utgangspunktet: da er det ingenting a lagre.
+      bokser[3].checked = false;
+      bokser[0].checked = true;
+      felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
+      ok("og tilbake til start er det ingenting a gjore",
+         felt("lagre").textContent === "Lagret for Andy's Pub" &&
+         felt("lagre").disabled === true, felt("lagre").textContent);
 
       // Sporsmalet admin har er «ble det jeg lagret staende», ikke «hvor
       // mange er det». Hinten ma svare pa det forste.
@@ -2811,15 +2842,18 @@ const SAK_15D = kjor("admin-lagret-star", `
       // tre synlige avkryssinger av fem ser ut som tap uten det.
       ok("hver runde sier hvor mange som er valgt i den",
          rundeTekst().indexOf("2 av 2 valgt") > -1 &&
-         rundeTekst().indexOf("1 av 1 valgt") > -1, rundeTekst());
+         rundeTekst().indexOf("1 av 2 valgt") > -1, rundeTekst());
 
       // Tallet telles av boksene, ikke fort ved siden av dem.
       bokser[0].checked = false;
       felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
       ok("tallet folger boksene med det samme",
          rundeTekst().indexOf("1 av 2 valgt") > -1, rundeTekst());
-      ok("og knappen sier det samme som boksene",
-         felt("lagre").textContent.indexOf("2 kamper") > -1, felt("lagre").textContent);
+      // Tre sto lagret, én er tatt vekk: knappen sier fjerningen, ikke
+      // de to som blir igjen.
+      ok("og knappen sier hva som er endret, ikke hva som star igjen",
+         felt("lagre").textContent === "Fjern 1 kamp for Andy's Pub",
+         felt("lagre").textContent);
 
       felt("merkIngen").click();
       ok("null valgt star som null, ikke som tomt",
@@ -2833,6 +2867,14 @@ const SAK_15D = kjor("admin-lagret-star", `
       felt("merkAlle").click();
       ok("og «kryss av alle» fyller dem igjen",
          rundeTekst().indexOf("2 av 2 valgt") > -1, rundeTekst());
+      // «Kryss av alle» tar med den fjerde ogsa, og den var aldri lagret.
+      // Da er det én tilfoyelse, ikke «ingenting a lagre» — og knappen
+      // skal si det.
+      ok("kryss av alle pa en liste med en ulagret sier at den legger til",
+         felt("lagre").textContent === "Legg til 1 kamp for Andy's Pub",
+         felt("lagre").textContent);
+      felt("kamper").querySelectorAll(".kamp input")[3].checked = false;
+      felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
       // Tilbake til det som sto lagret: da er det ingenting a lagre, og
       // knappen skal si det framfor a be om et trykk som ikke endrer noe.
       // Meldt 17. september 2026: «Jeg trykker lagre, far beskjed at de er
@@ -2849,9 +2891,10 @@ const SAK_15D = kjor("admin-lagret-star", `
       var enBoks = felt("kamper").querySelectorAll(".kamp input")[0];
       enBoks.checked = false;
       felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
-      ok("et kryss fjernet gir en knapp som ber om lagring",
+      // Tre sto lagret; ett kryss vekk er én fjerning, ikke «lagre 2».
+      ok("et kryss fjernet gir en knapp som sier at den fjerner én",
          felt("lagre").disabled === false &&
-         felt("lagre").textContent.indexOf("Lagre 2 kamper") === 0,
+         felt("lagre").textContent === "Fjern 1 kamp for Andy's Pub",
          felt("lagre").textContent);
       felt("lagre").click();
       setTimeout(function () { try {
@@ -2866,9 +2909,10 @@ const SAK_15D = kjor("admin-lagret-star", `
         // Endrer du noe etterpa, er det noe a lagre igjen.
         enBoks.checked = true;
         felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
+        // Den ene som ble fjernet, legges tilbake: én tilfoyelse.
         ok("en ny endring vekker knappen igjen",
            felt("lagre").disabled === false &&
-           felt("lagre").textContent.indexOf("Lagre 3 kamper") === 0,
+           felt("lagre").textContent === "Legg til 1 kamp for Andy's Pub",
            felt("lagre").textContent);
         videre();
       } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);

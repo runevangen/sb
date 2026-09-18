@@ -187,3 +187,42 @@ export function rundeTall(valgt, alle) {
   if (!alle) return "";
   return valgt + " av " + alle + " valgt";
 }
+
+/* ---------- hva en lagring faktisk endrer ---------- */
+
+// Meldt 18. september 2026: «Jeg kommer inn, fem kamper er markert, jeg
+// legger til én, og da står det 6 lagret. Egentlig så lagrer bruker 1 da.»
+//
+// Det var sant to ganger. Knappen talte hele valget framfor endringen —
+// og tjenesten skrev hele valget, ogsa de fem radene som alt la der. De
+// fikk nytt `satt` og ny `satt_av` hver gang noen lagret, sa feltet som
+// skal si NAR noen satte kampen, sa i stedet «sist noen trykket lagre».
+// Ingen sa det, for `satt` vises ikke — men et felt som stille blir usant
+// er verre enn et som ropes ut, fordi ingenting avsloerer det.
+export function visningsDiff(fraFor, onsket) {
+  const har = new Set((Array.isArray(fraFor) ? fraFor : []).map((v) => String(v.kampId)));
+  const vil = new Set((Array.isArray(onsket) ? onsket : []).map((v) => String(v.kampId)));
+  return {
+    nye: (Array.isArray(onsket) ? onsket : []).filter((v) => !har.has(String(v.kampId))),
+    fjern: (Array.isArray(fraFor) ? fraFor : []).filter((v) => !vil.has(String(v.kampId))),
+    uendret: (Array.isArray(fraFor) ? fraFor : []).filter((v) => vil.has(String(v.kampId))),
+  };
+}
+
+// Knappen sier hva trykket kommer til a gjore, ikke hvor mange kamper som
+// star avkrysset. «Lagre 6 kamper» nar du la til én er sant om det som
+// sendes og usant om det du gjor.
+export function lagreKnappTekst(lagt, fjernet, igjen, pub) {
+  const til = pub ? " for " + pub : "";
+  const kamp = (n) => n + (n === 1 ? " kamp" : " kamper");
+  if (!lagt && !fjernet) {
+    return igjen ? "Lagret" + til : "Ingen kamper satt" + til;
+  }
+  if (lagt && !fjernet) return "Legg til " + kamp(lagt) + til;
+  if (!lagt && fjernet) {
+    // Fjerner du de siste, er det en annen handling enn a fjerne noen av
+    // dem — og den fortjener sine egne ord.
+    return igjen ? "Fjern " + kamp(fjernet) + til : "Fjern alle kamper" + til;
+  }
+  return "Legg til " + kamp(lagt) + " og fjern " + fjernet + til;
+}

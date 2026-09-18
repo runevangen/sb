@@ -26,7 +26,7 @@ import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
 import { publisteRad, alleredeILista } from "./pub-forslag-data.js";
 import { PUBTYPER, PUBSIKKERHET, pubNokkel, sjekkPubRad, slaSammenPuber,
   koordinatFraLenke } from "./pub-data.js";
-import { visningsHint, rundeTall } from "./visning-data.js";
+import { visningsHint, rundeTall, lagreKnappTekst } from "./visning-data.js";
 
 const felt = (id) => document.getElementById(id);
 let kamper = [];
@@ -683,20 +683,16 @@ function oppdaterLagreknapp() {
     knapp.disabled = true;
     return;
   }
-  // Star boksene som de ble lagret, er det ingenting a lagre — og da skal
-  // knappen si det framfor a be om et trykk som ikke ville endret noe.
-  //
-  // Tomt og lagret er ikke det samme som lagret: har puben ingen kamper,
-  // ville «Lagret for Andy's Pub» pastatt at noe ligger der.
-  if (lagretSignatur !== null && valgtSignatur() === lagretSignatur) {
-    knapp.textContent = antall ? "Lagret for " + pub : "Ingen kamper satt for " + pub;
-    knapp.disabled = true;
-    return;
-  }
-  knapp.disabled = false;
-  knapp.textContent = antall
-    ? "Lagre " + antall + (antall === 1 ? " kamp" : " kamper") + " for " + pub
-    : "Fjern alle kamper for " + pub;
+  // Knappen sier hva trykket kommer til a GJORE, ikke hvor mange kamper
+  // som star avkrysset. Meldt 18. september 2026: «Jeg legger til én, og
+  // da star det 6 lagret. Egentlig sa lagrer bruker 1 da.»
+  const for_ = new Set((lagretSignatur || "").split("|").filter(Boolean));
+  const na = new Set(bokser.filter((b) => b.checked).map((b) => b.value));
+  const lagt = [...na].filter((v) => !for_.has(v)).length;
+  const fjernet = [...for_].filter((v) => !na.has(v)).length;
+
+  knapp.textContent = lagreKnappTekst(lagt, fjernet, antall, pub);
+  knapp.disabled = !lagt && !fjernet;
 }
 
 function nar(iso) {

@@ -4,9 +4,9 @@
 kommandoene, men ikke tallene: de sto i tre filer og glei fire ganger på to
 dager. Legger du til tester, er det denne fila som skal rettes.
 
-    node test/unit.mjs      620 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  355 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       563 tester, 3–20 s, headless Chromium
+    node test/unit.mjs      635 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  365 tester, ~250 ms, ingen nettleser
+    node test/run.mjs       567 tester, 3–20 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det

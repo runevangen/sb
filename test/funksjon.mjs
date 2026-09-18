@@ -648,21 +648,51 @@ const OKT_TOKEN = "okt-token-fra-appen";
 
 // Stubben svarer som PostgREST: DELETE gir 204 uten kropp, POST med
 // Prefer: return=representation gir radene tilbake.
-function stubVisninger(rader, status, skrivRader) {
+// Hvilke rader et PostgREST-filter i URL-en treffer. Stubben ma kunne
+// dette: tjenesten leser tilbake med den SAMME avgrensningen den skrev
+// med, og en stubb som svarer alt uansett filter ville vist en diff mot
+// andre pubers rader — altsa vaert enig med en feil vi ikke har.
+function treffer(url, rad) {
+  const pub = url.match(/pub=eq\.([^&]*)/);
+  if (pub && decodeURIComponent(pub[1]) !== rad.pub) return false;
+  const ider = url.match(/kamp_id=in\.\(([^)]*)\)/);
+  if (ider) {
+    const lista = ider[1].split(",").map(decodeURIComponent);
+    if (lista.indexOf(String(rad.kamp_id)) === -1) return false;
+  }
+  const foer = url.match(/dato=lt\.([^&]*)/);
+  if (foer && !(String(rad.dato) < decodeURIComponent(foer[1]))) return false;
+  return true;
+}
+
+// En liten tabell, ikke et fast svar. Tjenesten leser tilbake etter at
+// den har skrevet — bade for a bevise at raden ligger der, og for a gi
+// portalen hele lista for kampene. En stubb som svarer det samme foer og
+// etter skrivingen kan ikke si noe om det.
+//
+// `skrivIngenting` er tilfellet der skrivepolicyen mangler: POST svarer
+// pent, og ingenting blir lagret.
+function stubVisninger(rader, status, skrivIngenting) {
   const kall = [];
+  let tabell = (rader || []).map((r) => Object.assign({}, r));
   global.fetch = async (url, opsjoner) => {
     const o = opsjoner || {};
-    kall.push({ url: String(url), metode: o.method || "GET", opsjoner: o });
+    const u = String(url);
+    kall.push({ url: u, metode: o.method || "GET", opsjoner: o });
     if (status && status !== 200) {
       return new Response(JSON.stringify({ message: "nei", code: status === 503 ? "42P01" : "x" }),
         { status: status === 503 ? 400 : status });
     }
-    if (o.method === "DELETE") return new Response(null, { status: 204 });
-    if (o.method === "POST") {
-      return new Response(JSON.stringify(skrivRader === undefined ? JSON.parse(o.body) : skrivRader),
-        { status: 201 });
+    if (o.method === "DELETE") {
+      tabell = tabell.filter((r) => !treffer(u, r));
+      return new Response(null, { status: 204 });
     }
-    return new Response(JSON.stringify(rader || []), { status: 200 });
+    if (o.method === "POST") {
+      const inn = JSON.parse(o.body);
+      if (!skrivIngenting) tabell = tabell.concat(inn);
+      return new Response(JSON.stringify(skrivIngenting ? [] : inn), { status: 201 });
+    }
+    return new Response(JSON.stringify(tabell.filter((r) => treffer(u, r))), { status: 200 });
   };
   return kall;
 }
@@ -672,16 +702,26 @@ function stubVisninger(rader, status, skrivRader) {
 // samme pa begge ville ikke vist at det er to kall.
 function stubMedPubtabell(pubRader, pubFeiler) {
   const kall = [];
+  // Visninger-tabellen er levende her ogsa: leser tjenesten tilbake etter
+  // en skriving, ma den finne det den nettopp la inn.
+  let tabell = [];
   global.fetch = async (url, opsjoner) => {
     const o = opsjoner || {};
-    kall.push({ url: String(url), metode: o.method || "GET", opsjoner: o });
-    if (String(url).indexOf("/puber?") > -1) {
+    const u = String(url);
+    kall.push({ url: u, metode: o.method || "GET", opsjoner: o });
+    if (u.indexOf("/puber?") > -1) {
       if (pubFeiler) return new Response(JSON.stringify({ message: "nei" }), { status: 500 });
       return new Response(JSON.stringify(pubRader || []), { status: 200 });
     }
-    if (o.method === "DELETE") return new Response(null, { status: 204 });
-    if (o.method === "POST") return new Response(o.body, { status: 201 });
-    return new Response(JSON.stringify([]), { status: 200 });
+    if (o.method === "DELETE") {
+      tabell = tabell.filter((r) => !treffer(u, r));
+      return new Response(null, { status: 204 });
+    }
+    if (o.method === "POST") {
+      tabell = tabell.concat(JSON.parse(o.body));
+      return new Response(o.body, { status: 201 });
+    }
+    return new Response(JSON.stringify(tabell.filter((r) => treffer(u, r))), { status: 200 });
   };
   return kall;
 }
@@ -820,22 +860,87 @@ ok("adminpassordet nar aldri Supabase",
 ok("passordet lekker heller ikke ut til portalen",
    JSON.stringify(lagret).indexOf(PASSORD) === -1);
 
-// Ryddingen forst, og bare for denne puben og disse kampene: to puber
-// skal kunne settes etter hverandre, og en annen ligas visninger
-// overleve et bytte. Det er samme avgrensning slaSammen gjorde i minnet.
-const slett = kall.find((k) => k.metode === "DELETE");
-ok("puben sine rader ryddes for de nye skrives",
-   kall.indexOf(slett) < kall.indexOf(skriv), kall.map((k) => k.metode).join(","));
-ok("og ryddingen treffer bare denne puben",
-   slett.url.indexOf("pub=eq.Carls") > -1, slett.url);
-ok("og bare kampene som sto pa skjermen",
-   slett.url.indexOf("2126-09-13-brann-bodoglimt") > -1 &&
-   slett.url.indexOf("2126-09-14-molde-rosenborg") > -1, slett.url);
+// Ingenting ble fjernet her, sa ingenting skal slettes. Vi slettet alle
+// radene og skrev dem pa nytt for; da fikk rader som ikke var endret nytt
+// `satt` og ny `satt_av`. Meldt 18. september 2026.
+const slettinger = kall.filter((k) => k.metode === "DELETE"
+  && k.url.indexOf("dato=lt.") === -1);
+ok("en ren tilfoyelse sletter ingenting",
+   slettinger.length === 0, slettinger.map((k) => k.url).join(" | "));
+// Lest for skrevet: uten a vite hva som la der, kan ingen regne ut hva
+// som faktisk endrer seg.
+ok("tjenesten leser hva som ligger der for den skriver",
+   kall.indexOf(kall.find((k) => k.metode === "GET"
+     && k.url.indexOf("/visninger?") > -1)) < kall.indexOf(skriv),
+   kall.map((k) => k.metode).join(","));
+ok("og leser tilbake etterpa, som bevis pa at raden ligger der",
+   kall.filter((k) => k.metode === "GET" && k.url.indexOf("/visninger?") > -1).length === 2,
+   kall.map((k) => k.metode + " " + k.url.split("?")[0]).join(" | "));
+ok("kvitteringen sier hva som faktisk skjedde",
+   lagret.lagtTil === 1 && lagret.fjernet === 0 && lagret.uendret === 0 &&
+   lagret.merknad.indexOf("La til 1 kamp") === 0, JSON.stringify(lagret));
+
+/* ---- bare det som endrer seg skrives (meldt 18. september 2026) ---- */
+
+// «Jeg kommer inn, fem kamper er markert, jeg legger til én, og da star
+// det 6 lagret. Egentlig sa lagrer bruker 1 da.»
+const STOD_FRA_FOR = [
+  { pub: "Carls", kamp_id: "2126-09-13-brann-bodoglimt", kamp: "Brann – Bodo/Glimt",
+    dato: "2126-09-13T17:00:00+00:00", satt: "2026-09-01T10:00:00Z" },
+];
+kall = stubVisninger(STOD_FRA_FOR);
+r = await visninger(lagre());
+const lagtTil = await r.json();
+ok("en kamp som alt sto der skrives ikke pa nytt",
+   lagtTil.lagtTil === 0 && lagtTil.uendret === 1, JSON.stringify(lagtTil));
+ok("og ingen POST gar ut nar ingenting er nytt",
+   kall.filter((k) => k.metode === "POST").length === 0,
+   kall.map((k) => k.metode).join(","));
+// Det er dette som var den stille feilen: `satt` ble overskrevet pa rader
+// ingen hadde rort, sa feltet sa «sist noen trykket lagre» framfor «nar
+// kampen ble satt» — og i den siste admins navn.
+ok("og `satt` star urort pa raden som ikke ble endret",
+   lagtTil.visninger[0].satt === "2026-09-01T10:00:00Z",
+   JSON.stringify(lagtTil.visninger[0]));
+ok("kvitteringen sier at ingenting var endret",
+   lagtTil.merknad.indexOf("Ingenting var endret") === 0, lagtTil.merknad);
+
+// Fjerning: bare den ene raden, og bare for denne puben.
+const TO_STO = STOD_FRA_FOR.concat([
+  { pub: "Carls", kamp_id: "2126-09-14-molde-rosenborg", kamp: "Molde – Rosenborg",
+    dato: "2126-09-14T17:00:00+00:00", satt: "2026-09-01T10:00:00Z" },
+  // En annen pub, samme kamp. Den skal ikke rores.
+  { pub: "Utepils AS", kamp_id: "2126-09-14-molde-rosenborg", kamp: "Molde – Rosenborg",
+    dato: "2126-09-14T17:00:00+00:00", satt: "2026-09-01T10:00:00Z" },
+]);
+kall = stubVisninger(TO_STO);
+r = await visninger(lagre());
+const fjernet = await r.json();
+ok("den som ble tatt bort slettes",
+   fjernet.fjernet === 1 && fjernet.uendret === 1 && fjernet.lagtTil === 0,
+   JSON.stringify(fjernet));
+const enSletting = kall.filter((k) => k.metode === "DELETE"
+  && k.url.indexOf("dato=lt.") === -1);
+ok("og slettingen navngir bare den ene kampen",
+   enSletting.length === 1 &&
+   enSletting[0].url.indexOf("2126-09-14-molde-rosenborg") > -1 &&
+   enSletting[0].url.indexOf("2126-09-13-brann-bodoglimt") === -1,
+   enSletting.map((k) => k.url).join(" | "));
+ok("og bare for denne puben",
+   enSletting[0].url.indexOf("pub=eq.Carls") > -1, enSletting[0].url);
+// En annen pubs rad pa den samme kampen skal sta igjen. Det var dette
+// avgrensningen alltid har handlet om.
+ok("en annen pub sin rad pa samme kamp star igjen",
+   fjernet.visninger.every((v) => v.pub === "Carls") &&
+   fjernet.visninger.length === 1, JSON.stringify(fjernet.visninger));
+ok("kvitteringen sier bade hva som gikk og hva som sto",
+   fjernet.merknad.indexOf("fjernet 1 kamp") > -1 &&
+   fjernet.merknad.indexOf("1 kamp sto fra før") > -1, fjernet.merknad);
 
 // En skriving som svarer 200 er ikke bevis pa at raden ligger der. Samme
 // lekse som kampsvar: mangler skrivepolicyen, ser svaret vellykket ut
 // mens ingenting ble lagret.
-kall = stubVisninger([], 200, []);
+kall = stubVisninger([], 200, true);
 r = await visninger(lagre());
 const tomt = await r.json();
 ok("et tomt svar pa skrivingen meldes som feil", r.status === 502, r.status);

@@ -167,6 +167,16 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 - **En skriving som svarer 200 er ikke bevis på at raden ligger der.**
   `settSvar` leser tilbake to ganger — som deg og som hvem som helst — og
   forskjellen er diagnosen.
+- **Skriv bare det som endrer seg.** `/api/visninger` leser hva som ligger
+  der, regner ut forskjellen med `visningsDiff()`, og rører bare den. Vi
+  slettet og skrev alt på nytt før; da fikk rader ingen hadde endret nytt
+  `satt` og ny `satt_av`, så feltet som skal si **når** noen satte kampen,
+  sa «sist noen trykket lagre» — i den siste admins navn. Ingen så det,
+  for `satt` vises ikke. Et felt som stille blir usant er verre enn ett som
+  ropes ut: ingenting avslører det.
+- **Knappen sier hva trykket gjør, ikke hvor mye som er valgt.** «Lagre 6
+  kamper» når du la til én er sant om det som sendes og usant om det du
+  gjør. `lagreKnappTekst()` teller endringen.
 - **Feilsvar caches aldri** (`no-store`). Ellers låser et blaff seg fast.
 - Hemmeligheter står samlet i [`docs/nokler-og-tokens.md`](docs/nokler-og-tokens.md).
   Funksjonene leser miljøet **ved utrulling** — en ny variabel krever en
