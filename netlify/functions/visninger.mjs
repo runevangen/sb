@@ -119,10 +119,8 @@ async function lagre(inn) {
   const puber = await kjentePuber();
   if (!puber.some((p) => p.navn === pub)) return svar({ feil: "Ukjent pub" }, 400);
 
-  // Radene for denne puben og disse kampene. Tom liste inn: slaSammen gir
-  // da noyaktig de nye radene, og den samme regnemaskinen som for avgjor
-  // hvilken kamp-id en avkrysning betyr.
-  const nye = slaSammen([], pub, valgte, kamper);
+  // Radene for denne puben og disse kampene: de avkryssede, med nokkel.
+  const nye = slaSammen(pub, valgte, kamper);
   const problemer = sjekkVisninger(nye, puber.map((p) => p.navn));
   if (problemer.length) return svar({ feil: "Ugyldige visninger", problemer }, 400);
 

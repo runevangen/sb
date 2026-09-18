@@ -3187,7 +3187,7 @@ const SAK_15D = kjor("admin-lagret-star", `
 const VISNINGER_FRA_TJENESTEN = [
   { pub: "Lincoln Pub", kampId: "2026-09-20-brann-bodoglimt", kamp: "Brann – Bodo/Glimt",
     dato: "2026-09-20T17:00:00+00:00", satt: "2026-09-11T10:00:00.000Z" },
-  { pub: "Carls", kampId: "4", kamp: "Molde – Rosenborg",
+  { pub: "Carls", kampId: "2026-09-21-molde-rosenborg", kamp: "Molde – Rosenborg",
     dato: "2026-09-21T17:00:00+00:00", satt: "2026-09-11T10:00:00.000Z" },
 ];
 

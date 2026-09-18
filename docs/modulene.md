@@ -221,10 +221,11 @@ kreditering, og den står der pubene vises.
 
 [ADR 0018](adr/0018-visninger-i-supabase.md).
 
-- **`samme()` treffer både nøkkelen og den gamle id-en.** Rader skrevet med
-  en id skal virke ut kampen sin.
-- **`slaSammen()` rører bare kampene som var på skjermen.** Da kan admin
-  rette opp en runde uten at en kamp lenger nede forsvinner.
+- **`samme()` treffer bare nøkkelen.** Radene i basen skrives alltid med
+  nøkkel; tall-id-en fra den gamle datafila i repoet er borte med fila.
+- **`slaSammen()` lager radene for de avkryssede kampene, og ikke mer.**
+  Det som alt står i basen rører den ikke: tjenesten skriver bare
+  forskjellen (`visningsDiff`), så en kamp lenger nede står som før.
 - **`visningsDiff()` er grunnen til at vi ikke skriver alt på nytt.** Vi
   slettet og skrev hele valget før; da fikk rader ingen hadde endret nytt
   `satt` og ny `satt_av`, så feltet som skal si **når** noen satte kampen,
