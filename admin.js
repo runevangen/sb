@@ -1143,15 +1143,22 @@ function lesKartlenke() {
   // virker.
   const ut = felt("stedLenkeSvar");
   ut.hidden = false;
-  const punkt = koordinatFraLenke(felt("stedLenke").value);
+  const limt = felt("stedLenke").value;
+  const punkt = koordinatFraLenke(limt);
   if (!punkt || punkt.feil) {
-    ut.textContent = (punkt && punkt.feil) || "Lim inn en kartlenke først.";
+    ut.textContent = (punkt && punkt.feil)
+      || "Lim inn et koordinat eller en kartlenke først.";
     return;
   }
   felt("stedLat").value = punkt.lat.toFixed(4);
   felt("stedLon").value = punkt.lon.toFixed(4);
+  // «fra lenka» om et koordinat er en liten losn, men det er en losn: den
+  // som limte inn to tall leser at appen tror hen gjorde noe annet, og
+  // begynner a lure pa om den forsto det. Feltet tar begge deler, sa
+  // svaret ma si hvilken av dem det faktisk var.
   ut.textContent = "Hentet " + punkt.lat.toFixed(4) + ", " + punkt.lon.toFixed(4)
-    + " fra lenka. Sjekk at det stemmer.";
+    + (/https?:\/\//i.test(limt) ? " fra lenka." : " fra koordinatet du limte inn.")
+    + " Sjekk at det stemmer.";
 }
 
 felt("stedNytt").addEventListener("click", () => apneSted(null, ""));

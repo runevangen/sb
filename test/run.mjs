@@ -2606,6 +2606,9 @@ const SAK_15C = kjor("admin-koordinat", `
       ok("svaret sier hva som ble hentet",
          felt("stedLenkeSvar").textContent.indexOf("59.8432") > -1,
          felt("stedLenkeSvar").textContent);
+      ok("og at det kom fra ei lenke nar det gjorde det",
+         felt("stedLenkeSvar").textContent.indexOf("fra lenka") > -1,
+         felt("stedLenkeSvar").textContent);
       // Forklaringen ma sta igjen: den sier hvilke lenker som virker.
       ok("og forklaringen star fortsatt",
          felt("stedLenkeHint").textContent.indexOf("Google Maps") > -1,
@@ -2621,6 +2624,11 @@ const SAK_15C = kjor("admin-koordinat", `
       ok("et koordinat med parenteser rundt fyller feltene",
          felt("stedLat").value === "59.8340" && felt("stedLon").value === "10.8062",
          felt("stedLat").value + ", " + felt("stedLon").value);
+      // Svaret sa «fra lenka» uansett hva som ble limt inn. Den som limte
+      // to tall leste da at appen trodde hen gjorde noe annet.
+      ok("og svaret sier at det kom fra et koordinat, ikke fra ei lenke",
+         felt("stedLenkeSvar").textContent.indexOf("koordinatet du limte inn") > -1,
+         felt("stedLenkeSvar").textContent);
       // Etiketten sa «en kartlenke», og den som satt med et koordinat
       // leste at feltet ikke var for hen.
       ok("og etiketten sier at koordinat duger",
