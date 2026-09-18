@@ -69,6 +69,42 @@ og de sto der hele tiden, under en linje som sa at noe var galt.
 
 ---
 
+## 18. september 2026 — Det var ikke bredden, det var zoomen
+
+**Meldt som:** «Jeg kan fortsatt flytte vindu til høyre og venstre. Admin
+vindu.» — andre gang, etter at brukertabellen var rettet.
+
+Første gang fant jeg noe ekte: tabellen trengte 457 px der telefonen ga
+343. Jeg rettet den, skrev en vakt som måler `main` i en 320 px-boks, og
+trodde saken var ute av verden.
+
+**Andre gang målte jeg hvert eneste element.** Ingenting over 320 px. Alle
+seksjoner synlige, skjemaene åpne, tabellen full. Layouten var riktig.
+
+Safari på iPhone **zoomer inn av seg selv** når du fokuserer et felt med
+skrift under 16 px. Etter den zoomen er den visuelle viewporten mindre enn
+layout-viewporten, og sida kan dras sidelengs. Feltene arvet `font: inherit`
+— 15 px fra `body`. Én piksel fra å være trygg. PIN-feltet i brukerlista sto
+på 13.
+
+Det skjer i det du trykker i passordfeltet, altså første handling på sida.
+Derfor så det ut som om sida alltid var «løs».
+
+**Vakta målte feil ting.** Den målte bredde, og bredden var i orden. En
+vakt som måler feil ting sier «alt er bra» mens telefonen gjør noe annet —
+og den er verre enn ingen vakt, fordi den lukker spørsmålet. Den nye måler
+`font-size` på hvert `input`, `select` og `textarea`, og lister opp hvert
+felt som er for lite når den slår ut.
+
+**Appen har det samme problemet:** `.konto-felt` er 13 px og `.sok-felt`
+13,5. Ikke rørt her — det er lesernes design, og en annen avgjørelse.
+
+Samtidig: lenka i hamburgermenyen het «Hvem viser kampen (admin)», som
+beskrev én seksjon av portalen framfor portalen. Den heter «Admin» nå, som
+sida selv.
+
+---
+
 ## 18. september 2026 — «Egentlig så lagrer bruker 1 da»
 
 **Meldt som:** «Jeg kommer inn i admin, fem kamper er markert. Jeg legger

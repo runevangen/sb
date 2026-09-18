@@ -44,10 +44,17 @@
   .forslag-knapper { display: flex; gap: 14px; }
   h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tekst-dim); margin: 0 0 10px; }
   label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+  /* **Seksten piksler, ikke femten.** Safari pa iPhone zoomer inn av seg
+     selv nar du fokuserer et felt med mindre skrift enn 16 px — og etter
+     den zoomen er hele sida pannbar sidelengs. Meldt to ganger som «jeg
+     kan scrolle skjermen til venstre og hoyre»; forste gang lette jeg
+     etter noe som var for bredt, og fant ingenting, fordi layouten var
+     riktig hele tiden. Det var forstoerrelsen, ikke bredden.
+     `font: inherit` ga 15 px fra body. En piksel fra a vaere trygg. */
   input[type="password"], input[type="text"], input[type="url"],
   input[type="date"], input[type="number"], select, textarea {
     width: 100%; padding: 10px; border: 1px solid var(--ramme-sterk); border-radius: 8px;
-    background: #fff; color: var(--tekst); font: inherit;
+    background: #fff; color: var(--tekst); font: inherit; font-size: 16px;
   }
   textarea { resize: vertical; min-height: 60px; }
   /* Stedredigeringen. To felt side om side der de hoerer sammen — gate og
@@ -146,9 +153,10 @@
     display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
     padding-top: 8px; white-space: normal;
   }
+  /* Ogsa her: under 16 px zoomer iPhone inn i det du trykker i feltet. */
   .brukere input[type="text"] {
-    width: 90px; padding: 7px 8px; border: 1px solid var(--ramme-sterk);
-    border-radius: 6px; background: #fff; color: var(--tekst); font: inherit; font-size: 13px;
+    width: 96px; padding: 7px 8px; border: 1px solid var(--ramme-sterk);
+    border-radius: 6px; background: #fff; color: var(--tekst); font: inherit; font-size: 16px;
   }
   .brukere button { padding: 7px 10px; font-size: 13px; }
   /* Sletting star som tekst til den er trykket en gang — da blir den rod

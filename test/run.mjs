@@ -807,6 +807,19 @@ const SAK_5 = kjor("visning", FELLES + `
          document.querySelectorAll("#menuPanel button button").length === 0,
          document.querySelectorAll("#menuPanel button button").length);
 
+      // Lenka til portalen heter det samme som sida den apner. «Hvem viser
+      // kampen (admin)» beskrev en seksjon av portalen, ikke portalen.
+      var adminLenke = Array.prototype.filter.call(
+        document.querySelectorAll(".admin-lenke"),
+        function (a) { return a.getAttribute("href") === "/admin.html"; })[0];
+      ok("lenka til portalen heter Admin",
+         !!adminLenke && adminLenke.textContent.trim() === "Admin",
+         adminLenke && adminLenke.textContent);
+      // Personvern star forst: den gjelder alle som apner menyen.
+      ok("og personvern star forst av de to",
+         document.querySelector(".admin-lenke").getAttribute("href") === "/personvern.html",
+         document.querySelector(".admin-lenke").getAttribute("href"));
+
       // Footeren tok 38 % av menyen pa en telefon med stor skrift, og da
       // sto det siste emnet halvt under kanten. Malt med A+ og med
       // «Installer appen» synlig, som er det verste tilfellet: begge
@@ -2289,6 +2302,32 @@ const SAK_15 = kjor("admin", `
              under.indexOf("PIN-en deres") === -1, under);
           ok("og lover ingen utrulling a vente pa",
              under.indexOf("utrullingen") === -1, under);
+
+          // **Seksten piksler.** Safari pa iPhone zoomer inn av seg selv
+          // nar du fokuserer et felt med mindre skrift enn 16 px, og etter
+          // den zoomen er hele sida pannbar sidelengs.
+          //
+          // Meldt to ganger som «jeg kan scrolle skjermen til venstre og
+          // hoyre». Forste gang lette jeg etter noe som var for bredt, og
+          // brukertabellen VAR det — men etter at den var rettet, sto
+          // feilen der fortsatt. Andre gang malte jeg hvert eneste element
+          // og fant ingenting over 320 px. Layouten var riktig hele tiden;
+          // det var forstoerrelsen.
+          //
+          // Derfor maler denne skriftstoerrelse framfor bredde: bredden var
+          // aldri problemet, og en vakt som maler feil ting er en vakt som
+          // sier «alt er bra» mens telefonen gjor noe annet.
+          var smaaFelt = [];
+          Array.prototype.forEach.call(
+            document.querySelectorAll("input, select, textarea"), function (e) {
+              if (e.type === "checkbox" || e.type === "radio") return;
+              var px = parseFloat(getComputedStyle(e).fontSize);
+              if (!(px >= 16)) {
+                smaaFelt.push((e.id || e.className || e.tagName) + " " + px + "px");
+              }
+            });
+          ok("ingen felt er sa sma at iPhone zoomer inn i dem",
+             smaaFelt.length === 0, smaaFelt.join(", "));
 
           // Sida skal fa plass pa en telefon. Meldt 17. september 2026:
           // «Den er los pa mobil, dvs jeg kan scrolle hele skjermen til

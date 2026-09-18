@@ -140,6 +140,12 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   også i et element som aldri settes inn i dokumentet, og også når vi
   kaster alt utenom teksten rett etterpå.
 - Filtrerer noe feeden, står det som en knapp med kryss i toppfeltet.
+- **Felt er minst 16 px.** Safari på iPhone zoomer inn av seg selv når du
+  fokuserer et felt med mindre skrift, og etter den zoomen er sida pannbar
+  sidelengs. Meldt to ganger som «jeg kan scrolle skjermen til venstre og
+  høyre»; begge gangene lette jeg etter noe som var for bredt. Det var
+  forstørrelsen, ikke bredden. En vakt i `run.mjs` måler `font-size` på
+  hvert `input`, `select` og `textarea`.
 - **Hver regel som setter `display`, må si hva `[hidden]` betyr.**
   `display: flex` slår `[hidden]` fra nettleserens eget stilark, og da står
   et element framme som koden tror den har skjult.
