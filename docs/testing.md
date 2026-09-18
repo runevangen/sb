@@ -4,9 +4,9 @@
 kommandoene, men ikke tallene: de sto i tre filer og glei fire ganger på to
 dager. Legger du til tester, er det denne fila som skal rettes.
 
-    node test/unit.mjs      631 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      653 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  360 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       568 tester, 3–20 s, headless Chromium
+    node test/run.mjs       577 tester, 3–20 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
@@ -127,6 +127,12 @@ at en økt vi ikke kjenner levetiden på regnes som utløpt, at ditt eget
 svar finnes på id og ikke på navn, at «Ola» og «ola» blir samme konto
 mens «Bjorn» og «Bjørn» ikke blir det, og at ingenting i
 `puber-kontakt.js` eller `kanaler.js` slipper ut før noen har datert det.
+
+Suiten vokter også to lister som vedlikeholdes for hånd og derfor glir:
+at hver modul appen importerer står i service workerens `SKALL`, og at
+hver fil i appen er omtalt i [`modulene.md`](modulene.md). Begge leser
+filene fra disken framfor fra en liste i testen — en liste ved siden av
+dokumentet ville bare gitt to steder som kan ligge etter i stedet for ett.
 
 **`funksjon.mjs`** — kaller Netlify-funksjonene direkte med et stubbet
 `fetch`. Statuskoder, cache-headere, at API-nøkkelen, Supabase-nøkkelen

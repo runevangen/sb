@@ -3,11 +3,15 @@
 Viser saker fra sportsbibelen.no, med en fotballmodul. Vanilla ES-moduler,
 ingen byggesteg. Hostes på Netlify som `mvp-sb`.
 
-Denne fila er **reglene som gjelder nå**. Begrunnelsene står i
+Denne fila er **reglene som gjelder nå**, på tvers. Begrunnelsene står i
 [`docs/adr/`](docs/adr/README.md), historien i
 [`docs/hendelser.md`](docs/hendelser.md), testdetaljene i
 [`docs/testing.md`](docs/testing.md). Er du i tvil om *hvorfor*, er svaret
 der — ikke her.
+
+Reglene som gjelder **inne i én fil** — hva hver funksjon bærer, og hva
+som ryker om den flyttes — står i [`docs/modulene.md`](docs/modulene.md),
+modul for modul.
 
 ## Slik vil jeg ha svar
 
@@ -41,7 +45,7 @@ der — ikke her.
 
     personvern.html hva vi lagrer, og hvordan du blir kvitt det
     bilder/         annonsebilder, ett ferdig utsnitt per form
-    docs/           adr/, hendelser.md, testing.md,
+    docs/           adr/, modulene.md, hendelser.md, testing.md,
                     nokler-og-tokens.md, oppsett.sql, kampdag-dypdykk.md
     BACKLOGG.md     peker til issues, som er den ekte backloggen
 
@@ -77,6 +81,38 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 - **En knapp som ser ut som den gir noe den ikke gir, er verre enn en som
   sier hva den er.** Gjelder «Venner», «Meldt inn til oss», og
   «Valgt for deling» utlogget.
+- **«Andre fotballpuber» er stedene i lista som *ikke* har bekreftet.**
+  ★ betyr «viser denne kampen» og settes av admin; ⚽ betyr «kjent for å
+  vise fotball» og kommer fra `puber-oslo.js`. De to er ulike påstander,
+  og merkene holder dem fra hverandre.
+  De kuraterte stedene nådde lenge bare fram gjennom et **geografisk
+  filter** — `kjenteNaer` krever posisjonen din, `kjenteVedArena` at
+  arenaen er en vi kjenner. Utenlandsk kamp *og* nei til posisjon ga en
+  tom liste, enda `lag` i fila svarer på nettopp den kampen.
+  `stampuberFor()` er veien inn som manglet: spiller Brann, er
+  Brann-stampuben et svar uansett hvor du står. Den ligger **etter** de
+  geografiske kildene i `FORSLAG_KILDER` og **før** de rene karttreffene:
+  en stampub tvers over byen er et dårligere svar enn en fotballpub i
+  nabogata, men et bedre svar enn en tilfeldig bar Overpass fant.
+  **Og den er en utvei, ikke et tillegg.** Kommer en posisjon, tømmes
+  kilden: `puber-oslo.js` er en *Oslo*-liste, og en Oslo-stampub i en liste
+  for Bodø står der uten avstand, som om den var i nabogata. Er du i Oslo,
+  kommer de samme stedene tilbake gjennom `kjenteNaer`, med avstand på.
+- **`?posisjon=bodo` setter posisjonen, og skjermen sier det.** Pubene
+  «nær deg» kommer fra Overpass, og Overpass svarer på hvor du står — så
+  uten dette kan appen bare prøves i Oslo. `falskPosisjon()` tar et bynavn
+  fra `TESTBYER` eller et rått `lat,lon`. Så lenge den er på, står «Falsk
+  posisjon: Bodø» først i linja under forslagene: en app som viser puber
+  et annet sted enn du er, og tier om det, sier noe usant med sin egen
+  liste. `verktoy/byersjekk.mjs` gjør den samme målingen uten nettleser.
+- **Lagnavn fra API-et og fra redaksjonen foldes strengere enn
+  `normaliserLagnavn`.** Kilden skriver «Vaalerenga», fila «Vålerenga», og
+  `normaliserLagnavn` gir «vaalerenga» mot «valerenga» — to ulike lag, så
+  vidt den vet. `stampuberFor()` folder i tillegg `aa` → `a`, og den
+  foldingen ligger **der og ikke i `normaliserLagnavn`**: den går inn i
+  `kampNokkel()`, som er id-en alt lagret og delt står på
+  ([ADR 0008](docs/adr/0008-kampnokkel.md)). Endrer vi den, endrer vi
+  nøkkelen til hver rad som alt ligger i basen.
 - **Puber ved arenaen bare for arenaer vi kjenner.** `arenaFor()` kjenner
   tretti norske stadion; `/api/puber` svarer «Ukjent arena» på alt annet.
   Vakta står på `arenaFor(kamp.arena)`, ikke på at navnet finnes — ellers

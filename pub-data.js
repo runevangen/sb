@@ -266,6 +266,47 @@ export function merkKuraterte(puber, liste) {
   });
 }
 
+/* ---------- stampubene for lagene som spiller ---------- */
+
+// De kuraterte stedene nadde bare fram gjennom et geografisk filter:
+// `kjenteNaer` krever posisjonen din, `kjenteVedArena` krever at arenaen
+// er en vi kjenner. Er kampen utenlandsk OG du sier nei til posisjon,
+// finnes lista var ikke — selv om den ligger i koden og er det sterkeste
+// redaksjonelle signalet vi har.
+//
+// `lag` i puber-oslo.js svarer pa kampen uten a vite hvor du er: spiller
+// Brann, er Brann-stampuben et godt forslag enten du star i Oslo eller
+// ikke. Det er den samme opplysningen ⚽-merket alt baerer — den var bare
+// ikke en vei INN i lista.
+//
+// Navnene foldes med normaliserLagnavn, som ellers: «Vaalerenga» fra
+// kilden og «Valerenga» i fila er samme lag, og en liste som ikke visste
+// det ville truffet ingenting.
+// Foldingen er STRENGERE her enn normaliserLagnavn, og den ekstra biten
+// er «aa» → «a». Grunnen: dette er det forste stedet i appen der lagnavn
+// fra API-et moter lagnavn skrevet av redaksjonen. Kilden sier
+// «Vaalerenga», fila sier «Valerenga», og normaliserLagnavn gir
+// «vaalerenga» mot «valerenga» — to ulike lag, sa vidt den vet.
+// («Bodo/Glimt» mot «Bodo/Glimt» gar bra; o-en foldes alt.)
+//
+// Den ekstra foldingen ligger HER og ikke i normaliserLagnavn, og det er
+// ikke smak: normaliserLagnavn gar inn i kampNokkel(), som er id-en alt
+// lagret, oppslatt og delt star pa (ADR 0008). Endrer vi den, endrer vi
+// nokkelen til hver eneste rad som alt ligger i basen. Et sammenlikning
+// som bare gjelder her, hoerer hjemme her.
+function lagnokkel(navn) {
+  return normaliserLagnavn(navn || "").replace(/aa/g, "a");
+}
+
+export function stampuberFor(kamp, kjente) {
+  if (!kamp) return [];
+  const lagene = [kamp.hjemme, kamp.borte].map(lagnokkel).filter(Boolean);
+  if (!lagene.length) return [];
+  return (Array.isArray(kjente) ? kjente : []).filter((p) =>
+    (p && Array.isArray(p.lag) ? p.lag : [])
+      .some((l) => lagene.indexOf(lagnokkel(l)) > -1));
+}
+
 /* ---------- ett sporsmal, ett svar ---------- */
 
 // Hvor mange forslag som star framme. Resten ligger bak «Flere forslag»,
@@ -276,8 +317,14 @@ export const FORSLAG_MAKS = 6;
 // Rekkefolgen kildene rangeres i. Den er svaret: det som gjelder *denne
 // kampen* forst, sa det du selv har brukt, sa steder vi vet viser
 // fotball, sa resten fra kartet.
+// «stampuber» star ETTER de geografiske kildene og FOR de rene
+// karttreffene. Den fyller hullet der geografien ikke gir noe — ikke
+// foran den der den gjor det: en stampub tvers over byen er et darligere
+// svar enn en fotballpub i nabogata. Sto den forst, gikk den foran, og en
+// test fanget nettopp det.
 export const FORSLAG_KILDER = [
-  "bekreftede", "dine", "kjenteNaer", "kjenteVedArena", "naerDeg", "vedArena",
+  "bekreftede", "dine", "kjenteNaer", "kjenteVedArena",
+  "stampuber", "naerDeg", "vedArena",
 ];
 
 // Én liste, ikke seks grupper.
@@ -796,4 +843,50 @@ export function koordinatFraLenke(tekst) {
     }
   }
   return { feil: "Fant ingen koordinater i det du limte inn." };
+}
+
+/* ---------- falsk posisjon, for a teste andre byer ---------- */
+
+// Pubene rundt deg kommer fra Overpass, og Overpass svarer pa hvor du
+// star. Skal noen se hva appen gir i Bodo uten a reise dit, ma posisjonen
+// kunne settes. Meldt 18. september 2026: «vi ma finne ut hvordan vi kan
+// teste det sa reelt som mulig uten a ha noen fysisk der».
+//
+// Koordinatene er sentrum, ikke stadion: det er der folk star nar de
+// leter etter en pub. Skal du teste rundt en arena, er `arenaFor()` den
+// som kjenner dem — og da tar `?posisjon=67.28,14.40` det ogsa.
+export const TESTBYER = {
+  oslo: { navn: "Oslo", lat: 59.911, lon: 10.750 },
+  bergen: { navn: "Bergen", lat: 60.393, lon: 5.325 },
+  trondheim: { navn: "Trondheim", lat: 63.430, lon: 10.395 },
+  bodo: { navn: "Bodø", lat: 67.280, lon: 14.405 },
+  stavanger: { navn: "Stavanger", lat: 58.970, lon: 5.733 },
+  tromso: { navn: "Tromsø", lat: 69.649, lon: 18.956 },
+};
+
+// «?posisjon=bodo», «?posisjon=Bodø» eller «?posisjon=67.28,14.40».
+//
+// Navnet foldes, sa «Bodø» og «bodo» er samme by — den som taster dette
+// pa en telefon skal slippe a treffe o-en. Ren funksjon: den leser en
+// streng, ikke `location`, sa den kan males uten nettleser.
+//
+// Null nar ingenting er satt, og null nar verdien er tull. Et tall
+// utenfor kloden er ikke en posisjon, og a late som ville gitt et tomt
+// pubsok uten at noen skjonte hvorfor.
+export function falskPosisjon(sok) {
+  const tekst = String(sok || "");
+  const treff = tekst.match(/[?&]posisjon=([^&]*)/);
+  if (!treff) return null;
+  const verdi = decodeURIComponent(treff[1] || "").trim();
+  if (!verdi) return null;
+
+  const by = TESTBYER[normaliserLagnavn(verdi)];
+  if (by) return { navn: by.navn, lat: by.lat, lon: by.lon, kilde: "by" };
+
+  const tall = verdi.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+  if (!tall) return null;
+  const lat = Number(tall[1]);
+  const lon = Number(tall[2]);
+  if (!(lat >= -90 && lat <= 90) || !(lon >= -180 && lon <= 180)) return null;
+  return { navn: lat.toFixed(3) + ", " + lon.toFixed(3), lat, lon, kilde: "koordinat" };
 }

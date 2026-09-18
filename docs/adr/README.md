@@ -9,7 +9,8 @@ den framfor å redigere historien.
 
 Dette er ikke en symbolindeks. Funksjonsnavn står her bare når navnet
 selv bærer en regel — hvor noe hører hjemme, eller hva som skjer om det
-flyttes. Resten finner du i koden.
+flyttes. Resten finner du i koden — eller i [`../modulene.md`](../modulene.md),
+som går gjennom reglene fil for fil.
 
 | # | Beslutning |
 |---|---|
