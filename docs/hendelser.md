@@ -9,6 +9,58 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 18. september 2026 — puben var lagret, men appen hadde sluttet å spørre
+
+**Meldt som:** «Fikk til å lagre rbk pøbb. Men den dukker ikke opp i andre
+puber da jeg er innom Trondheim nå. Burde den ikke finne den som
+nærmeste.» Og etterpå: «Jeg la inn Trondheim og kordinator herfra.»
+
+**Hva det så ut som.** At rangeringen ikke tok den, eller at `KJENT_RADIUS`
+på 1500 m var for trangt. Den første målingen støttet det: fra Torvet er
+Ila 1560 meter — seksti meter utenfor.
+
+**Hva som faktisk var årsaken.** Ikke radiusen. Koordinatet var leserens
+eget, så avstanden var null.
+
+Raden var riktig, sammenslåingen virket, og hele kjeden ble kjørt i
+nettleseren med den ekte raden fra basen og posisjonen i Ila:
+
+    ok   kampen kan apnes
+    ok   knappen finnes
+    ok   RBK-puben star i lista
+
+Lista var hentet **én gang, ved sidelasting**, fra `initFotball()`. Runden
+er admin → app: du lagrer i portalen og går tilbake til appen. Appen sto da
+med `KJENTE` slik den var da sida ble lastet — før raden fantes — og hentet
+aldri igjen. Den ene runden en rettelse gjøres i, var den ene runden appen
+ikke så.
+
+**Hva som ble gjort.** `visibilitychange` er den runden: du forlot fana,
+gjorde noe, kom tilbake. `PUBLISTE_FERSK` holder det til ett kall per to
+minutter, samme vindu som `LEVETID_PUBLISTE` — kanten svarer med det samme
+der uansett. Et forsøk som ikke kom fram teller ikke som ferskt, så det
+prøves igjen neste gang; en egen sperre hindrer to samtidige kall, og hvert
+forsøk krever at et menneske har byttet fane.
+
+**Og en tom liste ble et svar.** Vakta sto på `!json.puber.length`, som var
+likegyldig da lista ble hentet én gang. Nå er den ikke det: tas den siste
+rettelsen bort i portalen, er det tomme svaret det riktige, og appen skal
+falle tilbake til fila framfor å bli stående med en rad ingen har lenger.
+`klar` skiller «ingen rettelser» fra «tjenesten kunne ikke svare».
+
+**Det andre som lå i det.** `tegnKjenteIgjen()` regnet bare om `kjenteNaer`
+og `kjenteVedArena`. To kilder til leser også `KJENTE`: `bekreftede` slår
+opp detaljene om stedet der, og `stampuber` leter etter `lag`. Så lenge
+lista ble hentet én gang var det likegyldig. Nå henter den flere ganger, og
+da måtte alle fire med — derfor holder boksen på kampen sin.
+
+**Hva som fanget det.** Ingenting, og det er verdt å merke seg: appen sa
+«Fant ingen puber i nærheten», som er en helt vanlig setning. En liste som
+mangler én rad ser ut som en liste. Sabotasjen som fjerner lytteren gir
+nøyaktig den setningen igjen.
+
+---
+
 ## 18. september 2026 — RBK-puben kunne ikke legges inn, og køen fikk skylda
 
 **Meldt som:** «Jeg prøvde å lagre RBK pøbb og sånt. Men ser den fortsatt i
