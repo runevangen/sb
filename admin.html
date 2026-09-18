@@ -243,14 +243,14 @@
   <section>
     <h2>Foreslåtte steder</h2>
     <p class="hint">Sendt inn av lesere. Ingenting havner i
-      <code>puber-oslo.js</code> av seg selv — du får raden her, og limer den
+      <code>puber.js</code> av seg selv — du får raden her, og limer den
       inn med koordinater og kilde. Det er derfor lista er verdt å stole på.</p>
     <p class="hint" id="forslagHint">Henter forslagene …</p>
     <div id="forslagListe"></div>
     <p class="melding" id="forslagMelding" role="status" aria-live="polite"></p>
   </section>
 
-  <!-- Stedredigeringen (#80). puber-oslo.js er fortsatt grunnfjellet:
+  <!-- Stedredigeringen (#80). puber.js er fortsatt grunnfjellet:
        den ligger i koden og virker uten nett. Det som lagres her er
        rettelsene oppa — nye steder, en adresse som flyttet, et sted som
        la ned. Fila rores aldri herfra. ADR 0020. -->
@@ -277,13 +277,21 @@
 
       <div class="felt-blokk felt-par">
         <div>
+          <!-- Byen styrer SOKET, den lagres ikke. Koordinatet sier selv
+               hvilken by stedet ligger i (byFor), og et felt ved siden av
+               kunne vaert uenig med tallene. -->
+          <label for="stedBy">Søk i by</label>
+          <select id="stedBy"></select>
+        </div>
+        <div>
           <label for="stedBydel">Bydel</label>
           <input type="text" id="stedBydel" autocomplete="off" maxlength="40">
         </div>
-        <div>
-          <label for="stedAdresse">Adresse</label>
-          <input type="text" id="stedAdresse" autocomplete="off" maxlength="120">
-        </div>
+      </div>
+
+      <div class="felt-blokk">
+        <label for="stedAdresse">Adresse</label>
+        <input type="text" id="stedAdresse" autocomplete="off" maxlength="120">
       </div>
       <div class="rad">
         <button class="lenke" id="stedSokAdresse" type="button">Slå opp adressen</button>

@@ -2098,7 +2098,7 @@ stedSvar = await r.json();
 ok("en fjernet rad lagres med navnet alene", r.status === 200 && stedSvar.ok === true,
    r.status + " " + JSON.stringify(stedSvar));
 ok("og svaret sier at fila star urort",
-   stedSvar.merknad.indexOf("puber-oslo.js") > -1, stedSvar.merknad);
+   stedSvar.merknad.indexOf("puber.js") > -1, stedSvar.merknad);
 
 // Mangler tabellen, star det hva som mangler — og hvor SQL-en er.
 kall = stubSteder(null, 503);
@@ -2129,6 +2129,52 @@ ok("et navnesok gir treff med koordinat",
 ok("alle speilene sporres samtidig",
    kall.length === OVERPASS_SPEIL.length, kall.length);
 ok("og svaret krediterer OpenStreetMap", stedSvar.kilde === "OpenStreetMap");
+
+// Byen soket leter i. Meldt 18. september 2026: en RBK-pub ble foreslatt,
+// og portalen kunne verken finne den eller lagre den. Soket var bundet
+// til en Oslo-boks, sa et sted i Trondheim fantes ikke — og forslaget ble
+// staende i koen som om ingen hadde provd.
+kall = stubSteder();
+r = await pubListe(stedBe({ handling: "sok", passord: PASSORD, navn: "RBK Pub",
+  by: "trondheim" }));
+stedSvar = await r.json();
+ok("soket kan be om en annen by",
+   r.status === 200 && stedSvar.by === "Trondheim", JSON.stringify(stedSvar));
+ok("og sporringen bruker den byens boks",
+   decodeURIComponent(kall[0].opsjoner.body).indexOf("(63.295,10.093") > -1,
+   decodeURIComponent(kall[0].opsjoner.body));
+
+kall = stubSteder();
+r = await pubListe(stedBe({ handling: "sok", passord: PASSORD, navn: "Andys Pub" }));
+ok("uten by er det Oslo, som for",
+   decodeURIComponent(kall[0].opsjoner.body).indexOf("(59.776,10.481") > -1,
+   decodeURIComponent(kall[0].opsjoner.body));
+
+// En ukjent by er ikke et stille tilbakefall til Oslo. Da ville portalen
+// svart «fant ingenting» om et sted som star der, bare i en annen by.
+kall = stubSteder();
+r = await pubListe(stedBe({ handling: "sok", passord: PASSORD, navn: "RBK Pub",
+  by: "hamar" }));
+stedSvar = await r.json();
+ok("en ukjent by avvises, og byene ramses opp",
+   r.status === 400 && stedSvar.feil.indexOf("Trondheim") > -1, stedSvar.feil);
+ok("og nar aldri Overpass", kall.length === 0, kall.length);
+
+// Lagringen slapp bare Oslo gjennom, og det var den andre halvdelen av
+// den samme feilen: selv med koordinatet tastet for hand sa vakta
+// «koordinatene ligger utenfor omradet» om et koordinat som var riktig.
+kall = stubSteder();
+r = await pubListe(stedBe({ passord: PASSORD, token: STED_OKT,
+  pub: Object.assign({}, ET_STED, { navn: "RBK Pub", lat: 63.4305, lon: 10.3951 }) }));
+stedSvar = await r.json();
+ok("et sted i Trondheim lagres",
+   r.status === 200 && stedSvar.ok === true, r.status + " " + JSON.stringify(stedSvar));
+
+r = await pubListe(stedBe({ passord: PASSORD, token: STED_OKT,
+  pub: Object.assign({}, ET_STED, { lat: 48.85, lon: 2.35 }) }));
+stedSvar = await r.json();
+ok("et sted utenfor alle byene gjor det ikke",
+   r.status === 400 && stedSvar.feil.indexOf("utenfor") > -1, stedSvar.feil);
 
 // Adressesoket. Navnesoket finner ikke et sted OSM ikke kjenner navnet pa,
 // og det er de sma stedene — nettopp de admin ma foere inn for hand.

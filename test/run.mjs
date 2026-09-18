@@ -2628,7 +2628,7 @@ const SAK_15 = kjor("admin", `
 // seksjon, og en test som ligger sju tilbakekall dypt er ikke til a rette.
 //
 // Fila er grunnfjellet. Editoren skriver rettelsene oppa, og portalen skal
-// vise begge deler — hva som star i puber-oslo.js, og hva som er rettet
+// vise begge deler — hva som star i puber.js, og hva som er rettet
 // herfra (#80, ADR 0020).
 const SAK_15B = kjor("admin-steder", `
   try {
@@ -2640,6 +2640,10 @@ const SAK_15B = kjor("admin-steder", `
 
   var stedKall = [];
   var lagret = [];
+  // Koen, med et forslag som svarer til stedet som lagres lenger nede.
+  var forslagKall = [];
+  var koen = [{ id: 7, navn: "Bar Boca", adresse: "Thorvald Meyers gate 30",
+                viserFotball: true, merknad: "", foreslatt: "2026-09-18", status: "ny" }];
   // Basen barer én rettelse fra for: Scotsman er tatt ut av lista.
   var iBasen = [{ nokkel: "scotsman", navn: "Scotsman", fjernet: true }];
 
@@ -2671,7 +2675,17 @@ const SAK_15B = kjor("admin-steder", `
       if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [] });
       return svar(200, { brukere: [] });
     }
-    if (u.indexOf("/api/pub-forslag") === 0) return svar(200, { forslag: [] });
+    if (u.indexOf("/api/pub-forslag") === 0) {
+      var f = JSON.parse((opt || {}).body || "{}");
+      forslagKall.push(f);
+      if (f.handling === "behandle") {
+        koen = koen.map(function (r) {
+          return r.id === f.id ? Object.assign({}, r, { status: f.status }) : r;
+        });
+        return svar(200, { ok: true });
+      }
+      return svar(200, { forslag: koen });
+    }
     if (u.indexOf("/api/fotball") === 0) {
       return svar(200, { liga: "Eliteserien", kamper: [], runder: [] });
     }
@@ -2758,6 +2772,23 @@ const SAK_15B = kjor("admin-steder", `
                stedKall.filter(function (k) { return k.handling === "liste"; }).length === 2,
                stedKall.length);
             ok("skjemaet lukkes nar raden er lagret", felt("stedSkjema").hidden === true);
+
+            // Meldt 18. september 2026: «Jeg provde a lagre RBK pobb og
+            // sant. Men ser den fortsatt i forslagskasse.» Lagringen og
+            // merkingen var to handlinger for én avgjorelse, og den
+            // naturlige er lagringen. Na henger merkingen paa den.
+            var behandlet = forslagKall.filter(function (f) {
+              return f.handling === "behandle";
+            });
+            ok("forslaget merkes nar stedet lagres",
+               behandlet.length === 1 && behandlet[0].status === "lagt-inn",
+               JSON.stringify(behandlet));
+            ok("og det er forslaget med samme navn som merkes",
+               behandlet.length === 1 && behandlet[0].id === 7,
+               JSON.stringify(behandlet));
+            ok("og meldinga sier det",
+               felt("stedMelding").textContent.indexOf("køen er merket") > -1,
+               felt("stedMelding").textContent);
             // Det som kommer over nettet, lander etter at visningen star
             // ferdig: det nye stedet skal vaere valgbart uten en ny apning.
             var etter = Array.prototype.map.call(felt("pub").options, function (o) { return o.value; });
@@ -2898,6 +2929,33 @@ const SAK_15C = kjor("admin-koordinat", `
          felt("stedLenkeSvar").textContent.indexOf("Kortlenker") === 0,
          felt("stedLenkeSvar").textContent);
 
+      // 1b. Byen soket leter i. Meldt 18. september 2026: en RBK-pub ble
+      //     foreslatt, og portalen kunne verken finne den eller lagre den
+      //     — soket var bundet til Oslo, og vakta avviste koordinatet som
+      //     fulgte. Forslaget ble staende i koen som om ingen hadde provd.
+      ok("byvelgeren har alle byene vi kjenner",
+         felt("stedBy").options.length === 6, felt("stedBy").options.length);
+      ok("og Trondheim er en av dem",
+         Array.prototype.some.call(felt("stedBy").options,
+           function (o) { return o.textContent === "Trondheim"; }));
+
+      // Koordinatet er fasiten, ikke velgeren: limes et Trondheim-punkt
+      // inn, skal «Sla opp» lete der raden faktisk ligger.
+      felt("stedLat").value = "";
+      felt("stedLon").value = "";
+      felt("stedLenke").value = "(63.4305, 10.3951)";
+      felt("stedLenkeLes").click();
+      ok("byen folger koordinatet som ble limt inn",
+         felt("stedBy").value === "trondheim", felt("stedBy").value);
+
+      // Og den folger et koordinat som tastes for hand.
+      felt("stedLat").value = "59.9135";
+      felt("stedLat").dispatchEvent(new Event("input"));
+      felt("stedLon").value = "10.7340";
+      felt("stedLon").dispatchEvent(new Event("input"));
+      ok("og et koordinat som tastes inn",
+         felt("stedBy").value === "oslo", felt("stedBy").value);
+
       // 2. Navnesoket: ingen treff, og det skal sies med utveiene.
       felt("stedLat").value = "";
       felt("stedLon").value = "";
@@ -2905,6 +2963,11 @@ const SAK_15C = kjor("admin-koordinat", `
       setTimeout(function () { try {
         ok("navnesoket sier at det ikke fant noe",
            felt("stedSokHint").textContent.indexOf("Ingen treff") === 0,
+           felt("stedSokHint").textContent);
+        // «Ingen treff pa RBK Pub» er sant i Oslo og usant i Trondheim.
+        // Uten byen i meldinga slutter man at stedet ikke finnes.
+        ok("og hvilken by den lette i",
+           felt("stedSokHint").textContent.indexOf("Oslo") > -1,
            felt("stedSokHint").textContent);
         ok("og peker pa kartlenka som utvei",
            felt("stedSokHint").textContent.indexOf("kartlenke") > -1,
@@ -3218,7 +3281,7 @@ const VISNINGER_FRA_TJENESTEN = [
 const SAK_16B = kjor("pub-rettelser", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
-  // Leseren star midt i Kvadraturen. The Toucan star i puber-oslo.js
+  // Leseren star midt i Kvadraturen. The Toucan star i puber.js
   // 463 meter unna; Nystedet finnes bare i basen.
   navigator.geolocation.getCurrentPosition = function (ok) {
     ok({ coords: { latitude: 59.9165, longitude: 10.7530 } });

@@ -1,7 +1,7 @@
-// Kontaktopplysninger om pubene i puber-oslo.js: telefon, e-post,
+// Kontaktopplysninger om pubene i puber.js: telefon, e-post,
 // adresse, mat, apningstider, bordbestilling, aldersgrense og skjermer.
 //
-// EGEN FIL, med vilje. puber-oslo.js baerer en redaksjonell vurdering —
+// EGEN FIL, med vilje. puber.js baerer en redaksjonell vurdering —
 // viser dette stedet fotball? — som star seg over tid. Et telefonnummer
 // gjor ikke det. De to raatner i ulikt tempo og skal kunne vedlikeholdes
 // hver for seg.

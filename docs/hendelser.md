@@ -9,6 +9,56 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 18. september 2026 — RBK-puben kunne ikke legges inn, og køen fikk skylda
+
+**Meldt som:** «Jeg prøvde å lagre RBK pøbb og sånt. Men ser den fortsatt i
+forslagskasse.»
+
+**Hva det så ut som.** At behandlingen av forslaget ikke tok — at «Lagt
+inn» ikke ble lagret, eller at køen ikke ble hentet på nytt.
+
+**Hva som faktisk var årsaken.** Køen sa sant. Stedet ble aldri lagret, og
+forslaget sto som «ny» fordi ingen rad var laget.
+
+To vakter stengte, begge med samme rot. `osmNavnSporring()` bygget en
+bounding box av Oslo — `(59.8,10.45,60.05,10.95)` — så et navnesøk etter
+«RBK Pub» lette i feil by og kunne ikke finne noe. Uten et treff, ingen
+koordinater. Og `sjekkPubliste()` hadde den samme boksen hardkodet inni
+seg, så et koordinat tastet for hånd ble avvist med «koordinatene ligger
+utenfor området» — om et koordinat som var helt riktig.
+
+**Det som hadde blitt usant var ramma, ikke køen.** Appen svarte allerede i
+flere byer: `TESTBYER` med Oslo, Bergen, Trondheim, Bodø, Stavanger og
+Tromsø kom inn dagen før, og `stampuberFor()` svarer på lagnavn — RBK er
+nøyaktig det tilfellet. Portalen var den siste delen som trodde alt var
+Oslo, og fila het `puber-oslo.js`, som var med på å gjøre det usynlig.
+
+**Hva som ble gjort.** Byene er nå én liste som gjør to jobber: `BYER`
+setter en falsk posisjon *og* er rammene portalen får lagre innenfor.
+`rammeFor()` regner boksen ut framfor å skrive den inn — lengdegradene
+smalner mot polene, og en fast bredde i grader ville gitt Tromsø en boks
+tre ganger så bred som Oslos. `sjekkPubliste()` uten ramme krever at raden
+ligger i én av byene; med ramme gjelder bare den, og det er søket, som
+leter i én by om gangen. Fila heter `puber.js`.
+
+**Byen lagres ikke på raden.** `byFor()` leser den ut av koordinatet.
+Byvelgeren i portalen styrer bare hvor vi *leter*, og følger tallene når de
+endrer seg — to felt som kan si hver sin by er to sannheter om ett sted.
+
+**Hva ramma er til for.** Ikke å si hvor folk bor. Den fanger lat og lon
+byttet om: da havner en Oslo-pub i Somalia, og begge tallene ser fortsatt
+riktige ut. Det er én grense å flytte hvis en pub ligger lenger ut —
+`BY_RADIUS_KM`, femten kilometer, ett sted for alle byene.
+
+**Hva som fanget det.** Ingenting. Vakta sa «koordinatene ligger utenfor
+området» til en admin som satt med riktige tall, og meldinga nevnte ikke at
+«området» var Oslo. Den sier nå hvilke byer som finnes. Og feilen var
+umulig å se fra køen, som var det eneste stedet den ga utslag: et forslag
+som blir stående ser likt ut enten ingen har prøvd eller noen har prøvd og
+blitt avvist.
+
+---
+
 ## 17. september 2026 — adressesøket fant ingenting, og bokstavene var halve
 
 **Meldt som:** «Feilmelding når jeg legger inn bydel og adresse på foreslått

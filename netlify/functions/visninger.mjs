@@ -23,7 +23,7 @@
 // igjen som doren til skjemaet, ikke til skrivingen — to lasser, og den
 // som faktisk holder er databasens.
 
-import { PUBER_OSLO } from "../../puber-oslo.js";
+import { KURATERTE } from "../../puber.js";
 import { slaSammenPuber, tolkPubRader } from "../../pub-data.js";
 import {
   sjekkVisninger, slaSammen, tolkVisninger, visningRad, kampIderFor,
@@ -224,9 +224,9 @@ async function kjentePuber() {
     "/rest/v1/" + PUBTABELL + "?select=" + PUBFELT + "&limit=500", null, null);
   if (!r.ok) {
     console.error("[visninger] publiste " + r.status + ": " + (r.melding || ""));
-    return PUBER_OSLO;
+    return KURATERTE;
   }
-  return slaSammenPuber(PUBER_OSLO, tolkPubRader(r.json));
+  return slaSammenPuber(KURATERTE, tolkPubRader(r.json));
 }
 
 /* ---------- tjenesten ---------- */

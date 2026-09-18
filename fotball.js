@@ -17,7 +17,7 @@ import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
          rangerForslag, FORSLAG_MAKS, tolkPubRader, slaSammenPuber,
          stampuberFor, falskPosisjon } from "./pub-data.js";
-import { PUBER_OSLO } from "./puber-oslo.js";
+import { KURATERTE } from "./puber.js";
 import { sjekkForslag, alleredeILista, NAVN_MAKS, ADRESSE_MAKS }
   from "./pub-forslag-data.js";
 import { bekreftetFor, merkBekreftet, tolkVisninger } from "./visning-data.js";
@@ -32,7 +32,7 @@ import { KANALER } from "./kanaler.js";
 // adresse som flyttet, et sted som la ned (#80, ADR 0020). De kommer over
 // nettet, og derfor er dette ikke en const lenger: alt som tegnes av den,
 // ma kunne tegnes pa nytt nar de lander.
-let KJENTE = kjenteAv(PUBER_OSLO);
+let KJENTE = kjenteAv(KURATERTE);
 const KJENT_RADIUS = 1500;
 
 function kjenteAv(liste) {
@@ -110,7 +110,7 @@ async function hentPubRettelser() {
   }
   if (!json || json.feil || !Array.isArray(json.puber) || !json.puber.length) return;
 
-  KJENTE = kjenteAv(slaSammenPuber(PUBER_OSLO, tolkPubRader(json.puber)));
+  KJENTE = kjenteAv(slaSammenPuber(KURATERTE, tolkPubRader(json.puber)));
   tegnKjenteIgjen();
 }
 
@@ -1372,10 +1372,14 @@ async function naerDegFra(boks, bekreftede, p) {
 
   // Stampubene er en UTVEI, ikke et tillegg: de finnes for tilfellet der
   // geografien ikke gir noe. Vet vi hvor du star, er geografien svaret, og
-  // da skal de vike — puber-oslo.js er en Oslo-liste, og en Oslo-stampub i
-  // en liste for Bodo star der uten avstand, som om den var i nabogata.
-  // Er du i Oslo, kommer de samme stedene tilbake gjennom kjenteNaer, med
-  // avstand pa.
+  // da skal de vike — et lagtreff baerer ingen avstand, og en stampub i en
+  // annen by star da i lista som om den var i nabogata. Er du i byen der
+  // den ligger, kommer den tilbake gjennom kjenteNaer, med avstand pa.
+  //
+  // Det sto «puber.js er en Oslo-liste» her til 18. september 2026. Lista
+  // dekker flere byer na, men regelen er den samme og var alltid den
+  // samme: det er den manglende avstanden som gjor stampuben til et
+  // darligere svar, ikke hvilken by den ligger i.
   boks.kilder.stampuber = [];
   tegnForslag(boks);
 
@@ -1479,7 +1483,7 @@ function kamprad(kamp, del, delbar) {
 
 // «Mangler stedet? Send det inn.»
 //
-// Lista i puber-oslo.js vokser i dag bare nar noen redigerer en fil. Den
+// Lista i puber.js vokser i dag bare nar noen redigerer en fil. Den
 // som star pa puben og ser at den ikke finnes der, har ingen vei til a si
 // fra — annet enn a skrive navnet i feltet over, der det blir staende for
 // hen alene (#80).

@@ -40,7 +40,7 @@ import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
 import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, enturNaermest,
          tolkHoldeplasser, grupperPuber, ofteBrukt, noterPub,
          rangerForslag, FORSLAG_MAKS, stampuberFor, FORSLAG_KILDER,
-         falskPosisjon, TESTBYER,
+         falskPosisjon, BYER,
          OVERPASS_SPEIL, overpassHeadere, restTid,
          sjekkPubliste, kuraterteNaer, merkKuraterte,
          sjekkKontaktliste, kontaktFor, finnKontakt, KONTAKT_FELT, kildeHolder,
@@ -48,10 +48,10 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
          osmNavnVask, osmNavnSporring, tolkNavnTreff, PUBTYPER, PUBSIKKERHET,
          delAdresse, osmAdresseSporring, tolkAdresseTreff, koordinatFraLenke,
          SOK_SEKUNDER, SOK_TAK, overpassFeiltekst,
-         OSLO_RAMME } from "../pub-data.js";
+         OSLO_RAMME, rammeFor, byFor, bynavn, BY_RADIUS_KM } from "../pub-data.js";
 import { PUBER_KONTAKT } from "../puber-kontakt.js";
 import { KANALER } from "../kanaler.js";
-import { PUBER_OSLO } from "../puber-oslo.js";
+import { KURATERTE } from "../puber.js";
 import { sjekkForslag, forslagRad, tolkForslag, alleredeILista, publisteRad }
   from "../pub-forslag-data.js";
 import { sjekkVisninger, visningerFor, slaSammen, utenGamle, tolkVisninger, visningRad, kampIderFor,
@@ -659,17 +659,17 @@ ok("odelagt lagring gir tom liste", ofteBrukt("rart").length === 0 && ofteBrukt(
 // Vokteren skal holde lista redigerbar for hvem som helst. Den ekte
 // lista ma passere; da slar en feilskrevet rad ut i testene framfor i
 // appen.
-ok("den kuraterte lista holder formen", sjekkPubliste(PUBER_OSLO).length === 0,
-   sjekkPubliste(PUBER_OSLO).join(" | "));
+ok("den kuraterte lista holder formen", sjekkPubliste(KURATERTE).length === 0,
+   sjekkPubliste(KURATERTE).join(" | "));
 ok("lista har innhold og er datert",
-   PUBER_OSLO.length >= 20 && PUBER_OSLO.every((p) => p.sjekket >= "2026-01-01"),
-   PUBER_OSLO.length);
+   KURATERTE.length >= 20 && KURATERTE.every((p) => p.sjekket >= "2026-01-01"),
+   KURATERTE.length);
 // Én regel for fila og for basen. Den var «ma vaere en URL» til
 // 16. september 2026, og det stengte ute den lille puben uten nettside.
 // Na er den «si hvordan vi vet det» — en lenke, eller en setning.
 ok("hver rad sier hvordan vi vet det",
-   PUBER_OSLO.every((p) => kildeHolder(p.kilde)),
-   PUBER_OSLO.filter((p) => !kildeHolder(p.kilde)).map((p) => p.navn).join(", "));
+   KURATERTE.every((p) => kildeHolder(p.kilde)),
+   KURATERTE.filter((p) => !kildeHolder(p.kilde)).map((p) => p.navn).join(", "));
 
 function rad(endring) {
   return Object.assign({ navn: "Testpuben", bydel: "Sentrum", adresse: "Gata 1",
@@ -679,8 +679,26 @@ function rad(endring) {
 ok("en riktig rad gir ingen feil", sjekkPubliste([rad()]).length === 0, sjekkPubliste([rad()]));
 ok("manglende felt fanges", sjekkPubliste([rad({ kilde: "" })])[0].indexOf("mangler kilde") > -1,
    sjekkPubliste([rad({ kilde: "" })]));
-ok("koordinat utenfor omradet fanges",
-   sjekkPubliste([rad({ lat: 63.43 })])[0].indexOf("utenfor omradet") > -1);
+// Ramma var Oslo alene til 18. september 2026. Da var lat 63.43 —
+// Trondheim — «utenfor omradet», og en RBK-pub kunne ikke lagres.
+ok("en rad i en annen by vi kjenner slipper gjennom",
+   sjekkPubliste([rad({ lat: 63.4305, lon: 10.3951 })]).length === 0,
+   sjekkPubliste([rad({ lat: 63.4305, lon: 10.3951 })]).join(" | "));
+// Vakta er mot skrivefeil, og den viktigste er lat og lon byttet om: da
+// havner en Oslo-pub i Somalia, og tallene ser fortsatt riktige ut.
+// Joinet, ikke [0]: en tom liste er nettopp det denne testen skal fange,
+// og da skal den si «fanget ingenting» framfor a velte pa undefined.
+ok("koordinat utenfor alle byene fanges",
+   sjekkPubliste([rad({ lat: 10.74, lon: 59.913 })]).join(" | ").indexOf("utenfor") > -1,
+   sjekkPubliste([rad({ lat: 10.74, lon: 59.913 })]).join(" | ") || "(ingen feil)");
+ok("og meldinga sier hvilke byer som finnes",
+   sjekkPubliste([rad({ lat: 48.85, lon: 2.35 })]).join(" | ").indexOf("Trondheim") > -1,
+   sjekkPubliste([rad({ lat: 48.85, lon: 2.35 })]).join(" | ") || "(ingen feil)");
+// Med en ramme gjelder bare den: det er soket i portalen, som leter i én
+// by om gangen.
+ok("en oppgitt ramme snevrer inn igjen",
+   sjekkPubliste([rad({ lat: 63.4305, lon: 10.3951 })], rammeFor("oslo")).length === 1,
+   sjekkPubliste([rad({ lat: 63.4305, lon: 10.3951 })], rammeFor("oslo")).join(" | "));
 ok("ukjent type og sikkerhet fanges",
    sjekkPubliste([rad({ type: "kafe" })]).length === 1 &&
    sjekkPubliste([rad({ sikkerhet: "kanskje" })]).length === 1);
@@ -712,19 +730,19 @@ ok("noe annet enn en liste fanges", sjekkPubliste("nei").length === 1);
 
 // Uten nettverk i det hele tatt: lista alene svarer «hva er i naerheten».
 const OSLO_S = { lat: 59.911, lon: 10.750 };
-const NAER = kuraterteNaer(PUBER_OSLO, OSLO_S, 1500);
+const NAER = kuraterteNaer(KURATERTE, OSLO_S, 1500);
 ok("kuraterte steder i naerheten, naermest forst",
    NAER.length > 3 && NAER.every((p, i) => i === 0 || p.avstand >= NAER[i - 1].avstand),
    NAER.slice(0, 3).map((p) => p.navn + " " + p.avstand).join(", "));
 ok("alle innenfor radien", NAER.every((p) => p.avstand <= 1500));
 ok("et sted langt unna er ikke med",
-   kuraterteNaer(PUBER_OSLO, { lat: 63.413, lon: 10.406 }, 1500).length === 0);
+   kuraterteNaer(KURATERTE, { lat: 63.413, lon: 10.406 }, 1500).length === 0);
 ok("tom liste eller ingen posisjon gir ingenting",
-   kuraterteNaer([], OSLO_S, 1500).length === 0 && kuraterteNaer(PUBER_OSLO, null, 1500).length === 0);
+   kuraterteNaer([], OSLO_S, 1500).length === 0 && kuraterteNaer(KURATERTE, null, 1500).length === 0);
 
 // OpenStreetMap vet at det er en pub; lista vet at de viser fotball.
 const FRA_OSM = [{ navn: "Carls", lat: 59.927, lon: 10.778 }, { navn: "Ukjent Bar", lat: 59.9, lon: 10.7 }];
-const MERKET = merkKuraterte(FRA_OSM, PUBER_OSLO);
+const MERKET = merkKuraterte(FRA_OSM, KURATERTE);
 ok("kjente steder merkes, resten star urort",
    MERKET[0].viserFotball === true && MERKET[0].lag.indexOf("Brann") > -1 &&
    MERKET[1].viserFotball === undefined, JSON.stringify(MERKET));
@@ -779,7 +797,7 @@ ok("ingen visninger gir tom liste",
    visningerFor({ id: 77 }, BLANDET).length === 0 && visningerFor(null, BLANDET).length === 0);
 
 // Lesersiden: hvem viser denne kampen, med det vi ellers vet om stedet.
-const BEK = bekreftetFor({ id: 11 }, BLANDET, PUBER_OSLO);
+const BEK = bekreftetFor({ id: 11 }, BLANDET, KURATERTE);
 ok("bekreftede puber hentes for kampen", BEK.length === 1 && BEK[0].navn === "Lincoln Pub",
    JSON.stringify(BEK.map((p) => p.navn)));
 ok("og de er merket som bekreftet", BEK[0].bekreftet === true);
@@ -787,7 +805,7 @@ ok("de barer med seg det vi vet om stedet fra publista",
    typeof BEK[0].lat === "number" && !!BEK[0].bydel, JSON.stringify(BEK[0]));
 // En pub som er tatt ut av publista skal ikke forsvinne stumt.
 const UKJENT = bekreftetFor({ id: 11 },
-   [{ pub: "Nedlagt Pub", kampId: 11, kamp: "x", dato: "2026-09-20T15:00:00Z", satt: "x" }], PUBER_OSLO);
+   [{ pub: "Nedlagt Pub", kampId: 11, kamp: "x", dato: "2026-09-20T15:00:00Z", satt: "x" }], KURATERTE);
 ok("en pub utenfor publista star med navnet sitt",
    UKJENT.length === 1 && UKJENT[0].navn === "Nedlagt Pub" && UKJENT[0].bekreftet === true);
 
@@ -810,7 +828,7 @@ ok("gamle kamper ryddes bort", utenGamle(GAMMEL, VNAA, 2).length === 1 &&
 ok("en kamp i gar beholdes", utenGamle(
    [{ pub: "Carls", kampId: 3, kamp: "z", dato: "2026-09-10T15:00:00Z", satt: "x" }], VNAA, 2).length === 1);
 
-const PUBNAVN = PUBER_OSLO.map((p) => p.navn);
+const PUBNAVN = KURATERTE.map((p) => p.navn);
 ok("gyldige visninger gir ingen feil", sjekkVisninger(SATT, PUBNAVN).length === 0,
    sjekkVisninger(SATT, PUBNAVN).join(" | "));
 // Navnene i raden til stedet. Kortet svarer pa «hvor skal jeg?», sa det
@@ -1889,11 +1907,11 @@ ok("ingen svar gir ingen grupper",
 // Samme vokter-tanke som for publista: den ekte fila ma passere, sa en
 // feilskrevet rad slar ut her framfor i appen.
 ok("kontaktfila holder formen",
-   sjekkKontaktliste(PUBER_KONTAKT, PUBER_OSLO.map((p) => p.navn)).length === 0,
-   sjekkKontaktliste(PUBER_KONTAKT, PUBER_OSLO.map((p) => p.navn)).slice(0, 3).join(" | "));
+   sjekkKontaktliste(PUBER_KONTAKT, KURATERTE.map((p) => p.navn)).length === 0,
+   sjekkKontaktliste(PUBER_KONTAKT, KURATERTE.map((p) => p.navn)).slice(0, 3).join(" | "));
 ok("hver pub i kontaktfila finnes i publista",
    Object.keys(PUBER_KONTAKT).length >= 20 &&
-   sjekkKontaktliste(PUBER_KONTAKT, PUBER_OSLO.map((p) => p.navn))
+   sjekkKontaktliste(PUBER_KONTAKT, KURATERTE.map((p) => p.navn))
      .every((f) => f.indexOf("ukjent pub") === -1),
    Object.keys(PUBER_KONTAKT).length);
 // Hvert eneste felt skal baere hvor det kom fra. Uten det er det en
@@ -2136,8 +2154,11 @@ ok("men en rad med en setning som kilde gjor det",
      { kilde: "Var innom 16.09.2026, storskjerm i baren" })).join(" | "));
 ok("en rad uten dato slipper ikke gjennom",
    sjekkPubRad(Object.assign({}, PUBBASE[0], { sjekket: "" })).length > 0);
-ok("en rad utenfor Oslo slipper ikke gjennom",
-   sjekkPubRad(Object.assign({}, PUBBASE[0], { lat: 63.43, lon: 10.39 })).length > 0);
+ok("en rad i Trondheim slipper gjennom",
+   sjekkPubRad(Object.assign({}, PUBBASE[0], { lat: 63.4305, lon: 10.3951 })).length === 0,
+   sjekkPubRad(Object.assign({}, PUBBASE[0], { lat: 63.4305, lon: 10.3951 })).join(" | "));
+ok("en rad utenfor alle byene slipper ikke gjennom",
+   sjekkPubRad(Object.assign({}, PUBBASE[0], { lat: 48.85, lon: 2.35 })).length > 0);
 ok("en ukjent type slipper ikke gjennom",
    sjekkPubRad(Object.assign({}, PUBBASE[0], { type: "kafe" })).length > 0);
 ok("en hel rad slipper gjennom", sjekkPubRad(PUBBASE[0]).length === 0,
@@ -2216,8 +2237,14 @@ ok("apostrofen deler navnet framfor a lime det sammen",
 ok("et navn med bare korte biter bruker den lengste alene",
    osmNavnSporring("Kro & Co") === osmNavnSporring("Kro"),
    osmNavnSporring("Kro & Co"));
-ok("og sporringen holder seg innenfor Oslo",
+ok("og sporringen holder seg innenfor Oslo som default",
    PUBSPOR.indexOf("(" + OSLO_RAMME.lat[0] + "," + OSLO_RAMME.lon[0]) > -1, PUBSPOR);
+// Uten dette lette portalen bare i Oslo, og en RBK-pub i Trondheim kunne
+// ikke finnes i det hele tatt — feltet for koordinater sto tomt, og
+// lagringen avviste raden som fulgte.
+ok("en annen by gir en annen boks",
+   osmNavnSporring("RBK Pub", rammeFor("trondheim")).indexOf("(63.295,10.093") > -1,
+   osmNavnSporring("RBK Pub", rammeFor("trondheim")));
 ok("et navn uten ord a soke pa gir ingen sporring",
    osmNavnSporring("a b") === "" && osmNavnSporring("") === "");
 
@@ -2295,8 +2322,11 @@ ok("adressesporringen sporr pa begge taggene",
 // Terrasse», som er en annen gate.
 ok("gata er forankret, ikke bare et delstreng-sok",
    ADRSPOR.indexOf('"^Berglyveien$"') > -1, ADRSPOR);
-ok("og sporringen holder seg innenfor Oslo",
-   ADRSPOR.indexOf("(59.8,10.45,60.05,10.95)") > -1, ADRSPOR);
+ok("og sporringen holder seg innenfor Oslo som default",
+   ADRSPOR.indexOf("(" + OSLO_RAMME.lat[0] + "," + OSLO_RAMME.lon[0]) > -1, ADRSPOR);
+ok("og en adresse kan sokes opp i en annen by",
+   osmAdresseSporring("Nordre gate 1", rammeFor("trondheim")).indexOf("(63.295,10.093") > -1,
+   osmAdresseSporring("Nordre gate 1", rammeFor("trondheim")));
 ok("uten nummer star gata alene",
    osmAdresseSporring("Grensen").indexOf("addr:housenumber") === -1,
    osmAdresseSporring("Grensen"));
@@ -2416,7 +2446,7 @@ ok("en runde uten kamper far ingen tekst", rundeTall(0, 0) === "", rundeTall(0, 
 // fysisk der.»
 ok("en by gir koordinatet sitt",
    falskPosisjon("?posisjon=bodo").navn === "Bodø" &&
-   falskPosisjon("?posisjon=bodo").lat === TESTBYER.bodo.lat,
+   falskPosisjon("?posisjon=bodo").lat === BYER.bodo.lat,
    JSON.stringify(falskPosisjon("?posisjon=bodo")));
 // Den som taster dette pa en telefon skal slippe a treffe o-en.
 ok("navnet foldes, sa Bodø og bodo er samme by",
@@ -2442,9 +2472,9 @@ ok("og et tall utenfor kloden er det heller ikke",
 ok("en tom verdi gir null", falskPosisjon("?posisjon=") === null);
 // Byene ma ha ekte koordinater, ellers maler skriptet feil sted.
 ok("alle testbyene har et koordinat i Norge",
-   Object.values(TESTBYER).every((b) =>
+   Object.values(BYER).every((b) =>
      b.lat > 57 && b.lat < 72 && b.lon > 4 && b.lon < 32 && b.navn),
-   JSON.stringify(Object.values(TESTBYER).map((b) => b.navn)));
+   JSON.stringify(Object.values(BYER).map((b) => b.navn)));
 
 /* ---------------- hva en lagring faktisk endrer ---------------- */
 
@@ -2579,6 +2609,11 @@ ok("testen fant faktisk filer a kreve dokumentasjon for",
 // Den andre veien: dokumentet skal ikke vise til filer som er borte. En
 // regel for en fil som ikke finnes lenger er verre enn ingen regel — den
 // leses som om den fortsatt gjelder.
+//
+// Sjekken gar pa navn i baklenker, og det gir konvensjonen: et filnavn i
+// `kode` er en peker og ma finnes; et gammelt navn i en setning om
+// historien skrives uten dem. «Den het puber-oslo.js til 18. september»
+// er prosa om noe som var, ikke en henvisning til noe som er.
 const nevnte = new Set(Array.from(
   dokument.matchAll(/`([a-z0-9./-]+\.(?:js|mjs|css|html|sql|md|toml))`/g), (m) => m[1]));
 // Dokumentet skriver filnavn slik en leser gjor: `run.mjs`, ikke

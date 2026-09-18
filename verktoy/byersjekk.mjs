@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Hva OpenStreetMap faktisk har av puber i norske byer.
 //
-//   node verktoy/byersjekk.mjs                 # alle byene i TESTBYER
+//   node verktoy/byersjekk.mjs                 # alle byene i BYER
 //   node verktoy/byersjekk.mjs bodo trondheim  # bare noen
 //   node verktoy/byersjekk.mjs 67.28,14.40     # et koordinat
 //
@@ -24,7 +24,7 @@
 // Kjøres for hånd. Overpass ber om fair use, og en skraper som går i CI er
 // en skraper noen kjører tusen ganger.
 
-import { TESTBYER, falskPosisjon, overpassSporring, tolkPuber,
+import { BYER, falskPosisjon, overpassSporring, tolkPuber,
          OVERPASS_SPEIL, overpassHeadere, rundPosisjon } from "../pub-data.js";
 
 const RADIUS = 1200;
@@ -56,14 +56,14 @@ const bedt = process.argv.slice(2);
 const steder = bedt.length
   ? bedt.map((a) => falskPosisjon("?posisjon=" + encodeURIComponent(a))
       || { navn: a, lat: NaN, lon: NaN })
-  : Object.values(TESTBYER);
+  : Object.values(BYER);
 
 console.log("Puber innen " + RADIUS + " m, fra OpenStreetMap.\n");
 
 for (const sted of steder) {
   if (!Number.isFinite(sted.lat)) {
     console.log("## " + sted.navn + "\n   kjenner ikke stedet. Bruk et navn fra"
-      + " TESTBYER, eller «59.91,10.75».\n");
+      + " BYER, eller «59.91,10.75».\n");
     continue;
   }
   const p = rundPosisjon(sted.lat, sted.lon);
