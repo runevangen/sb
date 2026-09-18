@@ -54,8 +54,8 @@ import { PUBER_OSLO } from "../puber-oslo.js";
 import { sjekkForslag, forslagRad, tolkForslag, alleredeILista, publisteRad }
   from "../pub-forslag-data.js";
 import { sjekkVisninger, visningerFor, slaSammen, utenGamle, tolkVisninger, visningRad, kampIderFor,
-         bekreftetFor, merkBekreftet, visningsHint, rundeTall }
-         from "../visning-data.js";
+         bekreftetFor, merkBekreftet, visningsHint, rundeTall,
+         visningsDiff, lagreKnappTekst } from "../visning-data.js";
 
 let feilet = 0;
 let kjort = 0;
@@ -2344,6 +2344,62 @@ ok("uten pubnavn star setningen likevel",
 // a vite om noe er krysset av lenger nede.
 ok("rundetallet sier valgt av totalt", rundeTall(3, 6) === "3 av 6 valgt", rundeTall(3, 6));
 ok("en runde uten kamper far ingen tekst", rundeTall(0, 0) === "", rundeTall(0, 0));
+
+/* ---------------- hva en lagring faktisk endrer ---------------- */
+
+// Meldt 18. september 2026: «Jeg kommer inn, fem kamper er markert, jeg
+// legger til én, og da star det 6 lagret. Egentlig sa lagrer bruker 1 da.»
+const FRA_FOR = [{ kampId: "a" }, { kampId: "b" }];
+const ONSKET = [{ kampId: "b" }, { kampId: "c" }];
+const DIFF = visningsDiff(FRA_FOR, ONSKET);
+ok("bare det som ikke sto der fra for er nytt",
+   DIFF.nye.length === 1 && DIFF.nye[0].kampId === "c", JSON.stringify(DIFF.nye));
+ok("bare det som falt ut skal fjernes",
+   DIFF.fjern.length === 1 && DIFF.fjern[0].kampId === "a", JSON.stringify(DIFF.fjern));
+// Den uendrede er hele poenget: den skal verken slettes eller skrives, sa
+// `satt` og `satt_av` star som de sto.
+ok("og den som sto der og fortsatt star, er uendret",
+   DIFF.uendret.length === 1 && DIFF.uendret[0].kampId === "b",
+   JSON.stringify(DIFF.uendret));
+ok("ingen endring gir tre tomme lister unntatt uendret",
+   visningsDiff(FRA_FOR, FRA_FOR).nye.length === 0 &&
+   visningsDiff(FRA_FOR, FRA_FOR).fjern.length === 0 &&
+   visningsDiff(FRA_FOR, FRA_FOR).uendret.length === 2);
+ok("tomt fra for gjor alt nytt",
+   visningsDiff([], ONSKET).nye.length === 2 && visningsDiff([], ONSKET).fjern.length === 0);
+ok("tomt onske fjerner alt",
+   visningsDiff(FRA_FOR, []).fjern.length === 2 && visningsDiff(FRA_FOR, []).nye.length === 0);
+ok("tull inn kaster ikke", visningsDiff(null, null).nye.length === 0);
+
+// Knappen sier hva trykket kommer til a GJORE. «Lagre 6 kamper» nar du la
+// til én er sant om det som sendes og usant om det du gjor.
+ok("en tilfoyelse sier at den legger til",
+   lagreKnappTekst(1, 0, 6, "Carls") === "Legg til 1 kamp for Carls",
+   lagreKnappTekst(1, 0, 6, "Carls"));
+ok("flertall boyes",
+   lagreKnappTekst(3, 0, 8, "Carls").indexOf("3 kamper") > -1,
+   lagreKnappTekst(3, 0, 8, "Carls"));
+ok("en fjerning sier at den fjerner",
+   lagreKnappTekst(0, 2, 4, "Carls") === "Fjern 2 kamper for Carls",
+   lagreKnappTekst(0, 2, 4, "Carls"));
+// Fjerner du de siste, er det en annen handling enn a fjerne noen.
+ok("de siste som fjernes far sine egne ord",
+   lagreKnappTekst(0, 3, 0, "Carls") === "Fjern alle kamper for Carls",
+   lagreKnappTekst(0, 3, 0, "Carls"));
+ok("begge deler pa en gang sier begge deler",
+   lagreKnappTekst(1, 2, 5, "Carls") === "Legg til 1 kamp og fjern 2 for Carls",
+   lagreKnappTekst(1, 2, 5, "Carls"));
+ok("ingen endring sier at det er lagret",
+   lagreKnappTekst(0, 0, 5, "Carls") === "Lagret for Carls",
+   lagreKnappTekst(0, 0, 5, "Carls"));
+// Tomt og lagret er ikke det samme som lagret: uten kamper ville «Lagret
+// for Carls» pastatt at noe ligger der.
+ok("tomt og uendret sier at ingenting er satt",
+   lagreKnappTekst(0, 0, 0, "Carls") === "Ingen kamper satt for Carls",
+   lagreKnappTekst(0, 0, 0, "Carls"));
+ok("uten pubnavn star teksten likevel",
+   lagreKnappTekst(1, 0, 1, "") === "Legg til 1 kamp",
+   lagreKnappTekst(1, 0, 1, ""));
 
 /* ---------------- det Overpass faktisk sier nar den nekter ---------------- */
 

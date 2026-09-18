@@ -27,6 +27,7 @@ import { PUBER_OSLO } from "../../puber-oslo.js";
 import { slaSammenPuber, tolkPubRader } from "../../pub-data.js";
 import {
   sjekkVisninger, slaSammen, tolkVisninger, visningRad, kampIderFor,
+  visningsDiff,
 } from "../../visning-data.js";
 
 const TABELL = "visninger";
@@ -95,6 +96,12 @@ async function hentOppsett(mangler) {
 
 /* ---------- skriving ---------- */
 
+// «1 kamp», ikke «1 kamper». Star her og ikke i visning-data.js fordi den
+// bare brukes til a forme kvitteringen herfra.
+function antall(n) {
+  return n + (n === 1 ? " kamp" : " kamper");
+}
+
 async function lagre(inn) {
   const token = String(inn.token || "");
   if (!token) {
@@ -122,33 +129,59 @@ async function lagre(inn) {
   const ider = kampIderFor(kamper);
   if (!ider.length) return svar({ feil: "Kampene mangler id" }, 400);
 
-  // Ryddingen forst: puben sine rader for akkurat de kampene som sto pa
-  // skjermen, og ingen andre. Da kan to puber settes etter hverandre, og
-  // en annen ligas visninger overlever et bytte — samme avgrensning som
-  // slaSammen gjorde i minnet.
-  const slett = await hosSupabase("DELETE",
-    "/rest/v1/" + TABELL + "?pub=eq." + encodeURIComponent(pub) +
-    "&kamp_id=in.(" + ider.map(encodeURIComponent).join(",") + ")", null, token);
-  if (!slett.ok) return feilSvar(slett);
+  // Avgrensningen er den samme som for: puben sine rader for akkurat de
+  // kampene som sto pa skjermen, og ingen andre. Da kan to puber settes
+  // etter hverandre, og en annen ligas visninger overlever et bytte.
+  const omfang = "?pub=eq." + encodeURIComponent(pub) +
+    "&kamp_id=in.(" + ider.map(encodeURIComponent).join(",") + ")";
 
-  let skrevet = [];
-  if (nye.length) {
+  // Det som ligger der fra for. Meldt 18. september 2026: «Jeg legger til
+  // én, og da star det 6 lagret. Egentlig sa lagrer bruker 1 da.»
+  //
+  // Vi slettet og skrev alle radene pa nytt. De som ikke var endret fikk
+  // da nytt `satt` og ny `satt_av` — feltet som skal si NAR noen satte
+  // kampen, sa i stedet «sist noen trykket lagre», og i en annens navn.
+  // Ingen sa det, for `satt` vises ikke. Et felt som stille blir usant er
+  // verre enn et som ropes ut: ingenting avsloerer det.
+  const fra = await hosSupabase("GET", "/rest/v1/" + TABELL + omfang +
+    "&select=" + FELT, null, token);
+  if (!fra.ok) return feilSvar(fra);
+  const { nye: skalLegges, fjern, uendret } = visningsDiff(tolkVisninger(fra.json), nye);
+
+  if (fjern.length) {
+    const borte = fjern.map((v) => encodeURIComponent(String(v.kampId))).join(",");
+    const slett = await hosSupabase("DELETE",
+      "/rest/v1/" + TABELL + "?pub=eq." + encodeURIComponent(pub) +
+      "&kamp_id=in.(" + borte + ")", null, token);
+    if (!slett.ok) return feilSvar(slett);
+  }
+
+  if (skalLegges.length) {
     const r = await hosSupabase("POST",
-      "/rest/v1/" + TABELL + "?select=" + FELT, nye.map(visningRad), token,
+      "/rest/v1/" + TABELL + "?select=" + FELT, skalLegges.map(visningRad), token,
       { "Prefer": "return=representation" });
     if (!r.ok) return feilSvar(r);
-    skrevet = tolkVisninger(r.json);
+  }
 
-    // En skriving som svarer 200 er ikke bevis pa at raden ligger der.
-    // Samme lekse som kampsvar: mangler skrivepolicyen, kan svaret se
-    // vellykket ut mens ingenting ble lagret.
-    if (!skrevet.length) {
-      return svar({
-        feil: "Ingenting ble lagret. Skrivingen svarte " + r.status
-          + ", men ingen rader kom tilbake. Star du i visning_skrivere?",
-        forsok: r.forsok,
-      }, 502);
-    }
+  // En skriving som svarer 200 er ikke bevis pa at raden ligger der.
+  // Samme lekse som kampsvar: mangler skrivepolicyen, kan svaret se
+  // vellykket ut mens ingenting ble lagret. Vi leser tilbake HELE omfanget
+  // — bade for a bevise skrivingen og fordi portalen trenger den fulle
+  // lista for disse kampene, ikke bare radene som nettopp ble laget.
+  const etter = await hosSupabase("GET", "/rest/v1/" + TABELL + omfang +
+    "&select=" + FELT, null, token);
+  if (!etter.ok) return feilSvar(etter);
+  const skrevet = tolkVisninger(etter.json);
+
+  const staar = new Set(skrevet.map((v) => String(v.kampId)));
+  const mangler = skalLegges.filter((v) => !staar.has(String(v.kampId)));
+  if (mangler.length) {
+    return svar({
+      feil: "Ingenting ble lagret. Skrivingen svarte ok, men " + mangler.length
+        + " av " + skalLegges.length + " rader kom ikke tilbake."
+        + " Star du i visning_skrivere?",
+      forsok: etter.forsok,
+    }, 502);
   }
 
   // Ryddebøtta til slutt, og en feil her skal ikke velte en lagring som
@@ -158,13 +191,28 @@ async function lagre(inn) {
     "/rest/v1/" + TABELL + "?dato=lt." + encodeURIComponent(grense), null, token);
   if (!ryddet.ok) console.error("[visninger] rydding feilet: " + (ryddet.melding || ""));
 
+  // Kvitteringen sier hva som faktisk skjedde, ikke hvor mange kamper som
+  // sto avkrysset. «Lagret 6 kamper» nar du la til én er sant om det som
+  // ble sendt og usant om det du gjorde.
+  const deler = [];
+  if (skalLegges.length) deler.push("La til " + antall(skalLegges.length));
+  if (fjern.length) deler.push("fjernet " + antall(fjern.length));
+  const endret = deler.length
+    ? deler.join(", ") + "."
+    : "Ingenting var endret.";
+  const sto = uendret.length ? " " + antall(uendret.length) + " sto fra før." : "";
+
   return svar({
     ok: true,
     pub,
     valgt: skrevet.length,
+    lagtTil: skalLegges.length,
+    fjernet: fjern.length,
+    uendret: uendret.length,
     visninger: skrevet,
-    merknad: "Lagret. Endringen er ute for leserne med det samme — ingen"
-      + " utrulling å vente på lenger.",
+    merknad: endret + sto
+      + " Endringen er ute for leserne med det samme — ingen utrulling å"
+      + " vente på.",
   }, 200);
 }
 

@@ -807,6 +807,33 @@ const SAK_5 = kjor("visning", FELLES + `
          document.querySelectorAll("#menuPanel button button").length === 0,
          document.querySelectorAll("#menuPanel button button").length);
 
+      // Lenka til portalen heter det samme som sida den apner. «Hvem viser
+      // kampen (admin)» beskrev en seksjon av portalen, ikke portalen.
+      var adminLenke = Array.prototype.filter.call(
+        document.querySelectorAll(".admin-lenke"),
+        function (a) { return a.getAttribute("href") === "/admin.html"; })[0];
+      ok("lenka til portalen heter Admin",
+         !!adminLenke && adminLenke.textContent.trim() === "Admin",
+         adminLenke && adminLenke.textContent);
+      // Personvern star forst: den gjelder alle som apner menyen.
+      ok("og personvern star forst av de to",
+         document.querySelector(".admin-lenke").getAttribute("href") === "/personvern.html",
+         document.querySelector(".admin-lenke").getAttribute("href"));
+
+      // **Seksten piksler.** Safari pa iPhone zoomer inn av seg selv nar du
+      // fokuserer et felt med mindre skrift, og etter den zoomen er sida
+      // pannbar sidelengs. Meldt i portalen 18. september; appen hadde det
+      // samme — PIN-feltet pa 13 px og sokefeltet pa 13,5.
+      var smaa = [];
+      Array.prototype.forEach.call(
+        document.querySelectorAll("input, select, textarea"), function (e) {
+          if (e.type === "checkbox" || e.type === "radio") return;
+          var px = parseFloat(getComputedStyle(e).fontSize);
+          if (!(px >= 16)) smaa.push((e.id || e.className || e.tagName) + " " + px + "px");
+        });
+      ok("ingen felt i appen er sa sma at iPhone zoomer inn i dem",
+         smaa.length === 0, smaa.join(", "));
+
       // Footeren tok 38 % av menyen pa en telefon med stor skrift, og da
       // sto det siste emnet halvt under kanten. Malt med A+ og med
       // «Installer appen» synlig, som er det verste tilfellet: begge
@@ -1986,11 +2013,15 @@ const SAK_15 = kjor("admin", `
       brukerKall.push(bk);
       if (bk.passord !== "hemmelig") return svar(401, { feil: "Feil passord" });
       if (bk.handling === "liste") {
+        // «sist» er PIN-datoen, «aktiv» er okta. Kari tastet PIN-en for
+        // fem dager siden og har appen i gang na; Ola har ingen levende
+        // okt. Nettopp den forskjellen kolonnen finnes for (ADR 0021).
         return svar(200, { brukere: [
           { id: "11111111-2222-3333-4444-555555555555", navn: "Kari", slug: "kari",
-            forst: "2026-09-01T10:00:00Z", sist: new Date(Date.now() - 3600000).toISOString() },
+            forst: "2026-09-01T10:00:00Z", sist: "2026-09-12T19:00:00Z",
+            aktiv: new Date(Date.now() - 3600000).toISOString() },
           { id: "66666666-7777-8888-9999-000000000000", navn: "Ola", slug: "ola",
-            forst: "2026-08-20T10:00:00Z", sist: "2026-08-20T10:00:00Z" }
+            forst: "2026-08-20T10:00:00Z", sist: "2026-08-20T10:00:00Z", aktiv: "" }
         ] });
       }
       if (bk.handling === "pin") return svar(200, { ok: true });
@@ -2122,14 +2153,18 @@ const SAK_15 = kjor("admin", `
 
         bokser[0].checked = true;
         bokser[0].dispatchEvent(new Event("change", { bubbles: true }));
-        // «Lagre» alene sier ikke hva den lagrer.
-        ok("knappen sier hvor mange og for hvem",
-           document.getElementById("lagre").textContent === "Lagre 1 kamp for " + puber.value,
+        // «Lagre» alene sier ikke hva den lagrer. Og fra 18. september
+        // sier den hva trykket GJOR, ikke hvor mange som star avkrysset:
+        // «Lagre 6 kamper» nar du la til én er sant om det som sendes og
+        // usant om det du gjor. Denne puben har ingenting fra for, sa én
+        // avkrysning er én tilfoyelse.
+        ok("knappen sier hva trykket gjor, og for hvem",
+           document.getElementById("lagre").textContent === "Legg til 1 kamp for " + puber.value,
            document.getElementById("lagre").textContent);
         bokser[1].checked = true;
         bokser[1].dispatchEvent(new Event("change", { bubbles: true }));
         ok("og teller riktig i flertall",
-           document.getElementById("lagre").textContent === "Lagre 2 kamper for " + puber.value,
+           document.getElementById("lagre").textContent === "Legg til 2 kamper for " + puber.value,
            document.getElementById("lagre").textContent);
         bokser[1].checked = false;
         bokser[1].dispatchEvent(new Event("change", { bubbles: true }));
@@ -2217,14 +2252,36 @@ const SAK_15 = kjor("admin", `
           var hodetekst = Array.prototype.map.call(hoder, function (h) {
             return h.textContent.trim();
           }).join("|");
+          // Fra 17. september er «Sist inne» sant: kolonnen leser oktene,
+          // ikke PIN-datoen (ADR 0021).
           ok("kolonnen heter det feltet faktisk er",
-             hodetekst.indexOf("Sist pålogget") !== -1 &&
-             hodetekst.indexOf("Sist inne") === -1, hodetekst);
+             hodetekst.indexOf("Sist inne") !== -1 &&
+             hodetekst.indexOf("Sist pålogget") === -1, hodetekst);
           var brukerAvsnitt = document.querySelectorAll("#brukere");
           var seksjon = brukerAvsnitt[0].closest("section").textContent;
-          ok("og siden sier at det ikke er sist bruk",
-             seksjon.indexOf("tastet PIN-en") !== -1 &&
-             seksjon.indexOf("ikke") !== -1, seksjon.slice(0, 200));
+          ok("og siden sier hva det er, og hva det ikke er",
+             seksjon.indexOf("sist appen var i gang") !== -1 &&
+             seksjon.indexOf("ikke sist de tastet PIN-en") !== -1,
+             seksjon.slice(0, 260));
+
+          // Timen som gikk er okta, ikke PIN-datoen fra 12. september.
+          // Leste cella «sist», ville det statt en dato flere dager
+          // tilbake — og det var hele feilen som ble meldt to dager pa rad.
+          var inneCelle = rader[0].querySelectorAll(".tid")[1];
+          ok("cella viser okta, ikke PIN-datoen",
+             inneCelle.textContent.indexOf("I dag") === 0, inneCelle.textContent);
+          // PIN-datoen er ikke borte — den trengs nar noen har glemt sin.
+          ok("PIN-datoen ligger i hjelpeteksten",
+             (inneCelle.title || "").indexOf("Tastet PIN-en sist") === 0,
+             inneCelle.title);
+          // Uten en levende okt star det noe, ikke ingenting: en tom celle
+          // er ikke til a skille fra «har aldri vaert inne».
+          var utenOkt = rader[1].querySelectorAll(".tid")[1];
+          ok("uten okt star det at det ikke finnes en",
+             utenOkt.textContent.indexOf("Ingen økt i live") === 0,
+             utenOkt.textContent);
+          ok("og PIN-datoen star likevel i hjelpeteksten",
+             (utenOkt.title || "").indexOf("Tastet PIN-en sist") === 0, utenOkt.title);
 
           // «Jeg er inne men det star 2 dager siden.» Begge deler er sant:
           // du er innlogget na, og feltet er sist du TASTET PIN-en. Den ene
@@ -2238,7 +2295,7 @@ const SAK_15 = kjor("admin", `
           // Den ma sta ved siden av datoen den svarer pa, ikke ved navnet.
           ok("merket star i palogget-cella, ikke ved navnet",
              !!deg[0] && deg[0].closest("td").className === "tid" &&
-             deg[0].closest("td").getAttribute("data-merke") === "Sist pålogget",
+             deg[0].closest("td").getAttribute("data-merke") === "Sist inne",
              deg[0] && deg[0].closest("td").className);
           // Bare din egen: et merke pa alles rader ville pastatt at alle er
           // innlogget, og det vet vi ingenting om.
@@ -2259,6 +2316,32 @@ const SAK_15 = kjor("admin", `
              under.indexOf("PIN-en deres") === -1, under);
           ok("og lover ingen utrulling a vente pa",
              under.indexOf("utrullingen") === -1, under);
+
+          // **Seksten piksler.** Safari pa iPhone zoomer inn av seg selv
+          // nar du fokuserer et felt med mindre skrift enn 16 px, og etter
+          // den zoomen er hele sida pannbar sidelengs.
+          //
+          // Meldt to ganger som «jeg kan scrolle skjermen til venstre og
+          // hoyre». Forste gang lette jeg etter noe som var for bredt, og
+          // brukertabellen VAR det — men etter at den var rettet, sto
+          // feilen der fortsatt. Andre gang malte jeg hvert eneste element
+          // og fant ingenting over 320 px. Layouten var riktig hele tiden;
+          // det var forstoerrelsen.
+          //
+          // Derfor maler denne skriftstoerrelse framfor bredde: bredden var
+          // aldri problemet, og en vakt som maler feil ting er en vakt som
+          // sier «alt er bra» mens telefonen gjor noe annet.
+          var smaaFelt = [];
+          Array.prototype.forEach.call(
+            document.querySelectorAll("input, select, textarea"), function (e) {
+              if (e.type === "checkbox" || e.type === "radio") return;
+              var px = parseFloat(getComputedStyle(e).fontSize);
+              if (!(px >= 16)) {
+                smaaFelt.push((e.id || e.className || e.tagName) + " " + px + "px");
+              }
+            });
+          ok("ingen felt er sa sma at iPhone zoomer inn i dem",
+             smaaFelt.length === 0, smaaFelt.join(", "));
 
           // Sida skal fa plass pa en telefon. Meldt 17. september 2026:
           // «Den er los pa mobil, dvs jeg kan scrolle hele skjermen til
@@ -2741,7 +2824,11 @@ const SAK_15D = kjor("admin-lagret-star", `
     { id: 502, hjemme: "Vaalerenga", borte: "Bodo/Glimt", dato: "2026-09-21T15:00:00+00:00",
       arena: "Intility Arena", runde: "Runde 21" },
     { id: 503, hjemme: "Viking", borte: "Lillestrom", dato: "2026-09-27T16:00:00+00:00",
-      arena: "SR-Bank Arena", runde: "Runde 22" }
+      arena: "SR-Bank Arena", runde: "Runde 22" },
+    // Ikke lagret fra for. Den finnes sa scenen kan gjore det som ble
+    // meldt: komme inn til noen avkryssede, og legge til én.
+    { id: 504, hjemme: "Stromsgodset", borte: "Sarpsborg 08",
+      dato: "2026-09-28T18:00:00+00:00", arena: "Marienlyst", runde: "Runde 22" }
   ];
   var VISNINGER = [
     { pub: "Andy's Pub", kampId: "2026-09-20-rosenborg-brann" },
@@ -2792,10 +2879,33 @@ const SAK_15D = kjor("admin-lagret-star", `
       felt("pub").dispatchEvent(new Event("change"));
 
       var bokser = felt("kamper").querySelectorAll(".kamp input");
-      ok("alle tre kampene er tegnet", bokser.length === 3, bokser.length);
-      ok("og alle tre er krysset av fra for",
-         Array.prototype.every.call(bokser, function (b) { return b.checked; }),
+      ok("alle fire kampene er tegnet", bokser.length === 4, bokser.length);
+      ok("og de tre som er lagret er krysset av",
+         bokser[0].checked && bokser[1].checked && bokser[2].checked && !bokser[3].checked,
          Array.prototype.map.call(bokser, function (b) { return b.checked; }).join(","));
+
+      // Meldt 18. september 2026, i innsenderens egne ord: «Jeg kommer
+      // inn, fem kamper er markert, jeg legger til én, og da star det 6
+      // lagret. Egentlig sa lagrer bruker 1 da.»
+      bokser[3].checked = true;
+      felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
+      ok("én lagt til sier «Legg til 1 kamp», ikke «Lagre 4»",
+         felt("lagre").textContent === "Legg til 1 kamp for Andy's Pub",
+         felt("lagre").textContent);
+      // Og ett vekk i tillegg: to ulike handlinger i samme trykk, og
+      // begge ma sies.
+      bokser[0].checked = false;
+      felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
+      ok("en tilfoyelse og en fjerning sier begge deler",
+         felt("lagre").textContent === "Legg til 1 kamp og fjern 1 for Andy's Pub",
+         felt("lagre").textContent);
+      // Tilbake til utgangspunktet: da er det ingenting a lagre.
+      bokser[3].checked = false;
+      bokser[0].checked = true;
+      felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
+      ok("og tilbake til start er det ingenting a gjore",
+         felt("lagre").textContent === "Lagret for Andy's Pub" &&
+         felt("lagre").disabled === true, felt("lagre").textContent);
 
       // Sporsmalet admin har er «ble det jeg lagret staende», ikke «hvor
       // mange er det». Hinten ma svare pa det forste.
@@ -2810,15 +2920,18 @@ const SAK_15D = kjor("admin-lagret-star", `
       // tre synlige avkryssinger av fem ser ut som tap uten det.
       ok("hver runde sier hvor mange som er valgt i den",
          rundeTekst().indexOf("2 av 2 valgt") > -1 &&
-         rundeTekst().indexOf("1 av 1 valgt") > -1, rundeTekst());
+         rundeTekst().indexOf("1 av 2 valgt") > -1, rundeTekst());
 
       // Tallet telles av boksene, ikke fort ved siden av dem.
       bokser[0].checked = false;
       felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
       ok("tallet folger boksene med det samme",
          rundeTekst().indexOf("1 av 2 valgt") > -1, rundeTekst());
-      ok("og knappen sier det samme som boksene",
-         felt("lagre").textContent.indexOf("2 kamper") > -1, felt("lagre").textContent);
+      // Tre sto lagret, én er tatt vekk: knappen sier fjerningen, ikke
+      // de to som blir igjen.
+      ok("og knappen sier hva som er endret, ikke hva som star igjen",
+         felt("lagre").textContent === "Fjern 1 kamp for Andy's Pub",
+         felt("lagre").textContent);
 
       felt("merkIngen").click();
       ok("null valgt star som null, ikke som tomt",
@@ -2832,6 +2945,14 @@ const SAK_15D = kjor("admin-lagret-star", `
       felt("merkAlle").click();
       ok("og «kryss av alle» fyller dem igjen",
          rundeTekst().indexOf("2 av 2 valgt") > -1, rundeTekst());
+      // «Kryss av alle» tar med den fjerde ogsa, og den var aldri lagret.
+      // Da er det én tilfoyelse, ikke «ingenting a lagre» — og knappen
+      // skal si det.
+      ok("kryss av alle pa en liste med en ulagret sier at den legger til",
+         felt("lagre").textContent === "Legg til 1 kamp for Andy's Pub",
+         felt("lagre").textContent);
+      felt("kamper").querySelectorAll(".kamp input")[3].checked = false;
+      felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
       // Tilbake til det som sto lagret: da er det ingenting a lagre, og
       // knappen skal si det framfor a be om et trykk som ikke endrer noe.
       // Meldt 17. september 2026: «Jeg trykker lagre, far beskjed at de er
@@ -2848,9 +2969,10 @@ const SAK_15D = kjor("admin-lagret-star", `
       var enBoks = felt("kamper").querySelectorAll(".kamp input")[0];
       enBoks.checked = false;
       felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
-      ok("et kryss fjernet gir en knapp som ber om lagring",
+      // Tre sto lagret; ett kryss vekk er én fjerning, ikke «lagre 2».
+      ok("et kryss fjernet gir en knapp som sier at den fjerner én",
          felt("lagre").disabled === false &&
-         felt("lagre").textContent.indexOf("Lagre 2 kamper") === 0,
+         felt("lagre").textContent === "Fjern 1 kamp for Andy's Pub",
          felt("lagre").textContent);
       felt("lagre").click();
       setTimeout(function () { try {
@@ -2865,9 +2987,10 @@ const SAK_15D = kjor("admin-lagret-star", `
         // Endrer du noe etterpa, er det noe a lagre igjen.
         enBoks.checked = true;
         felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
+        // Den ene som ble fjernet, legges tilbake: én tilfoyelse.
         ok("en ny endring vekker knappen igjen",
            felt("lagre").disabled === false &&
-           felt("lagre").textContent.indexOf("Lagre 3 kamper") === 0,
+           felt("lagre").textContent === "Legg til 1 kamp for Andy's Pub",
            felt("lagre").textContent);
         videre();
       } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);

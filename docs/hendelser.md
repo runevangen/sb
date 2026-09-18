@@ -69,6 +69,150 @@ og de sto der hele tiden, under en linje som sa at noe var galt.
 
 ---
 
+## 18. september 2026 — Det var ikke bredden, det var zoomen
+
+**Meldt som:** «Jeg kan fortsatt flytte vindu til høyre og venstre. Admin
+vindu.» — andre gang, etter at brukertabellen var rettet.
+
+Første gang fant jeg noe ekte: tabellen trengte 457 px der telefonen ga
+343. Jeg rettet den, skrev en vakt som måler `main` i en 320 px-boks, og
+trodde saken var ute av verden.
+
+**Andre gang målte jeg hvert eneste element.** Ingenting over 320 px. Alle
+seksjoner synlige, skjemaene åpne, tabellen full. Layouten var riktig.
+
+Safari på iPhone **zoomer inn av seg selv** når du fokuserer et felt med
+skrift under 16 px. Etter den zoomen er den visuelle viewporten mindre enn
+layout-viewporten, og sida kan dras sidelengs. Feltene arvet `font: inherit`
+— 15 px fra `body`. Én piksel fra å være trygg. PIN-feltet i brukerlista sto
+på 13.
+
+Det skjer i det du trykker i passordfeltet, altså første handling på sida.
+Derfor så det ut som om sida alltid var «løs».
+
+**Vakta målte feil ting.** Den målte bredde, og bredden var i orden. En
+vakt som måler feil ting sier «alt er bra» mens telefonen gjør noe annet —
+og den er verre enn ingen vakt, fordi den lukker spørsmålet. Den nye måler
+`font-size` på hvert `input`, `select` og `textarea`, og lister opp hvert
+felt som er for lite når den slår ut.
+
+**Appen hadde det samme:** `.konto-felt` på 13 px — der PIN-en skrives, og
+altså feltet folk blir stående lengst i — og `.sok-felt` på 13,5. Begge
+rettet. `--fs` er 1 eller 1,2, så skaleringen oppover står; det er bare
+bunnen som er løftet. Vakta dekker begge sider nå.
+
+Samtidig: lenka i hamburgermenyen het «Hvem viser kampen (admin)», som
+beskrev én seksjon av portalen framfor portalen. Den heter «Admin» nå, som
+sida selv.
+
+---
+
+## 18. september 2026 — «Egentlig så lagrer bruker 1 da»
+
+**Meldt som:** «Jeg kommer inn i admin, fem kamper er markert. Jeg legger
+til én og da står det 6 lagret. Egentlig så lagrer bruker 1 da. De
+tidligere er lagret fra før.»
+
+Det var sant på to nivåer, og det andre så ingen.
+
+### Knappen talte valget, ikke endringen
+
+«Lagre 6 kamper» er sant om det som ble sendt og usant om det du gjorde.
+Knappen sier nå «Legg til 1 kamp for Andy's Pub» — eller «Fjern 2 kamper»,
+eller «Legg til 1 kamp og fjern 2» når begge deler skjer i samme trykk.
+
+### Og tjenesten skrev dem virkelig alle seks
+
+Lagringen slettet pubens rader for kampene på skjermen og skrev hele
+valget på nytt. De fem som alt lå der fikk dermed **nytt `satt` og ny
+`satt_av`** hver gang noen trykket lagre.
+
+Feltet som skal si *når kampen ble satt*, sa i stedet *sist noen trykket
+lagre* — og i den siste admins navn, siden databasen setter `satt_av` fra
+økta som skriver.
+
+**Ingen så det, fordi `satt` ikke vises noe sted.** Det er nettopp derfor
+det er verre enn en synlig feil: et felt som stille blir usant har
+ingenting som avslører det. Det hadde ligget der og vært galt til noen en
+dag bygde en visning oppe på det og lurte på hvorfor alle kampene var satt
+samme minutt.
+
+Tjenesten leser nå hva som ligger der, regner ut forskjellen med
+`visningsDiff()`, og rører bare den. Uendrede rader beholder sitt
+opprinnelige `satt`.
+
+**Og lesingen tilbake ble sterkere av det.** Før var beviset at
+skrivingen ga rader tilbake; nå leses hele omfanget etterpå, og hver rad
+som skulle legges til må være der. Kvitteringen sier hva som faktisk
+skjedde: «La til 1 kamp. 5 sto fra før.»
+
+### Stubben kunne ikke svare på spørsmålet lenger
+
+Funksjonstestene ga et fast svar på hver GET — den samme lista før og
+etter skrivingen. En tjeneste som leser tilbake for å se hva den gjorde,
+kan ikke testes mot noe slikt. Stubben er nå en liten tabell som forstår
+`pub=eq.`, `kamp_id=in.(…)` og `dato=lt.`: GET gir det som ligger der, POST
+legger til, DELETE fjerner.
+
+At den må forstå filtrene er ikke pedanteri — en stubb som svarte alt
+uansett filter, ville gitt en diff mot andre pubers rader og vært enig med
+en feil vi ikke har.
+
+**Fanget av:** en admin som talte etter. Feilen i knappen var synlig; den i
+databasen var det ikke, og den ble funnet fordi den første ble meldt.
+
+---
+
+## 17. september 2026 — Spørsmålet jeg hadde svart nei på to ganger
+
+«Jeg ønsker å kunne se når de var inne med pålogget bruker, ikke bare tastet
+pin kode. Er det mulig?»
+
+To dager på rad hadde jeg forklart hvorfor kolonnen sto som den sto: feltet
+er `last_sign_in_at`, en fornyet økt rører det ikke, og å måle bruk ville
+vært sporingen [ADR 0004](adr/0004-ingen-statistikk.md) forbyr. Først døpte
+jeg kolonnen om. Så satte jeg «det er deg, innlogget nå» ved siden av den.
+Begge gangene gjorde jeg etiketten sannere og lot spørsmålet stå.
+
+**Da jeg endelig slø opp i basen i stedet for å resonnere om den, sto svaret
+der.** Samme konto:
+
+| Felt | Verdi |
+| --- | --- |
+| `users.last_sign_in_at` | 14. september |
+| `sessions.refreshed_at` | 17. september 21:04 |
+
+Supabase fører allerede når økta sist ble fornyet. Den **må** — det er slik
+folk holdes innlogget. Å lese det feltet er ikke å begynne å måle noen; det
+er samme slags oppslag som `last_sign_in_at`, som vi hadde vist hele tiden.
+[ADR 0021](adr/0021-sist-inne-fra-oktene.md).
+
+**Det jeg tok feil av var ikke reglene, men hvor jeg lette.** «Er dette
+mulig uten å bryte ADR 0004» ble besvart fra det jeg visste om koden vår,
+ikke fra det som faktisk lå i databasen. Ett oppslag — fire linjer SQL —
+gjorde to dager med forklaringer unødvendige.
+
+Tre ting måtte stå for at kolonnen ikke skulle bli en ny halvsannhet: at
+det betyr «sist appen var i gang», ikke «sist de så på skjermen»; at
+historikken bare er så lang som øktene lever, så «Ingen økt i live» står
+framfor en tom celle; og at PIN-datoen ikke forsvinner — den ligger i
+hjelpeteksten, for det er den du trenger når noen har glemt PIN-en.
+
+**`personvern.html` sa «når hver av dem logget inn første og siste gang».**
+Den setningen ble usann i det kolonnen skiftet betydning. Rettet — ikke som
+en ny opplysning, men for å holde en gammel sann.
+
+**En stubb som var enig med koden uansett:** funksjonstestene ga det samme
+svaret på hvert endepunkt, så økt-oppslaget fikk brukerlista tilbake som
+«økter». Alt var grønt før jeg skrev en linje med assertions. De to
+endepunktene svarer hver for seg nå, som hos Supabase.
+
+**Og en bakoverfnutt i en kommentar:** ``// `sist` er PIN-datoen`` inne i en
+scene avsluttet malen scenen står i. Feilen kom ut som «missing ) after
+argument list» på en linje flere hundre lenger opp.
+
+---
+
 ## 17. september 2026 — Fire ting i portalen, meldt i én melding
 
 ### Sida var løs på mobil

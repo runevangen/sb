@@ -59,7 +59,11 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 - **Ingen funksjon har en `service_role`-nøkkel**, med ett dokumentert
   unntak (`brukere.mjs`). [ADR 0010](docs/adr/0010-ingen-service-role.md)
 - **Ingen sporing, ingen informasjonskapsler, ingen samtykkebanner.**
-  [ADR 0004](docs/adr/0004-ingen-statistikk.md)
+  [ADR 0004](docs/adr/0004-ingen-statistikk.md) — vi **fører** ingen
+  teller. Å lese et felt Supabase skriver uansett, fordi den må for å
+  holde folk innlogget, er noe annet: `sessions.refreshed_at` gir «sist
+  inne» uten at vi har begynt å måle noen.
+  [ADR 0021](docs/adr/0021-sist-inne-fra-oktene.md)
 - **Ingenting er låst bak innlogging.** [ADR 0009](docs/adr/0009-fornavn-og-pin.md)
 - **`PIN_PEPPER` kan ikke endres.** Et nytt pepper låser alle ute.
 
@@ -141,6 +145,12 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   også i et element som aldri settes inn i dokumentet, og også når vi
   kaster alt utenom teksten rett etterpå.
 - Filtrerer noe feeden, står det som en knapp med kryss i toppfeltet.
+- **Felt er minst 16 px.** Safari på iPhone zoomer inn av seg selv når du
+  fokuserer et felt med mindre skrift, og etter den zoomen er sida pannbar
+  sidelengs. Meldt to ganger som «jeg kan scrolle skjermen til venstre og
+  høyre»; begge gangene lette jeg etter noe som var for bredt. Det var
+  forstørrelsen, ikke bredden. To vakter i `run.mjs` måler `font-size` på
+  hvert `input`, `select` og `textarea` — én i portalen og én i appen.
 - **Hver regel som setter `display`, må si hva `[hidden]` betyr.**
   `display: flex` slår `[hidden]` fra nettleserens eget stilark, og da står
   et element framme som koden tror den har skjult.
@@ -168,6 +178,16 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 - **En skriving som svarer 200 er ikke bevis på at raden ligger der.**
   `settSvar` leser tilbake to ganger — som deg og som hvem som helst — og
   forskjellen er diagnosen.
+- **Skriv bare det som endrer seg.** `/api/visninger` leser hva som ligger
+  der, regner ut forskjellen med `visningsDiff()`, og rører bare den. Vi
+  slettet og skrev alt på nytt før; da fikk rader ingen hadde endret nytt
+  `satt` og ny `satt_av`, så feltet som skal si **når** noen satte kampen,
+  sa «sist noen trykket lagre» — i den siste admins navn. Ingen så det,
+  for `satt` vises ikke. Et felt som stille blir usant er verre enn ett som
+  ropes ut: ingenting avslører det.
+- **Knappen sier hva trykket gjør, ikke hvor mye som er valgt.** «Lagre 6
+  kamper» når du la til én er sant om det som sendes og usant om det du
+  gjør. `lagreKnappTekst()` teller endringen.
 - **Feilsvar caches aldri** (`no-store`). Ellers låser et blaff seg fast.
 - Hemmeligheter står samlet i [`docs/nokler-og-tokens.md`](docs/nokler-og-tokens.md).
   Funksjonene leser miljøet **ved utrulling** — en ny variabel krever en

@@ -553,7 +553,12 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: inherit;
-  font-size: calc(13px * var(--fs));
+  /* **Seksten piksler, ikke tretten.** Safari pa iPhone zoomer inn av seg
+     selv nar du fokuserer et felt med mindre skrift, og etter den zoomen
+     er sida pannbar sidelengs. Her skrives PIN-en, sa det er feltet folk
+     blir staende lengst i. `--fs` er 1 eller 1.2, sa skaleringen oppover
+     star — det er bare bunnen som er loftet. */
+  font-size: calc(16px * var(--fs));
 }
 
 .konto-felt[hidden] { display: none; }
@@ -1410,7 +1415,9 @@ a.ad-cta:focus-visible {
   background: var(--bg-page);
   color: var(--text);
   font-family: inherit;
-  font-size: 13.5px;
+  /* Samme grunn som .konto-felt: under 16 px zoomer iPhone inn i det du
+     trykker i feltet, og da kan sida dras sidelengs. */
+  font-size: 16px;
 }
 
 .sok-felt::placeholder { color: var(--text-dimmer); }

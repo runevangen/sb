@@ -44,10 +44,17 @@
   .forslag-knapper { display: flex; gap: 14px; }
   h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tekst-dim); margin: 0 0 10px; }
   label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+  /* **Seksten piksler, ikke femten.** Safari pa iPhone zoomer inn av seg
+     selv nar du fokuserer et felt med mindre skrift enn 16 px — og etter
+     den zoomen er hele sida pannbar sidelengs. Meldt to ganger som «jeg
+     kan scrolle skjermen til venstre og hoyre»; forste gang lette jeg
+     etter noe som var for bredt, og fant ingenting, fordi layouten var
+     riktig hele tiden. Det var forstoerrelsen, ikke bredden.
+     `font: inherit` ga 15 px fra body. En piksel fra a vaere trygg. */
   input[type="password"], input[type="text"], input[type="url"],
   input[type="date"], input[type="number"], select, textarea {
     width: 100%; padding: 10px; border: 1px solid var(--ramme-sterk); border-radius: 8px;
-    background: #fff; color: var(--tekst); font: inherit;
+    background: #fff; color: var(--tekst); font: inherit; font-size: 16px;
   }
   textarea { resize: vertical; min-height: 60px; }
   /* Stedredigeringen. To felt side om side der de hoerer sammen — gate og
@@ -112,6 +119,11 @@
   .melding { margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; font-size: 14px; }
   .melding.ok { background: var(--ok-bg); color: var(--ok); }
   .melding.feil { background: var(--feil-bg); color: var(--feil); }
+  /* En hint som barer en feil skal leses som en feil. [hidden] sier hva
+     den betyr fordi regelen over setter farge, ikke display — men neste
+     som legger display her, ma vite det. */
+  .hint.feil { color: var(--feil); }
+  .hint[hidden] { display: none; }
   .melding:empty { display: none; padding: 0; }
   .hint { font-size: 12px; color: var(--tekst-svak); margin: 8px 0 0; }
   .rad { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -141,9 +153,10 @@
     display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
     padding-top: 8px; white-space: normal;
   }
+  /* Ogsa her: under 16 px zoomer iPhone inn i det du trykker i feltet. */
   .brukere input[type="text"] {
-    width: 90px; padding: 7px 8px; border: 1px solid var(--ramme-sterk);
-    border-radius: 6px; background: #fff; color: var(--tekst); font: inherit; font-size: 13px;
+    width: 96px; padding: 7px 8px; border: 1px solid var(--ramme-sterk);
+    border-radius: 6px; background: #fff; color: var(--tekst); font: inherit; font-size: 16px;
   }
   .brukere button { padding: 7px 10px; font-size: 13px; }
   /* Sletting star som tekst til den er trykket en gang — da blir den rod
@@ -380,23 +393,26 @@
 
   <section>
     <h2>Brukere</h2>
-    <!-- «Sist palogget», ikke «Sist inne». Feltet er last_sign_in_at fra
-         Supabase: naar noen sist TASTET PIN-en. Appen holder telefonen
-         innlogget med roterende fornyere (ADR 0009), og en fornying er
-         ingen palogging — sa en som bruker appen hver dag kan sta med en
-         dato flere uker tilbake. «Sist inne» pastod aktivitet vi ikke
-         maler. Meldt fra portalen 16. september 2026: «Jeg er inne na og
-         det star 2 dager siden.» Datoen var riktig; ordet var ikke. -->
+    <!-- «Sist inne» kommer fra oktene, ikke fra last_sign_in_at.
+         Det feltet er sist noen TASTET PIN-en, og appen holder telefonen
+         innlogget med roterende fornyere (ADR 0009): en fornying er ingen
+         palogging, sa en som er innom hver dag kunne sta med en dato uker
+         tilbake. Meldt to dager pa rad, begge gangene av en som var
+         innlogget i det oyeblikket han leste «2 dager siden».
+         Na er det sessions.refreshed_at som star her — Supabases eget
+         bokholderi, som GoTrue skriver fordi den MA for a holde folk
+         innlogget. Vi teller fortsatt ingenting selv. ADR 0021. -->
     <p class="hint">
-      <strong>Sist pålogget</strong> er sist personen tastet PIN-en — ikke
-      sist de brukte appen. Appen holder telefonen innlogget, så en som er
-      innom daglig kan stå med en dato uker tilbake. Vi måler ikke bruk, og
-      det er med vilje.
+      <strong>Sist inne</strong> er sist appen var i gang hos personen —
+      ikke sist de tastet PIN-en. Den datoen står i hjelpeteksten når du
+      holder pekeren over. Har ingen økt vært i live, står det ingenting:
+      logger noen ut, eller går økta ut, er den borte.
     </p>
     <p class="hint" id="brukerHint">Henter brukerne …</p>
+    <p class="hint feil" id="brukerOktfeil" hidden></p>
     <table class="brukere" id="brukere" hidden>
       <thead>
-        <tr><th>Navn</th><th>Første gang</th><th>Sist pålogget</th><th></th></tr>
+        <tr><th>Navn</th><th>Første gang</th><th>Sist inne</th><th></th></tr>
       </thead>
       <tbody id="brukerRader"></tbody>
     </table>
