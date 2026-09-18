@@ -260,7 +260,6 @@ kreditering, og den står der pubene vises.
   teller også per liga, ikke på tvers — boksene under viser én.
 - **`visningRad()` sender ikke `satt_av`.** Databasen setter den fra økta
   med `default auth.uid()`. Uten defaulten sto kolonnen tom i et døgn.
-- **`utenGamle()` rydder spilte kamper hver gang admin lagrer.**
 
 ### `konto-data.js` og `pin-data.js` — innlogging
 

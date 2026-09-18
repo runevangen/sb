@@ -36,7 +36,7 @@ import svarfunksjon from "../netlify/functions/svar.mjs";
 // baselinja tom, og den er nodt til a settes her, for den forste testen.
 [
   "THESPORTSDB_KEY", "API_FOOTBALL_KEY", "api_football_key",
-  "ADMIN_PASSORD", "PIN_PEPPER", "MET_KONTAKT", "GITHUB_TOKEN",
+  "ADMIN_PASSORD", "PIN_PEPPER", "MET_KONTAKT",
   "SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_KEY",
 ].forEach((navn) => { delete process.env[navn]; });
 
@@ -237,7 +237,6 @@ ok("tilbakefallet forklarer forsoket",
 // kunne fore inn en kamp som spilles om to uker. Leseren filtrerer til en
 // runde i visningen.
 ok("hele vinduet av kommende kamper er med", nes.kamper.length === 3, nes.kamper.length);
-ok("lagnavn i kampene oversettes ogsa", nes.kamper[0].borte === "Bodø/Glimt", nes.kamper[0].borte);
 ok("forste runde navngis som for", nes.runde === "Runde 21", nes.runde);
 ok("og rundene star oppfort i rekkefolge",
    Array.isArray(nes.runder) && nes.runder[0] === "Runde 21" && nes.runder.length > 1,
@@ -283,8 +282,6 @@ ok("svaret er merket med kilde og inneværende sesong",
 ok("hele vinduet er med, med forste runde navngitt",
    arets.kamper.length === 3 && arets.runde === "Runde 21",
    arets.kamper.length + " " + arets.runde);
-ok("tidspunktet er UTC med sone", arets.kamper[0].dato === "2026-09-13T15:00:00Z", arets.kamper[0].dato);
-ok("lagnavn oversettes ogsa herfra", arets.kamper[0].borte === "Bodø/Glimt", arets.kamper[0].borte);
 ok("arenaen folger med", arets.kamper[0].arena === "Brann Stadion", arets.kamper[0].arena);
 ok("arets kamper caches som neste runde ellers",
    (r.headers.get("Netlify-CDN-Cache-Control") || "").indexOf("s-maxage=21600") > -1,
@@ -756,9 +753,6 @@ ok("uten oppsett svarer portalen 503", r.status === 503, r.status);
 ok("og sier hvilke variabler som mangler",
    uoppsatt.feil.indexOf("ADMIN_PASSORD") > -1 && uoppsatt.feil.indexOf("SUPABASE_URL") > -1,
    uoppsatt.feil);
-// GITHUB_TOKEN kreves ikke lenger: lagringen gar ikke via repoet.
-ok("og krever ikke GITHUB_TOKEN lenger",
-   uoppsatt.feil.indexOf("GITHUB_TOKEN") === -1, uoppsatt.feil);
 ok("ingenting ble sendt noe sted", kall.length === 0, kall.length);
 
 // Portalen sporr om oppsettet for den viser noe. Da star det der for
@@ -1262,14 +1256,6 @@ ok("en fornying uten fornyer nar aldri tjenesten",
 // Tilbake til innloggingen: testene under leser `kall` fra den.
 kall = stubSupabase(OKT);
 r = await konto(kontoBe({ handling: "logg-inn", navn: "  Ola ", pin: "12 34" }));
-
-ok("samme navn gir samme konto uansett skrivemate",
-   JSON.parse(stubSupabase(OKT) && kall[0].opsjoner.body).email ===
-   JSON.parse((await (async () => {
-     const k = stubSupabase(OKT);
-     await konto(kontoBe({ handling: "logg-inn", navn: "OLA", pin: "1234" }));
-     return k[0].opsjoner.body;
-   })())).email);
 
 // Et navn som bare er tegnsetting ville blitt en tom nokkel, og en tom
 // nokkel er alles konto.

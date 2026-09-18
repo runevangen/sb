@@ -107,14 +107,6 @@ export function blirMedTekst(svar) {
     : liste.length + " blir med: " + navn;
 }
 
-// Hva den ene sa, skrevet ut: «Ola ser den på Andy's Pub». Brukes i
-// tittelen pa lista, sa et sted som er avtalt ikke bare star som et navn.
-export function svartekst(svar, kamp) {
-  if (!svar || !gyldigNavn(svar.navn)) return "";
-  const hvor = stedtekst(kamp, svar.hvor, svar.sted);
-  return hvor ? svar.navn + " ser den " + hvor : svar.navn + " blir med";
-}
-
 // Kampene noen har sagt at de blir med pa, forst.
 //
 // En runde er en tidsrekke, og den skal den vaere — men star det folk pa

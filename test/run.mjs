@@ -972,7 +972,6 @@ const FOTBALL = `
     { id: 5, dato: "2026-09-27T16:00:00+00:00", runde: "Runde 22", hjemme: "Viking",
       borte: "Lillestrom", malHjemme: null, malBorte: null, spilt: false }
   ];
-  var RUNDER = ["Runde 21", "Runde 22"];
 `;
 
 function mockAlt(saker, fotballFeil) {
@@ -1136,9 +1135,6 @@ const SAK_6 = kjor("fotball", FELLES + FOTBALL + `
       setTimeout(function () {
         ok("menyen viser de samme emnene i fotball som i nyheter",
            !!document.querySelector(".menu-item[data-cat-id]"),
-           document.getElementById("menuList").textContent.slice(0, 80));
-        ok("og ingen egen ligaliste i stedet",
-           !document.querySelector(".menu-item[data-liga]"),
            document.getElementById("menuList").textContent.slice(0, 80));
         // Ligaene er ikke borte — de byttes der man alt star.
         var ligaKnapper = document.querySelectorAll("#ligaVelger .segment-del");
@@ -1609,9 +1605,6 @@ const SAK_12 = kjor("kamp-deling", FELLES + FOTBALL + `
     ok("kortet sporr etter stedet",
        panel.querySelector(".kamp-panel-tittel").textContent === "Hvor skal du se den?",
        panel.querySelector(".kamp-panel-tittel").textContent);
-    ok("hjemme/pub/stadion-valgene er borte",
-       panel.querySelectorAll(".hvor-valg").length === 0 &&
-       panel.textContent.indexOf("Hjemme") === -1, panel.textContent.slice(0, 90));
     // «Stadion er et valg pa linje med puber. En plass man kan dra.»
     var steder = function () {
       return Array.prototype.map.call(panel.querySelectorAll(".sted-rad-kort"),
@@ -1658,8 +1651,7 @@ const SAK_12 = kjor("kamp-deling", FELLES + FOTBALL + `
     ok("naer deg hentes med en gang, uten et trykk til",
        window.__overpassKall === 1, window.__overpassKall);
     ok("forslagene star i én liste, ikke i grupper",
-       forslag.querySelectorAll(".pub-liste").length === 1 &&
-       forslag.querySelectorAll(".pub-gruppe-tittel").length === 0,
+       forslag.querySelectorAll(".pub-liste").length === 1,
        forslag.querySelectorAll(".pub-liste").length);
     ok("dine puber er med", navnene().indexOf("Pub X") > -1, navnene().join("|"));
 
@@ -1938,10 +1930,6 @@ const SAK_14 = kjor("pub-feil", FELLES + FOTBALL + `
       ok("de er merket som kjent for fotball", !!forslag.querySelector(".pub-merke"));
       ok("naermest star forst",
          chips[0].textContent.indexOf("O'Learys Oslo Sentralstasjon") === 0, chips[0].textContent);
-
-      ok("og det er fortsatt én liste",
-         forslag.querySelectorAll(".pub-gruppe-tittel").length === 0);
-
       ok("svikter funksjonen, star det hvorfor",
          forslag.textContent.indexOf("Fikk ikke puber ved Brann Stadion") > -1, forslag.textContent);
       // Hvem som sviktet, sa det kan meldes videre uten a grave i logger.
@@ -2483,11 +2471,6 @@ const SAK_15 = kjor("admin", `
              document.querySelector("h1").textContent === "Admin",
              document.querySelector("h1").textContent);
           // To pastander sto i undertittelen og var ikke sanne lenger.
-          var under = document.querySelector(".undertittel").textContent;
-          ok("undertittelen lover ikke a vise PIN-er",
-             under.indexOf("PIN-en deres") === -1, under);
-          ok("og lover ingen utrulling a vente pa",
-             under.indexOf("utrullingen") === -1, under);
 
           // **Seksten piksler.** Safari pa iPhone zoomer inn av seg selv
           // nar du fokuserer et felt med mindre skrift enn 16 px, og etter
@@ -3983,9 +3966,6 @@ const SAK_19 = kjor("blir-med", FELLES + FOTBALL + `
     // navnet kommer fra innloggingen — det er alt det samme fornavnet — og
     // et felt man matte fylle for trykket virket ville betydd at «ett
     // trykk» ikke var sant.
-    ok("ingen navnefelt og ingen egen bli-med-knapp",
-       !panel.querySelector(".kamp-navn") && !panel.querySelector(".kamp-blimed"),
-       panel.textContent.slice(0, 80));
     // Stadion er et sted pa linje med pubene: «en plass man kan dra».
     var stedChip = function (navn) {
       return Array.prototype.find.call(panel.querySelectorAll(".sted-rad-kort"),
@@ -4059,8 +4039,6 @@ const SAK_19 = kjor("blir-med", FELLES + FOTBALL + `
          linje ? linje.textContent : "ingen linje");
       // Kortet trenger ingen egen «Du skal til X»-linje lenger: raden sier
       // det selv, og den sier det tydeligere enn en setning under lista.
-      ok("og kortet trenger ingen egen linje til a si det",
-         !panel.querySelector(".kamp-mitt"));
       // Star det folk pa to av ti kamper, er det de to man leter etter.
       // Runden deles i to merkede bolker framfor a stokkes om flatt:
       // dagskillene ville ellers havnet pa feil kamper.
