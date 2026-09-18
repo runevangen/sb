@@ -108,14 +108,6 @@ export function slaSammen(alle, pub, valgteIder, kamper, naa) {
     String(a.dato).localeCompare(String(b.dato)) || String(a.pub).localeCompare(String(b.pub)));
 }
 
-// Kamper som allerede er spilt har ingen verdi her, og lista ville vokst
-// uten ende. Ryddes hver gang admin lagrer.
-export function utenGamle(alle, naa, dager) {
-  const grense = (naa || Date.now()) - (dager || 2) * 86400000;
-  return (Array.isArray(alle) ? alle : [])
-    .filter((v) => !v.dato || Date.parse(v.dato) >= grense);
-}
-
 /* ---------- fra lageret ---------- */
 
 // Radene slik PostgREST gir dem, formet som appen vil ha dem.
