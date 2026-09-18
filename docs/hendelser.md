@@ -69,6 +69,80 @@ og de sto der hele tiden, under en linje som sa at noe var galt.
 
 ---
 
+## 18. september 2026 — Lista fantes, men bare hvis du sa hvor du var
+
+**Drodlet fram, ikke meldt som feil:** «Andre fotballpuber — skulle ikke
+det være puber som ligger i lista, men ikke har bekreftet at de viser
+kampen?»
+
+Jo. Og de sto der — `kjenteNaer` og `kjenteVedArena` er nettopp det, merket
+⚽ framfor ★. Men begge når fram gjennom et **geografisk filter**:
+`kjenteNaer` krever posisjonen din, `kjenteVedArena` at arenaen er en av de
+tretti norske `arenaFor()` kjenner.
+
+**Utenlandsk kamp og nei til posisjon: da fantes ikke lista.** Ikke
+«tømt», ikke «feilet» — den ble aldri spørt. 26 steder redaksjonen har
+vurdert lå i pakka og ble ikke vist, enda `lag`-feltet i dem svarer på
+nettopp den kampen som sto på skjermen.
+
+`stampuberFor()` er veien inn som manglet. Spiller Brann, er
+Brann-stampuben et svar uansett hvor du står.
+
+### Plasseringen var avgjørelsen, ikke kilden
+
+Første forsøk satte `stampuber` rett etter `dine` — altså foran geografien.
+En eksisterende test falt: «nærmest står først». Kampen i fikstur er
+Brann–Bodø/Glimt, Scotsman *er* Bodø/Glimt-stampuben, og den gikk forbi
+den nærmeste puben.
+
+Testen hadde rett. En stampub tvers over byen er et dårligere svar enn en
+fotballpub i nabogata. Kilden skal **fylle hullet der geografien ikke gir
+noe, ikke gå foran den der den gjør det** — altså etter de geografiske
+kildene og før de rene karttreffene.
+
+### To ganger grønt av feil grunn
+
+**Røyktesten min.** Jeg kjørte `stampuberFor({hjemme:"Vaalerenga",
+borte:"Brann"})`, fikk to puber, og leste det som at foldingen virket. De
+to var **Brann**-puber. «Vaalerenga» traff ingenting: `normaliserLagnavn`
+gir «vaalerenga» mot «valerenga». Enhetstesten som spurte om nettopp den
+foldingen fant det.
+
+Dette er det første stedet i appen der lagnavn fra **API-et** møter lagnavn
+skrevet av **redaksjonen**, og derfor har ingen truffet det før. Foldingen
+`aa` → `a` ligger lokalt i `stampuberFor()` — ikke i `normaliserLagnavn`,
+som går inn i `kampNokkel()` og dermed i id-en til hver rad som alt ligger
+i basen ([ADR 0008](adr/0008-kampnokkel.md)).
+
+**Og nettlesertesten.** Jeg la påstanden i en scene som **gir posisjon midt
+i Oslo**, så Scotsman kom fra `kjenteNaer` hele tiden. Sabotasjen — kilden
+tømt — endret ingenting, og det var det som avslørte det. Scenen som faktisk
+har hullet måtte bygges: utenlandsk arena, posisjon avslått. Der står det
+nå «(tom liste)» når kilden fjernes.
+
+**Bakoverfnutten i en kommentar sprengte malen igjen**, andre dag på rad.
+Den står i `docs/testing.md`; jeg leste den ikke først.
+
+### Og en tredje gang, i det jeg trodde jeg var ferdig
+
+Falsk posisjon (`?posisjon=bodo`) kom til rett etter, for å kunne prøve
+appen i andre byer. Første kjøring i Bodø viste **Scotsman, O'Learys og
+Carls** — tre Oslo-puber, uten avstand, som om de lå i nabogata.
+
+De kom fra stampub-kilden jeg nettopp hadde lagt inn. `puber-oslo.js` er
+en **Oslo**-liste, og `stampuberFor()` spør ikke hvor du er. For en leser i
+Oslo er det riktig; for en leser i Bodø er det selvsikker støy.
+
+Kilden er en **utvei**, ikke et tillegg: kommer det en posisjon, tømmes
+den. Geografien er svaret der den finnes. Er du i Oslo, kommer de samme
+stedene tilbake gjennom `kjenteNaer` — med avstand på.
+
+Det var testen i Bodø-scenen som fant det, én time etter at kilden ble
+skrevet. Uten den ville feilen ligget i prod og sett helt rimelig ut for
+alle som bor i Oslo.
+
+---
+
 ## 18. september 2026 — Det var ikke bredden, det var zoomen
 
 **Meldt som:** «Jeg kan fortsatt flytte vindu til høyre og venstre. Admin

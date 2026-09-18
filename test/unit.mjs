@@ -39,7 +39,8 @@ import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
 
 import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, enturNaermest,
          tolkHoldeplasser, grupperPuber, ofteBrukt, noterPub,
-         rangerForslag, FORSLAG_MAKS,
+         rangerForslag, FORSLAG_MAKS, stampuberFor, FORSLAG_KILDER,
+         falskPosisjon, TESTBYER,
          OVERPASS_SPEIL, overpassHeadere, restTid,
          sjekkPubliste, kuraterteNaer, merkKuraterte,
          sjekkKontaktliste, kontaktFor, finnKontakt, KONTAKT_FELT, kildeHolder,
@@ -1581,6 +1582,68 @@ ok("uten tak kommer alle med",
    rangerForslag({ naerDeg: [{ navn: "a" }, { navn: "b" }, { navn: "c" }] }, 0).topp.length === 3);
 ok("tomt inn gir tomt ut",
    rangerForslag(null).topp.length === 0 && rangerForslag({}).resten.length === 0);
+
+/* ---- stampubene for lagene som spiller ---- */
+
+// De kuraterte stedene nadde bare fram gjennom et geografisk filter:
+// kjenteNaer krever posisjonen din, kjenteVedArena at arenaen er en vi
+// kjenner. Utenlandsk kamp OG nei til posisjon: da fantes ikke lista var,
+// enda `lag` i den svarer pa nettopp den kampen.
+const STAMPUBER = [
+  { navn: "Bohemen Sportspub", lag: ["Vålerenga", "Tottenham"] },
+  { navn: "Scotsman", lag: ["Manchester United", "Bodø/Glimt"] },
+  { navn: "Sofa & Bar", lag: [] },
+  { navn: "Uten lag-felt" },
+];
+ok("hjemmelaget gir treff",
+   stampuberFor({ hjemme: "Tottenham", borte: "Chelsea" }, STAMPUBER)
+     .map((p) => p.navn).join(",") === "Bohemen Sportspub",
+   JSON.stringify(stampuberFor({ hjemme: "Tottenham", borte: "Chelsea" }, STAMPUBER)));
+ok("og bortelaget ogsa",
+   stampuberFor({ hjemme: "Brann", borte: "Bodø/Glimt" }, STAMPUBER)
+     .map((p) => p.navn).join(",") === "Scotsman");
+// «Vaalerenga» fra kilden og «Valerenga» i fila er samme lag. Uten
+// foldingen hadde lista truffet ingenting — og det ville sett ut som om
+// det bare ikke fantes en stampub.
+ok("lagnavnet foldes, sa Vaalerenga treffer Vålerenga",
+   stampuberFor({ hjemme: "Vaalerenga", borte: "Molde" }, STAMPUBER)
+     .map((p) => p.navn).join(",") === "Bohemen Sportspub",
+   JSON.stringify(stampuberFor({ hjemme: "Vaalerenga", borte: "Molde" }, STAMPUBER)));
+ok("en kamp uten stampub gir ingen",
+   stampuberFor({ hjemme: "Molde", borte: "Sandefjord" }, STAMPUBER).length === 0);
+ok("et sted uten lag kommer aldri med",
+   stampuberFor({ hjemme: "Tottenham", borte: "Chelsea" }, STAMPUBER)
+     .every((p) => p.navn !== "Sofa & Bar" && p.navn !== "Uten lag-felt"));
+ok("tull inn kaster ikke",
+   stampuberFor(null, STAMPUBER).length === 0 &&
+   stampuberFor({ hjemme: "Brann" }, null).length === 0 &&
+   stampuberFor({}, STAMPUBER).length === 0);
+
+// Plasseringen er avgjorelsen, ikke bare at kilden finnes: stampubene
+// fyller hullet der geografien ikke gir noe — men gar ikke foran den der
+// den gjor det. En stampub tvers over byen er et darligere svar enn en
+// fotballpub i nabogata.
+ok("stampuber star etter de geografiske kildene",
+   FORSLAG_KILDER.indexOf("stampuber") > FORSLAG_KILDER.indexOf("kjenteNaer") &&
+   FORSLAG_KILDER.indexOf("stampuber") > FORSLAG_KILDER.indexOf("kjenteVedArena"),
+   FORSLAG_KILDER.join(","));
+// Men foran de rene karttreffene: et sted vi har vurdert redaksjonelt og
+// som er kjent for laget, slar en tilfeldig bar Overpass fant.
+ok("og for de rene karttreffene",
+   FORSLAG_KILDER.indexOf("stampuber") < FORSLAG_KILDER.indexOf("naerDeg") &&
+   FORSLAG_KILDER.indexOf("stampuber") < FORSLAG_KILDER.indexOf("vedArena"),
+   FORSLAG_KILDER.join(","));
+
+// Uten posisjon og uten kjent arena er stampuben det eneste som star
+// igjen. Det er nettopp den situasjonen kilden finnes for.
+const UTENLANDSK = rangerForslag({
+  bekreftede: [], dine: [], kjenteNaer: [], kjenteVedArena: [],
+  stampuber: [{ navn: "Scotsman", viserFotball: true }],
+  naerDeg: [], vedArena: [],
+}, 6);
+ok("uten posisjon og uten arena star stampuben igjen",
+   UTENLANDSK.topp.length === 1 && UTENLANDSK.topp[0].navn === "Scotsman",
+   JSON.stringify(UTENLANDSK.topp));
 // En pub uten navn er ingen pub, og ville blitt en tom knapp.
 ok("rader uten navn faller bort",
    rangerForslag({ dine: [{ navn: "" }, { navn: "Ekte pub" }, null] }).topp.length === 1);
@@ -2344,6 +2407,44 @@ ok("uten pubnavn star setningen likevel",
 // a vite om noe er krysset av lenger nede.
 ok("rundetallet sier valgt av totalt", rundeTall(3, 6) === "3 av 6 valgt", rundeTall(3, 6));
 ok("en runde uten kamper far ingen tekst", rundeTall(0, 0) === "", rundeTall(0, 0));
+
+/* ---------------- falsk posisjon, for a teste andre byer ---------------- */
+
+// Pubene «naer deg» kommer fra Overpass, og Overpass svarer pa hvor du
+// star. Appen er bygd og prov i Oslo. Meldt 18. september 2026: «vi ma
+// finne ut hvordan vi kan teste det sa reelt som mulig uten a ha noen
+// fysisk der.»
+ok("en by gir koordinatet sitt",
+   falskPosisjon("?posisjon=bodo").navn === "Bodø" &&
+   falskPosisjon("?posisjon=bodo").lat === TESTBYER.bodo.lat,
+   JSON.stringify(falskPosisjon("?posisjon=bodo")));
+// Den som taster dette pa en telefon skal slippe a treffe o-en.
+ok("navnet foldes, sa Bodø og bodo er samme by",
+   falskPosisjon("?posisjon=Bodø").lat === falskPosisjon("?posisjon=bodo").lat);
+ok("og store bokstaver spiller ingen rolle",
+   falskPosisjon("?posisjon=TRONDHEIM").navn === "Trondheim");
+ok("et koordinat gar ogsa",
+   falskPosisjon("?posisjon=67.28,14.40").lat === 67.28 &&
+   falskPosisjon("?posisjon=67.28,14.40").kilde === "koordinat",
+   JSON.stringify(falskPosisjon("?posisjon=67.28,14.40")));
+ok("parameteren finnes ogsa blant andre",
+   falskPosisjon("?a=1&posisjon=bergen&b=2").navn === "Bergen");
+// Null nar det ikke er satt, og null nar det er tull: a late som ville
+// gitt et tomt pubsok uten at noen skjonte hvorfor.
+ok("uten parameteren er det ingen falsk posisjon",
+   falskPosisjon("") === null && falskPosisjon(null) === null &&
+   falskPosisjon("?liga=premier") === null);
+ok("en ukjent by er ingen posisjon", falskPosisjon("?posisjon=maanen") === null);
+ok("og et tall utenfor kloden er det heller ikke",
+   falskPosisjon("?posisjon=999,999") === null &&
+   falskPosisjon("?posisjon=91,0") === null &&
+   falskPosisjon("?posisjon=0,181") === null);
+ok("en tom verdi gir null", falskPosisjon("?posisjon=") === null);
+// Byene ma ha ekte koordinater, ellers maler skriptet feil sted.
+ok("alle testbyene har et koordinat i Norge",
+   Object.values(TESTBYER).every((b) =>
+     b.lat > 57 && b.lat < 72 && b.lon > 4 && b.lon < 32 && b.navn),
+   JSON.stringify(Object.values(TESTBYER).map((b) => b.navn)));
 
 /* ---------------- hva en lagring faktisk endrer ---------------- */
 
