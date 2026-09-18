@@ -96,8 +96,10 @@ og den er verre enn ingen vakt, fordi den lukker spørsmålet. Den nye måler
 `font-size` på hvert `input`, `select` og `textarea`, og lister opp hvert
 felt som er for lite når den slår ut.
 
-**Appen har det samme problemet:** `.konto-felt` er 13 px og `.sok-felt`
-13,5. Ikke rørt her — det er lesernes design, og en annen avgjørelse.
+**Appen hadde det samme:** `.konto-felt` på 13 px — der PIN-en skrives, og
+altså feltet folk blir stående lengst i — og `.sok-felt` på 13,5. Begge
+rettet. `--fs` er 1 eller 1,2, så skaleringen oppover står; det er bare
+bunnen som er løftet. Vakta dekker begge sider nå.
 
 Samtidig: lenka i hamburgermenyen het «Hvem viser kampen (admin)», som
 beskrev én seksjon av portalen framfor portalen. Den heter «Admin» nå, som

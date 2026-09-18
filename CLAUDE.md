@@ -144,8 +144,8 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   fokuserer et felt med mindre skrift, og etter den zoomen er sida pannbar
   sidelengs. Meldt to ganger som «jeg kan scrolle skjermen til venstre og
   høyre»; begge gangene lette jeg etter noe som var for bredt. Det var
-  forstørrelsen, ikke bredden. En vakt i `run.mjs` måler `font-size` på
-  hvert `input`, `select` og `textarea`.
+  forstørrelsen, ikke bredden. To vakter i `run.mjs` måler `font-size` på
+  hvert `input`, `select` og `textarea` — én i portalen og én i appen.
 - **Hver regel som setter `display`, må si hva `[hidden]` betyr.**
   `display: flex` slår `[hidden]` fra nettleserens eget stilark, og da står
   et element framme som koden tror den har skjult.

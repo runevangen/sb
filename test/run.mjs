@@ -820,6 +820,20 @@ const SAK_5 = kjor("visning", FELLES + `
          document.querySelector(".admin-lenke").getAttribute("href") === "/personvern.html",
          document.querySelector(".admin-lenke").getAttribute("href"));
 
+      // **Seksten piksler.** Safari pa iPhone zoomer inn av seg selv nar du
+      // fokuserer et felt med mindre skrift, og etter den zoomen er sida
+      // pannbar sidelengs. Meldt i portalen 18. september; appen hadde det
+      // samme — PIN-feltet pa 13 px og sokefeltet pa 13,5.
+      var smaa = [];
+      Array.prototype.forEach.call(
+        document.querySelectorAll("input, select, textarea"), function (e) {
+          if (e.type === "checkbox" || e.type === "radio") return;
+          var px = parseFloat(getComputedStyle(e).fontSize);
+          if (!(px >= 16)) smaa.push((e.id || e.className || e.tagName) + " " + px + "px");
+        });
+      ok("ingen felt i appen er sa sma at iPhone zoomer inn i dem",
+         smaa.length === 0, smaa.join(", "));
+
       // Footeren tok 38 % av menyen pa en telefon med stor skrift, og da
       // sto det siste emnet halvt under kanten. Malt med A+ og med
       // «Installer appen» synlig, som er det verste tilfellet: begge
