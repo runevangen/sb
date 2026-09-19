@@ -454,7 +454,28 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   økt eies også av `app.js`.
 - **`KJENTE` er ingen `const`.** Rettelsene fra portalen kommer over nettet
   og lander etter at visningen står ferdig. Alt som tegnes av dem må kunne
-  tegnes på nytt — `tegnKjenteIgjen()`.
+  tegnes på nytt — `tegnKjenteIgjen()`, som regner om **alle fire** kildene
+  som leser `KJENTE`: `bekreftede` (detaljene om stedet slås opp der),
+  `kjenteVedArena`, `kjenteNaer` og `stampuber`. Derfor holder boksen på
+  `boks.kamp`: tre av de fire regnes ut av kampen.
+  Stampubene regnes bare om når vi *ikke* vet hvor du er — kommer en
+  posisjon, er de ryddet bort med vilje, og en ny tegning skal ikke vekke
+  dem.
+- **Rettelsene hentes ved oppstart *og* hver gang appen kommer fram
+  igjen.** De ble hentet én gang, i `initFotball()`, og det var runden
+  admin → app som falt utenfor — nettopp den runden en rettelse gjøres i.
+  En pub lagret i portalen fantes ikke i appen før en ny sidelasting.
+  `PUBLISTE_FERSK` er 120 000 ms, samme vindu som `LEVETID_PUBLISTE`:
+  kanten svarer med det samme der uansett, så et kall til er ett kall uten
+  et nytt svar.
+- **Et forsøk som ikke kom fram teller ikke som ferskt.** Da prøves det på
+  nytt neste gang du kommer tilbake. En egen sperre hindrer to samtidige
+  kall, og hvert nytt forsøk krever at et menneske har byttet fane — det
+  er ingen løkke å løpe løpsk i.
+- **En tom liste er et svar, ikke et ikke-svar.** Vakta sto på
+  `!json.puber.length`, som var likegyldig da lista ble hentet én gang.
+  Tas den siste rettelsen bort, skal appen falle tilbake til fila. `klar`
+  skiller «ingen rettelser» fra «tjenesten kunne ikke svare».
 - **Det som kommer over nettet, lander etter at visningen står ferdig.**
   Alt som tegnes av data fra `/api/svar` må tegnes på nytt i `tegnSvar()`:
   kampraden, den åpne kampen og linjene under. **Tre feil i dette

@@ -91,6 +91,12 @@ export function initFotball(paNavigering, paLagsok, paFavoritt, paDeling, paPube
   });
 
   hentPubRettelser();
+
+  // Runden admin → app. Uten denne sto appen med lista slik den var da
+  // sida ble lastet, og en rettelse gjort i mellomtiden fantes ikke.
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) hentPubRettelser();
+  });
 }
 
 // Rettelsene admin har gjort i portalen (#80).
@@ -100,15 +106,48 @@ export function initFotball(paNavigering, paLagsok, paFavoritt, paDeling, paPube
 // over stedene ville sagt at noe mangler, i det vanlige tilfellet der
 // ingenting gjor det. Den som *skriver* en rettelse, far beskjed; det er
 // der man venter et svar.
-async function hentPubRettelser() {
+// Hvor lenge et svar regnes som ferskt. Samme tall som LEVETID_PUBLISTE i
+// funksjonen: kanten svarer med det samme i det vinduet uansett, sa et
+// kall til er ett kall uten et nytt svar.
+const PUBLISTE_FERSK = 120000;
+let pubRettelserFerskt = 0;
+let pubRettelserGar = false;
+
+// Hentes ved oppstart OG hver gang appen kommer fram igjen.
+//
+// Meldt 18. september 2026: en pub ble lagret i portalen og sto ikke i
+// appen etterpa. Raden var riktig, sammenslaingen virket, avstanden var
+// null — lista var bare hentet **én gang, ved sidelasting**, og det var
+// for admin lagret. Runden admin → app er nettopp den runden en rettelse
+// gjores i, og den var den ene runden appen ikke sa.
+//
+// `visibilitychange` er den runden: du forlot fana, gjorde noe, kom
+// tilbake. Ferskhetsvinduet holder det til ett kall uansett hvor mange
+// ganger du blar fram og tilbake.
+async function hentPubRettelser(naa = Date.now()) {
+  if (pubRettelserGar) return;
+  if (pubRettelserFerskt && naa - pubRettelserFerskt < PUBLISTE_FERSK) return;
+  pubRettelserGar = true;
   let json = null;
   try {
     const respons = await fetch("/api/pub-liste", { headers: { "Accept": "application/json" } });
     json = JSON.parse(await respons.text());
   } catch (err) {
+    // Et forsok som ikke kom fram teller ikke som ferskt: neste gang du
+    // kommer tilbake, provet det igjen. Sperra over hindrer at to kall
+    // gar samtidig, og hvert nytt forsok krever at et menneske har byttet
+    // fane — det er ingen loekke a lope lopsk i.
+    pubRettelserGar = false;
     return;
   }
-  if (!json || json.feil || !Array.isArray(json.puber) || !json.puber.length) return;
+  pubRettelserGar = false;
+  // `klar` skiller «ingen rettelser» fra «tjenesten kunne ikke svare».
+  // Det skillet var likegyldig da lista ble hentet én gang; na er det
+  // ikke det. Tas den siste rettelsen bort i portalen, er det tomme
+  // svaret det RIKTIGE svaret, og appen skal falle tilbake til fila —
+  // ikke bli staende med en rad ingen har lenger.
+  if (!json || json.feil || !Array.isArray(json.puber) || json.klar !== true) return;
+  pubRettelserFerskt = naa;
 
   KJENTE = kjenteAv(slaSammenPuber(KURATERTE, tolkPubRader(json.puber)));
   tegnKjenteIgjen();
@@ -122,7 +161,17 @@ async function hentPubRettelser() {
 function tegnKjenteIgjen() {
   Array.from(apneBokser).forEach((boks) => {
     if (!boks.isConnected) { apneBokser.delete(boks); return; }
-    const bekreftede = boks.bekreftede || [];
+
+    // Bekreftede kommer fra visningene, men DETALJENE om stedet — bydel,
+    // koordinat, stamlag — slas opp i KJENTE. Regnes de ikke om, star en
+    // bekreftet pub med opplysningene den hadde for rettelsen.
+    let bekreftede = boks.bekreftede || [];
+    if (boks.kamp) {
+      bekreftede = bekreftetFor(boks.kamp, sisteVisninger, KJENTE);
+      boks.bekreftede = bekreftede;
+      boks.kilder.bekreftede = bekreftede;
+    }
+
     const arena = arenaFor(boks.dataset.arena || "");
     if (arena) {
       boks.kilder.kjenteVedArena = merkBekreftet(
@@ -131,6 +180,13 @@ function tegnKjenteIgjen() {
     if (boks.sistePosisjon) {
       boks.kilder.kjenteNaer = merkBekreftet(
         kuraterteNaer(KJENTE, boks.sistePosisjon, KJENT_RADIUS), bekreftede);
+    } else if (boks.kamp) {
+      // Stampubene leses ogsa av KJENTE: en ny rad med `lag` svarer pa
+      // denne kampen. De regnes bare om nar vi IKKE vet hvor du er —
+      // kommer en posisjon, er de ryddet bort med vilje, og en ny tegning
+      // skal ikke vekke dem.
+      boks.kilder.stampuber = merkBekreftet(
+        merkKuraterte(stampuberFor(boks.kamp, KJENTE), KJENTE), bekreftede);
     }
     tegnForslag(boks);
   });
@@ -1109,6 +1165,10 @@ const apneBokser = new Set();
 function pubForslag(kamp, pubFelt) {
   const boks = el("div", "pub-forslag");
   apneBokser.add(boks);
+  // Kampen huskes fordi tre av kildene regnes ut AV den og av KJENTE:
+  // bekreftede, stampuber og kjenteVedArena. Lander en rettelse etterpa,
+  // ma alle tre regnes om — ikke bare de to arenaen og posisjonen gir.
+  boks.kamp = kamp;
   boks.dataset.arena = kamp.arena || "";
   boks.pubFelt = pubFelt;
   boks.kilder = {};
