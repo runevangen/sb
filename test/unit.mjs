@@ -57,7 +57,7 @@ import { sjekkForslag, forslagRad, tolkForslag, alleredeILista, publisteRad }
   from "../pub-forslag-data.js";
 import { sjekkVisninger, visningerFor, slaSammen, tolkVisninger, visningRad, kampIderFor,
          bekreftetFor, merkBekreftet, visningsHint, rundeTall,
-         visningsDiff, lagreKnappTekst } from "../visning-data.js";
+         visningsDiff, lagreKnappTekst, rundeKnappTekst } from "../visning-data.js";
 
 let feilet = 0;
 let kjort = 0;
@@ -2484,6 +2484,25 @@ ok("uten pubnavn star setningen likevel",
 // a vite om noe er krysset av lenger nede.
 ok("rundetallet sier valgt av totalt", rundeTall(3, 6) === "3 av 6 valgt", rundeTall(3, 6));
 ok("en runde uten kamper far ingen tekst", rundeTall(0, 0) === "", rundeTall(0, 0));
+
+// Knappen som krysser av en hel runde. Samme regel som lagreKnappTekst:
+// den sier hva trykket GJOR, ikke hvor mye som star avkrysset. «Kryss av
+// alle 8» nar tre alt star, er usant om handlingen — den legger til fem.
+ok("ingenting avkrysset: trykket tar hele runden",
+   rundeKnappTekst(0, 8) === "Kryss av alle 8", rundeKnappTekst(0, 8));
+ok("noe avkrysset: trykket teller det som MANGLER",
+   rundeKnappTekst(3, 8) === "Kryss av 5 til", rundeKnappTekst(3, 8));
+ok("alt avkrysset: trykket fjerner i stedet",
+   rundeKnappTekst(8, 8) === "Fjern alle 8", rundeKnappTekst(8, 8));
+// En runde med én kamp er ikke «alle 1».
+ok("én kamp far entall",
+   rundeKnappTekst(0, 1) === "Kryss av kampen" &&
+   rundeKnappTekst(1, 1) === "Fjern kampen",
+   rundeKnappTekst(0, 1) + " / " + rundeKnappTekst(1, 1));
+ok("en tom runde gir ingen knappetekst", rundeKnappTekst(0, 0) === "");
+// Flere avkrysset enn det finnes bokser skal ikke gi «Kryss av -1 til».
+ok("tull inn gir ikke en negativ opptelling",
+   rundeKnappTekst(9, 8) === "Fjern alle 8", rundeKnappTekst(9, 8));
 
 /* ---------------- falsk posisjon, for a teste andre byer ---------------- */
 

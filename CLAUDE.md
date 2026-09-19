@@ -357,7 +357,10 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   ropes ut: ingenting avslører det.
 - **Knappen sier hva trykket gjør, ikke hvor mye som er valgt.** «Lagre 6
   kamper» når du la til én er sant om det som sendes og usant om det du
-  gjør. `lagreKnappTekst()` teller endringen.
+  gjør. `lagreKnappTekst()` teller endringen. Det samme gjelder knappen per
+  runde: `rundeKnappTekst()` sier «Kryss av 5 til» når tre av åtte står,
+  ikke «Kryss av alle 8» — trykket legger til fem. Står alt, snur den til
+  «Fjern alle 8», og teksten følger hvert håndsatt kryss.
 - **Feilsvar caches aldri** (`no-store`). Ellers låser et blaff seg fast.
 - Hemmeligheter står samlet i [`docs/nokler-og-tokens.md`](docs/nokler-og-tokens.md).
   Funksjonene leser miljøet **ved utrulling** — en ny variabel krever en

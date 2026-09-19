@@ -3913,6 +3913,30 @@ const SAK_15D = kjor("admin-lagret-star", `
          felt("lagre").textContent === "Fjern alle kamper for Andy's Pub" &&
          felt("lagre").disabled === false, felt("lagre").textContent);
 
+      // Knappen per runde, meldt 19. september 2026. «Kryss av alle»
+      // finnes fra for og tar HELE vinduet; denne tar én runde, og
+      // teksten ma si hva trykket gjor — ikke hvor mye som star.
+      var skille1 = felt("kamper").querySelectorAll(".runde-skille")[0];
+      var rundeknapp = skille1.querySelector(".runde-alle");
+      ok("hver runde har sin egen kryss-av-knapp",
+         !!rundeknapp, skille1.textContent);
+      ok("og uten kryss sier den at den tar hele runden",
+         rundeknapp.textContent === "Kryss av alle 2", rundeknapp.textContent);
+      rundeknapp.click();
+      ok("trykket krysser av runden — og BARE den",
+         rundeTekst().indexOf("2 av 2 valgt") > -1 &&
+         rundeTekst().indexOf("0 av 2 valgt") > -1, rundeTekst());
+      // Na er runden full, og da er neste trykk det motsatte. Sto det
+      // fortsatt «Kryss av alle», lovet knappen noe den ikke gjor.
+      ok("og da snur knappen til a fjerne",
+         rundeknapp.textContent === "Fjern alle 2", rundeknapp.textContent);
+      // Teksten ma folge haken ogsa nar du krysser av for hand.
+      felt("kamper").querySelectorAll(".kamp input")[0].checked = false;
+      felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
+      ok("et handsatt kryss teller med i knappeteksten",
+         rundeknapp.textContent === "Kryss av 1 til", rundeknapp.textContent);
+      rundeknapp.click();
+
       felt("merkAlle").click();
       ok("og «kryss av alle» fyller dem igjen",
          rundeTekst().indexOf("2 av 2 valgt") > -1, rundeTekst());

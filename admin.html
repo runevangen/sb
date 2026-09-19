@@ -104,6 +104,25 @@
   /* Tallet er ikke en overskrift: det teller, og skal leses som en
      opplysning ved siden av — ikke som en del av rundenavnet. */
   .runde-tall { font-weight: 400; letter-spacing: 0.02em; text-transform: none; }
+  /* Navnet tar plassen som blir til overs, sa tallet og knappen star
+     samlet til hoyre framfor a spres utover av space-between. */
+  .runde-navn { flex: 1 1 auto; }
+  /* Knappen som krysser av hele runden. Ingen display-regel her med
+     vilje: en <button> er inline-block fra nettleseren og flex-barn her,
+     og da er det ingenting som kan sla [hidden] i stykker. */
+  .runde-alle {
+    background: none;
+    border: 0;
+    padding: 0 0 0 2px;
+    font: inherit;
+    letter-spacing: 0.02em;
+    text-transform: none;
+    font-weight: 400;
+    color: var(--aksent);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .runde-alle:hover { text-decoration: underline; }
   .kamper li:first-child.runde-skille { padding-top: 6px; }
   .kamper li:last-child { border-bottom: 0; }
   .kamp { display: flex; align-items: center; gap: 12px; padding: 11px 2px; cursor: pointer; }

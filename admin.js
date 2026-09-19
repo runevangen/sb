@@ -26,7 +26,8 @@ import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
 import { publisteRad, alleredeILista } from "./pub-forslag-data.js";
 import { PUBTYPER, PUBSIKKERHET, pubNokkel, sjekkPubRad, slaSammenPuber,
   koordinatFraLenke, BYER, byFor, PUBLISTE_FELT } from "./pub-data.js";
-import { visningsHint, rundeTall, lagreKnappTekst } from "./visning-data.js";
+import { visningsHint, rundeTall, lagreKnappTekst,
+         rundeKnappTekst } from "./visning-data.js";
 
 const felt = (id) => document.getElementById(id);
 let kamper = [];
@@ -611,13 +612,33 @@ function tegnKamper() {
       sisteRunde = k.runde;
       const skille = document.createElement("li");
       skille.className = "runde-skille";
-      skille.textContent = k.runde;
+      // Navnet i sitt eget element, sa det kan ta plassen som blir til
+      // overs og la tallet og knappen sta samlet til hoyre. En ren
+      // tekstnode kan ikke det.
+      const navn = document.createElement("span");
+      navn.className = "runde-navn";
+      navn.textContent = k.runde;
+      skille.appendChild(navn);
       // Tallet star her fordi lista er lengre enn skjermen. Uten det ma
       // admin rulle gjennom hele for a vite om noe er krysset av lenger
       // nede — og tre synlige avkryssinger av fem ser ut som tap.
       const tall = document.createElement("span");
       tall.className = "runde-tall";
       skille.appendChild(tall);
+      // Ett trykk for hele runden. Selve PASTANDEN star urort: hver rad
+      // er fortsatt per kamp, satt av et menneske. Det er bare klikkinga
+      // som blir billigere.
+      const alle = document.createElement("button");
+      alle.type = "button";
+      alle.className = "runde-alle";
+      alle.addEventListener("click", () => {
+        const bokser = rundensBokser(skille);
+        // Er alt krysset av, fjerner trykket. Ellers fyller det opp.
+        const fyll = bokser.some((b) => !b.checked);
+        bokser.forEach((b) => { b.checked = fyll; });
+        oppdaterLagreknapp();
+      });
+      skille.appendChild(alle);
       liste.appendChild(skille);
     }
     const rad = document.createElement("li");
@@ -654,12 +675,31 @@ function settKamptittel() {
 
 // Tallene per runde regnes av boksene selv, ikke av et tall vi forer:
 // en teller ved siden av sannheten glir fra den.
+// Boksene som hoerer til én runde: radene mellom denne overskrifta og
+// den neste. Lista er flat — overskriftene er sosken av kampradene, ikke
+// foreldre — sa runden leses ved a ga framover til neste skille.
+function rundensBokser(skille) {
+  const ut = [];
+  let rad = skille.nextElementSibling;
+  while (rad && !rad.classList.contains("runde-skille")) {
+    const boks = rad.querySelector(".kamp input");
+    if (boks) ut.push(boks);
+    rad = rad.nextElementSibling;
+  }
+  return ut;
+}
+
 function oppdaterRundetall() {
   let skille = null;
   let valgt = 0;
   let alle = 0;
   const skriv = () => {
-    if (skille) skille.querySelector(".runde-tall").textContent = rundeTall(valgt, alle);
+    if (!skille) return;
+    skille.querySelector(".runde-tall").textContent = rundeTall(valgt, alle);
+    // Teksten ma folge haken: krysser du av den siste selv, skal knappen
+    // si «Fjern alle» — ikke fortsatt love et trykk som ikke finnes.
+    const knapp = skille.querySelector(".runde-alle");
+    if (knapp) knapp.textContent = rundeKnappTekst(valgt, alle);
   };
   Array.from(felt("kamper").children).forEach((rad) => {
     if (rad.classList.contains("runde-skille")) {
