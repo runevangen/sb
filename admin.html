@@ -271,6 +271,16 @@
       <button id="stedNytt" type="button">Nytt sted</button>
       <button class="lenke" id="stedAvbryt" type="button" hidden>Avbryt</button>
     </div>
+
+    <!-- Filteret bygges av byFor() i admin.js, ut av koordinatene som
+         faktisk ligger i lista: en by uten steder er et valg som ikke gir
+         noe. Hele raden er skjult naar det bare finnes én gruppe — da er
+         velgeren en kontroll uten et valg. -->
+    <div class="rad" id="stedFilterRad" hidden>
+      <label for="stedFilterBy" style="margin: 0;">Vis</label>
+      <select id="stedFilterBy"></select>
+    </div>
+
     <ul class="steder" id="stedListe"></ul>
 
     <form id="stedSkjema" hidden>

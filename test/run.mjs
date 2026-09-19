@@ -2825,6 +2825,56 @@ const SAK_15B = kjor("admin-steder", `
       ok("men beholder resten av lista", navnene.length > 20, navnene.length);
 
       // Skjemaet star ikke framme uoppfordret.
+      // Filter paa by. Meldt 19. september 2026: lista vokser med hver by,
+      // og seksogtjue rader er ikke noe man leser seg gjennom for a finne
+      // den ene i Trondheim.
+      //
+      // Velgeren bygges av koordinatene som faktisk ligger i lista: en by
+      // uten steder er et valg som ikke gir noe.
+      var filterRad = felt("stedFilterRad");
+      var velger = felt("stedFilterBy");
+      ok("filteret staar der naar det finnes mer enn én gruppe",
+         filterRad.hidden === false, "skjult");
+      var valgene = Array.prototype.map.call(velger.options,
+        function (o) { return o.textContent; });
+      ok("alle-valget teller radene", valgene[0].indexOf("Alle byer (") === 0, valgene.join(" | "));
+      ok("og Oslo staar med sitt eget tall",
+         valgene.some(function (t) { return t.indexOf("Oslo (") === 0; }), valgene.join(" | "));
+      // Scotsman er tatt ut og har ingen koordinater i det hele tatt. En
+      // rad som er tatt ut slipper gjennom paa navnet alene, saa den KAN
+      // mangle dem — og et filter som skjuler den, har tatt den ut av
+      // portalen.
+      ok("og radene uten koordinat har sin egen gruppe",
+         valgene.some(function (t) { return t.indexOf("Uten koordinat (") === 0; }),
+         valgene.join(" | "));
+
+      var antallRader = function () { return felt("stedListe").querySelectorAll("li").length; };
+      var alleRader = antallRader();
+      velger.value = "oslo";
+      velger.dispatchEvent(new Event("change"));
+      ok("ett valg snevrer lista inn", antallRader() < alleRader,
+         antallRader() + " av " + alleRader);
+      ok("og Scotsman-raden som er tatt ut er ute av den",
+         felt("stedListe").textContent.indexOf("tatt ut") === -1,
+         felt("stedListe").textContent.slice(0, 120));
+      // Tallet som staar, maa vaere tallet som vises: «26 steder i lista»
+      // over en liste med ett sted leses som at de andre er borte.
+      ok("og hinten sier hva som vises, ikke hva lista inneholder",
+         felt("stedHint").textContent.indexOf("Viser ") === 0 &&
+         felt("stedHint").textContent.indexOf("i Oslo") > -1,
+         felt("stedHint").textContent);
+
+      velger.value = "uten";
+      velger.dispatchEvent(new Event("change"));
+      ok("radene uten koordinat kan naas",
+         felt("stedListe").textContent.indexOf("Scotsman") > -1,
+         felt("stedListe").textContent.slice(0, 120));
+
+      velger.value = "";
+      velger.dispatchEvent(new Event("change"));
+      ok("og alt kommer tilbake", antallRader() === alleRader,
+         antallRader() + " av " + alleRader);
+
       // Feltene som MA fylles ut, skal SI det — ikke avsloere det etter at
       // du har trykket lagre. Meldt 19. september 2026.
       //
@@ -3046,6 +3096,14 @@ const SAK_15C = kjor("admin-koordinat", `
     felt("loggInn").click();
 
     setTimeout(function () { try {
+      // Ingen rettelser i denne scenen, sa alle radene staar i puber.js og
+      // ligger i Oslo. Én gruppe er ikke et valg: en velger som bare kan si
+      // det den alt viser, er en kontroll uten et valg.
+      ok("filteret staar ikke der naar alt er i én by",
+         felt("stedFilterRad").hidden === true,
+         Array.prototype.map.call(felt("stedFilterBy").options,
+           function (o) { return o.textContent; }).join(" | "));
+
       felt("stedNytt").click();
       felt("stedNavn").value = "RBK. Pøbb og sånt";
       felt("stedAdresse").value = "Berglyveien 4J";

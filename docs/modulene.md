@@ -543,6 +543,13 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   sikkerheten — den ligger i funksjonen og i basen — men det er ordenen, og
   det sparer et kall mot API-Football per åpning.
 - **Knappen sier hva trykket gjør.** `lagreKnappTekst()`.
+- **Stedslista filtreres på by.** `byenTil()` leser byen ut av koordinatet
+  med `byFor()`; `fyllStedFilter()` bygger velgeren av de byene som har
+  rader, med tall, og skjuler hele raden når det finnes færre enn to
+  grupper. Rader uten koordinat samles under `UTEN_BY` — et sted som er
+  tatt ut kan mangle dem, og det skal fortsatt kunne åpnes. Er den valgte
+  byen borte etter en redigering, faller filteret tilbake til alle framfor
+  å vise en tom liste uten en vei ut.
 - **Feltene som må fylles ut er merket, og merkingen kommer fra
   `PUBLISTE_FELT`.** `merkPakrevde()` går gjennom den lista og setter
   stjerne pluss `aria-required`; `PAKREVD_ID` er bare navn → felt-id. Et

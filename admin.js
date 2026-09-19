@@ -1060,6 +1060,63 @@ async function hentSteder() {
   }
 }
 
+// Hvilken by en rad ligger i, lest ut av koordinatet. Ingen rad barer
+// byen sin som et felt — `byFor()` er fasiten, og et felt ved siden av
+// kunne vaert uenig med tallene.
+//
+// «uten» er ikke en feil: en rad som er TATT UT slipper gjennom paa navnet
+// alene (sjekkPubRad), sa den kan mangle koordinater helt. En slik rad maa
+// fortsatt kunne aapnes — et filter som skjuler den, har tatt den ut av
+// portalen.
+const UTEN_BY = "uten";
+
+function byenTil(p) {
+  const lat = Number(p && p.lat);
+  const lon = Number(p && p.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return UTEN_BY;
+  return byFor(lat, lon) || UTEN_BY;
+}
+
+// Hvilken by som er valgt. Tom streng er alle.
+let stedFilter = "";
+
+// Velgeren bygges av det som faktisk ligger i lista, med tall: da ser du
+// hvor stedene er framfor a klikke gjennom seks byer for a finne det ut.
+function fyllStedFilter(rader) {
+  const antall = new Map();
+  rader.forEach((p) => {
+    const by = byenTil(p);
+    antall.set(by, (antall.get(by) || 0) + 1);
+  });
+
+  // Rekkefolgen i BYER, ikke i lista: den er den samme hver gang.
+  const grupper = Object.keys(BYER).filter((n) => antall.has(n));
+  if (antall.has(UTEN_BY)) grupper.push(UTEN_BY);
+
+  // Er den valgte byen borte — siste sted der ble flyttet — faller vi
+  // tilbake til alle framfor a vise en tom liste uten en vei ut.
+  if (stedFilter && grupper.indexOf(stedFilter) === -1) stedFilter = "";
+
+  const velger = felt("stedFilterBy");
+  velger.textContent = "";
+  const alle = document.createElement("option");
+  alle.value = "";
+  alle.textContent = "Alle byer (" + rader.length + ")";
+  velger.appendChild(alle);
+  grupper.forEach((n) => {
+    const valg = document.createElement("option");
+    valg.value = n;
+    valg.textContent = (n === UTEN_BY ? "Uten koordinat" : BYER[n].navn)
+      + " (" + antall.get(n) + ")";
+    velger.appendChild(valg);
+  });
+  velger.value = stedFilter;
+
+  // Én gruppe er ikke et valg. En velger som bare kan si det den alt
+  // viser, er en kontroll uten et valg — og da er den i veien.
+  felt("stedFilterRad").hidden = grupper.length < 2;
+}
+
 function tegnSteder() {
   const liste = felt("stedListe");
   liste.textContent = "";
@@ -1071,17 +1128,34 @@ function tegnSteder() {
   // star der det pleier. Nye steder legges bakerst av slaSammenPuber.
   const sammen = slaSammenPuber(KURATERTE, pubRettelser);
   const skjulte = pubRettelser.filter((p) => p.fjernet);
+  const alle = sammen.concat(skjulte);
 
-  sammen.concat(skjulte).forEach((p) => {
+  fyllStedFilter(alle);
+
+  const vist = stedFilter ? alle.filter((p) => byenTil(p) === stedFilter) : alle;
+  vist.forEach((p) => {
     const nokkel = pubNokkel(p.navn);
     liste.appendChild(stedRad(p, nokkel, rettet.get(nokkel)));
   });
 
+  // Tallet som star, ma vaere tallet som vises. «26 steder i lista» over en
+  // liste med ett sted er sant om lista og usant om skjermen, og da leses
+  // det som at de andre er borte.
+  //
+  // «Steder» og «rader» er ikke det samme, og forskjellen er de fjernede:
+  // et sted som er tatt ut er ikke i lista, men raden staar her sa den kan
+  // aapnes igjen. Ufiltrert teller vi stedene; filtrert teller vi radene,
+  // for det er dem filteret gar pa.
+  const kilde = pubRettelser.length
+    ? pubRettelser.length + " er rettet herfra; resten står i puber.js."
+    : "Alle står i puber.js. Ingenting er rettet herfra ennå.";
+  const byNavn = stedFilter === UTEN_BY ? "uten koordinat"
+    : (BYER[stedFilter] ? "i " + BYER[stedFilter].navn : "");
   felt("stedHint").hidden = false;
-  felt("stedHint").textContent = sammen.length + " steder i lista. "
-    + (pubRettelser.length
-      ? pubRettelser.length + " er rettet herfra; resten står i puber.js."
-      : "Alle står i puber.js. Ingenting er rettet herfra ennå.");
+  felt("stedHint").textContent = stedFilter
+    ? "Viser " + vist.length + " " + byNavn + ", av " + alle.length
+      + " rader. " + kilde
+    : sammen.length + " steder i lista. " + kilde;
 }
 
 function stedRad(p, nokkel, rettelse) {
@@ -1337,3 +1411,7 @@ felt("stedLenkeLes").addEventListener("click", lesKartlenke);
 // action, og en navigasjon her ville mistet alt som er tastet.
 felt("stedSkjema").addEventListener("submit", (e) => e.preventDefault());
 felt("stedFjernet").addEventListener("change", oppdaterPakrevdTekst);
+felt("stedFilterBy").addEventListener("change", () => {
+  stedFilter = felt("stedFilterBy").value;
+  tegnSteder();
+});

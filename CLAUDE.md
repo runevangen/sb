@@ -240,6 +240,19 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   uten å utløse `change`, og et skjema som lyver om sine egne krav er verre
   enn et som ikke sier noe. Stjerna er `aria-hidden`; skjermleseren får
   `aria-required`.
+- **Stedslista i portalen filtreres på by, og byen leses av koordinatet.**
+  `byenTil()` bruker `byFor()` — ingen rad bærer byen som et felt, og et
+  felt ved siden av kunne vært uenig med tallene. Velgeren bygges av de
+  byene som **faktisk har steder**, med tall: en by uten rader er et valg
+  som ikke gir noe, og hele raden skjules når det bare finnes én gruppe.
+  **En rad uten koordinat får sin egen gruppe.** Et sted som er tatt ut
+  slipper gjennom på navnet alene, så det kan mangle koordinater helt — og
+  et filter som skjuler den raden, har tatt stedet ut av portalen.
+  **Og tallet som står må være tallet som vises:** «26 steder i lista» over
+  en liste med ett sted leses som at de andre er borte. Filtrert teller
+  hinten radene den viser. «Steder» og «rader» er ikke det samme, og
+  forskjellen er de fjernede: et sted som er tatt ut er ikke i lista, men
+  raden står der så den kan åpnes igjen.
 - **Felt er minst 16 px.** Safari på iPhone zoomer inn av seg selv når du
   fokuserer et felt med mindre skrift, og etter den zoomen er sida pannbar
   sidelengs. Meldt to ganger som «jeg kan scrolle skjermen til venstre og
