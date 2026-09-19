@@ -626,7 +626,7 @@ function tegnKamper() {
     const boks = document.createElement("input");
     boks.type = "checkbox";
     boks.value = kampNokkel(k) || String(k.id);
-    boks.checked = alt.indexOf(boks.value) > -1 || alt.indexOf(String(k.id)) > -1;
+    boks.checked = alt.indexOf(boks.value) > -1;
     const tekst = document.createElement("span");
     tekst.className = "kamp-navn";
     tekst.textContent = k.hjemme + " – " + k.borte;

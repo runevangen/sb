@@ -754,7 +754,7 @@ const VKAMPER = [
 ];
 const VNAA = Date.parse("2026-09-11T10:00:00Z");
 
-const SATT = slaSammen([], "Carls", [11], VKAMPER, VNAA);
+const SATT = slaSammen("Carls", ["2026-09-13-brann-bodoglimt"], VKAMPER, VNAA);
 ok("en valgt kamp blir en visning",
    SATT.length === 1 && SATT[0].pub === "Carls" &&
    SATT[0].kamp === "Brann – Bodø/Glimt" && SATT[0].satt === new Date(VNAA).toISOString(),
@@ -764,46 +764,48 @@ ok("en valgt kamp blir en visning",
 ok("visningen lagres pa kampens nokkel, ikke pa id-en",
    SATT[0].kampId === "2026-09-13-brann-bodoglimt", SATT[0].kampId);
 
-// Admin retter opp en runde uten a rore resten.
-const BLANDET = slaSammen(
-  [{ pub: "Carls", kampId: 99, kamp: "Gammel", dato: "2026-10-01T15:00:00Z", satt: "x" },
-   { pub: "Lincoln Pub", kampId: 11, kamp: "Brann – Bodø/Glimt", dato: "2026-09-13T15:00:00Z", satt: "x" }],
-  "Carls", [12], VKAMPER, VNAA);
-ok("andre puber rores ikke",
-   BLANDET.some((v) => v.pub === "Lincoln Pub" && v.kampId === 11), JSON.stringify(BLANDET));
-ok("kamper utenfor runden star igjen",
-   BLANDET.some((v) => v.pub === "Carls" && v.kampId === 99));
-ok("en kamp som ikke lenger er krysset av, forsvinner",
-   !BLANDET.some((v) => v.pub === "Carls" && v.kampId === 11));
-ok("den nye er med", BLANDET.some((v) => v.pub === "Carls" &&
-   v.kampId === "2026-09-14-molde-rosenborg"), JSON.stringify(BLANDET));
-// Radene som alt star i visninger.js ble skrevet med et tall, og de skal
-// virke ut kampen sin framfor a forsvinne ved utrullingen.
-ok("en rad med gammel id finnes fortsatt",
-   visningerFor(VKAMPER[0], [{ pub: "Lincoln Pub", kampId: 11, kamp: "x",
-     dato: VKAMPER[0].dato, satt: "x" }]).length === 1);
-ok("lista er sortert pa dato", BLANDET.every((v, i) =>
-   i === 0 || String(v.dato) >= String(BLANDET[i - 1].dato)), BLANDET.map((v) => v.dato).join(","));
-// Store og sma bokstaver skal ikke gi to rader for samme pub.
-ok("puben kjennes igjen uansett skrivemate",
-   slaSammen(SATT, "carls", [], VKAMPER, VNAA).length === 0);
+// Avkrysningene kommer som nokler fra portalen, i den rekkefolgen admin
+// trykket. Radene sorteres pa dato uansett.
+const TO = slaSammen("Carls",
+  ["2026-09-14-molde-rosenborg", "2026-09-13-brann-bodoglimt"], VKAMPER, VNAA);
+ok("bare de avkryssede blir rader",
+   TO.length === 2 && TO.every((v) => v.pub === "Carls"), JSON.stringify(TO));
+ok("lista er sortert pa dato",
+   TO[0].kampId === "2026-09-13-brann-bodoglimt" && TO[1].kampId === "2026-09-14-molde-rosenborg",
+   TO.map((v) => v.dato).join(","));
+// Tall-id-en fra den gamle visninger.js er borte med fila. En avkrysning
+// som bare barer kildens id velger derfor ingenting — den kan ikke
+// oppsta fra portalen, og skal ikke bli en rad ved et uhell.
+ok("kildens id alene velger ingenting", slaSammen("Carls", [11], VKAMPER, VNAA).length === 0);
+ok("ingen avkrysninger gir ingen rader", slaSammen("Carls", [], VKAMPER, VNAA).length === 0);
 
+// Radene slik de star i basen: med nokkel.
+const ALLE_VISNINGER = [
+  { pub: "Lincoln Pub", kampId: "2026-09-13-brann-bodoglimt", kamp: "Brann – Bodø/Glimt",
+    dato: "2026-09-13T15:00:00Z", satt: "x" },
+  { pub: "Carls", kampId: "2026-10-01-a-b", kamp: "Gammel", dato: "2026-10-01T15:00:00Z", satt: "x" },
+];
 ok("visninger for en kamp finnes",
-   visningerFor({ id: 11 }, BLANDET).length === 1 &&
-   visningerFor({ id: 11 }, BLANDET)[0].pub === "Lincoln Pub");
+   visningerFor(VKAMPER[0], ALLE_VISNINGER).length === 1 &&
+   visningerFor(VKAMPER[0], ALLE_VISNINGER)[0].pub === "Lincoln Pub");
+ok("en rad med kildens id treffer ikke",
+   visningerFor(VKAMPER[0], [{ pub: "Lincoln Pub", kampId: 11, kamp: "x",
+     dato: VKAMPER[0].dato, satt: "x" }]).length === 0);
 ok("ingen visninger gir tom liste",
-   visningerFor({ id: 77 }, BLANDET).length === 0 && visningerFor(null, BLANDET).length === 0);
+   visningerFor(VKAMPER[1], ALLE_VISNINGER).length === 0 &&
+   visningerFor(null, ALLE_VISNINGER).length === 0);
 
 // Lesersiden: hvem viser denne kampen, med det vi ellers vet om stedet.
-const BEK = bekreftetFor({ id: 11 }, BLANDET, KURATERTE);
+const BEK = bekreftetFor(VKAMPER[0], ALLE_VISNINGER, KURATERTE);
 ok("bekreftede puber hentes for kampen", BEK.length === 1 && BEK[0].navn === "Lincoln Pub",
    JSON.stringify(BEK.map((p) => p.navn)));
 ok("og de er merket som bekreftet", BEK[0].bekreftet === true);
 ok("de barer med seg det vi vet om stedet fra publista",
    typeof BEK[0].lat === "number" && !!BEK[0].bydel, JSON.stringify(BEK[0]));
 // En pub som er tatt ut av publista skal ikke forsvinne stumt.
-const UKJENT = bekreftetFor({ id: 11 },
-   [{ pub: "Nedlagt Pub", kampId: 11, kamp: "x", dato: "2026-09-20T15:00:00Z", satt: "x" }], KURATERTE);
+const UKJENT = bekreftetFor(VKAMPER[0],
+   [{ pub: "Nedlagt Pub", kampId: "2026-09-13-brann-bodoglimt", kamp: "x",
+      dato: "2026-09-20T15:00:00Z", satt: "x" }], KURATERTE);
 ok("en pub utenfor publista star med navnet sitt",
    UKJENT.length === 1 && UKJENT[0].navn === "Nedlagt Pub" && UKJENT[0].bekreftet === true);
 
