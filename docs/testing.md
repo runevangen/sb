@@ -6,7 +6,7 @@ dager. Legger du til tester, er det denne fila som skal rettes.
 
     node test/unit.mjs      660 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  367 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       594 tester, 3–20 s, headless Chromium
+    node test/run.mjs       601 tester, 3–20 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
@@ -154,6 +154,13 @@ innlogging til lagring, innlogging i to steg, «jeg blir med» fra trykk
 til angring, og hele fotballmodulen.
 
 ## Feller i testrammen
+
+- **Skriv aldri bakoverstrek i et testskript.** Skriptene limes inn i en
+  template-streng, og `\d` er borte før nettleseren ser det — mønsteret
+  blir `dd.dd.dddd` og treffer ingenting. Fella har slått til tre ganger:
+  i en XSS-test, i en CSS-selektor, og i en regex for en dato. Regelen er
+  ikke «tell bakoverstrekene riktig», den er **la være å bruke dem**:
+  `split(".")` framfor `/\./`, `indexOf` framfor `test()`.
 
 - **`getComputedStyle()` gir et *levende* objekt.** Vil du vite hva en
   klasse faktisk gjør, må verdiene kopieres til vanlige strenger **før**
