@@ -339,6 +339,33 @@ export function kuraterteNaer(liste, senter, radius) {
     .sort((a, b) => a.avstand - b.avstand);
 }
 
+// De kuraterte stedene i SAMME BY som deg, naermest forst. Radiusen er
+// en sirkel, og en by er ikke det: star du fire kilometer ut, faller
+// steder i din egen by utenfor `kuraterteNaer` enda de apenbart er et
+// svar. Da sto det ingenting igjen for en by med ett kuratert sted.
+//
+// Den star ETTER de geografiske kildene og FOR karttreffene, av samme
+// grunn som stampubene: et kuratert sted tvers over byen er et darligere
+// svar enn en fotballpub i nabogata, men et bedre svar enn en tilfeldig
+// bar Overpass fant.
+//
+// Til forskjell fra stampubene **baerer den avstand**, og derfor blir den
+// ogsa staende nar posisjonen kommer. Det var nettopp den manglende
+// avstanden som gjorde en stampub i en annen by til et darlig svar; her
+// er byen den samme som din, og tallet star pa brikka.
+//
+// Uten en by a sta i er det ingenting a si: `byFor()` svarer null utenfor
+// de seks, og da er det `kuraterteNaer` og kartet som gjelder.
+export function kuraterteIByen(liste, senter) {
+  if (!Array.isArray(liste) || !senter) return [];
+  const by = byFor(senter.lat, senter.lon);
+  if (!by) return [];
+  return liste
+    .filter((p) => p && byFor(p.lat, p.lon) === by)
+    .map((p) => Object.assign({}, p, { avstand: avstandM(senter, p) }))
+    .sort((a, b) => a.avstand - b.avstand);
+}
+
 // Merker treff fra OpenStreetMap som vi vet viser fotball. Da star
 // «viser fotball» pa de vi er sikre pa, uten a skjule resten.
 export function merkKuraterte(puber, liste) {
@@ -409,8 +436,14 @@ export const FORSLAG_MAKS = 6;
 // test fanget nettopp det.
 export const FORSLAG_KILDER = [
   "bekreftede", "dine", "kjenteNaer", "kjenteVedArena",
-  "stampuber", "naerDeg", "vedArena",
+  "stampuber", "kjenteIByen", "naerDeg", "vedArena",
 ];
+
+// «kjenteIByen» og «stampuber» motes aldri i den samme lista, og det er
+// ikke tilfeldig: stampubene tommes i det en posisjon lander, og
+// kjenteIByen krever en posisjon for a vite hvilken by du star i. De
+// dekker hver sin halvdel av det samme hullet — den ene uten posisjon,
+// den andre med.
 
 // Én liste, ikke seks grupper.
 //

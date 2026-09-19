@@ -16,7 +16,7 @@ import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
          rangerForslag, FORSLAG_MAKS, tolkPubRader, slaSammenPuber,
-         posisjonsfeil,
+         posisjonsfeil, kuraterteIByen,
          stampuberFor, falskPosisjon } from "./pub-data.js";
 import { KURATERTE } from "./puber.js";
 import { sjekkForslag, alleredeILista, NAVN_MAKS, ADRESSE_MAKS }
@@ -171,6 +171,13 @@ async function hentPubRettelser(naa = Date.now()) {
 // lista, og de ma regnes om — ellers star et sted som la ned i gar, der
 // til kortet lukkes. Tredje gang den fella har kostet noe i dette
 // prosjektet.
+//
+// FEM kilder leser KJENTE, og alle fem ma regnes om her: `bekreftede`,
+// `kjenteVedArena`, `kjenteNaer`, `kjenteIByen` og `stampuber`. Lista
+// vokser nar en ny kilde legges til, og en som glemmes her blir staende
+// med gamle rader til kortet lukkes. `kjenteIByen` var den femte, lagt
+// til 19. september 2026 — og den ville glidd ut her om ikke SAK_14J
+// hadde landet en rettelse i et apent kort og sett etter den.
 function tegnKjenteIgjen() {
   Array.from(apneBokser).forEach((boks) => {
     if (!boks.isConnected) { apneBokser.delete(boks); return; }
@@ -193,6 +200,8 @@ function tegnKjenteIgjen() {
     if (boks.sistePosisjon) {
       boks.kilder.kjenteNaer = merkBekreftet(
         kuraterteNaer(KJENTE, boks.sistePosisjon, NAER_RADIUS), bekreftede);
+      boks.kilder.kjenteIByen = merkBekreftet(
+        kuraterteIByen(KJENTE, boks.sistePosisjon), bekreftede);
     } else if (boks.kamp) {
       // Stampubene leses ogsa av KJENTE: en ny rad med `lag` svarer pa
       // denne kampen. De regnes bare om nar vi IKKE vet hvor du er —
@@ -1572,6 +1581,10 @@ async function naerDegFra(boks, bekreftede, p) {
   boks.sistePosisjon = p;
   boks.kilder.kjenteNaer = merkBekreftet(
     kuraterteNaer(KJENTE, p, NAER_RADIUS), bekreftede);
+  // Og stedene i byen din, uansett avstand. Radiusen er en sirkel, og en
+  // by er ikke det: star du fire kilometer ut, faller din egen bys steder
+  // utenfor sirkelen enda de apenbart er svaret.
+  boks.kilder.kjenteIByen = merkBekreftet(kuraterteIByen(KJENTE, p), bekreftede);
 
   // Stampubene er en UTVEI, ikke et tillegg: de finnes for tilfellet der
   // geografien ikke gir noe. Vet vi hvor du star, er geografien svaret, og

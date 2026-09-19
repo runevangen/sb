@@ -42,7 +42,7 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
          rangerForslag, FORSLAG_MAKS, stampuberFor, FORSLAG_KILDER,
          falskPosisjon, BYER,
          OVERPASS_SPEIL, overpassHeadere, restTid,
-         sjekkPubliste, kuraterteNaer, merkKuraterte,
+         sjekkPubliste, kuraterteNaer, kuraterteIByen, merkKuraterte,
          sjekkKontaktliste, kontaktFor, finnKontakt, KONTAKT_FELT, kildeHolder,
          pubNokkel, tolkPubRader, pubRadTilBase, slaSammenPuber, sjekkPubRad,
          osmNavnVask, osmNavnSporring, tolkNavnTreff, PUBTYPER, PUBSIKKERHET,
@@ -1655,6 +1655,71 @@ const UTENLANDSK = rangerForslag({
 ok("uten posisjon og uten arena star stampuben igjen",
    UTENLANDSK.topp.length === 1 && UTENLANDSK.topp[0].navn === "Scotsman",
    JSON.stringify(UTENLANDSK.topp));
+/* ---------------- de kuraterte stedene i byen din ---------------- */
+
+// Meldt 19. september 2026: «jeg onsker a fa opp puben uavhengig om den
+// har lag RBK eller ikke». Radiusen er en SIRKEL, og en by er ikke det:
+// star du fire kilometer ut, faller din egen bys steder utenfor sirkelen
+// enda de apenbart er svaret. For en by med ett kuratert sted sto det da
+// ingenting igjen.
+const I_BYEN = [
+  { navn: "RBK-pubben", lat: 63.4286, lon: 10.3641 },   // Trondheim, Ila
+  { navn: "Lerkendalkroa", lat: 63.4130, lon: 10.4060 }, // Trondheim, lenger sor
+  { navn: "Oslo-puben", lat: 59.9139, lon: 10.7522 },   // Oslo
+  { navn: "Uten koordinat" },
+];
+// Fire og en halv kilometer ost for RBK-pubben, fortsatt i Trondheim.
+const UTKANT = { lat: 63.4286, lon: 10.4545 };
+
+const BY_TREFF = kuraterteIByen(I_BYEN, UTKANT);
+ok("et sted i byen din kommer med selv om det er utenfor radiusen",
+   BY_TREFF.some((p) => p.navn === "RBK-pubben"),
+   BY_TREFF.map((p) => p.navn).join(", ") || "(tom)");
+ok("og radiusen alene ville ikke tatt det",
+   !kuraterteNaer(I_BYEN, UTKANT, 3000).some((p) => p.navn === "RBK-pubben"),
+   kuraterteNaer(I_BYEN, UTKANT, 3000).map((p) => p.navn).join(", ") || "(tom)");
+
+// Dette er forskjellen fra stampubene, og grunnen til at denne kilden
+// BLIR staende nar posisjonen kommer: et lagtreff baerer ingen avstand,
+// et bytreff gjor det.
+ok("bytreffet baerer avstanden sin",
+   BY_TREFF.every((p) => Number.isFinite(p.avstand)),
+   JSON.stringify(BY_TREFF.map((p) => [p.navn, p.avstand])));
+ok("og naermeste star forst",
+   BY_TREFF.map((p) => p.avstand).every((a, i, r) => i === 0 || r[i - 1] <= a),
+   JSON.stringify(BY_TREFF.map((p) => p.avstand)));
+
+// Det som holder kilden aerlig: din by, ikke alle byer. Slapp Oslo-puben
+// gjennom her, sto den i Trondheim som om den la i nabogata — nettopp
+// den feilen stampubene ble tommet for a unnga.
+ok("men steder i en ANNEN by kommer ikke med",
+   !BY_TREFF.some((p) => p.navn === "Oslo-puben"),
+   BY_TREFF.map((p) => p.navn).join(", "));
+ok("og rader uten koordinat heller ikke",
+   !BY_TREFF.some((p) => p.navn === "Uten koordinat"),
+   BY_TREFF.map((p) => p.navn).join(", "));
+
+// Star du utenfor de seks byene, vet vi ikke hvilken by du er i, og da
+// er det ingenting a si. En liste her ville vaert gjetning.
+ok("utenfor byene gir den ingenting",
+   kuraterteIByen(I_BYEN, { lat: 62.0, lon: 7.0 }).length === 0,
+   JSON.stringify(kuraterteIByen(I_BYEN, { lat: 62.0, lon: 7.0 })));
+ok("og uten posisjon likesa",
+   kuraterteIByen(I_BYEN, null).length === 0 &&
+   kuraterteIByen(null, UTKANT).length === 0);
+
+// Plasseringen: etter de geografiske kildene, for karttreffene — samme
+// begrunnelse som stampubene. Et kuratert sted tvers over byen slar en
+// tilfeldig bar fra kartet, men taper for en fotballpub i nabogata.
+ok("kjenteIByen star etter de geografiske kildene",
+   FORSLAG_KILDER.indexOf("kjenteIByen") > FORSLAG_KILDER.indexOf("kjenteNaer") &&
+   FORSLAG_KILDER.indexOf("kjenteIByen") > FORSLAG_KILDER.indexOf("kjenteVedArena"),
+   FORSLAG_KILDER.join(","));
+ok("og for de rene karttreffene",
+   FORSLAG_KILDER.indexOf("kjenteIByen") < FORSLAG_KILDER.indexOf("naerDeg") &&
+   FORSLAG_KILDER.indexOf("kjenteIByen") < FORSLAG_KILDER.indexOf("vedArena"),
+   FORSLAG_KILDER.join(","));
+
 // En pub uten navn er ingen pub, og ville blitt en tom knapp.
 ok("rader uten navn faller bort",
    rangerForslag({ dine: [{ navn: "" }, { navn: "Ekte pub" }, null] }).topp.length === 1);
