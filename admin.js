@@ -887,8 +887,46 @@ function stedFelt() {
     sikkerhet: felt("stedSikkerhet").value,
     sjekket: felt("stedSjekket").value,
     merknad: felt("stedMerknad").value,
+    // Flagget settes bare nar noe FAKTISK er krysset av. Et tomt flagg og
+    // «ingen pastand» skal vaere den samme raden — ellers ligger det en
+    // tom struktur i basen som ser ut som en pastand ingen har gjort.
+    ligaer: valgteLigaer().length ? {
+      sender: valgteLigaer(),
+      kilde: felt("stedLigaKilde").value,
+      // Datoen deles med resten av raden. Sesongen regnes AV den gjennom
+      // sesongFor(), sa flagget utloeper ved sesongslutt uten et eget
+      // felt som kunne sagt noe annet.
+      sjekket: felt("stedSjekket").value,
+    } : null,
     fjernet: felt("stedFjernet").checked,
   };
+}
+
+function valgteLigaer() {
+  return Array.from(felt("stedLigaer").querySelectorAll("input:checked"))
+    .map((b) => b.value);
+}
+
+// Hakeboksene bygges AV LIGAER, ikke skrevet i markupen: en liste i
+// HTML-en kunne glidd fra den appen faktisk kjenner, og da ville portalen
+// lagret en liga ingen kamp har. Samme grunn som PUBTYPER og
+// PUBSIKKERHET fyller sine to velgere.
+function byggLigavalg() {
+  const liste = felt("stedLigaer");
+  liste.replaceChildren();
+  Object.keys(LIGAER).forEach((nokkel) => {
+    const rad = document.createElement("li");
+    const boks = document.createElement("input");
+    boks.type = "checkbox";
+    boks.value = nokkel;
+    boks.id = "stedLiga-" + nokkel;
+    const merke = document.createElement("label");
+    merke.setAttribute("for", boks.id);
+    merke.textContent = LIGAER[nokkel].navn;
+    rad.appendChild(boks);
+    rad.appendChild(merke);
+    liste.appendChild(rad);
+  });
 }
 
 function fyllSted(p) {
@@ -907,6 +945,12 @@ function fyllSted(p) {
   felt("stedSjekket").value = new Date().toISOString().slice(0, 10);
   felt("stedMerknad").value = (p && p.merknad) || "";
   felt("stedFjernet").checked = !!(p && p.fjernet);
+  const flagg = (p && p.ligaer) || null;
+  const sender = (flagg && Array.isArray(flagg.sender)) ? flagg.sender : [];
+  Array.from(felt("stedLigaer").querySelectorAll("input")).forEach((b) => {
+    b.checked = sender.indexOf(b.value) > -1;
+  });
+  felt("stedLigaKilde").value = (flagg && flagg.kilde) || "";
   felt("stedTreff").textContent = "";
   felt("stedSokHint").hidden = true;
 }
@@ -925,6 +969,7 @@ PUBSIKKERHET.forEach((sk) => {
   valg.textContent = sk + (sk === "usikker" ? " (vises ikke i appen)" : "");
   felt("stedSikkerhet").appendChild(valg);
 });
+byggLigavalg();
 
 /* ---------------- feltene som MA fylles ut ---------------- */
 

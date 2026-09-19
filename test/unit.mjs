@@ -43,6 +43,8 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
          falskPosisjon, BYER,
          OVERPASS_SPEIL, overpassHeadere, restTid,
          sjekkPubliste, kuraterteNaer, kuraterteIByen, merkKuraterte,
+         ligaflaggGjelder, ligapuberAv, ligamerkeTekst, sjekkLigaflagg,
+         ligaflaggTilBase,
          sjekkKontaktliste, kontaktFor, finnKontakt, KONTAKT_FELT, kildeHolder,
          pubNokkel, tolkPubRader, pubRadTilBase, slaSammenPuber, sjekkPubRad,
          osmNavnVask, osmNavnSporring, tolkNavnTreff, PUBTYPER, PUBSIKKERHET,
@@ -2541,6 +2543,111 @@ ok("alle testbyene har et koordinat i Norge",
    Object.values(BYER).every((b) =>
      b.lat > 57 && b.lat < 72 && b.lon > 4 && b.lon < 32 && b.navn),
    JSON.stringify(Object.values(BYER).map((b) => b.navn)));
+
+/* ---------------- ligaene et sted sender ---------------- */
+
+// Meldt 19. september 2026: «viser alt flagg ma vi snakke om». Det ble
+// ikke «viser alt», for kamper KOLLIDERER: tre Eliteserie-kamper kl. 15
+// blir tre pastander der et sted med én skjerm bare kan innfri én.
+// Pastanden ligger derfor pa liganiva.
+const LIGADAG = (s) => new Date(s + "T12:00:00Z");
+const FLAGG = {
+  sender: ["eliteserien", "premier"],
+  kilde: "Ringte 19.09.2026, de sender alle Eliteserie-kamper",
+  sjekket: "2026-09-19",
+};
+
+ok("et flagg gjelder ligaen det ble satt for",
+   ligaflaggGjelder(FLAGG, "eliteserien", LIGADAG("2026-09-19")) === true);
+ok("men ikke en liga det ikke nevner",
+   ligaflaggGjelder(FLAGG, "laliga", LIGADAG("2026-09-19")) === false);
+
+// FORELDELSEN. Dette er hele grunnen til at flagget er trygt: hver annen
+// opplysning her doer av seg selv, men et staende flagg doer aldri.
+// sesongFor() kjenner alt forskjellen, sa det trengs ingen egen dato.
+ok("Eliteserien gjelder ut aret",
+   ligaflaggGjelder(FLAGG, "eliteserien", LIGADAG("2026-12-31")) === true);
+ok("og er utlopt ved nyttar",
+   ligaflaggGjelder(FLAGG, "eliteserien", LIGADAG("2027-01-01")) === false,
+   "kalenderliga skal doe ved arsskiftet");
+// Premier League er host-var: den SKAL overleve nyttar, ellers hadde
+// flagget dodd midt i sesongen.
+ok("Premier League overlever nyttar",
+   ligaflaggGjelder(FLAGG, "premier", LIGADAG("2027-01-01")) === true);
+ok("og utloper forst i juli",
+   ligaflaggGjelder(FLAGG, "premier", LIGADAG("2027-06-30")) === true &&
+   ligaflaggGjelder(FLAGG, "premier", LIGADAG("2027-07-01")) === false);
+
+// Kilde og dato, som for kanalene og kontaktfeltene. Uten dem er det en
+// pastand ingen kan etterproeve, og da vises den ikke.
+ok("et flagg uten kilde gjelder ikke",
+   ligaflaggGjelder({ sender: ["eliteserien"], sjekket: "2026-09-19" },
+                    "eliteserien", LIGADAG("2026-09-19")) === false);
+ok("og et uten dato heller ikke",
+   ligaflaggGjelder({ sender: ["eliteserien"], kilde: "Ringte dem og spurte" },
+                    "eliteserien", LIGADAG("2026-09-19")) === false);
+ok("tull inn kaster ikke",
+   ligaflaggGjelder(null, "eliteserien", LIGADAG("2026-09-19")) === false &&
+   ligaflaggGjelder(FLAGG, "", LIGADAG("2026-09-19")) === false &&
+   ligaflaggGjelder(FLAGG, "finnesikke", LIGADAG("2026-09-19")) === false);
+
+// Kilden siler KANDIDATER — den leter ikke selv. Geografien er gjort av
+// den som kaller, sa et Oslo-sted ikke blir et svar i Trondheim.
+const KANDIDATER = [
+  { navn: "Med flagg", ligaer: FLAGG },
+  { navn: "Uten flagg" },
+  { navn: "Utlopt flagg", ligaer: Object.assign({}, FLAGG, { sjekket: "2025-09-19" }) },
+];
+const LIGAPUBER = ligapuberAv(KANDIDATER, { liga: "eliteserien" }, LIGADAG("2026-09-19"));
+ok("bare stedene med et gyldig flagg kommer med",
+   LIGAPUBER.map((p) => p.navn).join(",") === "Med flagg",
+   LIGAPUBER.map((p) => p.navn).join(",") || "(tom)");
+ok("en kamp uten liga gir ingen",
+   ligapuberAv(KANDIDATER, {}, LIGADAG("2026-09-19")).length === 0);
+
+// Merket NAVNGIR ligaen. «Viser vanligvis kamper» ville latt leseren tro
+// det gjaldt kampen hen ser pa, ogsa nar stedet ikke sender den ligaen.
+ok("merket navngir ligaen",
+   ligamerkeTekst("eliteserien") === "Sender Eliteserien",
+   ligamerkeTekst("eliteserien"));
+ok("og en ukjent liga gir ingen tekst", ligamerkeTekst("tulleliga") === "");
+
+// Plasseringen: rett etter bekreftede, for alt annet. Bare ★ er
+// sterkere — der har et menneske sett pa nettopp denne kampen.
+ok("ligapuber star rett etter bekreftede",
+   FORSLAG_KILDER.indexOf("ligapuber") === FORSLAG_KILDER.indexOf("bekreftede") + 1,
+   FORSLAG_KILDER.join(","));
+ok("og foran alle de geografiske",
+   FORSLAG_KILDER.indexOf("ligapuber") < FORSLAG_KILDER.indexOf("kjenteNaer") &&
+   FORSLAG_KILDER.indexOf("ligapuber") < FORSLAG_KILDER.indexOf("naerDeg"),
+   FORSLAG_KILDER.join(","));
+
+// Vakta: krysser du av en liga uten kilde, skal portalen si fra FOR
+// lagring. Uten dette ville raden blitt lagret og aldri vist — og admin
+// trodd flagget sto.
+ok("et flagg uten kilde stoppes av vakta",
+   sjekkLigaflagg({ sender: ["eliteserien"], sjekket: "2026-09-19" }).length === 1);
+ok("en ukjent liga stoppes ogsa",
+   sjekkLigaflagg({ sender: ["tulleliga"], kilde: "Ringte dem og spurte",
+                    sjekket: "2026-09-19" }).join(",").indexOf("ukjent liga") === 0);
+// Ingen ligaer krysset av er INGEN pastand, og da kreves ingenting.
+ok("men ingen ligaer krever ingenting",
+   sjekkLigaflagg({ sender: [] }).length === 0 &&
+   sjekkLigaflagg(null).length === 0);
+
+// Lagringa: et tomt flagg og «ingen pastand» skal bli den samme raden.
+ok("et tomt flagg lagres som ingenting",
+   ligaflaggTilBase({ sender: [] }) === null &&
+   ligaflaggTilBase({ sender: ["tulleliga"] }) === null);
+ok("og ukjente ligaer siles bort for lagring",
+   JSON.stringify(ligaflaggTilBase({ sender: ["eliteserien", "tulleliga"],
+     kilde: "Ringte dem og spurte", sjekket: "2026-09-19" }).sender) ===
+   JSON.stringify(["eliteserien"]));
+// Sesongen lagres ikke: den leses av sjekket. To felt kunne sagt hver
+// sin sesong om det samme flagget.
+ok("sesongen lagres ikke som et eget felt",
+   ligaflaggTilBase(FLAGG).sesong === undefined,
+   JSON.stringify(ligaflaggTilBase(FLAGG)));
 
 /* ---------------- nar posisjonen uteblir ---------------- */
 
