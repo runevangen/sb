@@ -81,6 +81,29 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 - **En knapp som ser ut som den gir noe den ikke gir, er verre enn en som
   sier hva den er.** Gjelder «Venner», «Meldt inn til oss», og
   «Valgt for deling» utlogget.
+- **Ingen knapp navngir noe appen ikke har.** «Del i chatten» sto til
+  19. september 2026, og Sportsbibelen har ingen chat — knappen lovet et
+  sted å sende den. Hvor teksten havner er leserens valg i
+  delingsmenyen, så knappen heter «Del» og svaret «Kopiert. Lim inn der du
+  vil.»
+- **Har du valgt et sted, minimeres de andre — men ikke der noen skal.**
+  Sto du med ditt eget sted blant seks, var lista noe å lese seg gjennom
+  framfor et svar. Framme står **ditt sted** og **stedene noen andre skal
+  til**: det siste er det eneste som kan endre svaret ditt. At det finnes
+  fire puber til, er det ikke. Resten ligger bak «Vis de andre (N)», og
+  åpen/lukket huskes på panelet — `tegnSteder` kjører på hvert svar, og en
+  liste som lukker seg selv midt i en vurdering er verre enn ingen
+  minimering. Melder du deg av, står alt framme igjen.
+- **Sier du at du skal til et sted vi ikke kjenner, blir du spurt om å
+  sende det inn.** Skjemaet har stått der hele tiden, bak «Mangler stedet?
+  Send det inn.» — en knapp du måtte legge merke til. Øyeblikket stedet
+  faktisk mangler, er øyeblikket du nettopp sa at du skal dit.
+  `panel.tilbyForslag()` kommer **etter** svaret, ikke mens du skriver: et
+  halvskrevet navn på et sted som finnes er ikke et sted som mangler.
+  Den holder kjeft for stadion, for den som ikke er logget inn (databasen
+  setter `foreslatt_av` fra økta, så et tilbud som ikke kan tas imot er
+  verre enn ingen), og for et sted `alleredeILista()` kjenner — ellers ber
+  appen deg melde inn en pub den selv har i lista.
 - **«Andre fotballpuber» er stedene i lista som *ikke* har bekreftet.**
   ★ betyr «viser denne kampen» og settes av admin; ⚽ betyr «kjent for å
   vise fotball» og kommer fra `puber.js`. De to er ulike påstander,
@@ -213,6 +236,33 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   også i et element som aldri settes inn i dokumentet, og også når vi
   kaster alt utenom teksten rett etterpå.
 - Filtrerer noe feeden, står det som en knapp med kryss i toppfeltet.
+- **Et felt som må fylles ut, sier det — før du trykker lagre.** Stjernene
+  i stedskjemaet settes av `merkPakrevde()` **ut av `PUBLISTE_FELT`**, ikke
+  skrevet i markupen: en liste i HTML-en kunne glidd fra den lista
+  validatoren bruker, og da lover skjemaet noe annet enn det slipper
+  gjennom. Et navn i `PUBLISTE_FELT` uten et felt i skjemaet blir stående i
+  `dataset.umerket`, og en vakt i `run.mjs` slår ut.
+  **Merkingen må være sann begge veier:** adresse, lag og merknad slipper
+  gjennom uten verdi, og en stjerne der ville sagt at noe kreves som ikke
+  gjør det. Tas stedet **ut** av lista, holder navnet alene — `sjekkPubRad`
+  slipper en fjernet rad gjennom på navnet — og da sier forklaringa det, og
+  stjernene dempes. `apneSted()` kaller den også: `fyllSted` setter haken
+  uten å utløse `change`, og et skjema som lyver om sine egne krav er verre
+  enn et som ikke sier noe. Stjerna er `aria-hidden`; skjermleseren får
+  `aria-required`.
+- **Stedslista i portalen filtreres på by, og byen leses av koordinatet.**
+  `byenTil()` bruker `byFor()` — ingen rad bærer byen som et felt, og et
+  felt ved siden av kunne vært uenig med tallene. Velgeren bygges av de
+  byene som **faktisk har steder**, med tall: en by uten rader er et valg
+  som ikke gir noe, og hele raden skjules når det bare finnes én gruppe.
+  **En rad uten koordinat får sin egen gruppe.** Et sted som er tatt ut
+  slipper gjennom på navnet alene, så det kan mangle koordinater helt — og
+  et filter som skjuler den raden, har tatt stedet ut av portalen.
+  **Og tallet som står må være tallet som vises:** «26 steder i lista» over
+  en liste med ett sted leses som at de andre er borte. Filtrert teller
+  hinten radene den viser. «Steder» og «rader» er ikke det samme, og
+  forskjellen er de fjernede: et sted som er tatt ut er ikke i lista, men
+  raden står der så den kan åpnes igjen.
 - **Felt er minst 16 px.** Safari på iPhone zoomer inn av seg selv når du
   fokuserer et felt med mindre skrift, og etter den zoomen er sida pannbar
   sidelengs. Meldt to ganger som «jeg kan scrolle skjermen til venstre og
