@@ -16,6 +16,7 @@ import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
          rangerForslag, FORSLAG_MAKS, tolkPubRader, slaSammenPuber,
+         posisjonsfeil,
          stampuberFor, falskPosisjon } from "./pub-data.js";
 import { KURATERTE } from "./puber.js";
 import { sjekkForslag, alleredeILista, NAVN_MAKS, ADRESSE_MAKS }
@@ -33,7 +34,19 @@ import { KANALER } from "./kanaler.js";
 // nettet, og derfor er dette ikke en const lenger: alt som tegnes av den,
 // ma kunne tegnes pa nytt nar de lander.
 let KJENTE = kjenteAv(KURATERTE);
-const KJENT_RADIUS = 1500;
+// To ulike sporsmal, og de tale ulike tall. «Naer deg» er en pastand om
+// DEG: lista sorteres pa avstand og hver brikke baerer sin egen, sa tre
+// kilometer er noe du selv kan forkaste. «Ved arenaen» er en pastand om
+// STADION, og der er tre kilometer en halvtimes gange — malt fra KFUM
+// Arena ville atte kuraterte steder stat under overskriften, de fleste av
+// dem sentrumspuber som ikke ligger ved den arenaen i det hele tatt.
+//
+// Tallene sto som ett til 19. september 2026. Da lat 1500 akkurat lite
+// nok til at RBK-puben i Trondheim — 1545 meter fra sentrum — falt
+// utenfor med 45 meter, mens den samme utvidelsen som slapp den inn ville
+// gjort arenalista usann.
+const NAER_RADIUS = 3000;
+const ARENA_RADIUS = 1500;
 
 function kjenteAv(liste) {
   return liste.filter((p) => p.sikkerhet !== "usikker");
@@ -175,11 +188,11 @@ function tegnKjenteIgjen() {
     const arena = arenaFor(boks.dataset.arena || "");
     if (arena) {
       boks.kilder.kjenteVedArena = merkBekreftet(
-        kuraterteNaer(KJENTE, arena, KJENT_RADIUS), bekreftede);
+        kuraterteNaer(KJENTE, arena, ARENA_RADIUS), bekreftede);
     }
     if (boks.sistePosisjon) {
       boks.kilder.kjenteNaer = merkBekreftet(
-        kuraterteNaer(KJENTE, boks.sistePosisjon, KJENT_RADIUS), bekreftede);
+        kuraterteNaer(KJENTE, boks.sistePosisjon, NAER_RADIUS), bekreftede);
     } else if (boks.kamp) {
       // Stampubene leses ogsa av KJENTE: en ny rad med `lag` svarer pa
       // denne kampen. De regnes bare om nar vi IKKE vet hvor du er —
@@ -1289,6 +1302,11 @@ function pubForslag(kamp, pubFelt) {
   boks.feil = [];
   boks.kart = false;
   boks.proveNaer = false;
+  // Hvorfor «naer deg» uteble, som sin egen setning og ikke som en rad i
+  // `boks.feil`: den skal kunne BYTTES UT nar du prover igjen. Lagt i
+  // feil-lista ville «Du sa nei til posisjon» blitt staende etter at du
+  // sa ja — en setning som var sann da den ble skrevet og usann na.
+  boks.posisjonsfeil = "";
   return boks;
 }
 
@@ -1319,7 +1337,7 @@ function fyllForslag(boks, kamp) {
   const arena = arenaFor(kamp.arena);
   if (arena) {
     boks.kilder.kjenteVedArena = merkBekreftet(
-      kuraterteNaer(KJENTE, arena, KJENT_RADIUS), bekreftede);
+      kuraterteNaer(KJENTE, arena, ARENA_RADIUS), bekreftede);
   }
 
   tegnForslag(boks);
@@ -1409,7 +1427,10 @@ function notetekst(boks, topp) {
   const falsk = boks.falskPosisjon
     ? "Falsk posisjon: " + boks.falskPosisjon.navn + ". "
     : "";
-  const feil = boks.feil.join(" ");
+  // Posisjonsfeilen forst: uteble posisjonen, er det DEN som forklarer
+  // hvorfor resten er tynt, og de andre linjene er folger av den.
+  const feil = [boks.posisjonsfeil].concat(boks.feil)
+    .filter(Boolean).join(" ");
   if (!topp.length) {
     if (boks.venter > 0) return falsk + "Finner puber …";
     return falsk + (feil || "Fant ingen puber i nærheten. Skriv navnet selv.");
@@ -1510,17 +1531,32 @@ function hentNaerDeg(boks, bekreftede) {
     naerDegFra(boks, bekreftede, rundPosisjon(falsk.lat, falsk.lon));
     return;
   }
-  if (!navigator.geolocation) return;
+  // Et nytt forsok viser bort svaret fra forrige: star det «Du sa nei»
+  // mens vi sporr pa nytt, sier skjermen noe om fortida som fortsatt
+  // handler om na.
+  boks.posisjonsfeil = "";
+
+  if (!navigator.geolocation) {
+    // Ingen knapp her: det finnes ingenting a prove om igjen. Men det
+    // skal sta hvorfor, ellers er «Fant ingen puber i naerheten» det
+    // eneste leseren far — og den setningen er ikke sann.
+    boks.posisjonsfeil = posisjonsfeil(0);
+    tegnForslag(boks);
+    return;
+  }
   boks.venter += 1;
 
   navigator.geolocation.getCurrentPosition((pos) => {
     naerDegFra(boks, bekreftede,
       rundPosisjon(pos.coords.latitude, pos.coords.longitude));
-  }, () => {
-    // Avslatt posisjon er ikke en feil verdt en linje: resten av lista
-    // star der fortsatt, og leseren vet hva hen nettopp sa nei til. Men
-    // knappen skal sta der, sa det gar an a ombestemme seg.
+  }, (err) => {
+    // Nei, tidsavbrudd og «fant ikke posisjonen» sto som ett stille
+    // avbrudd for. De er tre ulike ting: det forste kan du gjore om, det
+    // andre kan proves under apen himmel, og det tredje sier at
+    // telefonen sjol ga opp. Knappen star uansett — ombestemme seg gar
+    // an i alle tre.
     boks.venter -= 1;
+    boks.posisjonsfeil = posisjonsfeil(err && err.code);
     boks.proveNaer = true;
     tegnForslag(boks);
   }, { maximumAge: 300000, timeout: 10000 });
@@ -1535,7 +1571,7 @@ async function naerDegFra(boks, bekreftede, p) {
   // mye her, der Overpass har vaert det skjoreste leddet.
   boks.sistePosisjon = p;
   boks.kilder.kjenteNaer = merkBekreftet(
-    kuraterteNaer(KJENTE, p, KJENT_RADIUS), bekreftede);
+    kuraterteNaer(KJENTE, p, NAER_RADIUS), bekreftede);
 
   // Stampubene er en UTVEI, ikke et tillegg: de finnes for tilfellet der
   // geografien ikke gir noe. Vet vi hvor du star, er geografien svaret, og

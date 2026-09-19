@@ -9,6 +9,70 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 19. september 2026 — de siste 45 meterne, og setningen som skjulte dem
+
+**Meldt som:** «Utvid `KJENT_RADIUS`» og «undersøk hvorfor posisjon ikke
+slo inn» — to valg etter at RBK-puben fortsatt ikke sto der.
+
+**Hva det så ut som.** To uavhengige saker. Det var én, og den lå i
+setningen som sto igjen begge gangene.
+
+**Radiusen, målt.** Puben ligger 63.4286, 10.3641 — **1545 meter** fra
+Trondheim sentrum slik `BYER` definerer det, mot en radius på 1500. Den
+bommet med 45 meter. (Oppføringen over målte 1560 m fra Torvet; samme pub,
+litt annet utgangspunkt.) Radiusen *var* altså en ekte årsak, den lå bare
+bak en større en og ble stående da den første ble rettet.
+
+**Hvorfor den ikke bare ble skrudd opp.** `KJENT_RADIUS` gjorde to jobber.
+Målt fra KFUM Arena gir 3000 m åtte kuraterte steder, mot ett på 1500 —
+og de sju nye er sentrumspuber som ikke ligger ved den arenaen. «Nær deg»
+tåler tre kilometer fordi hver brikke bærer avstanden sin og du forkaster
+den selv; «ved arenaen» er en påstand du ikke kan forkaste. Så tallet ble
+to: `NAER_RADIUS` 3000, `ARENA_RADIUS` 1500.
+
+**Posisjonen, og hvorfor spørsmålet ikke lot seg stille.** Appen håndterte
+avslag, tidsavbrudd, «telefonen fant den ikke» og «nettleseren har ikke
+API-et» likt — og stille. Det siste som et rent `return`, uten så mye som
+en knapp. Da sto «Fant ingen puber i nærheten. Skriv navnet selv.» igjen
+som eneste forklaring.
+
+Den setningen er ikke sann i noen av de fire tilfellene. Vi fant ingenting
+fordi vi aldri fikk vite hvor «nær» var, og de to tingene ber leseren om
+helt ulike ting: den ene å skrive navnet selv, den andre å trykke ja.
+
+**Og det er den samme setningen som skjulte forrige feil.** Oppføringen
+over ender med at ingenting fanget den, fordi appen sa «Fant ingen puber i
+nærheten» — «en helt vanlig setning». Den var vanlig nettopp fordi den ble
+sagt uansett hva som hadde skjedd. En feilmelding som passer til alt,
+forteller ingenting.
+
+**Hva som ble gjort.** `posisjonsfeil()` i `pub-data.js` gir én setning per
+årsak, og hver navngir det som mangler på skjermen. Den ligger i sitt eget
+felt på boksen, ikke i `boks.feil`, fordi den skal kunne **byttes ut**: i
+feil-lista ble «Du sa nei til posisjon» stående etter at leseren sa ja.
+Uten geolocation settes ingen knapp — en vei tilbake som ikke fører noe
+sted er verre enn ingen.
+
+**Testen som var grønn hele tida.** `SAK_14D` dekket den samme raden og
+passerte. Den står i **døra** til puben — «samme punkt raden lagres med»,
+altså null meter. Den beviste at sammenslåinga virker, ikke at stedet nås
+fra der en leser står. En test som stiller seg der svaret er opplagt, måler
+ikke det den tror. `SAK_14H` står i Trondheim sentrum i stedet.
+
+**Hva som fanget det.** Seks sabotasjer, og alle ga symptomet tilbake.
+Radiusen satt til 1500 igjen gir «Fant ingen puber i nærheten. Skriv
+navnet selv.» — ordrett det som sto på skjermen. Den mest verdifulle var den tredje: droppes nullstillingen, blir
+«Posisjonen kom ikke fram i tide» stående etter et vellykket nytt forsøk.
+Den feilen ville ingen sett, for skjermen sa noe som hadde vært sant.
+
+**Én ting til, om tallene.** Testtallet 660 som ble skrevet inn dagen før,
+gjaldt et tre der PR #113 ikke hadde landet ennå. Den fjernet to
+enhetstester, og squash-en rettet tallet til 658 av seg selv. Verdt å merke
+seg at det gikk bra: to økter samme time traff fila i ulik rekkefølge, og
+det var nettopp derfor tallet bare står ett sted.
+
+---
+
 ## 18. september 2026 — puben var lagret, men appen hadde sluttet å spørre
 
 **Meldt som:** «Fikk til å lagre rbk pøbb. Men den dukker ikke opp i andre

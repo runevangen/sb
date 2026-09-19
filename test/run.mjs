@@ -2243,6 +2243,303 @@ const SAK_14C = kjor("pub-falsk-posisjon", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
 `);
 
+/* ---------------- 14E. radiusen for «naer deg» ---------------- */
+
+// Meldt 19. september 2026: en RBK-pub lagret i portalen dukket ikke opp
+// i appen fra Trondheim. Malt: 1545 meter fra sentrum, mot en radius pa
+// 1500. Den bommet med 45 meter.
+//
+// Tallet sto som ETT for «naer deg» og «ved arenaen», og de to tale ikke
+// det samme tallet: tre kilometer fra deg er noe du kan forkaste selv,
+// tre kilometer fra stadion gjor overskriften usann. Scenen star 2,1 km
+// nord for Majorstuen — ingenting innenfor 1500, tre steder innenfor
+// 3000. Settes NAER_RADIUS tilbake til 1500, blir lista tom.
+const SAK_14E = kjor("pub-naer-radius", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "" }); });
+  history.replaceState(null, "", location.pathname + "?posisjon=59.9479,10.7145");
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("overpass") > -1) {
+      // Kartet gir ingenting. Star det noe i lista, kom det fra fila.
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        json: function () { return Promise.resolve({ elements: [] }); } });
+    }
+    if (u.indexOf("/api/vaer?") === 0 || u.indexOf("/api/puber?") === 0) {
+      return Promise.resolve({ ok: false, status: 400, statusText: "Bad Request",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/pub-liste") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ puber: [] })); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ svar: [], visninger: [] })); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({
+          liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+          kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+          kamper: ARETS, runde: "Runde 5" })); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    panel.querySelector(".pub-apne").click();
+    var forslag = panel.querySelector(".pub-forslag");
+    setTimeout(function () { try {
+      var navnene = Array.prototype.map.call(
+        forslag.querySelectorAll(".pub-chip"), function (c) { return c.textContent; });
+      // 2689 m fra Oslo sentrum, 2,1 km fra der vi star. Under den gamle
+      // radiusen pa 1500 fantes den ikke.
+      ok("et kuratert sted 2,1 km unna star i lista",
+         navnene.some(function (n) { return n.indexOf("The Old Irish Pub Majorstuen") === 0; }),
+         navnene.join(" | ") || "(tom liste)");
+      // Avstanden ma vaere pa brikka: en lengre liste er bare aerlig sa
+      // lenge leseren ser hvor langt det er og kan forkaste den selv.
+      var avstander = Array.prototype.map.call(
+        forslag.querySelectorAll(".pub-avstand"), function (a) { return a.textContent; });
+      ok("og den baerer avstanden sin, sa den kan forkastes",
+         avstander.length > 0 && avstander.join("").length > 0,
+         avstander.join(" | ") || "(ingen avstander)");
+      ferdig();
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 600);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
+`);
+
+/* ---------------- 14H. rettelsen sett fra sentrum ---------------- */
+
+// Den meldte saken, med raden slik /api/pub-liste faktisk leverer den.
+//
+// SAK_14D dekket den samme raden og var gronn hele tida — men den star i
+// DORA til puben, «samme punkt raden lagres med», altsa null meter unna.
+// Den beviste at sammenslainga virker, ikke at stedet nas fra der en
+// leser star. Her star scenen i Trondheim sentrum, 1545 meter unna, og
+// det var nettopp de meterne som manglet.
+const SAK_14H = kjor("pub-rettelse-fra-sentrum", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "" }); });
+  // Trondheim sentrum, slik BYER definerer det.
+  history.replaceState(null, "", location.pathname + "?posisjon=63.43,10.395");
+  var RBK = { nokkel: "rbkpobbogsant", navn: "RBK. Pøbb og sånt", bydel: "Ila",
+    adresse: "Gata 2", lat: 63.4286, lon: 10.3641, type: "sportsbar", lag: [],
+    kilde: "Var innom 18.09.2026, storskjerm i baren", sikkerhet: "bekreftet",
+    sjekket: "2026-09-18", merknad: "", fjernet: false };
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("overpass") > -1) {
+      // Kartet gir ingenting: star puben der, kom den fra rettelsene.
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        json: function () { return Promise.resolve({ elements: [] }); } });
+    }
+    if (u.indexOf("/api/pub-liste") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { klar: true, puber: [RBK] })); } });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ svar: [], visninger: [] })); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({
+          liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+          kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+          kamper: ARETS, runde: "Runde 5" })); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var rad = document.querySelector(".kamp.delbar");
+    var del = rad && rad.querySelector(".kamp-del");
+    if (del) del.click();
+    var panel = document.querySelector(".kamp-panel");
+    panel.querySelector(".pub-apne").click();
+    var forslag = panel.querySelector(".pub-forslag");
+    setTimeout(function () { try {
+      var tekst = forslag.textContent;
+      // Dette er hele saken: raden er riktig, sammenslainga virker, og
+      // likevel sto den ikke der — 45 meter for langt unna.
+      ok("en rettelse fra portalen nas fra sentrum, ikke bare fra dora",
+         tekst.indexOf("Pøbb") > -1, tekst.slice(0, 260) || "(tomt panel)");
+      // Og den bærer avstanden sin, sa det gar an a vurdere den.
+      var avstand = forslag.querySelector(".pub-avstand");
+      ok("og den viser hvor langt det er",
+         !!avstand && avstand.textContent.length > 0,
+         avstand ? avstand.textContent : "(ingen avstand)");
+      ferdig();
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
+`);
+
+/* ---------------- 14F. hvorfor posisjonen uteble ---------------- */
+
+// Meldt 19. september 2026: «undersok hvorfor posisjon ikke slo inn».
+// Det lot seg ikke undersoke fra skjermen, og DET var feilen. Nei,
+// tidsavbrudd og «fant ikke posisjonen» ble handtert likt og stille, og
+// da sto «Fant ingen puber i naerheten» igjen som eneste forklaring — en
+// setning som ikke er sann nar vi aldri fikk vite hvor «naer» var.
+const SAK_14F = kjor("pub-posisjon-hvorfor", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "" }); });
+  // Tidsavbrudd, ikke avslag: kode 3. Stuben modellerer nettleserens eget
+  // svar, ikke var handtering av det.
+  navigator.geolocation.getCurrentPosition = function (ok_, feil) {
+    feil({ code: 3, message: "timeout" });
+  };
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        json: function () { return Promise.resolve({ elements: [] }); } });
+    }
+    if (u.indexOf("/api/vaer?") === 0 || u.indexOf("/api/puber?") === 0) {
+      return Promise.resolve({ ok: false, status: 400, statusText: "Bad Request",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/pub-liste") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ puber: [] })); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ svar: [], visninger: [] })); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({
+          liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+          kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+          kamper: ARETS, runde: "Runde 5" })); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    panel.querySelector(".pub-apne").click();
+    var forslag = panel.querySelector(".pub-forslag");
+    setTimeout(function () { try {
+      var note = forslag.querySelector(".pub-note").textContent;
+      // Et tidsavbrudd er ikke et nei. La den skylda pa leseren, leter
+      // hen etter en innstilling hen aldri rorte.
+      ok("et tidsavbrudd sier at posisjonen ikke kom fram",
+         note.indexOf("kom ikke fram i tide") > -1, note);
+      ok("og legger ikke skylda pa leseren",
+         note.indexOf("Du sa nei") === -1, note);
+      // Den gamle setningen er usann her: vi fant ingenting fordi vi
+      // aldri fikk vite hvor «naer» var.
+      ok("og staar ikke lenger som «fant ingen puber»",
+         note.indexOf("Fant ingen puber") === -1, note);
+      // Knappen star: et tidsavbrudd kan proves om igjen.
+      ok("og veien tilbake star der",
+         !!forslag.querySelector(".pub-naer"), note);
+
+      // Na sier telefonen ja. Den gamle setningen ma VEK — den var sann
+      // da den ble skrevet og er usann na. Dette er hele grunnen til at
+      // posisjonsfeilen er sitt eget felt og ikke en rad i boks.feil.
+      navigator.geolocation.getCurrentPosition = function (ok_) {
+        ok_({ coords: { latitude: 59.9139, longitude: 10.7522, accuracy: 20 } });
+      };
+      forslag.querySelector(".pub-naer").click();
+      setTimeout(function () { try {
+        var etterpa = panel.querySelector(".pub-forslag .pub-note").textContent;
+        ok("og forsvinner nar posisjonen kommer",
+           etterpa.indexOf("kom ikke fram i tide") === -1, etterpa);
+        var navnene = Array.prototype.map.call(
+          panel.querySelectorAll(".pub-forslag .pub-chip"),
+          function (c) { return c.textContent; });
+        ok("og da star stedene naer deg der",
+           navnene.length > 0, navnene.join(" | ") || "(tom liste)");
+        ferdig();
+      } catch (e) { ok("ingen unntak etter nytt forsok", false, e.message); ferdig(); } }, 600);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 600);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
+`);
+
+/* ---------------- 14G. nettleseren uten posisjon ---------------- */
+
+// Det stilleste tilfellet av alle: `if (!navigator.geolocation) return;`.
+// Ingen setning, og ingen knapp — for det finnes ingenting a prove om
+// igjen. Da sto panelet der og sa «Fant ingen puber i naerheten» om en
+// maling som aldri ble forsokt.
+const SAK_14G = kjor("pub-ingen-geolocation", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "" }); });
+  // Nettleseren har ikke API-et i det hele tatt.
+  try {
+    Object.defineProperty(navigator, "geolocation",
+      { value: undefined, configurable: true });
+  } catch (e) { /* lar seg ikke fjerne her */ }
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        json: function () { return Promise.resolve({ elements: [] }); } });
+    }
+    if (u.indexOf("/api/vaer?") === 0 || u.indexOf("/api/puber?") === 0) {
+      return Promise.resolve({ ok: false, status: 400, statusText: "Bad Request",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/pub-liste") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ puber: [] })); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ svar: [], visninger: [] })); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({
+          liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+          kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+          kamper: ARETS, runde: "Runde 5" })); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    panel.querySelector(".pub-apne").click();
+    var forslag = panel.querySelector(".pub-forslag");
+    setTimeout(function () { try {
+      var note = forslag.querySelector(".pub-note").textContent;
+      ok("en nettleser uten posisjon sier at det er nettleseren",
+         note.indexOf("Nettleseren gir ikke posisjon") > -1, note);
+      // Og ingen knapp: den ville lovet et nytt forsok som ikke finnes.
+      ok("og tilbyr ingen knapp som ikke kan gi noe",
+         !forslag.querySelector(".pub-naer"), note);
+      ferdig();
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 600);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
+`);
+
 const SAK_15 = kjor("admin", `
   // Skrivingen gar med admins egen okt na (#79), ikke med en nokkel:
   // RLS slar opp uid-en i visning_skrivere, og ADMIN_PASSORD betyr
@@ -5540,7 +5837,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
 let feilet = 0;
 
 for (const t of alle) {
