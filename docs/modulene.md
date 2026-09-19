@@ -488,6 +488,18 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
 - **Et trykk på et sted er svaret.** Før var det tre steg og et navnefelt
   på hver kamp. Navnet kommer nå fra innloggingen — et felt man måtte fylle
   ville betydd at «ett trykk» ikke var sant.
+- **Har du valgt, minimeres de andre — men ikke der noen skal.** `framme`
+  er ditt sted pluss alt med `harFolk`; resten går bak `.sted-mer`.
+  Åpen/lukket ligger på `panel.visAlleSteder`, fordi `tegnSteder` kjører på
+  hvert svar. `.sted-resten` setter `display: flex` og må derfor si hva
+  `[hidden]` betyr.
+- **`panel.tilbyForslag()` spør om å sende inn et ukjent sted, etter
+  svaret.** Den er stille for stadion, for den utloggede, og for et sted
+  `alleredeILista()` kjenner. `sendInnSted()`-boksen eksponerer
+  `apneMed(navn)` så tilbudet kan åpne og forhåndsfylle skjemaet som alt
+  ligger der — det er én vei inn, ikke et nytt skjema.
+- **Knappen heter «Del», ikke «Del i chatten».** Appen har ingen chat, og
+  hvor teksten havner er leserens valg i delingsmenyen.
 - **«Hjemme» er borte.** Kortet handler om hvor man møter noen, og sofaen
   er ikke et møtested.
 - **Et sted fra en lenke blir *pekt ut*, ikke valgt.** Chipen markeres og

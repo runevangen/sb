@@ -4151,6 +4151,63 @@ const SAK_19 = kjor("blir-med", FELLES + FOTBALL + `
          pubX.querySelector(".sted-rad-folk").textContent.indexOf("Du") === 0,
          pubX.querySelector(".sted-rad-folk").textContent);
 
+      // Har du valgt et sted, er sporsmalet besvart. Da er de andre radene
+      // ikke et svar lenger, de er en liste du ma lese deg gjennom for a
+      // finne din egen. Meldt 19. september 2026.
+      var mer = panel.querySelector(".sted-mer");
+      ok("de andre stedene ligger bak én knapp",
+         !!mer && mer.textContent === "Vis de andre (1)", mer ? mer.textContent : "ingen knapp");
+      var arenaEtter = stedChip("Brann Stadion");
+      ok("og stadion er blant dem",
+         !!arenaEtter && !!arenaEtter.closest(".sted-resten"),
+         arenaEtter ? arenaEtter.className : "ingen arena-rad");
+      // Guardet, ikke kjedet: er knappen borte, er det NETTOPP det denne
+      // testen skal fange — og da skal den si det framfor a velte paa null.
+      var resten = panel.querySelector(".sted-resten");
+      ok("som faktisk er skjult", !!resten && resten.hidden === true,
+         resten ? "star framme" : "ingen skjult liste");
+      // Ditt eget sted star fortsatt framme: det er svaret.
+      ok("mens ditt eget sted star framme", !pubX.closest(".sted-resten"));
+      if (mer && resten) {
+        mer.click();
+        ok("ett trykk viser dem",
+           resten.hidden === false && mer.textContent === "Skjul de andre", mer.textContent);
+        mer.click();
+      } else {
+        ok("ett trykk viser dem", false, "ingen knapp a trykke pa");
+      }
+
+      // «Vi kjenner ikke stedet. Send det inn?»
+      //
+      // Skjemaet har staatt der hele tiden, bak «Mangler stedet? Send det
+      // inn.» — en knapp du maa legge merke til. Oeyeblikket stedet
+      // faktisk mangler, er oeyeblikket du nettopp sa at du skal dit.
+      var tilbud = panel.querySelector(".sted-tilbud");
+      ok("appen tilbyr a sende inn et sted vi ikke kjenner",
+         !!tilbud && tilbud.hidden === false, tilbud ? "skjult" : "ingen linje");
+      ok("og den navngir stedet",
+         tilbud.textContent.indexOf("Pub X") > -1, tilbud.textContent);
+      var tilbudKnapp = tilbud ? tilbud.querySelector(".sted-tilbud-knapp") : null;
+      if (tilbudKnapp) {
+        tilbudKnapp.click();
+        var skjema = panel.querySelector(".sted-forslag-skjema");
+        ok("knappen apner skjemaet", skjema.hidden === false);
+        ok("med navnet ferdig utfylt",
+           skjema.querySelector("input[type=text]").value === "Pub X",
+           skjema.querySelector("input[type=text]").value);
+        ok("og tilbudet forsvinner nar det er tatt imot", tilbud.hidden === true);
+      } else {
+        ok("knappen apner skjemaet", false, "ingen knapp");
+        ok("med navnet ferdig utfylt", false, "ingen knapp");
+        ok("og tilbudet forsvinner nar det er tatt imot", false, "ingen knapp");
+      }
+
+      // Sportsbibelen har ingen chat. En knapp som navngir noe appen ikke
+      // har, lover et sted a sende den.
+      ok("delingsknappen heter «Del»",
+         panel.querySelector(".kamp-send").textContent === "Del",
+         panel.querySelector(".kamp-send").textContent);
+
       // «Ola blir med» sier hvem, ikke hvor — og hvor er det man apner
       // kortet for a finne ut. Star du selv pa lista, leses stedet ditt
       // forst, sa du ser det mens du blar uten a apne noe.
@@ -4460,6 +4517,145 @@ const SAK_19A = kjor("kort-for-svar", FELLES + FOTBALL + `
       ferdig();
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
+`);
+
+/* ---------------- 19d. har du valgt, er de andre i veien ---------------- */
+
+// Meldt 19. september 2026: «Har jeg valgt en pub, saa kan de andre
+// minimiseres. Om noen venner har valgt annen pub saa kan de pubene
+// vises.»
+//
+// Det er to paastander, og den andre er den viktige: stedene der noen
+// andre skal, er det eneste som kan endre svaret ditt. At det finnes fire
+// puber til, er det ikke.
+const SAK_19D = kjor("sted-minimering", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
+  localStorage.setItem("sb-konto", JSON.stringify({ token: "okt-1", navn: "Ola",
+    bruker: "u-1", fornyer: "f-1",
+    utloper: new Date(Date.now() + 3600000).toISOString() }));
+
+  // Du skal til Pub X. Kari skal et helt annet sted.
+  window.__lagret = [
+    { kamp_id: "2026-09-20-brann-bodoglimt", navn: "Ola", hvor: "pub", sted: "Pub X", bruker: "u-1" },
+    { kamp_id: "2026-09-20-brann-bodoglimt", navn: "Kari", hvor: "pub", sted: "Karis Kjeller", bruker: "u-2" }
+  ];
+  function svarMed(kropp) {
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, o) {
+    u = String(u);
+    if (u.indexOf("/api/svar") === 0) {
+      var inn = o && o.body ? JSON.parse(o.body) : null;
+      if (inn && inn.handling === "fjern") {
+        window.__lagret = window.__lagret.filter(function (r) { return r.bruker !== "u-1"; });
+        return svarMed({ fjernet: true });
+      }
+      if (inn) {
+        window.__lagret = window.__lagret
+          .filter(function (r) { return r.bruker !== "u-1"; })
+          .concat([{ kamp_id: String(inn.kampId), navn: inn.navn, hvor: inn.hvor,
+            sted: inn.sted, bruker: "u-1" }]);
+      }
+      return svarMed({ svar: somTjenesten(window.__lagret) });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 || u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return svarMed(kropp);
+    }
+    return svarMed(u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker);
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var rad = document.querySelectorAll(".kamp.delbar")[0];
+    rad.querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    var stedChip = function (navn) {
+      return Array.prototype.find.call(panel.querySelectorAll(".sted-rad-kort"),
+        function (c) { return c.querySelector(".sted-navn") &&
+          c.querySelector(".sted-navn").textContent === navn; });
+    };
+
+    ok("ditt eget sted star framme",
+       !!stedChip("Pub X") && !stedChip("Pub X").closest(".sted-resten"),
+       stedChip("Pub X") ? stedChip("Pub X").className : "ingen rad");
+    // Kjernen i det som ble meldt: stedet Kari skal til er det eneste
+    // ANDRE som fortsatt svarer paa «hvor moter jeg noen».
+    ok("og stedet en venn skal til blir staaende",
+       !!stedChip("Karis Kjeller") && !stedChip("Karis Kjeller").closest(".sted-resten"),
+       stedChip("Karis Kjeller") ? stedChip("Karis Kjeller").className : "ingen rad");
+    ok("med navnet hennes i raden",
+       stedChip("Karis Kjeller").querySelector(".sted-rad-folk")
+         .textContent.indexOf("Kari") > -1,
+       stedChip("Karis Kjeller").textContent);
+    // Stadion er en plass man kan dra, men ingen skal dit og du har valgt.
+    ok("mens stadion gaar bak knappen",
+       !!stedChip("Brann Stadion") && !!stedChip("Brann Stadion").closest(".sted-resten"),
+       stedChip("Brann Stadion") ? stedChip("Brann Stadion").className : "ingen rad");
+    var mer = panel.querySelector(".sted-mer");
+    ok("og knappen teller dem", !!mer && mer.textContent === "Vis de andre (1)",
+       mer ? mer.textContent : "ingen knapp");
+
+    // Angrer du, er sporsmalet aapent igjen — og da skal alt staa framme.
+    stedChip("Pub X").querySelector(".sted-knapp").click();
+    setTimeout(function () { try {
+      ok("melder du deg av, er ingenting minimert",
+         !panel.querySelector(".sted-mer"),
+         panel.querySelector(".sted-mer") ? panel.querySelector(".sted-mer").textContent : "");
+      ok("og stadion star framme igjen",
+         !!stedChip("Brann Stadion") && !stedChip("Brann Stadion").closest(".sted-resten"));
+      // Tilbudet om a sende inn stedet horer til et svar. For det kan
+      // testes at det RYDDES, maa det ha vaert framme — en test som
+      // sjekker at noe er skjult uten at det noen gang sto framme, er
+      // gronn uansett hva koden gjor.
+      panel.querySelector(".pub-apne").click();
+      var felt = panel.querySelector(".kamp-pub");
+      felt.value = "Ukjent Kro";
+      felt.dispatchEvent(new Event("input"));
+      panel.querySelector(".sted-egen").click();
+      setTimeout(function () { try {
+        var tilbud = panel.querySelector(".sted-tilbud");
+        ok("et ukjent sted gir tilbudet",
+           tilbud.hidden === false && tilbud.textContent.indexOf("Ukjent Kro") > -1,
+           tilbud.hidden ? "skjult" : tilbud.textContent);
+
+        // Angrer du, er det ikke lenger et sted du skal — og da er det
+        // ikke lenger et sted vi skal be deg melde inn.
+        stedChip("Ukjent Kro").querySelector(".sted-knapp").click();
+        setTimeout(function () { try {
+          ok("og det ryddes bort nar du melder deg av",
+             tilbud.hidden === true, tilbud.textContent);
+
+          // Det motsatte: sier du at du skal til et sted som ALT staar i
+          // puber.js, er det ingenting a melde inn. Uten den vakta ville
+          // appen bedt deg sende inn en pub den selv har i lista.
+          felt.value = "Bohemen Sportspub";
+          felt.dispatchEvent(new Event("input"));
+          panel.querySelector(".sted-egen").click();
+          setTimeout(function () { try {
+            ok("svaret gikk gjennom",
+               panel.querySelector(".kamp-svar").textContent
+                 .indexOf("Bohemen Sportspub") > -1,
+               panel.querySelector(".kamp-svar").textContent);
+            ok("men et sted vi alt kjenner tilbys ikke",
+               tilbud.hidden === true, tilbud.textContent);
+            ferdig();
+          } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+        } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+      return;
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700); });
 `);
 
 /* ---------------- 19b. et gammelt token logger deg ikke ut ---------------- */
@@ -5165,7 +5361,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
 let feilet = 0;
 
 for (const t of alle) {

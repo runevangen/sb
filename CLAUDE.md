@@ -81,6 +81,29 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 - **En knapp som ser ut som den gir noe den ikke gir, er verre enn en som
   sier hva den er.** Gjelder «Venner», «Meldt inn til oss», og
   «Valgt for deling» utlogget.
+- **Ingen knapp navngir noe appen ikke har.** «Del i chatten» sto til
+  19. september 2026, og Sportsbibelen har ingen chat — knappen lovet et
+  sted å sende den. Hvor teksten havner er leserens valg i
+  delingsmenyen, så knappen heter «Del» og svaret «Kopiert. Lim inn der du
+  vil.»
+- **Har du valgt et sted, minimeres de andre — men ikke der noen skal.**
+  Sto du med ditt eget sted blant seks, var lista noe å lese seg gjennom
+  framfor et svar. Framme står **ditt sted** og **stedene noen andre skal
+  til**: det siste er det eneste som kan endre svaret ditt. At det finnes
+  fire puber til, er det ikke. Resten ligger bak «Vis de andre (N)», og
+  åpen/lukket huskes på panelet — `tegnSteder` kjører på hvert svar, og en
+  liste som lukker seg selv midt i en vurdering er verre enn ingen
+  minimering. Melder du deg av, står alt framme igjen.
+- **Sier du at du skal til et sted vi ikke kjenner, blir du spurt om å
+  sende det inn.** Skjemaet har stått der hele tiden, bak «Mangler stedet?
+  Send det inn.» — en knapp du måtte legge merke til. Øyeblikket stedet
+  faktisk mangler, er øyeblikket du nettopp sa at du skal dit.
+  `panel.tilbyForslag()` kommer **etter** svaret, ikke mens du skriver: et
+  halvskrevet navn på et sted som finnes er ikke et sted som mangler.
+  Den holder kjeft for stadion, for den som ikke er logget inn (databasen
+  setter `foreslatt_av` fra økta, så et tilbud som ikke kan tas imot er
+  verre enn ingen), og for et sted `alleredeILista()` kjenner — ellers ber
+  appen deg melde inn en pub den selv har i lista.
 - **«Andre fotballpuber» er stedene i lista som *ikke* har bekreftet.**
   ★ betyr «viser denne kampen» og settes av admin; ⚽ betyr «kjent for å
   vise fotball» og kommer fra `puber.js`. De to er ulike påstander,

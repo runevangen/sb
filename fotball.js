@@ -739,7 +739,8 @@ function delPanel(kamp) {
   // Star du pa en pub som ikke finnes i lista, har du til na ikke hatt
   // noen vei til a si fra (#80). Skjemaet star her og ikke lenger opp:
   // det er nettopp nar du har skrevet et navn selv at stedet mangler.
-  utvidet.appendChild(sendInnSted(pubFelt));
+  const forslagSkjema = sendInnSted(pubFelt);
+  utvidet.appendChild(forslagSkjema);
 
   // Lenka ut til pubene som pleier a vise fotball. Har ingen meldt inn
   // noe pa denne kampen, er det den eneste veien videre — da sier lenka
@@ -767,7 +768,50 @@ function delPanel(kamp) {
   };
   apne.addEventListener("click", () => vis(utvidet.hidden));
 
+  // «Vi kjenner ikke stedet. Send det inn?»
+  //
+  // Skjemaet har staatt der hele tiden, men bak «Mangler stedet? Send det
+  // inn.» — en knapp du maa legge merke til. Det oeyeblikket stedet
+  // faktisk mangler, er oeyeblikket du nettopp sa at du skal dit: da har
+  // du bestemt deg, og da er stedet verdt aa melde.
+  //
+  // Tilbudet kommer ETTER svaret, ikke mens du skriver. Et halvskrevet
+  // navn paa et sted som finnes, er ikke et sted som mangler — og en linje
+  // som dukker opp for hver bokstav ville vaert i veien.
+  const tilbud = el("p", "sted-tilbud");
+  tilbud.hidden = true;
+  const tilbudKnapp = el("button", "sted-tilbud-knapp", "Send det inn");
+  tilbudKnapp.type = "button";
+  tilbudKnapp.addEventListener("click", () => {
+    const stedsnavn = tilbud.dataset.sted || "";
+    tilbud.hidden = true;
+    // Skjemaet ligger bak lenka: den maa apnes foer feltet kan faa fokus.
+    vis(true);
+    forslagSkjema.apneMed(stedsnavn);
+  });
+
+  panel.tilbyForslag = (hvor, stedsnavn) => {
+    tilbud.hidden = true;
+    tilbud.dataset.sted = "";
+    // Bare puber. Stadion er ikke et sted noen skal foere opp i lista, og
+    // arenaen kjenner vi fra for.
+    if (hvor !== "pub" || !stedsnavn) return;
+    // Ingen konto, ingen innsending: databasen setter `foreslatt_av` fra
+    // okten. Da er et tilbud som ikke kan tas imot verre enn ingen.
+    if (!konto.okt()) return;
+    // Star stedet alt i lista, er det ingenting a melde — og folder vi
+    // ikke navnet, ber vi om «Andys Pub» fordi lista sier «Andy's Pub».
+    if (alleredeILista(stedsnavn, KJENTE)) return;
+    tilbud.dataset.sted = stedsnavn;
+    tilbud.replaceChildren();
+    tilbud.appendChild(el("span", null,
+      "Vi kjenner ikke «" + stedsnavn + "». Send det inn, så finner andre det også."));
+    tilbud.appendChild(tilbudKnapp);
+    tilbud.hidden = false;
+  };
+
   panel.appendChild(melding);
+  panel.appendChild(tilbud);
   panel.appendChild(apne);
   panel.appendChild(utvidet);
 
@@ -776,10 +820,15 @@ function delPanel(kamp) {
   // hvor man moter noen.
   panel.appendChild(el("div", "kamp-panel-liste"));
 
-  // Delingen sender beskjeden til gruppechatten. Lista i kortet er det
+  // Delingen apner telefonens egen delingsmeny. Lista i kortet er det
   // vennene ser nar de apner kampen, sa dette er en tekstknapp under,
   // ikke en handling som konkurrerer med stedene.
-  const send = el("button", "kamp-send", "Del i chatten");
+  //
+  // Sto «Del i chatten» til 19. september 2026. Sportsbibelen har ingen
+  // chat, og en knapp som navngir noe appen ikke har, lover et sted a
+  // sende den. Hvor teksten havner er leserens valg i delingsmenyen —
+  // gruppechatten, e-post, en notis — og «Del» er sant om alle.
+  const send = el("button", "kamp-send", "Del");
   send.type = "button";
   panel.appendChild(send);
 
@@ -822,15 +871,65 @@ function delPanel(kamp) {
     const paaLista = !!konto.okt();
 
     steder.replaceChildren();
-    stedKilder(kamp, bekreftede(), rad, egneSteder).forEach((sted) => {
+
+    // Har du valgt et sted, er sporsmalet besvart — og da er de andre
+    // radene ikke et svar lenger, de er en liste du ma lese deg gjennom
+    // for a finne din egen.
+    //
+    // To star fortsatt framme: **ditt sted**, og **stedene noen andre
+    // skal til**. Det siste er ikke pynt: det er det eneste som kan endre
+    // svaret ditt. Star det tre venner pa en annen pub, er det en
+    // opplysning; at det finnes fire puber til, er det ikke.
+    //
+    // Resten ligger bak én knapp som sier hvor mange. Ingenting skjules —
+    // men det du alt har bestemt, skal ikke konkurrere med det du har
+    // valgt bort.
+    const alle = stedKilder(kamp, bekreftede(), rad, egneSteder);
+    const framme = [];
+    const bak = [];
+    alle.forEach((sted) => {
       const nokkel = stedNokkel(sted.navn);
-      steder.appendChild(stedRad(kamp, panel, sted, {
+      const erValgt = !!valgt && nokkel === valgt;
+      if (!valgt || erValgt || sted.harFolk) framme.push(sted);
+      else bak.push(sted);
+    });
+
+    const tegn = (sted) => {
+      const nokkel = stedNokkel(sted.navn);
+      return stedRad(kamp, panel, sted, {
         valgt: !!valgt && nokkel === valgt,
         paaLista,
         pekt: !!pekt && nokkel === pekt && nokkel !== valgt,
         melding,
-      }));
-    });
+      });
+    };
+
+    framme.forEach((sted) => steder.appendChild(tegn(sted)));
+
+    if (bak.length) {
+      // Apen eller lukket huskes pa panelet: tegnSteder kjorer pa hvert
+      // svar, og en liste som lukker seg selv midt i en vurdering er verre
+      // enn ingen minimering.
+      const resten = el("div", "sted-resten");
+      resten.hidden = !panel.visAlleSteder;
+      bak.forEach((sted) => resten.appendChild(tegn(sted)));
+
+      const mer = el("button", "sted-mer");
+      mer.type = "button";
+      const merTekst = () => (panel.visAlleSteder
+        ? "Skjul de andre" : "Vis de andre (" + bak.length + ")");
+      mer.textContent = merTekst();
+      mer.setAttribute("aria-expanded", panel.visAlleSteder ? "true" : "false");
+      mer.addEventListener("click", () => {
+        panel.visAlleSteder = !panel.visAlleSteder;
+        resten.hidden = !panel.visAlleSteder;
+        mer.textContent = merTekst();
+        mer.setAttribute("aria-expanded", panel.visAlleSteder ? "true" : "false");
+      });
+
+      steder.appendChild(mer);
+      steder.appendChild(resten);
+    }
 
     // Ingen steder a trykke pa: da er forslagene ikke et tillegg, de er
     // hele svaret, og de skal sta apne.
@@ -894,7 +993,9 @@ function delPanel(kamp) {
       puber.noter(sted);
     }
     if (utfall === "delt") { lukkPanel(); return; }
-    if (utfall === "kopiert") melding.textContent = "Kopiert. Lim inn i chatten.";
+    // «Lim inn i chatten» pekte pa det samme stedet appen ikke har. Hvor
+    // det limes inn er leserens valg.
+    if (utfall === "kopiert") melding.textContent = "Kopiert. Lim inn der du vil.";
     else if (utfall !== "avbrutt") {
       melding.textContent = "Fikk ikke delt. Kopier teksten selv: " + tekst;
     }
@@ -1103,6 +1204,9 @@ async function svarSted(kamp, panel, hvor, sted, melding, avmeld) {
         (s) => !(s.kampId === kampNokkelFor(kamp) && s.bruker === okt.bruker));
       panel.settLokalt(null);
       melding.textContent = "Du skal ikke dit likevel.";
+      // Angret du, er det ikke lenger et sted du skal — og da er det ikke
+      // lenger et sted vi skal be deg melde inn.
+      if (panel.tilbyForslag) panel.tilbyForslag(null, "");
     } else {
       konto.settNavn(navn);
       const json = await svarTjeneste({
@@ -1111,6 +1215,9 @@ async function svarSted(kamp, panel, hvor, sted, melding, avmeld) {
       ferdigLest = leggInnSvar(kampNokkelFor(kamp), tolkSvar(json.svar));
       panel.settLokalt({ hvor, sted });
       melding.textContent = "Du har planlagt å dra til " + (sted || stedtekst(kamp, hvor, sted)) + ".";
+      // Sa du at du skal til et sted vi ikke kjenner, er det na det er
+      // verdt a spoerre om det skal inn i lista.
+      if (panel.tilbyForslag) panel.tilbyForslag(hvor, sted);
       // Tjenesten sier fra nar raden er skrevet, men ingen andre kan lese
       // den. Da er alt riktig fra din side og likevel usynlig for alle —
       // og det er verre a la det sta som en vellykket lagring.
@@ -1669,6 +1776,19 @@ function sendInnSted(pubFelt) {
 
   boks.appendChild(apne);
   boks.appendChild(skjema);
+
+  // Veien inn hit fra et svar: har du nettopp sagt at du skal til et sted
+  // vi ikke kjenner, er dette skjemaet svaret — og da skal du slippe a
+  // finne det selv. Navnet settes uansett hva som sto der fra for: det er
+  // stedet du nettopp valgte, ikke et halvskrevet sok.
+  boks.apneMed = (stedsnavn) => {
+    skjema.hidden = false;
+    apne.setAttribute("aria-expanded", "true");
+    if (stedsnavn) navn.value = String(stedsnavn).slice(0, NAVN_MAKS);
+    si("", "");
+    (navn.value ? adresse : navn).focus();
+  };
+
   return boks;
 }
 
