@@ -2069,6 +2069,60 @@ a.ad-cta:focus-visible {
   gap: 6px;
 }
 
+/* Har du valgt et sted, ligger resten bak denne. Stiplet, som .pub-mer, sa
+   den ikke ser ut som enda et sted. */
+.sted-mer {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  background: none;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: calc(12px * var(--fs));
+  cursor: pointer;
+}
+
+.sted-mer:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* `display: flex` slar [hidden] fra nettleserens eget stilark, sa den ma
+   sies her — ellers star radene framme mens koden tror de er skjult. */
+.sted-resten {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sted-resten[hidden] { display: none; }
+
+/* «Vi kjenner ikke stedet. Send det inn?» Star mellom meldinga og lenka
+   til stedene, sa den leses i det svaret nettopp ble gitt. */
+.sted-tilbud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-size: calc(13px * var(--fs));
+  color: var(--text-dim);
+}
+
+.sted-tilbud[hidden] { display: none; }
+
+.sted-tilbud-knapp {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: calc(12px * var(--fs));
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.sted-tilbud-knapp:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 .sted-rad-kort {
   display: flex;
   align-items: center;
