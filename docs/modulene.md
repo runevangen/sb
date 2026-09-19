@@ -681,6 +681,10 @@ spørsmål kode ikke kan svare på alene.
   svikter **sies**, ikke utelates stille.
 - **`byersjekk.mjs`** — spør Overpass hva som finnes i en by, så en
   falsk posisjon kan sammenliknes med virkeligheten.
+- **`lag-pdf.mjs`** — lager PDF av et dokument i `docs/` med Chromium og
+  ingenting annet, så et sammendrag kan sendes som vedlegg. Oversetter
+  bare det Markdown-en i `docs/` faktisk bruker; en pakke for resten
+  ville vært prosjektets første npm-avhengighet, for et vedlegg.
 
 ---
 
