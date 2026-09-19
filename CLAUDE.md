@@ -172,6 +172,16 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   over hvilke tegn som er bokstaver, mangler alltid noen. Vask bort det
   som faktisk er farlig — hermetegn, apostrof, bakoverstrek — ikke alt du
   ikke kom på.
+- **«Jeg står her» er den eneste veien inn som virker i Google
+  Maps-appen.** Den lange URL-en med koordinatet i finnes bare i en
+  nettleser med adressefelt; på telefonen får du del-lenka, og
+  `maps.app.goo.gl/…` er en oppslagsnøkkel hos Google — den bærer
+  ingenting. Knappen leser telefonens egen posisjon, og punktet er
+  gjerne bedre enn kartets: Googles eget punkt ligger ofte midt på
+  bygget, mens du står i døra. **Nøyaktigheten står i svaret** — fire
+  desimaler ser like presise ut enten de er på tolv meter eller to
+  kilometer. Kilden fylles med «Var innom ‹dato›», men **bare når feltet
+  er tomt**: en kilde som står der er en vurdering, ikke en plassholder.
 - **Koordinatfeltet tar det kartet faktisk gir deg.** Høyreklikk i Google
   Maps gir et *koordinat*, ikke en lenke — og fra stedskortet med
   parenteser rundt. `koordinatFraLenke()` tåler parenteser, hakeparenteser

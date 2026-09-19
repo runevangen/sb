@@ -3108,6 +3108,59 @@ const SAK_15C = kjor("admin-koordinat", `
       felt("stedNavn").value = "RBK. Pøbb og sånt";
       felt("stedAdresse").value = "Berglyveien 4J";
 
+      // 0. «Jeg star her». Den eneste veien inn som virker i Google
+      //    Maps-appen: den lange URL-en med koordinatet i finnes bare i
+      //    en nettleser med adressefelt (#116).
+      var forHer = stedKall.length;
+      navigator.geolocation.getCurrentPosition = function (ok_) {
+        ok_({ coords: { latitude: 63.4341806, longitude: 10.401078, accuracy: 12 } });
+      };
+      felt("stedHer").click();
+      ok("posisjonen fyller koordinatene",
+         felt("stedLat").value === "63.4342" && felt("stedLon").value === "10.4011",
+         felt("stedLat").value + ", " + felt("stedLon").value);
+      ok("og gjorde det uten a sporre noen tjeneste",
+         stedKall.length === forHer, stedKall.length + " mot " + forHer);
+      // Trykker du knappen, *er* du der — og det er noyaktig det kilden
+      // skal svare pa.
+      ok("kilden fylles med at du var innom",
+         felt("stedKilde").value.indexOf("Var innom") === 0,
+         felt("stedKilde").value);
+      // Ingen regex her: en bakoverstrek i en template-streng er borte
+      // for nettleseren ser den, sa «\d» blir «d» og monsteret treffer
+      // ingenting. Tredje gang den fella slar til i dette prosjektet —
+      // og den enkle regelen er a la vaere a skrive bakoverstrek i det
+      // hele tatt, ikke a telle dem riktig.
+      var datoen = felt("stedKilde").value.replace("Var innom ", "");
+      ok("og datoen star pa norsk form i setningen",
+         datoen.length === 10 && datoen.split(".").length === 3 &&
+         datoen.split(".")[2].length === 4, felt("stedKilde").value);
+      // Et punkt med to kilometers usikkerhet er en bygning et annet sted
+      // i byen. Fire desimaler ser like presise ut uansett.
+      ok("noyaktigheten star i svaret",
+         felt("stedHerSvar").textContent.indexOf("12 meter") > -1,
+         felt("stedHerSvar").textContent);
+
+      // En kilde som star der fra for er en vurdering. Den skal ikke
+      // skrives over av var egen setning.
+      felt("stedKilde").value = "https://rbkpub.no/sport";
+      felt("stedHer").click();
+      ok("en kilde som star der fra for rores ikke",
+         felt("stedKilde").value === "https://rbkpub.no/sport",
+         felt("stedKilde").value);
+
+      // Avslatt posisjon er ikke en feil, det er et svar — og det krever
+      // noe annet av den som leser meldinga.
+      navigator.geolocation.getCurrentPosition = function (ok_, nei) {
+        nei({ code: 1, message: "User denied Geolocation" });
+      };
+      felt("stedHer").click();
+      ok("nei til posisjon sier hva du kan gjore i stedet",
+         felt("stedHerSvar").textContent.indexOf("sa nei til posisjon") > -1 &&
+         felt("stedHerSvar").textContent.indexOf("lim det inn") > -1,
+         felt("stedHerSvar").textContent);
+      felt("stedKilde").value = "";
+
       // 1. Kartlenka. Den spor ingen, og virker ogsa nar Overpass er nede
       //    — det er hele grunnen til at den finnes.
       var forLenke = stedKall.length;
