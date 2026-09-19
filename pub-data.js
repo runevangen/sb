@@ -5,7 +5,7 @@
 
 // Samme normalisering som lagnavn: sma bokstaver, norske tegn foldet,
 // tegnsetting fjernet. Da er «O'Reilly's» og «OReillys» samme sted.
-import { normaliserLagnavn } from "./fotball-data.js";
+import { normaliserLagnavn, sesongFor, ligaFor } from "./fotball-data.js";
 
 // Overpass-tjenerne vi prover, i rekkefolge. Hovedtjeneren er raskest og
 // naermest kilden, men avviser mye; speilene er mildere. Alle tre snakker
@@ -326,6 +326,12 @@ export function sjekkPubliste(liste, ramme) {
       feil.push(hvor + ": kilde sier ikke hvordan vi vet det"
         + " (en lenke, eller minst " + KILDE_MIN_ORD + " ord)");
     }
+    // Ligaflagget er en pastand om virkeligheten, og da gjelder samme
+    // krav som ellers her: kilde og dato. Uten dem viser appen det ikke
+    // (`ligaflaggGjelder` stopper det), men da hadde portalen lagret noe
+    // som aldri kom fram — og admin ville trodd flagget sto. Et felt som
+    // ma fylles ut, sier det for du trykker lagre.
+    sjekkLigaflagg(p.ligaer).forEach((f) => feil.push(hvor + ": " + f));
   });
   return feil;
 }
@@ -435,9 +441,19 @@ export const FORSLAG_MAKS = 6;
 // svar enn en fotballpub i nabogata. Sto den forst, gikk den foran, og en
 // test fanget nettopp det.
 export const FORSLAG_KILDER = [
-  "bekreftede", "dine", "kjenteNaer", "kjenteVedArena",
+  "bekreftede", "ligapuber", "dine", "kjenteNaer", "kjenteVedArena",
   "stampuber", "kjenteIByen", "naerDeg", "vedArena",
 ];
+
+// «ligapuber» star rett ETTER `bekreftede` og for alt annet. Den svarer
+// pa KAMPEN — «dette stedet sender Eliteserien» — mens de geografiske
+// kildene bare svarer pa stedet. Bare ★ er sterkere: der har et menneske
+// sett pa nettopp denne kampen.
+//
+// Den er likevel ikke en ny vei INN i lista. Kandidatene kommer fra de
+// geografiske kildene, og kilden siler dem. Et sted i Oslo som sender
+// Eliteserien er ikke et svar for den som star i Trondheim, og uten den
+// silinga var vi tilbake til feilen stampubene ble tommet for a unnga.
 
 // «kjenteIByen» og «stampuber» motes aldri i den samme lista, og det er
 // ikke tilfeldig: stampubene tommes i det en posisjon lander, og
@@ -474,6 +490,9 @@ export function rangerForslag(kilder, maks = FORSLAG_MAKS) {
       // sagt at det viser kampen. Korteste avstand vinner.
       if (p.bekreftet) eks.bekreftet = true;
       if (p.viserFotball) eks.viserFotball = true;
+      // Ligamerket ma samles som de andre: vinner `bekreftede` plassen,
+      // ligger flagget i en kilde lenger ned, og uten dette forsvant det.
+      if (p.senderLigaen && !eks.senderLigaen) eks.senderLigaen = p.senderLigaen;
       if (p.lag && p.lag.length && !(eks.lag && eks.lag.length)) eks.lag = p.lag;
       if (Number.isFinite(p.avstand) &&
           (!Number.isFinite(eks.avstand) || p.avstand < eks.avstand)) {
@@ -485,6 +504,72 @@ export function rangerForslag(kilder, maks = FORSLAG_MAKS) {
   const alle = Array.from(sett.values());
   const tak = Number.isFinite(maks) && maks > 0 ? maks : alle.length;
   return { topp: alle.slice(0, tak), resten: alle.slice(tak) };
+}
+
+/* ---------- ligaene et sted sender ---------- */
+
+// «Viser alt»-flagget, meldt 19. september 2026. Formen er ikke «viser
+// alle kamper», for det kan nesten ingen: kamper KOLLIDERER. Tre
+// Eliteserie-kamper kl. 15 blir tre pastander der et sted med én skjerm
+// bare kan innfri én. Pastanden er derfor pa LIGANIVA — «vi sender
+// Eliteserien» — og det er noe et sted faktisk kan si sant.
+//
+// Samme innsikt som kanaler.js: «Rettighetene er en egenskap ved LIGAEN,
+// ikke ved kampen.» Det gjelder stedet som viser dem ogsa.
+//
+// MERKET ER SVAKERE ENN ★, og det er hele poenget. ★ betyr «admin
+// krysset av denne kampen» — datert, signert, per kamp. Lot vi flagget
+// produsere ★, ville merket stille blitt omdefinert til «noen sa en gang
+// at de pleier», pa kamper ingen har sett pa.
+//
+// FORELDELSEN ER DET FARLIGSTE. Hver annen opplysning her doer av seg
+// selv: en avkryssing doer nar kampen er spilt. Et staende flagg doer
+// aldri — stedet mister rettighetene, bygger om, legger ned sportsrommet,
+// og flagget lover kamper i manedsvis.
+//
+// Derfor utloper det ved SESONGSLUTT, og det trengs ikke en eneste ny
+// dato for a regne det ut: `sesongFor()` vet alt forskjellen pa en
+// kalenderliga og en host-var-liga, med juli som skille. Et flagg gjelder
+// sa lenge sesongen det ble sjekket i, fortsatt er den vi star i.
+//
+//     Eliteserien sjekket 19.09.2026 → utloper ved nyttar
+//     Premier League sjekket 19.09.2026 → overlever nyttar, utloper i juli
+//
+// Én funksjon, to riktige svar, og ingen egen utlopsdato som kan gli fra
+// den appen ellers regner med.
+export function ligaflaggGjelder(ligaer, nokkel, naa) {
+  if (!ligaer || typeof ligaer !== "object" || !nokkel) return false;
+  const sender = Array.isArray(ligaer.sender) ? ligaer.sender : [];
+  if (sender.indexOf(nokkel) === -1) return false;
+  // Kilde og dato, som for kanalene og kontaktfeltene: en pastand om
+  // virkeligheten uten «hvordan vet vi det» slipper ikke gjennom.
+  if (!kildeHolder(ligaer.kilde)) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(ligaer.sjekket || ""))) return false;
+
+  const liga = ligaFor(nokkel);
+  if (!liga) return false;
+  const sjekket = new Date(String(ligaer.sjekket) + "T12:00:00Z");
+  if (Number.isNaN(sjekket.getTime())) return false;
+  return sesongFor(liga, sjekket) === sesongFor(liga, naa || new Date());
+}
+
+// Stedene som sender ligaen denne kampen spilles i. Geografien er ALT
+// gjort av den som kaller: et sted i Oslo som sender Eliteserien er ikke
+// et svar for den som star i Trondheim, og kilden far derfor kandidatene
+// inn framfor a lete i hele lista selv.
+export function ligapuberAv(kandidater, kamp, naa) {
+  const nokkel = kamp && kamp.liga;
+  if (!nokkel) return [];
+  return (Array.isArray(kandidater) ? kandidater : [])
+    .filter((p) => p && ligaflaggGjelder(p.ligaer, nokkel, naa));
+}
+
+// Teksten pa merket. Den NAVNGIR ligaen med vilje: «viser vanligvis
+// kamper» ville latt leseren tro det gjaldt kampen hen ser pa, ogsa nar
+// stedet ikke sender den ligaen i det hele tatt.
+export function ligamerkeTekst(nokkel) {
+  const liga = ligaFor(nokkel);
+  return liga ? "Sender " + liga.navn : "";
 }
 
 /* ---------- nar posisjonen uteblir ---------- */
@@ -665,6 +750,9 @@ export function tolkPubRader(rader) {
     sikkerhet: String((r && r.sikkerhet) || ""),
     sjekket: String((r && r.sjekket) || "").slice(0, 10),
     merknad: String((r && r.merknad) || ""),
+    // Ligaflagget kommer som det ligger i basen, eller ikke i det hele
+    // tatt. En tom verdi er «ingen pastand», ikke et tomt flagg.
+    ligaer: (r && r.ligaer && typeof r.ligaer === "object") ? r.ligaer : null,
     fjernet: !!(r && r.fjernet),
   })).filter((p) => p.nokkel);
 }
@@ -686,7 +774,27 @@ export function pubRadTilBase(p) {
     sikkerhet: String(p.sikkerhet || "").trim(),
     sjekket: String(p.sjekket || "").slice(0, 10),
     merknad: String(p.merknad || "").trim() || null,
+    // Ligaflagget lagres som det er, eller som null. Et tomt flagg og
+    // «ingen pastand» skal vaere den samme raden i basen.
+    ligaer: ligaflaggTilBase(p.ligaer),
     fjernet: !!p.fjernet,
+  };
+}
+
+// Flagget slik det skal ligge: bare kjente liganokler, kilde og dato
+// trimmet, og null nar det ikke star igjen noe a pasta. Sesongen lagres
+// IKKE — den leses av `sjekket` gjennom sesongFor(), sa to felt aldri kan
+// si hver sin sesong om det samme flagget.
+export function ligaflaggTilBase(flagg) {
+  if (!flagg || typeof flagg !== "object") return null;
+  const sender = (Array.isArray(flagg.sender) ? flagg.sender : [])
+    .map((n) => String(n).trim())
+    .filter((n) => !!ligaFor(n));
+  if (!sender.length) return null;
+  return {
+    sender: Array.from(new Set(sender)),
+    kilde: String(flagg.kilde || "").trim(),
+    sjekket: String(flagg.sjekket || "").slice(0, 10),
   };
 }
 
@@ -736,6 +844,7 @@ function utenBasefelt(p) {
     lat: p.lat, lon: p.lon, type: p.type, lag: p.lag || [],
     kilde: p.kilde, sikkerhet: p.sikkerhet, sjekket: p.sjekket,
   };
+  if (p.ligaer) ut.ligaer = p.ligaer;
   if (p.merknad) ut.merknad = p.merknad;
   return ut;
 }
@@ -754,6 +863,28 @@ export function sjekkPubRad(p, ramme) {
   if (p.fjernet) return [];
   return sjekkPubliste([pubRadTilBase(p)], ramme)
     .map((f) => f.replace(/^rad 1 \([^)]*\): /, ""));
+}
+
+// Vokter ligaflagget. Tom liste betyr at alt er bra — og et flagg som
+// ikke finnes er helt greit: de aller fleste steder har ingen.
+export function sjekkLigaflagg(flagg) {
+  if (flagg === null || flagg === undefined) return [];
+  if (typeof flagg !== "object") return ["ligaflagget er ikke et oppslag"];
+  const sender = Array.isArray(flagg.sender) ? flagg.sender : [];
+  // Ingen ligaer krysset av er ingen pastand, og da kreves ingenting.
+  if (!sender.length) return [];
+
+  const feil = [];
+  const ukjent = sender.filter((n) => !ligaFor(String(n)));
+  if (ukjent.length) feil.push("ukjent liga " + ukjent.join(", "));
+  if (!kildeHolder(flagg.kilde)) {
+    feil.push("ligaene mangler kilde (en lenke, eller minst "
+      + KILDE_MIN_ORD + " ord)");
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(flagg.sjekket || ""))) {
+    feil.push("ligaene mangler dato");
+  }
+  return feil;
 }
 
 /* ---------- sla opp et sted i OpenStreetMap ---------- */

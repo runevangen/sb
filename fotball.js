@@ -16,7 +16,7 @@ import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
          rangerForslag, FORSLAG_MAKS, tolkPubRader, slaSammenPuber,
-         posisjonsfeil, kuraterteIByen,
+         posisjonsfeil, kuraterteIByen, ligapuberAv, ligamerkeTekst,
          stampuberFor, falskPosisjon } from "./pub-data.js";
 import { KURATERTE } from "./puber.js";
 import { sjekkForslag, alleredeILista, NAVN_MAKS, ADRESSE_MAKS }
@@ -210,6 +210,9 @@ function tegnKjenteIgjen() {
       boks.kilder.stampuber = merkBekreftet(
         merkKuraterte(stampuberFor(boks.kamp, KJENTE), KJENTE), bekreftede);
     }
+    // SJETTE kilden som leser KJENTE — og den ma regnes SIST, for den
+    // siler de geografiske som nettopp ble regnet om over.
+    boks.kilder.ligapuber = ligapuberIBoks(boks, bekreftede);
     tegnForslag(boks);
   });
 }
@@ -1348,6 +1351,7 @@ function fyllForslag(boks, kamp) {
     boks.kilder.kjenteVedArena = merkBekreftet(
       kuraterteNaer(KJENTE, arena, ARENA_RADIUS), bekreftede);
   }
+  boks.kilder.ligapuber = ligapuberIBoks(boks, bekreftede);
 
   tegnForslag(boks);
 
@@ -1384,6 +1388,26 @@ function fyllForslag(boks, kamp) {
       tegnForslag(boks);
     });
   }
+}
+
+// Stedene som sender ligaen kampen spilles i. Kandidatene er de
+// geografiske kildene som ALT star i boksen — ikke hele KJENTE: et sted i
+// Oslo som sender Eliteserien er ikke et svar for den som star i
+// Trondheim. Flagget loefter stedene som svarer pa kampen, det apner
+// ingen ny doer inn i lista.
+function ligapuberIBoks(boks, bekreftede) {
+  if (!boks.kamp) return [];
+  const naer = boks.kilder.kjenteNaer || [];
+  const iByen = boks.kilder.kjenteIByen || [];
+  const vedArena = boks.kilder.kjenteVedArena || [];
+  const sett = new Map();
+  naer.concat(iByen, vedArena).forEach((p) => {
+    if (p && p.navn && !sett.has(p.navn)) sett.set(p.navn, p);
+  });
+  const tekst = ligamerkeTekst(boks.kamp.liga);
+  return merkBekreftet(
+    ligapuberAv(Array.from(sett.values()), boks.kamp)
+      .map((p) => Object.assign({}, p, { senderLigaen: tekst })), bekreftede);
 }
 
 // Ett sted som bestemmer hva som star pa skjermen.
@@ -1469,6 +1493,19 @@ function pubChip(pub, boks, valgt) {
     b.appendChild(merke);
     const lag = (pub.lag || []).join(", ");
     b.title = lag ? "Kjent for å vise fotball. Stampub for " + lag + "." : "Kjent for å vise fotball.";
+  }
+  // 📺 «Sender Eliteserien». Den NAVNGIR ligaen med vilje: «viser
+  // vanligvis kamper» ville latt leseren tro det gjaldt kampen hen ser
+  // pa, ogsa nar stedet ikke sender den ligaen i det hele tatt. Merket er
+  // svakere enn ★ — der har et menneske sett pa nettopp denne kampen —
+  // og star derfor etter det.
+  // Bare nar stedet IKKE har bekreftet kampen: ★ sier alt noe sterkere
+  // om nettopp denne kampen, og to merker om samme sak er stoy.
+  if (pub.senderLigaen && !pub.bekreftet) {
+    const tv = el("span", "pub-liga", "📺");
+    tv.setAttribute("aria-label", pub.senderLigaen);
+    b.title = pub.senderLigaen + ".";
+    b.appendChild(tv);
   }
   if (Number.isFinite(pub.avstand)) {
     b.appendChild(el("span", "pub-avstand", avstandtekst(pub.avstand)));
@@ -1585,6 +1622,8 @@ async function naerDegFra(boks, bekreftede, p) {
   // by er ikke det: star du fire kilometer ut, faller din egen bys steder
   // utenfor sirkelen enda de apenbart er svaret.
   boks.kilder.kjenteIByen = merkBekreftet(kuraterteIByen(KJENTE, p), bekreftede);
+  // Etter de geografiske: kilden siler DEM, sa den ma regnes etterpa.
+  boks.kilder.ligapuber = ligapuberIBoks(boks, bekreftede);
 
   // Stampubene er en UTVEI, ikke et tillegg: de finnes for tilfellet der
   // geografien ikke gir noe. Vet vi hvor du star, er geografien svaret, og

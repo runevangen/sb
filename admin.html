@@ -104,6 +104,35 @@
   /* Tallet er ikke en overskrift: det teller, og skal leses som en
      opplysning ved siden av — ikke som en del av rundenavnet. */
   .runde-tall { font-weight: 400; letter-spacing: 0.02em; text-transform: none; }
+  /* Navnet tar plassen som blir til overs, sa tallet og knappen star
+     samlet til hoyre framfor a spres utover av space-between. */
+  .runde-navn { flex: 1 1 auto; }
+  /* Knappen som krysser av hele runden. Ingen display-regel her med
+     vilje: en <button> er inline-block fra nettleseren og flex-barn her,
+     og da er det ingenting som kan sla [hidden] i stykker. */
+  .runde-alle {
+    background: none;
+    border: 0;
+    padding: 0 0 0 2px;
+    font: inherit;
+    letter-spacing: 0.02em;
+    text-transform: none;
+    font-weight: 400;
+    color: var(--aksent);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .runde-alle:hover { text-decoration: underline; }
+  /* Ligaene som hakebokser. list-style og padding nullstilles her fordi
+     <ul> baerer nettleserens egne; display er satt, saa [hidden] maa sies
+     eksplisitt — ellers star lista framme naar koden tror den skjuler. */
+  .ligaer { display: flex; flex-wrap: wrap; gap: 6px 16px; list-style: none;
+            margin: 0 0 12px; padding: 0; }
+  .ligaer[hidden] { display: none; }
+  .ligaer li { display: flex; align-items: center; gap: 8px; }
+  .ligaer input { width: 20px; height: 20px; flex: 0 0 auto;
+                  accent-color: var(--aksent); }
+  .ligaer label { margin: 0; font-weight: 400; font-size: 16px; }
   .kamper li:first-child.runde-skille { padding-top: 6px; }
   .kamper li:last-child { border-bottom: 0; }
   .kamp { display: flex; align-items: center; gap: 12px; padding: 11px 2px; cursor: pointer; }
@@ -396,6 +425,29 @@
         <input type="text" id="stedLag" autocomplete="off"
                placeholder="Vålerenga, Tottenham">
         <p class="hint">Skill med komma. Tomt er helt greit.</p>
+      </div>
+
+      <!-- Ligaene stedet sender. Paastanden ligger paa LIGANIVAA og ikke
+           paa kampen, fordi kamper kolliderer: tre Eliteserie-kamper
+           kl. 15 blir tre paastander der et sted med én skjerm bare kan
+           innfri én. «Vi sender Eliteserien» er noe et sted kan si sant.
+
+           Merket i appen er SVAKERE enn ★. Stjerna betyr at et menneske
+           krysset av nettopp den kampen; dette betyr at stedet sender
+           ligaen. To ulike paastander, to ulike merker. -->
+      <div class="felt-blokk">
+        <label id="stedLigaerLabel">Ligaer stedet sender</label>
+        <ul class="ligaer" id="stedLigaer" aria-labelledby="stedLigaerLabel"></ul>
+        <label for="stedLigaKilde">Hvordan vet vi det?</label>
+        <input type="text" id="stedLigaKilde" autocomplete="off" maxlength="200"
+               placeholder="Ringte 19.09.2026 – de sender alle Eliteserie-kamper">
+        <p class="hint" id="stedLigaHint">
+          Tomt er helt greit. Krysser du av en liga, må kilden og datoen
+          under stå — som ellers her. Flagget <strong>utløper ved
+          sesongslutt</strong> og regnes ut av datoen: Eliteserien ved
+          nyttår, de andre i juli. Et sted som slutter å sende ligaen,
+          lover derfor ikke kamper i det uendelige.
+        </p>
       </div>
 
       <!-- Kilde og dato er ikke pynt: en udatert rad er verre enn ingen
