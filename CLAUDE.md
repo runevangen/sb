@@ -226,7 +226,22 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   — kampraden, den åpne kampen og linjene under. Tre feil i dette
   prosjektet har vært den samme. Det samme gjelder stedene fra
   `/api/pub-liste`: `KJENTE` er ingen `const`, og et kort som alt står
-  åpent tegnes om i `tegnKjenteIgjen()`.
+  åpent tegnes om i `tegnKjenteIgjen()` — som regner om **alle** kildene
+  som leser `KJENTE`: `bekreftede`, `kjenteVedArena`, `kjenteNaer` og
+  `stampuber`. Derfor husker boksen kampen sin.
+- **Rettelsene hentes på nytt når appen kommer fram igjen.** De ble hentet
+  **én gang, ved sidelasting**, og runden admin → app er nettopp den
+  runden en rettelse gjøres i — den ene runden appen ikke så. En pub
+  lagret i portalen fantes da ikke i appen før du lastet den på nytt:
+  raden var riktig, sammenslåingen virket, avstanden var null.
+  `visibilitychange` er den runden. `PUBLISTE_FERSK` holder det til ett
+  kall per to minutter, samme vindu som `LEVETID_PUBLISTE` — kanten svarer
+  med det samme der uansett.
+  **Og en tom liste er et svar.** Vakta sto på `!json.puber.length`, som
+  var likegyldig da lista ble hentet én gang. Nå er den ikke det: tas den
+  siste rettelsen bort i portalen, er det tomme svaret det riktige, og
+  appen skal falle tilbake til fila framfor å bli stående med en rad ingen
+  har lenger. `klar` skiller «ingen rettelser» fra «tjenesten svarte ikke».
 - **«Kommende» viser hele vinduet**, ikke én runde, med en overskrift per
   runde. Taket på tjue id-er mot `/api/svar` holdes av buntingen i
   `hentSvarFor()`, ikke av at lista kappes i forkant.

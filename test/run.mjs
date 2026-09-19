@@ -1947,6 +1947,127 @@ const SAK_14 = kjor("pub-feil", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
 `);
 
+/* ---------------- 14D. rettelsen som kom mens appen sto apen ---------------- */
+
+// Meldt 18. september 2026: «Fikk til aa lagre rbk poebb. Men den dukker
+// ikke opp i andre puber da jeg er innom Trondheim naa.»
+//
+// Raden var riktig, sammenslaingen virket, og avstanden var null — lista
+// var bare hentet ÉN GANG, ved sidelasting, og det var foer admin lagret.
+// Runden admin → app er nettopp den runden en rettelse gjoeres i, og den
+// var den ene runden appen ikke sa.
+const SAK_14D = kjor("pub-rettelse-i-bakgrunnen", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "" }); });
+  // Leseren star i Ila, samme punkt raden lagres med.
+  navigator.geolocation.getCurrentPosition = function (ok) {
+    ok({ coords: { latitude: 63.4286, longitude: 10.3641 } });
+  };
+  var RBK = { nokkel: "rbkpubben", navn: "RBK-pubben", bydel: "Ila",
+    adresse: "Gata 2", lat: 63.4286, lon: 10.3641, type: "sportsbar", lag: [],
+    kilde: "Var innom 18.09.2026, storskjerm i baren", sikkerhet: "bekreftet",
+    sjekket: "2026-09-18", merknad: "", fjernet: false };
+  // Det portalen har lagret akkurat na. Byttes underveis i testen.
+  window.__iBasen = [];
+  window.__listeKall = 0;
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve({ elements: [] }); } });
+    }
+    if (u.indexOf("/api/pub-liste") === 0) {
+      window.__listeKall += 1;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { klar: true, puber: window.__iBasen })); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ svar: [], visninger: [] })); } });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+
+  // Appen tror den er borte og kommer tilbake. Ferskhetsvinduet males i
+  // Date.now(), sa klokka flyttes framfor a vente to minutter.
+  var ekteNa = Date.now;
+  function kommTilbake(sekunder) {
+    var frem = ekteNa() + (sekunder || 0) * 1000;
+    Date.now = function () { return frem; };
+    document.dispatchEvent(new Event("visibilitychange"));
+  }
+
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var rad = document.querySelector(".kamp.delbar");
+    var del = rad && rad.querySelector(".kamp-del");
+    if (del) del.click();
+    var panel = document.querySelector(".kamp-panel");
+    ok("kampen kan apnes", !!panel);
+    if (!panel) { ferdig(); return; }
+    var apne = panel.querySelector(".pub-apne");
+    if (apne) apne.click();
+
+    setTimeout(function () { try {
+      var forslag = panel.querySelector(".pub-forslag");
+      ok("lista er hentet én gang ved oppstart", window.__listeKall === 1, window.__listeKall);
+      ok("og puben finnes ikke enna",
+         forslag.textContent.indexOf("RBK-pubben") === -1, forslag.textContent.slice(0, 160));
+
+      // Admin lagrer i portalen mens kortet star apent.
+      window.__iBasen = [RBK];
+      kommTilbake(130);
+
+      setTimeout(function () { try {
+        ok("appen henter pa nytt nar den kommer fram igjen",
+           window.__listeKall === 2, window.__listeKall);
+        // Kortet sto apent hele tiden: det er tegnet om, ikke lastet om.
+        ok("og puben star i det apne kortet",
+           forslag.textContent.indexOf("RBK-pubben") > -1, forslag.textContent.slice(0, 260));
+        ok("med avstand, ikke bare navn",
+           forslag.textContent.indexOf("m unna") > -1 || forslag.textContent.indexOf(" m") > -1,
+           forslag.textContent.slice(0, 260));
+
+        // Et nytt bytte innenfor ferskhetsvinduet skal ikke koste et kall:
+        // kanten svarer med det samme i det vinduet uansett.
+        kommTilbake(140);
+        setTimeout(function () { try {
+          ok("men ikke pa nytt innenfor ferskhetsvinduet",
+             window.__listeKall === 2, window.__listeKall);
+
+          // Tas den siste rettelsen bort, er det tomme svaret det RIKTIGE
+          // svaret. Sto sperra pa «tom liste», ble raden staende for evig.
+          window.__iBasen = [];
+          kommTilbake(400);
+          setTimeout(function () { try {
+            ok("en tom liste henter ogsa", window.__listeKall === 3, window.__listeKall);
+            ok("og da faller puben ut igjen",
+               forslag.textContent.indexOf("RBK-pubben") === -1,
+               forslag.textContent.slice(0, 260));
+            Date.now = ekteNa;
+            ferdig();
+          } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+        } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300);
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700); });
+`);
+
 /* ---------------- 15. admin-portalen ---------------- */
 
 // Portalen er en egen side. Den skriver ingenting selv: testen fanger
@@ -5044,7 +5165,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
 let feilet = 0;
 
 for (const t of alle) {
