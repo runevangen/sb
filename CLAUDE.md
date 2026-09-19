@@ -226,6 +226,20 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   også i et element som aldri settes inn i dokumentet, og også når vi
   kaster alt utenom teksten rett etterpå.
 - Filtrerer noe feeden, står det som en knapp med kryss i toppfeltet.
+- **Et felt som må fylles ut, sier det — før du trykker lagre.** Stjernene
+  i stedskjemaet settes av `merkPakrevde()` **ut av `PUBLISTE_FELT`**, ikke
+  skrevet i markupen: en liste i HTML-en kunne glidd fra den lista
+  validatoren bruker, og da lover skjemaet noe annet enn det slipper
+  gjennom. Et navn i `PUBLISTE_FELT` uten et felt i skjemaet blir stående i
+  `dataset.umerket`, og en vakt i `run.mjs` slår ut.
+  **Merkingen må være sann begge veier:** adresse, lag og merknad slipper
+  gjennom uten verdi, og en stjerne der ville sagt at noe kreves som ikke
+  gjør det. Tas stedet **ut** av lista, holder navnet alene — `sjekkPubRad`
+  slipper en fjernet rad gjennom på navnet — og da sier forklaringa det, og
+  stjernene dempes. `apneSted()` kaller den også: `fyllSted` setter haken
+  uten å utløse `change`, og et skjema som lyver om sine egne krav er verre
+  enn et som ikke sier noe. Stjerna er `aria-hidden`; skjermleseren får
+  `aria-required`.
 - **Felt er minst 16 px.** Safari på iPhone zoomer inn av seg selv når du
   fokuserer et felt med mindre skrift, og etter den zoomen er sida pannbar
   sidelengs. Meldt to ganger som «jeg kan scrolle skjermen til venstre og

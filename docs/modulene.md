@@ -543,6 +543,15 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   sikkerheten — den ligger i funksjonen og i basen — men det er ordenen, og
   det sparer et kall mot API-Football per åpning.
 - **Knappen sier hva trykket gjør.** `lagreKnappTekst()`.
+- **Feltene som må fylles ut er merket, og merkingen kommer fra
+  `PUBLISTE_FELT`.** `merkPakrevde()` går gjennom den lista og setter
+  stjerne pluss `aria-required`; `PAKREVD_ID` er bare navn → felt-id. Et
+  navn uten id blir stående i `stedSkjema.dataset.umerket`, som en vakt i
+  `run.mjs` krever er tom. Merkingen er sann begge veier: adresse, lag og
+  merknad er valgfrie og står umerket. Tas stedet ut av lista, holder
+  navnet, og `oppdaterPakrevdTekst()` sier det — den kalles både på
+  `change` og fra `apneSted()`, fordi `fyllSted` setter haken uten å
+  utløse noen hendelse.
 - **Koordinatfeltet heter «koordinat eller kartlenke».** Den som sitter med
   tallene skal se at feltet er til dem.
 - **Rettelsene skrives som hele rader.** `slaSammenPuber()` slår sammen

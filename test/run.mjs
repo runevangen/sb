@@ -2825,6 +2825,74 @@ const SAK_15B = kjor("admin-steder", `
       ok("men beholder resten av lista", navnene.length > 20, navnene.length);
 
       // Skjemaet star ikke framme uoppfordret.
+      // Feltene som MA fylles ut, skal SI det — ikke avsloere det etter at
+      // du har trykket lagre. Meldt 19. september 2026.
+      //
+      // Lista leses ut av PUBLISTE_FELT i pub-data.js, ikke skrevet ved
+      // siden av den. Star det et navn der uten et felt i skjemaet, blir
+      // det staaende i dataset.umerket — og denne testen er hele grunnen
+      // til at feltet finnes.
+      ok("hvert pakrevd felt i PUBLISTE_FELT er merket",
+         felt("stedSkjema").dataset.umerket === "",
+         "umerket: " + felt("stedSkjema").dataset.umerket);
+      var merket = function (id) {
+        var l = document.querySelector('label[for="' + id + '"]');
+        return !!l && !!l.querySelector(".pakrevd");
+      };
+      ok("navn, bydel og koordinatene er merket",
+         merket("stedNavn") && merket("stedBydel") &&
+         merket("stedLat") && merket("stedLon"));
+      // Kilde og sjekket er de to som oftest mangler, og begge ser ut som
+      // noe man kan hoppe over. De er nettopp de som ikke er pynt.
+      ok("og kilde, sjekket, type og sikkerhet",
+         merket("stedKilde") && merket("stedSjekket") &&
+         merket("stedType") && merket("stedSikkerhet"));
+      // Og merkingen ma vaere SANN: adressen, laget og merknaden slipper
+      // gjennom validatoren uten verdi. En stjerne der ville sagt at noe
+      // kreves som ikke gjor det.
+      ok("men ikke feltene som faktisk er valgfrie",
+         !merket("stedAdresse") && !merket("stedLag") && !merket("stedMerknad"),
+         "adresse " + merket("stedAdresse") + ", lag " + merket("stedLag") +
+         ", merknad " + merket("stedMerknad"));
+      // Byen styrer bare soket og lagres ikke, sa den kreves ikke.
+      ok("og ikke byvelgeren, som ikke lagres", !merket("stedBy"));
+      ok("skjermleseren far det samme som oyet",
+         felt("stedKilde").getAttribute("aria-required") === "true" &&
+         felt("stedAdresse").getAttribute("aria-required") === null,
+         felt("stedKilde").getAttribute("aria-required"));
+      ok("og forklaringa staar over skjemaet",
+         felt("stedPakrevdNote").textContent.indexOf("må fylles ut") > -1,
+         felt("stedPakrevdNote").textContent);
+
+      // Tas stedet ut av lista, kreves bare navnet: sjekkPubRad slipper en
+      // fjernet rad gjennom pa navnet alene. Da er atte stjerner usant.
+      felt("stedFjernet").checked = true;
+      felt("stedFjernet").dispatchEvent(new Event("change"));
+      ok("tas stedet ut, sier forklaringa at navnet holder",
+         felt("stedPakrevdNote").textContent.indexOf("holder det med navnet") > -1,
+         felt("stedPakrevdNote").textContent);
+      felt("stedFjernet").checked = false;
+      felt("stedFjernet").dispatchEvent(new Event("change"));
+      ok("og tilbake igjen nar det ikke tas ut",
+         felt("stedPakrevdNote").textContent.indexOf("må fylles ut") > -1,
+         felt("stedPakrevdNote").textContent);
+
+      // Apner du et sted som ALT er tatt ut, setter fyllSted haken uten a
+      // utlose change. Da ville forklaringa sagt «ma fylles ut» om felt
+      // som ikke kreves — et skjema som lyver om sine egne krav.
+      var utRad = Array.prototype.find.call(felt("stedListe").querySelectorAll("li"),
+        function (li) { return li.textContent.indexOf("tatt ut") > -1; });
+      if (utRad) {
+        utRad.querySelector("button").click();
+        ok("apner du et sted som alt er tatt ut, sier forklaringa det med en gang",
+           felt("stedPakrevdNote").textContent.indexOf("holder det med navnet") > -1,
+           felt("stedPakrevdNote").textContent);
+        felt("stedAvbryt").click();
+      } else {
+        ok("apner du et sted som alt er tatt ut, sier forklaringa det med en gang",
+           false, "fant ingen rad som er tatt ut");
+      }
+
       ok("skjemaet er skjult til man ber om det", felt("stedSkjema").hidden === true);
       felt("stedNytt").click();
       ok("nytt sted apner skjemaet", felt("stedSkjema").hidden === false);

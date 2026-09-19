@@ -25,7 +25,7 @@ import { LIGAER, kampNokkel } from "./fotball-data.js";
 import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
 import { publisteRad, alleredeILista } from "./pub-forslag-data.js";
 import { PUBTYPER, PUBSIKKERHET, pubNokkel, sjekkPubRad, slaSammenPuber,
-  koordinatFraLenke, BYER, byFor } from "./pub-data.js";
+  koordinatFraLenke, BYER, byFor, PUBLISTE_FELT } from "./pub-data.js";
 import { visningsHint, rundeTall, lagreKnappTekst } from "./visning-data.js";
 
 const felt = (id) => document.getElementById(id);
@@ -886,10 +886,73 @@ PUBSIKKERHET.forEach((sk) => {
   felt("stedSikkerhet").appendChild(valg);
 });
 
+/* ---------------- feltene som MA fylles ut ---------------- */
+
+// Hvilket felt i skjemaet som svarer til hvert navn i PUBLISTE_FELT.
+//
+// Merkingen leses UT AV den lista, ikke skrevet ved siden av den: legges
+// et felt til der, skal stjerna folge. Et navn uten en id her blir
+// staaende i `umerket`, og en test slaar ut framfor at et pakrevd felt
+// star umerket i portalen.
+const PAKREVD_ID = {
+  navn: "stedNavn",
+  bydel: "stedBydel",
+  lat: "stedLat",
+  lon: "stedLon",
+  type: "stedType",
+  kilde: "stedKilde",
+  sikkerhet: "stedSikkerhet",
+  sjekket: "stedSjekket",
+};
+
+// Et felt som ma fylles ut, skal SI det — ikke avsloere det etter at du
+// har trykket lagre. «kilde» og «sjekket» er de to som oftest mangler, og
+// begge ser ut som noe man kan hoppe over.
+//
+// Stjerna er for oyet og er aria-hidden: skjermleseren far
+// `aria-required`, og «stjerne» lest hoyt for hvert felt er stoy.
+function merkPakrevde() {
+  const umerket = [];
+  PUBLISTE_FELT.forEach((navnet) => {
+    const id = PAKREVD_ID[navnet];
+    const inn = id ? document.getElementById(id) : null;
+    const merke = id ? document.querySelector('label[for="' + id + '"]') : null;
+    if (!inn || !merke) { umerket.push(navnet); return; }
+    inn.setAttribute("aria-required", "true");
+    if (merke.querySelector(".pakrevd")) return;
+    const stjerne = document.createElement("span");
+    stjerne.className = "pakrevd";
+    stjerne.textContent = "*";
+    stjerne.setAttribute("aria-hidden", "true");
+    merke.appendChild(stjerne);
+  });
+  // Testen leser denne: er den ikke tom, star et pakrevd felt umerket.
+  felt("stedSkjema").dataset.umerket = umerket.join(",");
+}
+
+// Tas stedet UT av lista, kreves bare navnet — sjekkPubRad slipper en
+// fjernet rad gjennom pa navnet alene, fordi det eneste den sier er at
+// stedet ikke skal vises. Da ville atte stjerner vaert usant, og
+// forklaringa sier hva som gjelder.
+function oppdaterPakrevdTekst() {
+  const ut = felt("stedFjernet").checked;
+  felt("stedSkjema").classList.toggle("tatt-ut", ut);
+  felt("stedPakrevdNote").textContent = ut
+    ? "Stedet tas ut av lista. Da holder det med navnet."
+    : "Felt merket * må fylles ut.";
+}
+
+merkPakrevde();
+
 function apneSted(p, nokkel) {
   stedRedigeres = nokkel || "";
   fyllSted(p);
   settBy(p);
+  // fyllSted setter haken uten a utlose `change`. Apner du et sted som alt
+  // er tatt ut, ville forklaringa ellers sagt «ma fylles ut» om felt som
+  // ikke kreves — og et skjema som lyver om sine egne krav er verre enn et
+  // som ikke sier noe.
+  oppdaterPakrevdTekst();
   felt("stedSkjema").hidden = false;
   felt("stedAvbryt").hidden = false;
   stedMelding("", "");
@@ -1273,3 +1336,4 @@ felt("stedLenkeLes").addEventListener("click", lesKartlenke);
 // Enter i et felt skal ikke sende skjemaet noe sted: det finnes ingen
 // action, og en navigasjon her ville mistet alt som er tastet.
 felt("stedSkjema").addEventListener("submit", (e) => e.preventDefault());
+felt("stedFjernet").addEventListener("change", oppdaterPakrevdTekst);
