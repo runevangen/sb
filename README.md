@@ -89,6 +89,7 @@ skjedde 13. september 2026 med `PIN_PEPPER`.
 |---|---|
 | [`CLAUDE.md`](CLAUDE.md) | Reglene som gjelder nå. Start her. |
 | [`docs/adr/`](docs/adr/README.md) | Hvorfor de gjelder — én fil per beslutning |
+| [`docs/kampdag-flyt.md`](docs/kampdag-flyt.md) | Kampdagen fra trykket på kortet til admin, med bilder |
 | [`docs/hendelser.md`](docs/hendelser.md) | Hva som gikk galt, og hva som faktisk var årsaken |
 | [`docs/testing.md`](docs/testing.md) | De tre testreglene og fellene i testrammen |
 | [`docs/nokler-og-tokens.md`](docs/nokler-og-tokens.md) | Hver hemmelighet: hvor den settes, hva som svikter uten |

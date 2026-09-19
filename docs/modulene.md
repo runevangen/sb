@@ -489,6 +489,18 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
 - **Et trykk på et sted er svaret.** Før var det tre steg og et navnefelt
   på hver kamp. Navnet kommer nå fra innloggingen — et felt man måtte fylle
   ville betydd at «ett trykk» ikke var sant.
+- **Har du valgt, minimeres de andre — men ikke der noen skal.** `framme`
+  er ditt sted pluss alt med `harFolk`; resten går bak `.sted-mer`.
+  Åpen/lukket ligger på `panel.visAlleSteder`, fordi `tegnSteder` kjører på
+  hvert svar. `.sted-resten` setter `display: flex` og må derfor si hva
+  `[hidden]` betyr.
+- **`panel.tilbyForslag()` spør om å sende inn et ukjent sted, etter
+  svaret.** Den er stille for stadion, for den utloggede, og for et sted
+  `alleredeILista()` kjenner. `sendInnSted()`-boksen eksponerer
+  `apneMed(navn)` så tilbudet kan åpne og forhåndsfylle skjemaet som alt
+  ligger der — det er én vei inn, ikke et nytt skjema.
+- **Knappen heter «Del», ikke «Del i chatten».** Appen har ingen chat, og
+  hvor teksten havner er leserens valg i delingsmenyen.
 - **«Hjemme» er borte.** Kortet handler om hvor man møter noen, og sofaen
   er ikke et møtested.
 - **Et sted fra en lenke blir *pekt ut*, ikke valgt.** Chipen markeres og
@@ -532,6 +544,22 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   sikkerheten — den ligger i funksjonen og i basen — men det er ordenen, og
   det sparer et kall mot API-Football per åpning.
 - **Knappen sier hva trykket gjør.** `lagreKnappTekst()`.
+- **Stedslista filtreres på by.** `byenTil()` leser byen ut av koordinatet
+  med `byFor()`; `fyllStedFilter()` bygger velgeren av de byene som har
+  rader, med tall, og skjuler hele raden når det finnes færre enn to
+  grupper. Rader uten koordinat samles under `UTEN_BY` — et sted som er
+  tatt ut kan mangle dem, og det skal fortsatt kunne åpnes. Er den valgte
+  byen borte etter en redigering, faller filteret tilbake til alle framfor
+  å vise en tom liste uten en vei ut.
+- **Feltene som må fylles ut er merket, og merkingen kommer fra
+  `PUBLISTE_FELT`.** `merkPakrevde()` går gjennom den lista og setter
+  stjerne pluss `aria-required`; `PAKREVD_ID` er bare navn → felt-id. Et
+  navn uten id blir stående i `stedSkjema.dataset.umerket`, som en vakt i
+  `run.mjs` krever er tom. Merkingen er sann begge veier: adresse, lag og
+  merknad er valgfrie og står umerket. Tas stedet ut av lista, holder
+  navnet, og `oppdaterPakrevdTekst()` sier det — den kalles både på
+  `change` og fra `apneSted()`, fordi `fyllSted` setter haken uten å
+  utløse noen hendelse.
 - **Koordinatfeltet heter «koordinat eller kartlenke».** Den som sitter med
   tallene skal se at feltet er til dem.
 - **Rettelsene skrives som hele rader.** `slaSammenPuber()` slår sammen
@@ -654,6 +682,10 @@ spørsmål kode ikke kan svare på alene.
   svikter **sies**, ikke utelates stille.
 - **`byersjekk.mjs`** — spør Overpass hva som finnes i en by, så en
   falsk posisjon kan sammenliknes med virkeligheten.
+- **`lag-pdf.mjs`** — lager PDF av et dokument i `docs/` med Chromium og
+  ingenting annet, så et sammendrag kan sendes som vedlegg. Oversetter
+  bare det Markdown-en i `docs/` faktisk bruker; en pakke for resten
+  ville vært prosjektets første npm-avhengighet, for et vedlegg.
 
 ---
 

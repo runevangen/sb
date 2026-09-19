@@ -25,7 +25,7 @@ import { LIGAER, kampNokkel } from "./fotball-data.js";
 import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
 import { publisteRad, alleredeILista } from "./pub-forslag-data.js";
 import { PUBTYPER, PUBSIKKERHET, pubNokkel, sjekkPubRad, slaSammenPuber,
-  koordinatFraLenke, BYER, byFor } from "./pub-data.js";
+  koordinatFraLenke, BYER, byFor, PUBLISTE_FELT } from "./pub-data.js";
 import { visningsHint, rundeTall, lagreKnappTekst } from "./visning-data.js";
 
 const felt = (id) => document.getElementById(id);
@@ -886,10 +886,73 @@ PUBSIKKERHET.forEach((sk) => {
   felt("stedSikkerhet").appendChild(valg);
 });
 
+/* ---------------- feltene som MA fylles ut ---------------- */
+
+// Hvilket felt i skjemaet som svarer til hvert navn i PUBLISTE_FELT.
+//
+// Merkingen leses UT AV den lista, ikke skrevet ved siden av den: legges
+// et felt til der, skal stjerna folge. Et navn uten en id her blir
+// staaende i `umerket`, og en test slaar ut framfor at et pakrevd felt
+// star umerket i portalen.
+const PAKREVD_ID = {
+  navn: "stedNavn",
+  bydel: "stedBydel",
+  lat: "stedLat",
+  lon: "stedLon",
+  type: "stedType",
+  kilde: "stedKilde",
+  sikkerhet: "stedSikkerhet",
+  sjekket: "stedSjekket",
+};
+
+// Et felt som ma fylles ut, skal SI det — ikke avsloere det etter at du
+// har trykket lagre. «kilde» og «sjekket» er de to som oftest mangler, og
+// begge ser ut som noe man kan hoppe over.
+//
+// Stjerna er for oyet og er aria-hidden: skjermleseren far
+// `aria-required`, og «stjerne» lest hoyt for hvert felt er stoy.
+function merkPakrevde() {
+  const umerket = [];
+  PUBLISTE_FELT.forEach((navnet) => {
+    const id = PAKREVD_ID[navnet];
+    const inn = id ? document.getElementById(id) : null;
+    const merke = id ? document.querySelector('label[for="' + id + '"]') : null;
+    if (!inn || !merke) { umerket.push(navnet); return; }
+    inn.setAttribute("aria-required", "true");
+    if (merke.querySelector(".pakrevd")) return;
+    const stjerne = document.createElement("span");
+    stjerne.className = "pakrevd";
+    stjerne.textContent = "*";
+    stjerne.setAttribute("aria-hidden", "true");
+    merke.appendChild(stjerne);
+  });
+  // Testen leser denne: er den ikke tom, star et pakrevd felt umerket.
+  felt("stedSkjema").dataset.umerket = umerket.join(",");
+}
+
+// Tas stedet UT av lista, kreves bare navnet — sjekkPubRad slipper en
+// fjernet rad gjennom pa navnet alene, fordi det eneste den sier er at
+// stedet ikke skal vises. Da ville atte stjerner vaert usant, og
+// forklaringa sier hva som gjelder.
+function oppdaterPakrevdTekst() {
+  const ut = felt("stedFjernet").checked;
+  felt("stedSkjema").classList.toggle("tatt-ut", ut);
+  felt("stedPakrevdNote").textContent = ut
+    ? "Stedet tas ut av lista. Da holder det med navnet."
+    : "Felt merket * må fylles ut.";
+}
+
+merkPakrevde();
+
 function apneSted(p, nokkel) {
   stedRedigeres = nokkel || "";
   fyllSted(p);
   settBy(p);
+  // fyllSted setter haken uten a utlose `change`. Apner du et sted som alt
+  // er tatt ut, ville forklaringa ellers sagt «ma fylles ut» om felt som
+  // ikke kreves — og et skjema som lyver om sine egne krav er verre enn et
+  // som ikke sier noe.
+  oppdaterPakrevdTekst();
   felt("stedSkjema").hidden = false;
   felt("stedAvbryt").hidden = false;
   stedMelding("", "");
@@ -997,6 +1060,63 @@ async function hentSteder() {
   }
 }
 
+// Hvilken by en rad ligger i, lest ut av koordinatet. Ingen rad barer
+// byen sin som et felt — `byFor()` er fasiten, og et felt ved siden av
+// kunne vaert uenig med tallene.
+//
+// «uten» er ikke en feil: en rad som er TATT UT slipper gjennom paa navnet
+// alene (sjekkPubRad), sa den kan mangle koordinater helt. En slik rad maa
+// fortsatt kunne aapnes — et filter som skjuler den, har tatt den ut av
+// portalen.
+const UTEN_BY = "uten";
+
+function byenTil(p) {
+  const lat = Number(p && p.lat);
+  const lon = Number(p && p.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return UTEN_BY;
+  return byFor(lat, lon) || UTEN_BY;
+}
+
+// Hvilken by som er valgt. Tom streng er alle.
+let stedFilter = "";
+
+// Velgeren bygges av det som faktisk ligger i lista, med tall: da ser du
+// hvor stedene er framfor a klikke gjennom seks byer for a finne det ut.
+function fyllStedFilter(rader) {
+  const antall = new Map();
+  rader.forEach((p) => {
+    const by = byenTil(p);
+    antall.set(by, (antall.get(by) || 0) + 1);
+  });
+
+  // Rekkefolgen i BYER, ikke i lista: den er den samme hver gang.
+  const grupper = Object.keys(BYER).filter((n) => antall.has(n));
+  if (antall.has(UTEN_BY)) grupper.push(UTEN_BY);
+
+  // Er den valgte byen borte — siste sted der ble flyttet — faller vi
+  // tilbake til alle framfor a vise en tom liste uten en vei ut.
+  if (stedFilter && grupper.indexOf(stedFilter) === -1) stedFilter = "";
+
+  const velger = felt("stedFilterBy");
+  velger.textContent = "";
+  const alle = document.createElement("option");
+  alle.value = "";
+  alle.textContent = "Alle byer (" + rader.length + ")";
+  velger.appendChild(alle);
+  grupper.forEach((n) => {
+    const valg = document.createElement("option");
+    valg.value = n;
+    valg.textContent = (n === UTEN_BY ? "Uten koordinat" : BYER[n].navn)
+      + " (" + antall.get(n) + ")";
+    velger.appendChild(valg);
+  });
+  velger.value = stedFilter;
+
+  // Én gruppe er ikke et valg. En velger som bare kan si det den alt
+  // viser, er en kontroll uten et valg — og da er den i veien.
+  felt("stedFilterRad").hidden = grupper.length < 2;
+}
+
 function tegnSteder() {
   const liste = felt("stedListe");
   liste.textContent = "";
@@ -1008,17 +1128,34 @@ function tegnSteder() {
   // star der det pleier. Nye steder legges bakerst av slaSammenPuber.
   const sammen = slaSammenPuber(KURATERTE, pubRettelser);
   const skjulte = pubRettelser.filter((p) => p.fjernet);
+  const alle = sammen.concat(skjulte);
 
-  sammen.concat(skjulte).forEach((p) => {
+  fyllStedFilter(alle);
+
+  const vist = stedFilter ? alle.filter((p) => byenTil(p) === stedFilter) : alle;
+  vist.forEach((p) => {
     const nokkel = pubNokkel(p.navn);
     liste.appendChild(stedRad(p, nokkel, rettet.get(nokkel)));
   });
 
+  // Tallet som star, ma vaere tallet som vises. «26 steder i lista» over en
+  // liste med ett sted er sant om lista og usant om skjermen, og da leses
+  // det som at de andre er borte.
+  //
+  // «Steder» og «rader» er ikke det samme, og forskjellen er de fjernede:
+  // et sted som er tatt ut er ikke i lista, men raden staar her sa den kan
+  // aapnes igjen. Ufiltrert teller vi stedene; filtrert teller vi radene,
+  // for det er dem filteret gar pa.
+  const kilde = pubRettelser.length
+    ? pubRettelser.length + " er rettet herfra; resten står i puber.js."
+    : "Alle står i puber.js. Ingenting er rettet herfra ennå.";
+  const byNavn = stedFilter === UTEN_BY ? "uten koordinat"
+    : (BYER[stedFilter] ? "i " + BYER[stedFilter].navn : "");
   felt("stedHint").hidden = false;
-  felt("stedHint").textContent = sammen.length + " steder i lista. "
-    + (pubRettelser.length
-      ? pubRettelser.length + " er rettet herfra; resten står i puber.js."
-      : "Alle står i puber.js. Ingenting er rettet herfra ennå.");
+  felt("stedHint").textContent = stedFilter
+    ? "Viser " + vist.length + " " + byNavn + ", av " + alle.length
+      + " rader. " + kilde
+    : sammen.length + " steder i lista. " + kilde;
 }
 
 function stedRad(p, nokkel, rettelse) {
@@ -1273,3 +1410,8 @@ felt("stedLenkeLes").addEventListener("click", lesKartlenke);
 // Enter i et felt skal ikke sende skjemaet noe sted: det finnes ingen
 // action, og en navigasjon her ville mistet alt som er tastet.
 felt("stedSkjema").addEventListener("submit", (e) => e.preventDefault());
+felt("stedFjernet").addEventListener("change", oppdaterPakrevdTekst);
+felt("stedFilterBy").addEventListener("change", () => {
+  stedFilter = felt("stedFilterBy").value;
+  tegnSteder();
+});

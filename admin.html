@@ -126,6 +126,16 @@
   .hint[hidden] { display: none; }
   .melding:empty { display: none; padding: 0; }
   .hint { font-size: 12px; color: var(--tekst-svak); margin: 8px 0 0; }
+  /* Feltene som MA fylles ut. Stjerna er for oyet — skjermleseren far
+     aria-required, og «stjerne» lest hoyt atte ganger er stoy. */
+  .pakrevd { color: var(--feil); margin-left: 3px; font-weight: 700; }
+  /* Tas stedet ut av lista, kreves bare navnet: sjekkPubRad slipper en
+     fjernet rad gjennom pa navnet alene. Da er atte stjerner usant, og de
+     dempes framfor a forsvinne — feltene er fortsatt de samme. */
+  #stedSkjema.tatt-ut .pakrevd { color: var(--tekst-svak); font-weight: 400; }
+  /* Forklaringa til stjerna star over skjemaet, ikke under: den skal leses
+     for man begynner a fylle ut. */
+  #stedPakrevdNote { margin: 0 0 12px; }
   .rad { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .rad input[type="password"] { flex: 1 1 180px; width: auto; }
   /* Brukerlista. Ett kort per person framfor fire kolonner.
@@ -261,9 +271,25 @@
       <button id="stedNytt" type="button">Nytt sted</button>
       <button class="lenke" id="stedAvbryt" type="button" hidden>Avbryt</button>
     </div>
+
+    <!-- Filteret bygges av byFor() i admin.js, ut av koordinatene som
+         faktisk ligger i lista: en by uten steder er et valg som ikke gir
+         noe. Hele raden er skjult naar det bare finnes én gruppe — da er
+         velgeren en kontroll uten et valg. -->
+    <div class="rad" id="stedFilterRad" hidden>
+      <label for="stedFilterBy" style="margin: 0;">Vis</label>
+      <select id="stedFilterBy"></select>
+    </div>
+
     <ul class="steder" id="stedListe"></ul>
 
     <form id="stedSkjema" hidden>
+      <!-- Stjernene settes av merkPakrevde() i admin.js, ut av
+           PUBLISTE_FELT. De star ikke i markupen: en liste her ville kunne
+           gli fra den lista validatoren faktisk bruker, og da lover
+           skjemaet noe annet enn det slipper gjennom. -->
+      <p class="hint" id="stedPakrevdNote">Felt merket * må fylles ut.</p>
+
       <div class="felt-blokk">
         <label for="stedNavn">Navn</label>
         <div class="rad">
