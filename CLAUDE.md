@@ -159,6 +159,26 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   sviktet. For de kampene er stedene **nær deg** svaret, og det er de vi
   leter etter. Stadionraden blir stående: hvor kampen spilles er en
   opplysning, ikke et søk.
+- **«Nær deg» og «ved arenaen» er to påstander, og de tåler ikke samme
+  radius.** `NAER_RADIUS` er 3000 m, `ARENA_RADIUS` 1500 m. Avstanden står
+  på hver brikke, så en lang liste sortert på avstand er ærlig — du ser tre
+  kilometer og forkaster den selv. Stadion kan du ikke forkaste: målt fra
+  KFUM Arena ville 3000 m gitt åtte kuraterte steder under en overskrift
+  som sier «ved arenaen», og de fleste av dem er sentrumspuber som ikke
+  ligger der. Tallene sto som **ett** til 19. september 2026, og da lå
+  1500 akkurat lavt nok til at RBK-puben i Trondheim — 1545 m fra sentrum —
+  falt utenfor med 45 meter, mens den ene utvidelsen som slapp den inn
+  ville gjort arenalista usann.
+- **Uteblir posisjonen, sier skjermen hvilken av dem det var.** Nei,
+  tidsavbrudd, «telefonen fant den ikke» og «nettleseren har ikke API-et»
+  ble håndtert likt og stille, og da sto «Fant ingen puber i nærheten»
+  igjen som eneste forklaring — en setning som ikke er sann når vi aldri
+  fikk vite hvor «nær» var. `posisjonsfeil()` gir én setning per årsak, og
+  hver av dem navngir det som mangler på skjermen. **Den ligger i sitt eget
+  felt, ikke i `boks.feil`:** den skal kunne byttes ut når du prøver igjen.
+  I feil-lista ble «Du sa nei til posisjon» stående etter at du sa ja — sann
+  da den ble skrevet, usann da den ble lest. Uten geolocation står det
+  ingen knapp: en vei tilbake som ikke fører noe sted er verre enn ingen.
 - **En stille tom liste er ikke til å skille fra «ingen svarte».** Feiler
   et kall der lista *er* hele visningen, si det. Er lista et tillegg til
   noe annet, ti — men da får den som handlet beskjed.

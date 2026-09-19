@@ -48,7 +48,8 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
          osmNavnVask, osmNavnSporring, tolkNavnTreff, PUBTYPER, PUBSIKKERHET,
          delAdresse, osmAdresseSporring, tolkAdresseTreff, koordinatFraLenke,
          SOK_SEKUNDER, SOK_TAK, overpassFeiltekst,
-         OSLO_RAMME, rammeFor, byFor, bynavn, BY_RADIUS_KM } from "../pub-data.js";
+         OSLO_RAMME, rammeFor, byFor, bynavn, BY_RADIUS_KM,
+         posisjonsfeil } from "../pub-data.js";
 import { PUBER_KONTAKT } from "../puber-kontakt.js";
 import { KANALER } from "../kanaler.js";
 import { KURATERTE } from "../puber.js";
@@ -2456,6 +2457,39 @@ ok("alle testbyene har et koordinat i Norge",
    Object.values(BYER).every((b) =>
      b.lat > 57 && b.lat < 72 && b.lon > 4 && b.lon < 32 && b.navn),
    JSON.stringify(Object.values(BYER).map((b) => b.navn)));
+
+/* ---------------- nar posisjonen uteblir ---------------- */
+
+// Meldt 19. september 2026: «undersok hvorfor posisjon ikke slo inn».
+// Det gikk ikke an a undersoke fra skjermen, og DET var feilen: appen
+// handterte nei, tidsavbrudd og «fant ikke posisjonen» likt og stille.
+// Fire ulike arsaker ma gi fire ulike setninger, ellers er sporsmalet
+// ubesvarlig for den som star der.
+const GRUNNER = [0, 1, 2, 3].map((k) => posisjonsfeil(k));
+ok("hver arsak far sin egen setning",
+   new Set(GRUNNER).size === 4, GRUNNER.join(" | "));
+
+ok("et nei sier at det var DU som sa nei",
+   posisjonsfeil(1).indexOf("Du sa nei") === 0, posisjonsfeil(1));
+
+ok("et tidsavbrudd legger ikke skylda pa deg",
+   posisjonsfeil(3).indexOf("Du sa nei") === -1 &&
+   posisjonsfeil(3).indexOf("kom ikke fram i tide") > 0, posisjonsfeil(3));
+
+ok("en nettleser uten posisjon sier at det er nettleseren",
+   posisjonsfeil(0).indexOf("Nettleseren") === 0, posisjonsfeil(0));
+
+// En ukjent kode er fortsatt et svar. Kastet den, eller ga den tom
+// streng, ville skjermen vaert like taus som for.
+ok("en ukjent kode gir likevel en setning",
+   posisjonsfeil(99).length > 10 && posisjonsfeil(undefined).length > 10,
+   posisjonsfeil(99) + " | " + posisjonsfeil(undefined));
+
+// Hver setning ma si hva som mangler pa skjermen, ikke bare hva som
+// skjedde: «Du sa nei til posisjon» alene forklarer ikke den tomme lista.
+ok("hver setning navngir det som uteblir",
+   GRUNNER.concat([posisjonsfeil(99)])
+     .every((t) => t.indexOf("nær deg") > 0), GRUNNER.join(" | "));
 
 /* ---------------- hva en lagring faktisk endrer ---------------- */
 

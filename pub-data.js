@@ -454,6 +454,31 @@ export function rangerForslag(kilder, maks = FORSLAG_MAKS) {
   return { topp: alle.slice(0, tak), resten: alle.slice(tak) };
 }
 
+/* ---------- nar posisjonen uteblir ---------- */
+
+// Fire helt ulike ting kan ha skjedd, og de krever ulike ting av den som
+// leser: et nei kan gjores om, en maling som ikke kom fram kan proves pa
+// nytt under apen himmel, og en nettleser uten posisjon kan ingen av
+// delene. I appen sto de som ett stille `return` til 19. september 2026,
+// og da var «Fant ingen puber i naerheten» det eneste pa skjermen — en
+// setning som ikke er sann. Vi fant ingenting fordi vi aldri fikk vite
+// hvor «naer» var, og de to er ikke det samme: den forste ber deg skrive
+// navnet selv, den andre ber deg trykke ja.
+//
+// Kodene er nettleserens egne (GeolocationPositionError); 0 er tilfellet
+// der API-et ikke finnes i det hele tatt og ingen kode blir gitt.
+const POSISJON_GRUNN = {
+  0: "Nettleseren gir ikke posisjon",
+  1: "Du sa nei til posisjon",
+  2: "Telefonen fant ikke posisjonen",
+  3: "Posisjonen kom ikke fram i tide",
+};
+
+export function posisjonsfeil(kode) {
+  const grunn = POSISJON_GRUNN[kode] || "Fikk ikke posisjonen";
+  return grunn + ", så stedene nær deg står ikke her.";
+}
+
 /* ---------- dine puber ---------- */
 
 // Lagres lokalt som [{ navn, antall }]. Den som er brukt oftest star
