@@ -9,6 +9,59 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 19. september 2026 — radiusen er en sirkel, og en by er ikke det
+
+**Meldt som:** «jeg ønsker å få opp puben uavhengig om den har lag RBK
+eller ikke. Det er en pub som er satt opp som plass som viser kamper.»
+
+**Hva det så ut som.** En etterlysning av en ny vei inn for `lag`-løse
+steder. Det var det ikke — to slike veier fantes alt.
+
+**Hva som faktisk var tilfelle.** Puben var registrert i portalen for
+Kristiansund–Rosenborg 19.09 kl. 14:00, og den registreringen går gjennom
+`bekreftetFor()`: ingen posisjon, ingen avstand, ingen `lag`, og
+`bekreftede` står først i `FORSLAG_KILDER`. For den kampen sto puben
+øverst med ★ uansett hvor i verden leseren var. Og for alle andre kamper
+nådde den fram i Trondheim gjennom `kjenteNaer` etter at radiusen ble delt
+samme dag. Ønsket var altså oppfylt to ganger over.
+
+**`lag` ville lagt til én smal ting:** at stedet dukker opp på RBK-kamper
+når vi *ikke* vet hvor du er. Det ble ikke gjort, og ikke bare fordi det
+var unødvendig: `lag` betyr «stampub for Rosenborg», en påstand om
+tilhørighet. At et sted viser kamper er en annen påstand, og ★ og ⚽ holdes
+fra hverandre nettopp derfor.
+
+**Hullet som var ekte.** `NAER_RADIUS` er en sirkel. En by er ikke det.
+Fire og en halv kilometer øst for puben — fortsatt godt inne i Trondheim —
+ga `kjenteNaer` ingenting, og da sto byens eneste kuraterte sted uten vei
+inn. Samme fra utkanten av Oslo: null kuraterte steder, enda 26 ligger i
+byen.
+
+**Hva som ble gjort.** `kuraterteIByen()` gir stedene i samme by som deg,
+uansett avstand, nærmest først. `byFor()` leser byen ut av koordinatet, som
+ellers — ingen rad bærer byen som felt. Kilden ligger etter de geografiske
+og før karttreffene, av samme grunn som stampubene.
+
+**Men den bærer avstand, og det er forskjellen.** Stampubene tømmes når en
+posisjon lander, fordi et lagtreff ikke vet hvor langt det er og derfor
+står i lista som om det lå i nabogata. Et bytreff vet det, og tallet står
+på brikka. Derfor blir denne stående. De to møtes forresten aldri:
+`stampuber` finnes bare uten posisjon, `kjenteIByen` bare med.
+
+**Hva som fanget det.** Fem sabotasjer. To av dem er verdt å skille:
+fjernes kilden fra `naerDegFra` faller `SAK_14I`, fjernes den fra
+`tegnKjenteIgjen` faller `SAK_14J` — og den andre er fella som har kostet
+tre ganger her før. `kjenteIByen` er den **femte** kilden som leser
+`KJENTE`, altså nok en sjanse til å glemme en. Derfor lander `SAK_14J` en
+rettelse mens kortet står åpent, på et sted utenfor radiusen: bare
+bykilden kan finne det, så testen svarer på om nettopp den ble regnet om.
+
+**Det som ikke ble målt bort.** For puben det gjaldt endrer dette
+ingenting fra Trondheim sentrum — der lå den alt innenfor 3 km. Kilden
+tetter hullet lenger ut, og i Oslo-utkanten der 26 steder var usynlige.
+
+---
+
 ## 19. september 2026 — de siste 45 meterne, og setningen som skjulte dem
 
 **Meldt som:** «Utvid `KJENT_RADIUS`» og «undersøk hvorfor posisjon ikke
