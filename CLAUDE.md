@@ -104,6 +104,32 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   setter `foreslatt_av` fra økta, så et tilbud som ikke kan tas imot er
   verre enn ingen), og for et sted `alleredeILista()` kjenner — ellers ber
   appen deg melde inn en pub den selv har i lista.
+- **En bekreftet visning svarer på kampen, ikke på hvor du er — og må
+  derfor bære avstand.** `bekreftetFor()` kjenner ingen geografi: den er
+  den ENESTE kilden som svarer på *denne kampen*, og det er derfor den står
+  først i `FORSLAG_KILDER`. Men ingenting filtrerte den, så en pub på
+  Grønland i Oslo sto øverst som svaret på «hvor skal du se den?» for en
+  leser i Trondheim — 392 km unna. Samme antagelse som `puber.js` bar:
+  riktig så lenge alt var Oslo.
+  **Linja under kampraden navngir bare de nære.** Er ingen i nærheten, sier
+  den «Vises ett sted, ingen i nærheten» og legger puben bak «Vis hvor» —
+  skjult, ikke borte, for en bekreftet visning er et faktum noen har ført
+  inn. Der står byen ved navnet: «Bernie's (Oslo)».
+  **I kortet går de fjerne bak «Vis de andre», med avstanden på raden.**
+  «Bernie's» og «Bernie's 392 km» er to ulike svar, og bare det andre kan
+  leses.
+  **`NAER_M` er femti kilometer, ikke `KJENT_RADIUS`.** Det siste er
+  gangavstand; en pub som har meldt inn kampen tvers over byen er fortsatt
+  et godt svar. Femti skiller Oslo fra Trondheim uten å skille Grünerløkka
+  fra Holmlia.
+  **Og ukjent avstand demper ingenting.** `naerNok()` svarer ja når vi ikke
+  vet — uten posisjon, eller uten koordinater på stedet. En liste som
+  gjemmer noe fordi den mangler opplysninger, gjemmer det uten grunn.
+  Posisjonen til radene ligger i `sisteKjentePosisjon`, satt fra
+  `?posisjon=` ved oppstart og ellers første gang et kort får en. **Vi ber
+  aldri om posisjon for å tegne en rad** — trykket som åpner kortet er
+  handlingen telefonen krever, og lander posisjonen etterpå, tegnes radene
+  om (`settPosisjon`).
 - **«Andre fotballpuber» er stedene i lista som *ikke* har bekreftet.**
   ★ betyr «viser denne kampen» og settes av admin; ⚽ betyr «kjent for å
   vise fotball» og kommer fra `puber.js`. De to er ulike påstander,

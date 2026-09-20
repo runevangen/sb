@@ -16,7 +16,8 @@ import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
          rangerForslag, FORSLAG_MAKS, tolkPubRader, slaSammenPuber,
-         stampuberFor, falskPosisjon } from "./pub-data.js";
+         stampuberFor, falskPosisjon, avstandM, byFor, BYER }
+  from "./pub-data.js";
 import { KURATERTE } from "./puber.js";
 import { sjekkForslag, alleredeILista, NAVN_MAKS, ADRESSE_MAKS }
   from "./pub-forslag-data.js";
@@ -89,6 +90,12 @@ export function initFotball(paNavigering, paLagsok, paFavoritt, paDeling, paPube
     faner.appendChild(velgerknapp(del, DEL_NAVN[del],
       () => naviger(aktivLiga, del)));
   });
+
+  // «?posisjon=bodo» koster ingenting og spor ingen, sa den settes med en
+  // gang: da er linja under kampraden riktig fra forste tegning framfor
+  // etter at et kort er apnet.
+  const falsk = falskPosisjon(typeof location === "object" ? location.search : "");
+  if (falsk) sisteKjentePosisjon = rundPosisjon(falsk.lat, falsk.lon);
 
   hentPubRettelser();
 
@@ -167,7 +174,7 @@ function tegnKjenteIgjen() {
     // bekreftet pub med opplysningene den hadde for rettelsen.
     let bekreftede = boks.bekreftede || [];
     if (boks.kamp) {
-      bekreftede = bekreftetFor(boks.kamp, sisteVisninger, KJENTE);
+      bekreftede = medAvstand(bekreftetFor(boks.kamp, sisteVisninger, KJENTE));
       boks.bekreftede = bekreftede;
       boks.kilder.bekreftede = bekreftede;
     }
@@ -685,7 +692,9 @@ function delPanel(kamp) {
   // En funksjon, ikke en verdi: visningene kommer fra nettet na, og et
   // kort som ble apnet for svaret landet ville ellers statt med det
   // tomme svaret for alltid. tegnSteder() kalles pa nytt av tegnSvar().
-  const bekreftede = () => bekreftetFor(kamp, sisteVisninger, KJENTE);
+  // Med avstand: raden i kortet skal si «Bernie's 392 km», ikke bare
+  // «Bernie's». Den regnes hver gang — posisjonen kan lande etterpa.
+  const bekreftede = () => medAvstand(bekreftetFor(kamp, sisteVisninger, KJENTE));
 
   // Overskrifta i kortet sier hva lista under er. Lagene er overskrifta
   // pa kampen, og de star i linja over — kortet skal ikke ha en tittel
@@ -890,7 +899,14 @@ function delPanel(kamp) {
     alle.forEach((sted) => {
       const nokkel = stedNokkel(sted.navn);
       const erValgt = !!valgt && nokkel === valgt;
-      if (!valgt || erValgt || sted.harFolk) framme.push(sted);
+      // Ditt eget sted og stedene noen skal til staar alltid framme.
+      if (erValgt || sted.harFolk) { framme.push(sted); return; }
+      // Et sted vi VET er langt unna, er ikke et svar paa «hvor skal jeg».
+      // En bekreftet visning kjenner ingen geografi — den svarer paa
+      // kampen — og sto derfor oeverst 392 km unna. Ukjent avstand demper
+      // ingenting: se naerNok.
+      if (!naerNok(sted)) { bak.push(sted); return; }
+      if (!valgt) framme.push(sted);
       else bak.push(sted);
     });
 
@@ -1025,7 +1041,8 @@ function stedKilder(kamp, bekreftede, rad, egne) {
     sett.set(nokkel, Object.assign({ navn: String(navn) }, felt));
   };
 
-  bekreftede.forEach((p) => legg(p.navn, { hvor: "pub", bekreftet: true }));
+  bekreftede.forEach((p) => legg(p.navn,
+    { hvor: "pub", bekreftet: true, avstand: p.avstand, lat: p.lat, lon: p.lon }));
   if (kamp.arena) legg(kamp.arena, { hvor: "stadion", stadion: true });
   stederFraSvar(sisteSvar.filter((s) => s.kampId === kampNokkelFor(kamp)))
     .forEach((s) => legg(s.navn, { hvor: s.hvor, harFolk: true }));
@@ -1098,6 +1115,11 @@ function stedRad(kamp, panel, sted, form) {
     topp.appendChild(merke);
   }
   topp.appendChild(el("span", "sted-navn", sted.navn));
+  // Avstanden staar paa raden, ikke bare i rekkefolgen. «Bernie's» og
+  // «Bernie's 392 km» er to ulike svar, og bare det andre kan leses.
+  if (Number.isFinite(sted.avstand)) {
+    topp.appendChild(el("span", "sted-avstand", avstandtekst(sted.avstand)));
+  }
   venstre.appendChild(topp);
 
   const folk = sisteSvar.filter((s) => s.kampId === kampNokkelFor(kamp) &&
@@ -1298,7 +1320,9 @@ function fyllForslag(boks, kamp) {
 
   // Pubene som har meldt at de viser nettopp denne kampen. Den eneste
   // kilden som svarer pa kampen framfor pa stedet — derfor forst.
-  const bekreftede = bekreftetFor(kamp, sisteVisninger, KJENTE);
+  // Avstand pa, nar vi vet hvor leseren er: uten den sto Bernie's i Oslo og
+  // RBK-pubben i Trondheim likt i lista, og den forste sto oeverst.
+  const bekreftede = medAvstand(bekreftetFor(kamp, sisteVisninger, KJENTE));
   boks.kilder.bekreftede = bekreftede;
   // Huskes sa et nytt forsok pa posisjon kan merke treffene likt.
   boks.bekreftede = bekreftede;
@@ -1495,6 +1519,75 @@ async function hentPuberRundt(arena) {
 // Overpass rett fra nettleseren, med posisjonen rundet til rundt hundre
 // meter. Posisjonen gar aldri innom oss. Svaret huskes per posisjon, sa
 // et nytt trykk ikke koster et nytt kall.
+// Hvor leseren er, sist vi fikk vite det.
+//
+// `boks.sistePosisjon` er per KORT, og kortene apnes én om gangen. Linja
+// under kampraden tegnes for noe kort er apent, og den trengte en posisjon
+// ogsa: en bekreftet visning 392 km unna sto der som svaret paa «hvor skal
+// du se den?».
+//
+// Denne settes fra `falskPosisjon()` med en gang — den koster ingenting og
+// spor ingen — og ellers forste gang et kort faktisk far en posisjon. Vi
+// ber ALDRI om posisjon for a tegne en rad: trykket som apner kortet er
+// handlingen telefonen krever, og den regelen star.
+let sisteKjentePosisjon = null;
+
+// Hva som er «i naerheten» for en bekreftet visning.
+//
+// Ikke KJENT_RADIUS (1500 m): det er «gangavstand», og en pub som har meldt
+// inn kampen tvers over byen er fortsatt et godt svar. Femti kilometer er
+// «her jeg er», og det skiller Oslo fra Trondheim uten a skille Grunerlokka
+// fra Holmlia.
+const NAER_M = 50000;
+
+// Avstanden til et sted, eller null nar vi ikke kan vite.
+//
+// Null er ikke «langt unna». Uten posisjon, eller uten koordinater paa
+// stedet, VET vi ikke — og da skal ingenting dempes. En liste som gjemmer
+// noe fordi den mangler opplysninger, gjemmer det uten grunn.
+function avstandTil(p) {
+  if (!sisteKjentePosisjon || !p) return null;
+  const lat = Number(p.lat);
+  const lon = Number(p.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return avstandM(sisteKjentePosisjon, { lat, lon });
+}
+
+// Vet vi ikke, er svaret ja. Se avstandTil.
+function naerNok(p) {
+  const m = avstandTil(p);
+  return m === null || m <= NAER_M;
+}
+
+// Bekreftede visninger med avstand paa, nar vi vet hvor leseren er. Uten
+// avstand sto Bernie's i Oslo og RBK-pubben i Trondheim likt i lista, og
+// den forste sto oeverst.
+function medAvstand(liste) {
+  return (liste || []).map((p) => {
+    const m = avstandTil(p);
+    return m === null ? p : Object.assign({}, p, { avstand: m });
+  });
+}
+
+// Byen et sted ligger i, til teksten «Bernie's (Oslo)». Null nar vi ikke
+// kjenner den — da star navnet alene framfor en paastand vi ikke har.
+function byenTil(p) {
+  const lat = Number(p && p.lat);
+  const lon = Number(p && p.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const n = byFor(lat, lon);
+  return n ? BYER[n].navn : null;
+}
+
+// Settes en posisjon etter at radene er tegnet, ma de tegnes om: linja
+// under kampen navngir bare de naere, og hvilke som er naere var ukjent da
+// den ble tegnet. Samme felle som svarene og rettelsene.
+function settPosisjon(p) {
+  const forst = !sisteKjentePosisjon;
+  sisteKjentePosisjon = p;
+  if (forst) tegnSvar(document.getElementById("fotballInnhold"));
+}
+
 const naerHusket = new Map();
 
 function hentNaerDeg(boks, bekreftede) {
@@ -1534,6 +1627,7 @@ async function naerDegFra(boks, bekreftede, p) {
   // koden, sa den virker ogsa nar Overpass ikke svarer. Det er verdt
   // mye her, der Overpass har vaert det skjoreste leddet.
   boks.sistePosisjon = p;
+  settPosisjon(p);
   boks.kilder.kjenteNaer = merkBekreftet(
     kuraterteNaer(KJENTE, p, KJENT_RADIUS), bekreftede);
 
@@ -1799,22 +1893,76 @@ function sendInnSted(pubFelt) {
 function viserlinje(kamp) {
   const bekreftede = bekreftetFor(kamp, sisteVisninger, KJENTE);
   if (!bekreftede.length) return null;
+
+  // «Denne kampen vises pa: Bernie's» sto over en leser i Trondheim, om en
+  // pub pa Gronland i Oslo — 392 km unna. Kilden svarer pa KAMPEN og
+  // kjenner ingen geografi, og det var riktig sa lenge lista var Oslo.
+  //
+  // Na navngir linja bare de naere. De andre ligger bak en knapp, og der
+  // star det hvor de er: et sted i en annen by er fortsatt et svar paa
+  // «hvem viser kampen», bare ikke paa «hvor skal jeg».
+  const naere = bekreftede.filter(naerNok);
+  const fjerne = bekreftede.filter((p) => !naerNok(p));
+
   const linje = el("div", "kamp-viser");
   const merke = el("span", "kamp-viser-merke", "★");
   merke.setAttribute("aria-hidden", "true");
   linje.appendChild(merke);
-  linje.appendChild(el("span", "kamp-viser-tekst", "Denne kampen vises på: "));
-  bekreftede.forEach((p, i) => {
-    if (i) linje.appendChild(el("span", "kamp-viser-tekst", ", "));
-    const knapp = el("button", "kamp-viser-pub", p.navn);
+
+  const pubKnapp = (p, medSted) => {
+    const sted = medSted ? (byenTil(p) || avstandtekst(avstandTil(p) || 0)) : "";
+    const knapp = el("button", "kamp-viser-pub", p.navn + (sted ? " (" + sted + ")" : ""));
     knapp.type = "button";
     knapp.title = "Meldt inn til oss. Trykk for å dele at du ser kampen her.";
     knapp.addEventListener("click", (e) => {
       e.stopPropagation();
       apnePanelMed(knapp.closest(".kamp"), "pub", p.navn);
     });
-    linje.appendChild(knapp);
+    return knapp;
+  };
+
+  linje.appendChild(el("span", "kamp-viser-tekst", naere.length
+    ? "Denne kampen vises på: "
+    // Er ingen i naerheten, skal linja ikke pasta at kampen vises et sted
+    // du kan dra. Den sier hva den vet, og knappen viser hvor.
+    : "Vises " + (fjerne.length === 1 ? "ett sted" : fjerne.length + " steder")
+      + ", ingen i nærheten. "));
+
+  naere.forEach((p, i) => {
+    if (i) linje.appendChild(el("span", "kamp-viser-tekst", ", "));
+    linje.appendChild(pubKnapp(p, false));
   });
+
+  if (fjerne.length) {
+    // Skjult, ikke borte: en bekreftet visning er et faktum noen har fort
+    // inn, og det skal ga an a se det. Men det skal koste et trykk, og da
+    // star stedet ved navnet.
+    const resten = el("span", "kamp-viser-fjerne");
+    resten.hidden = true;
+    fjerne.forEach((p, i) => {
+      if (i) resten.appendChild(el("span", "kamp-viser-tekst", ", "));
+      resten.appendChild(pubKnapp(p, true));
+    });
+
+    const mer = el("button", "kamp-viser-mer");
+    mer.type = "button";
+    const merTekst = () => (resten.hidden
+      ? (naere.length ? "+" + fjerne.length + " andre steder" : "Vis hvor")
+      : "Skjul");
+    mer.textContent = merTekst();
+    mer.setAttribute("aria-expanded", "false");
+    mer.addEventListener("click", (e) => {
+      e.stopPropagation();
+      resten.hidden = !resten.hidden;
+      mer.textContent = merTekst();
+      mer.setAttribute("aria-expanded", resten.hidden ? "false" : "true");
+    });
+
+    if (naere.length) linje.appendChild(el("span", "kamp-viser-tekst", " "));
+    linje.appendChild(mer);
+    linje.appendChild(resten);
+  }
+
   return linje;
 }
 
