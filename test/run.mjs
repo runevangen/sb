@@ -4108,6 +4108,109 @@ const SAK_16C = kjor("bekreftet-langt-unna", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700); });
 `);
 
+/* ------- 16D. sok i lista: i Trondheim, men i Oslo paa fredag ------- */
+
+// Meldt 20. september 2026: «Jeg er i dag i Trondheim men planlegger kamp
+// om 3 dager. Da er jeg i Oslo. Saa da meg ogsaa kunne trykke paa andre
+// plasser eller puber.»
+//
+// Kortet rangerer etter hvor du staar NAA. For en kamp i kveld er det
+// riktig; for en kamp om tre dager er det en gjetning, og for den som
+// reiser feil gjetning. Soket er veien utenom geografien.
+const SAK_16D = kjor("sted-sok", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "" }); });
+  history.replaceState(null, "", location.pathname + "?posisjon=trondheim");
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: true, status: 200, json: function () {
+        return Promise.resolve({ elements: [] }); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ svar: [], visninger: [] })); } });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 ||
+        u.indexOf("/api/pub-liste") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var rad = document.querySelectorAll(".kamp.delbar")[0];
+    rad.querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    panel.querySelector(".pub-apne").click();
+
+    setTimeout(function () { try {
+      var forslag = panel.querySelector(".pub-forslag");
+      var felt = panel.querySelector(".kamp-pub");
+      var navnene = function () {
+        return Array.prototype.map.call(forslag.querySelectorAll(".pub-chip"),
+          function (c) { return c.textContent; }).join(" | ");
+      };
+
+      // Uten sok: ingenting fra Oslo, for leseren staar i Trondheim.
+      ok("uten sok staar ingen Oslo-pub i lista",
+         navnene().indexOf("Andy") === -1, navnene() || "(tom)");
+
+      // Ett felt, to jobber. Dette er det samme feltet som «Jeg skal hit»
+      // bruker — to tekstfelt ved siden av hverandre ville krevd at du
+      // gjettet hvilket som gjor hva.
+      felt.value = "oslo";
+      felt.dispatchEvent(new Event("input"));
+      var etter = navnene();
+      ok("sok paa by henter dem fram likevel",
+         etter.indexOf("Andy") > -1, etter.slice(0, 200) || "(tom)");
+      // Et treff paastaar ingenting om avstand — den staar paa brikka, sa
+      // du kan forkaste den selv.
+      ok("og avstanden staar paa dem", etter.indexOf("km") > -1, etter.slice(0, 200));
+      ok("linja sier hva lista er na",
+         forslag.querySelector(".pub-note").textContent.indexOf("treff på «oslo»") > -1,
+         forslag.querySelector(".pub-note").textContent);
+      // Den falske posisjonen gjelder like mye under et sok: avstandene
+      // males fra den.
+      ok("og merket for falsk posisjon staar fortsatt",
+         forslag.querySelector(".pub-note").textContent.indexOf("Falsk posisjon") === 0,
+         forslag.querySelector(".pub-note").textContent);
+
+      // Soket tar ikke feltet fra deg: et sted vi ikke kjenner kan
+      // fortsatt skrives og brukes.
+      felt.value = "Kroa til Kari";
+      felt.dispatchEvent(new Event("input"));
+      ok("uten treff sies det, uten a kalle det en feil",
+         forslag.querySelector(".pub-note").textContent.indexOf("Ingen steder i lista") > -1,
+         forslag.querySelector(".pub-note").textContent);
+      ok("og feltet kan fortsatt brukes",
+         forslag.querySelector(".pub-note").textContent.indexOf("Jeg skal hit") > -1 &&
+         panel.querySelector(".sted-egen").disabled === false,
+         forslag.querySelector(".pub-note").textContent);
+
+      // Tomt felt: lista er tilbake til rangeringen.
+      felt.value = "";
+      felt.dispatchEvent(new Event("input"));
+      ok("tommer du feltet, er rangeringen tilbake",
+         forslag.querySelector(".pub-note").textContent.indexOf("treff på") === -1,
+         forslag.querySelector(".pub-note").textContent);
+      ferdig();
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700); });
+`);
+
 /* ------- 16B. rettelsene fra portalen treffer leseren ------- */
 
 // Det som kommer over nettet, lander etter at visningen star ferdig.
@@ -6094,7 +6197,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_16C, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
 let feilet = 0;
 
 for (const t of alle) {

@@ -135,6 +135,30 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   aldri om posisjon for å tegne en rad** — trykket som åpner kortet er
   handlingen telefonen krever, og lander posisjonen etterpå, tegnes radene
   om (`settPosisjon`).
+- **Kortet rangerer etter hvor du står *nå*, og søket er veien utenom.**
+  For en kamp i kveld er «nå» og «ved avspark» det samme. For en kamp om
+  tre dager er det en gjetning, og for den som reiser feil gjetning: «jeg
+  er i Trondheim i dag, men i Oslo på fredag». Da svarer ingen av de
+  geografiske kildene, og stedet du leter etter finnes i lista uten å være
+  nåbart. `sokKuraterte()` leter i **navn, bydel og by** — byen leses av
+  koordinatet (`byFor`), ingen rad bærer den som et felt.
+  **Et treff påstår ingenting om avstand**, og trenger derfor ingen regel
+  om hva som er nær nok. Avstanden står på brikka der vi kjenner den, så
+  «391 km» er noe du kan forkaste selv.
+  **Ett felt, to jobber, og det er med vilje ett.** Søket ligger på
+  «Skriv stedet du skal» — to tekstfelt ved siden av hverandre ville krevd
+  at du gjettet hvilket som gjorde hva. Søket **erstatter** lista mens det
+  er aktivt (rangeringen svarer på noe annet enn det du spør om), og tar
+  ikke feltet fra deg: uten treff står «Jeg skal hit» der like fullt.
+  Et valg **avslutter** søket — satte vi søket til navnet, tømte lista seg
+  for hvert treff som kom fra kartet framfor fra vår egen liste.
+  **Søket folder ikke som `normaliserLagnavn`.** Den har en håndskrevet
+  bokstavliste, og ü står ikke i den: «Grünerløkka» ble «grnerlokka», og
+  et søk på bydelen ga null treff på stedene som ligger der. Den kan ikke
+  rettes der — den går inn i `kampNokkel()` ([ADR 0008](docs/adr/0008-kampnokkel.md)) —
+  så `sokNokkel()` folder med NFD og `\p{M}`, som `lagnokkel()` i
+  `stampuberFor`. En sammenlikning som bare gjelder ett sted, hører hjemme
+  det stedet.
 - **«Andre fotballpuber» er stedene i lista som *ikke* har bekreftet.**
   ★ betyr «viser denne kampen» og settes av admin; ⚽ betyr «kjent for å
   vise fotball» og kommer fra `puber.js`. De to er ulike påstander,
