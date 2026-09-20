@@ -242,10 +242,11 @@ kreditering, og den står der pubene vises.
 
 [ADR 0018](adr/0018-visninger-i-supabase.md).
 
-- **`samme()` treffer både nøkkelen og den gamle id-en.** Rader skrevet med
-  en id skal virke ut kampen sin.
-- **`slaSammen()` rører bare kampene som var på skjermen.** Da kan admin
-  rette opp en runde uten at en kamp lenger nede forsvinner.
+- **`samme()` treffer bare nøkkelen.** Radene i basen skrives alltid med
+  nøkkel; tall-id-en fra den gamle datafila i repoet er borte med fila.
+- **`slaSammen()` lager radene for de avkryssede kampene, og ikke mer.**
+  Det som alt står i basen rører den ikke: tjenesten skriver bare
+  forskjellen (`visningsDiff`), så en kamp lenger nede står som før.
 - **`visningsDiff()` er grunnen til at vi ikke skriver alt på nytt.** Vi
   slettet og skrev hele valget før; da fikk rader ingen hadde endret nytt
   `satt` og ny `satt_av`, så feltet som skal si **når** noen satte kampen,
@@ -492,8 +493,10 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   `settPosisjon()` første gang et kort får en; da tegnes radene om.
   `naerNok()` svarer **ja når vi ikke vet** — uten posisjon, eller uten
   koordinater på stedet — så ingenting gjemmes i blinde. `NAER_M` er 50 km,
-  ikke `KJENT_RADIUS`: det siste er gangavstand, og en pub tvers over byen
-  er fortsatt et godt svar.
+  ikke `NAER_RADIUS`: det siste er gangavstand, og en pub tvers over byen er
+  fortsatt et godt svar. Her er en sirkel riktig, til forskjell fra
+  `kjenteNaer`: 30 km er den bredeste byen, 160 km det nærmeste bypar, og
+  femti ligger rent imellom.
 - **Et trykk på et sted er svaret.** Før var det tre steg og et navnefelt
   på hver kamp. Navnet kommer nå fra innloggingen — et felt man måtte fylle
   ville betydd at «ett trykk» ikke var sant.
@@ -690,6 +693,10 @@ spørsmål kode ikke kan svare på alene.
   svikter **sies**, ikke utelates stille.
 - **`byersjekk.mjs`** — spør Overpass hva som finnes i en by, så en
   falsk posisjon kan sammenliknes med virkeligheten.
+- **`lag-pdf.mjs`** — lager PDF av et dokument i `docs/` med Chromium og
+  ingenting annet, så et sammendrag kan sendes som vedlegg. Oversetter
+  bare det Markdown-en i `docs/` faktisk bruker; en pakke for resten
+  ville vært prosjektets første npm-avhengighet, for et vedlegg.
 
 ---
 

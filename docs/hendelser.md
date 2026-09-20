@@ -51,8 +51,134 @@ koordinater på stedet, VET vi ikke — og en liste som gjemmer noe fordi den
 mangler opplysninger, gjemmer det uten grunn. Sabotasjen som snur den
 regelen feller fem tester som ikke handler om dette i det hele tatt.
 
+**Og en sirkel er riktig her.** Terskelen ble først skrevet med byen først,
+som `kuraterteIByen()` fra dagen før — «radiusen er en sirkel, og en by er
+ikke det». Men sabotasjen som fjernet bydelen felte ingenting: den bredeste
+byen i `BYER` er tretti kilometer tvers over, og de to nærmeste byene
+ligger hundre og seksti fra hverandre. Med femti kilometer finnes det ingen
+inndata der de to reglene er uenige. Byveien ble tatt ut igjen — to veier
+til samme svar er én vei for mye, og den ene som ikke kan testes er den som
+skal bort.
+
 **Hva som fanget det.** Ingenting. Alle tester på den linja sto med leseren
 i Oslo og puben i Oslo — den ene kombinasjonen der feilen ikke finnes.
+
+---
+
+## 19. september 2026 — radiusen er en sirkel, og en by er ikke det
+
+**Meldt som:** «jeg ønsker å få opp puben uavhengig om den har lag RBK
+eller ikke. Det er en pub som er satt opp som plass som viser kamper.»
+
+**Hva det så ut som.** En etterlysning av en ny vei inn for `lag`-løse
+steder. Det var det ikke — to slike veier fantes alt.
+
+**Hva som faktisk var tilfelle.** Puben var registrert i portalen for
+Kristiansund–Rosenborg 19.09 kl. 14:00, og den registreringen går gjennom
+`bekreftetFor()`: ingen posisjon, ingen avstand, ingen `lag`, og
+`bekreftede` står først i `FORSLAG_KILDER`. For den kampen sto puben
+øverst med ★ uansett hvor i verden leseren var. Og for alle andre kamper
+nådde den fram i Trondheim gjennom `kjenteNaer` etter at radiusen ble delt
+samme dag. Ønsket var altså oppfylt to ganger over.
+
+**`lag` ville lagt til én smal ting:** at stedet dukker opp på RBK-kamper
+når vi *ikke* vet hvor du er. Det ble ikke gjort, og ikke bare fordi det
+var unødvendig: `lag` betyr «stampub for Rosenborg», en påstand om
+tilhørighet. At et sted viser kamper er en annen påstand, og ★ og ⚽ holdes
+fra hverandre nettopp derfor.
+
+**Hullet som var ekte.** `NAER_RADIUS` er en sirkel. En by er ikke det.
+Fire og en halv kilometer øst for puben — fortsatt godt inne i Trondheim —
+ga `kjenteNaer` ingenting, og da sto byens eneste kuraterte sted uten vei
+inn. Samme fra utkanten av Oslo: null kuraterte steder, enda 26 ligger i
+byen.
+
+**Hva som ble gjort.** `kuraterteIByen()` gir stedene i samme by som deg,
+uansett avstand, nærmest først. `byFor()` leser byen ut av koordinatet, som
+ellers — ingen rad bærer byen som felt. Kilden ligger etter de geografiske
+og før karttreffene, av samme grunn som stampubene.
+
+**Men den bærer avstand, og det er forskjellen.** Stampubene tømmes når en
+posisjon lander, fordi et lagtreff ikke vet hvor langt det er og derfor
+står i lista som om det lå i nabogata. Et bytreff vet det, og tallet står
+på brikka. Derfor blir denne stående. De to møtes forresten aldri:
+`stampuber` finnes bare uten posisjon, `kjenteIByen` bare med.
+
+**Hva som fanget det.** Fem sabotasjer. To av dem er verdt å skille:
+fjernes kilden fra `naerDegFra` faller `SAK_14I`, fjernes den fra
+`tegnKjenteIgjen` faller `SAK_14J` — og den andre er fella som har kostet
+tre ganger her før. `kjenteIByen` er den **femte** kilden som leser
+`KJENTE`, altså nok en sjanse til å glemme en. Derfor lander `SAK_14J` en
+rettelse mens kortet står åpent, på et sted utenfor radiusen: bare
+bykilden kan finne det, så testen svarer på om nettopp den ble regnet om.
+
+**Det som ikke ble målt bort.** For puben det gjaldt endrer dette
+ingenting fra Trondheim sentrum — der lå den alt innenfor 3 km. Kilden
+tetter hullet lenger ut, og i Oslo-utkanten der 26 steder var usynlige.
+
+---
+
+## 19. september 2026 — de siste 45 meterne, og setningen som skjulte dem
+
+**Meldt som:** «Utvid `KJENT_RADIUS`» og «undersøk hvorfor posisjon ikke
+slo inn» — to valg etter at RBK-puben fortsatt ikke sto der.
+
+**Hva det så ut som.** To uavhengige saker. Det var én, og den lå i
+setningen som sto igjen begge gangene.
+
+**Radiusen, målt.** Puben ligger 63.4286, 10.3641 — **1545 meter** fra
+Trondheim sentrum slik `BYER` definerer det, mot en radius på 1500. Den
+bommet med 45 meter. (Oppføringen over målte 1560 m fra Torvet; samme pub,
+litt annet utgangspunkt.) Radiusen *var* altså en ekte årsak, den lå bare
+bak en større en og ble stående da den første ble rettet.
+
+**Hvorfor den ikke bare ble skrudd opp.** `KJENT_RADIUS` gjorde to jobber.
+Målt fra KFUM Arena gir 3000 m åtte kuraterte steder, mot ett på 1500 —
+og de sju nye er sentrumspuber som ikke ligger ved den arenaen. «Nær deg»
+tåler tre kilometer fordi hver brikke bærer avstanden sin og du forkaster
+den selv; «ved arenaen» er en påstand du ikke kan forkaste. Så tallet ble
+to: `NAER_RADIUS` 3000, `ARENA_RADIUS` 1500.
+
+**Posisjonen, og hvorfor spørsmålet ikke lot seg stille.** Appen håndterte
+avslag, tidsavbrudd, «telefonen fant den ikke» og «nettleseren har ikke
+API-et» likt — og stille. Det siste som et rent `return`, uten så mye som
+en knapp. Da sto «Fant ingen puber i nærheten. Skriv navnet selv.» igjen
+som eneste forklaring.
+
+Den setningen er ikke sann i noen av de fire tilfellene. Vi fant ingenting
+fordi vi aldri fikk vite hvor «nær» var, og de to tingene ber leseren om
+helt ulike ting: den ene å skrive navnet selv, den andre å trykke ja.
+
+**Og det er den samme setningen som skjulte forrige feil.** Oppføringen
+over ender med at ingenting fanget den, fordi appen sa «Fant ingen puber i
+nærheten» — «en helt vanlig setning». Den var vanlig nettopp fordi den ble
+sagt uansett hva som hadde skjedd. En feilmelding som passer til alt,
+forteller ingenting.
+
+**Hva som ble gjort.** `posisjonsfeil()` i `pub-data.js` gir én setning per
+årsak, og hver navngir det som mangler på skjermen. Den ligger i sitt eget
+felt på boksen, ikke i `boks.feil`, fordi den skal kunne **byttes ut**: i
+feil-lista ble «Du sa nei til posisjon» stående etter at leseren sa ja.
+Uten geolocation settes ingen knapp — en vei tilbake som ikke fører noe
+sted er verre enn ingen.
+
+**Testen som var grønn hele tida.** `SAK_14D` dekket den samme raden og
+passerte. Den står i **døra** til puben — «samme punkt raden lagres med»,
+altså null meter. Den beviste at sammenslåinga virker, ikke at stedet nås
+fra der en leser står. En test som stiller seg der svaret er opplagt, måler
+ikke det den tror. `SAK_14H` står i Trondheim sentrum i stedet.
+
+**Hva som fanget det.** Seks sabotasjer, og alle ga symptomet tilbake.
+Radiusen satt til 1500 igjen gir «Fant ingen puber i nærheten. Skriv
+navnet selv.» — ordrett det som sto på skjermen. Den mest verdifulle var den tredje: droppes nullstillingen, blir
+«Posisjonen kom ikke fram i tide» stående etter et vellykket nytt forsøk.
+Den feilen ville ingen sett, for skjermen sa noe som hadde vært sant.
+
+**Én ting til, om tallene.** Testtallet 660 som ble skrevet inn dagen før,
+gjaldt et tre der PR #113 ikke hadde landet ennå. Den fjernet to
+enhetstester, og squash-en rettet tallet til 658 av seg selv. Verdt å merke
+seg at det gikk bra: to økter samme time traff fila i ulik rekkefølge, og
+det var nettopp derfor tallet bare står ett sted.
 
 ---
 

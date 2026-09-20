@@ -339,6 +339,33 @@ export function kuraterteNaer(liste, senter, radius) {
     .sort((a, b) => a.avstand - b.avstand);
 }
 
+// De kuraterte stedene i SAMME BY som deg, naermest forst. Radiusen er
+// en sirkel, og en by er ikke det: star du fire kilometer ut, faller
+// steder i din egen by utenfor `kuraterteNaer` enda de apenbart er et
+// svar. Da sto det ingenting igjen for en by med ett kuratert sted.
+//
+// Den star ETTER de geografiske kildene og FOR karttreffene, av samme
+// grunn som stampubene: et kuratert sted tvers over byen er et darligere
+// svar enn en fotballpub i nabogata, men et bedre svar enn en tilfeldig
+// bar Overpass fant.
+//
+// Til forskjell fra stampubene **baerer den avstand**, og derfor blir den
+// ogsa staende nar posisjonen kommer. Det var nettopp den manglende
+// avstanden som gjorde en stampub i en annen by til et darlig svar; her
+// er byen den samme som din, og tallet star pa brikka.
+//
+// Uten en by a sta i er det ingenting a si: `byFor()` svarer null utenfor
+// de seks, og da er det `kuraterteNaer` og kartet som gjelder.
+export function kuraterteIByen(liste, senter) {
+  if (!Array.isArray(liste) || !senter) return [];
+  const by = byFor(senter.lat, senter.lon);
+  if (!by) return [];
+  return liste
+    .filter((p) => p && byFor(p.lat, p.lon) === by)
+    .map((p) => Object.assign({}, p, { avstand: avstandM(senter, p) }))
+    .sort((a, b) => a.avstand - b.avstand);
+}
+
 // Merker treff fra OpenStreetMap som vi vet viser fotball. Da star
 // «viser fotball» pa de vi er sikre pa, uten a skjule resten.
 export function merkKuraterte(puber, liste) {
@@ -409,8 +436,14 @@ export const FORSLAG_MAKS = 6;
 // test fanget nettopp det.
 export const FORSLAG_KILDER = [
   "bekreftede", "dine", "kjenteNaer", "kjenteVedArena",
-  "stampuber", "naerDeg", "vedArena",
+  "stampuber", "kjenteIByen", "naerDeg", "vedArena",
 ];
+
+// «kjenteIByen» og «stampuber» motes aldri i den samme lista, og det er
+// ikke tilfeldig: stampubene tommes i det en posisjon lander, og
+// kjenteIByen krever en posisjon for a vite hvilken by du star i. De
+// dekker hver sin halvdel av det samme hullet — den ene uten posisjon,
+// den andre med.
 
 // Én liste, ikke seks grupper.
 //
@@ -452,6 +485,31 @@ export function rangerForslag(kilder, maks = FORSLAG_MAKS) {
   const alle = Array.from(sett.values());
   const tak = Number.isFinite(maks) && maks > 0 ? maks : alle.length;
   return { topp: alle.slice(0, tak), resten: alle.slice(tak) };
+}
+
+/* ---------- nar posisjonen uteblir ---------- */
+
+// Fire helt ulike ting kan ha skjedd, og de krever ulike ting av den som
+// leser: et nei kan gjores om, en maling som ikke kom fram kan proves pa
+// nytt under apen himmel, og en nettleser uten posisjon kan ingen av
+// delene. I appen sto de som ett stille `return` til 19. september 2026,
+// og da var «Fant ingen puber i naerheten» det eneste pa skjermen — en
+// setning som ikke er sann. Vi fant ingenting fordi vi aldri fikk vite
+// hvor «naer» var, og de to er ikke det samme: den forste ber deg skrive
+// navnet selv, den andre ber deg trykke ja.
+//
+// Kodene er nettleserens egne (GeolocationPositionError); 0 er tilfellet
+// der API-et ikke finnes i det hele tatt og ingen kode blir gitt.
+const POSISJON_GRUNN = {
+  0: "Nettleseren gir ikke posisjon",
+  1: "Du sa nei til posisjon",
+  2: "Telefonen fant ikke posisjonen",
+  3: "Posisjonen kom ikke fram i tide",
+};
+
+export function posisjonsfeil(kode) {
+  const grunn = POSISJON_GRUNN[kode] || "Fikk ikke posisjonen";
+  return grunn + ", så stedene nær deg står ikke her.";
 }
 
 /* ---------- dine puber ---------- */

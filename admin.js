@@ -626,7 +626,7 @@ function tegnKamper() {
     const boks = document.createElement("input");
     boks.type = "checkbox";
     boks.value = kampNokkel(k) || String(k.id);
-    boks.checked = alt.indexOf(boks.value) > -1 || alt.indexOf(String(k.id)) > -1;
+    boks.checked = alt.indexOf(boks.value) > -1;
     const tekst = document.createElement("span");
     tekst.className = "kamp-navn";
     tekst.textContent = k.hjemme + " – " + k.borte;
@@ -997,7 +997,7 @@ function synkBy() {
 }
 
 function nullstillOppslag() {
-  ["stedSokHint", "stedAdresseHint", "stedLenkeSvar"].forEach((id) => {
+  ["stedSokHint", "stedAdresseHint", "stedLenkeSvar", "stedHerSvar"].forEach((id) => {
     felt(id).textContent = "";
     felt(id).hidden = true;
   });
@@ -1400,6 +1400,66 @@ function lesKartlenke() {
     + " Sjekk at det stemmer.";
 }
 
+// **Den eneste veien inn som virker i Google Maps-appen.** Den lange
+// URL-en med koordinatet i finnes bare i en nettleser med adressefelt; pa
+// telefonen far du bare del-lenka, og den baerer ingenting (#116).
+//
+// Og punktet er bedre enn kartets: Googles eget punkt for et sted ligger
+// ofte midt pa bygget, mens du star i dora. Star du der, er telefonen det
+// noyaktigste kartet som finnes.
+//
+// Kilden fylles med det samme. Trykker du knappen, *er* du der — og det
+// er noyaktig det kilden skal svare pa. Setningen star apen sa du kan
+// skrive videre: «Var innom 19.09.2026, storskjerm i baren».
+function hentHer() {
+  const ut = felt("stedHerSvar");
+  ut.hidden = false;
+  if (!navigator.geolocation) {
+    ut.textContent = "Denne nettleseren gir oss ingen posisjon."
+      + " Tast koordinatet, eller lim det inn under.";
+    return;
+  }
+  ut.textContent = "Spør om posisjonen …";
+
+  navigator.geolocation.getCurrentPosition((pos) => {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+    felt("stedLat").value = lat.toFixed(4);
+    felt("stedLon").value = lon.toFixed(4);
+    synkBy();
+
+    const idag = new Date().toISOString().slice(0, 10);
+    const alt = felt("stedKilde").value.trim();
+    // Star det noe der fra for, rores det ikke: en kilde er en vurdering,
+    // og a skrive over den med var egen setning ville kastet den.
+    if (!alt) felt("stedKilde").value = "Var innom " + norskDato(idag);
+    felt("stedSjekket").value = idag;
+
+    // Noyaktigheten er ikke pynt. Et punkt med 2 km usikkerhet er en
+    // bygning et annet sted i byen, og da skal det stå — ikke skjules bak
+    // fire desimaler som ser like presise ut uansett.
+    const meter = Math.round(pos.coords.accuracy || 0);
+    ut.textContent = "Hentet " + lat.toFixed(4) + ", " + lon.toFixed(4)
+      + (meter ? " (på " + meter + " meter nær)" : "")
+      + (alt ? "." : ". Kilden er fylt ut — skriv gjerne videre.");
+  }, (err) => {
+    // Avslatt posisjon er ikke en feil, det er et svar. De to krever ulike
+    // ting av den som leser meldinga.
+    ut.textContent = err && err.code === 1
+      ? "Du sa nei til posisjon. Tast koordinatet, eller lim det inn under."
+      : "Fikk ikke posisjonen (" + ((err && err.message) || "ukjent grunn")
+        + "). Prøv igjen, eller lim inn koordinatet under.";
+  }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+}
+
+// «2026-09-19» er riktig, men det er ikke slik noen skriver en dato i en
+// setning. Kilden leses av et menneske.
+function norskDato(iso) {
+  const d = String(iso).split("-");
+  return d.length === 3 ? d[2] + "." + d[1] + "." + d[0] : iso;
+}
+
+felt("stedHer").addEventListener("click", hentHer);
 felt("stedNytt").addEventListener("click", () => apneSted(null, ""));
 felt("stedAvbryt").addEventListener("click", lukkSted);
 felt("stedLagre").addEventListener("click", lagreSted);

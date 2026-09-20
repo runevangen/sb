@@ -118,10 +118,15 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   **I kortet går de fjerne bak «Vis de andre», med avstanden på raden.**
   «Bernie's» og «Bernie's 392 km» er to ulike svar, og bare det andre kan
   leses.
-  **`NAER_M` er femti kilometer, ikke `KJENT_RADIUS`.** Det siste er
-  gangavstand; en pub som har meldt inn kampen tvers over byen er fortsatt
-  et godt svar. Femti skiller Oslo fra Trondheim uten å skille Grünerløkka
-  fra Holmlia.
+  **`NAER_M` er femti kilometer, ikke `NAER_RADIUS`.** Det siste er
+  gangavstand til et sted du skal; en pub som har meldt inn kampen tvers
+  over byen er fortsatt et godt svar. En sirkel er riktig **her**, til
+  forskjell fra `kjenteNaer` — den bredeste byen i `BYER` er tretti
+  kilometer tvers over, og de to nærmeste byene ligger hundre og seksti fra
+  hverandre. Femti ligger rent imellom, så sirkelen gir samme svar som
+  `byFor()` ville gitt, for alle seks. Det ble prøvd med byen først, som
+  `kuraterteIByen()`: ingen test kunne skille de to, fordi ingen inndata
+  finnes der de er uenige. To veier til samme svar er én vei for mye.
   **Og ukjent avstand demper ingenting.** `naerNok()` svarer ja når vi ikke
   vet — uten posisjon, eller uten koordinater på stedet. En liste som
   gjemmer noe fordi den mangler opplysninger, gjemmer det uten grunn.
@@ -185,6 +190,40 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   sviktet. For de kampene er stedene **nær deg** svaret, og det er de vi
   leter etter. Stadionraden blir stående: hvor kampen spilles er en
   opplysning, ikke et søk.
+- **Radiusen er en sirkel, og en by er ikke det.** `kuraterteIByen()` gir
+  de kuraterte stedene i **samme by som deg**, uansett avstand — `byFor()`
+  leser byen ut av koordinatet, som ellers. Står du fire kilometer ut,
+  faller din egen bys steder utenfor `NAER_RADIUS` enda de åpenbart er
+  svaret, og for en by med ett kuratert sted sto det da ingenting igjen.
+  Kilden ligger **etter** de geografiske og **før** karttreffene, av samme
+  grunn som stampubene. **Men i motsetning til dem bærer den avstand**, og
+  blir derfor stående når posisjonen kommer: det var nettopp den manglende
+  avstanden som gjorde en stampub i en annen by til et dårlig svar. Din
+  by, ikke alle byer — slipper et Oslo-sted gjennom i Trondheim, er vi
+  tilbake til den feilen. Utenfor de seks byene svarer den ingenting:
+  vi vet da ikke hvilken by du står i, og en liste ville vært gjetning.
+  `kjenteIByen` og `stampuber` møtes aldri — den ene krever posisjon, den
+  andre tømmes av den. De dekker hver sin halvdel av det samme hullet.
+- **«Nær deg» og «ved arenaen» er to påstander, og de tåler ikke samme
+  radius.** `NAER_RADIUS` er 3000 m, `ARENA_RADIUS` 1500 m. Avstanden står
+  på hver brikke, så en lang liste sortert på avstand er ærlig — du ser tre
+  kilometer og forkaster den selv. Stadion kan du ikke forkaste: målt fra
+  KFUM Arena ville 3000 m gitt åtte kuraterte steder under en overskrift
+  som sier «ved arenaen», og de fleste av dem er sentrumspuber som ikke
+  ligger der. Tallene sto som **ett** til 19. september 2026, og da lå
+  1500 akkurat lavt nok til at RBK-puben i Trondheim — 1545 m fra sentrum —
+  falt utenfor med 45 meter, mens den ene utvidelsen som slapp den inn
+  ville gjort arenalista usann.
+- **Uteblir posisjonen, sier skjermen hvilken av dem det var.** Nei,
+  tidsavbrudd, «telefonen fant den ikke» og «nettleseren har ikke API-et»
+  ble håndtert likt og stille, og da sto «Fant ingen puber i nærheten»
+  igjen som eneste forklaring — en setning som ikke er sann når vi aldri
+  fikk vite hvor «nær» var. `posisjonsfeil()` gir én setning per årsak, og
+  hver av dem navngir det som mangler på skjermen. **Den ligger i sitt eget
+  felt, ikke i `boks.feil`:** den skal kunne byttes ut når du prøver igjen.
+  I feil-lista ble «Du sa nei til posisjon» stående etter at du sa ja — sann
+  da den ble skrevet, usann da den ble lest. Uten geolocation står det
+  ingen knapp: en vei tilbake som ikke fører noe sted er verre enn ingen.
 - **En stille tom liste er ikke til å skille fra «ingen svarte».** Feiler
   et kall der lista *er* hele visningen, si det. Er lista et tillegg til
   noe annet, ti — men da får den som handlet beskjed.
@@ -198,6 +237,16 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   over hvilke tegn som er bokstaver, mangler alltid noen. Vask bort det
   som faktisk er farlig — hermetegn, apostrof, bakoverstrek — ikke alt du
   ikke kom på.
+- **«Jeg står her» er den eneste veien inn som virker i Google
+  Maps-appen.** Den lange URL-en med koordinatet i finnes bare i en
+  nettleser med adressefelt; på telefonen får du del-lenka, og
+  `maps.app.goo.gl/…` er en oppslagsnøkkel hos Google — den bærer
+  ingenting. Knappen leser telefonens egen posisjon, og punktet er
+  gjerne bedre enn kartets: Googles eget punkt ligger ofte midt på
+  bygget, mens du står i døra. **Nøyaktigheten står i svaret** — fire
+  desimaler ser like presise ut enten de er på tolv meter eller to
+  kilometer. Kilden fylles med «Var innom ‹dato›», men **bare når feltet
+  er tomt**: en kilde som står der er en vurdering, ikke en plassholder.
 - **Koordinatfeltet tar det kartet faktisk gir deg.** Høyreklikk i Google
   Maps gir et *koordinat*, ikke en lenke — og fra stedskortet med
   parenteser rundt. `koordinatFraLenke()` tåler parenteser, hakeparenteser
@@ -303,8 +352,11 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   prosjektet har vært den samme. Det samme gjelder stedene fra
   `/api/pub-liste`: `KJENTE` er ingen `const`, og et kort som alt står
   åpent tegnes om i `tegnKjenteIgjen()` — som regner om **alle** kildene
-  som leser `KJENTE`: `bekreftede`, `kjenteVedArena`, `kjenteNaer` og
-  `stampuber`. Derfor husker boksen kampen sin.
+  som leser `KJENTE`: `bekreftede`, `kjenteVedArena`, `kjenteNaer`,
+  `kjenteIByen` og `stampuber`. Fem, ikke fire — `kjenteIByen` kom til
+  19. september 2026, og lista her vokser med hver ny kilde. En som
+  glemmes blir stående med gamle rader til kortet lukkes.
+  Derfor husker boksen kampen sin.
 - **Rettelsene hentes på nytt når appen kommer fram igjen.** De ble hentet
   **én gang, ved sidelasting**, og runden admin → app er nettopp den
   runden en rettelse gjøres i — den ene runden appen ikke så. En pub

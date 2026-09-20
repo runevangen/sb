@@ -42,13 +42,14 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
          rangerForslag, FORSLAG_MAKS, stampuberFor, FORSLAG_KILDER,
          falskPosisjon, BYER,
          OVERPASS_SPEIL, overpassHeadere, restTid,
-         sjekkPubliste, kuraterteNaer, merkKuraterte,
+         sjekkPubliste, kuraterteNaer, kuraterteIByen, merkKuraterte,
          sjekkKontaktliste, kontaktFor, finnKontakt, KONTAKT_FELT, kildeHolder,
          pubNokkel, tolkPubRader, pubRadTilBase, slaSammenPuber, sjekkPubRad,
          osmNavnVask, osmNavnSporring, tolkNavnTreff, PUBTYPER, PUBSIKKERHET,
          delAdresse, osmAdresseSporring, tolkAdresseTreff, koordinatFraLenke,
          SOK_SEKUNDER, SOK_TAK, overpassFeiltekst,
-         OSLO_RAMME, rammeFor, byFor, bynavn, BY_RADIUS_KM } from "../pub-data.js";
+         OSLO_RAMME, rammeFor, byFor, bynavn, BY_RADIUS_KM,
+         posisjonsfeil } from "../pub-data.js";
 import { PUBER_KONTAKT } from "../puber-kontakt.js";
 import { KANALER } from "../kanaler.js";
 import { KURATERTE } from "../puber.js";
@@ -754,7 +755,7 @@ const VKAMPER = [
 ];
 const VNAA = Date.parse("2026-09-11T10:00:00Z");
 
-const SATT = slaSammen([], "Carls", [11], VKAMPER, VNAA);
+const SATT = slaSammen("Carls", ["2026-09-13-brann-bodoglimt"], VKAMPER, VNAA);
 ok("en valgt kamp blir en visning",
    SATT.length === 1 && SATT[0].pub === "Carls" &&
    SATT[0].kamp === "Brann – Bodø/Glimt" && SATT[0].satt === new Date(VNAA).toISOString(),
@@ -764,46 +765,48 @@ ok("en valgt kamp blir en visning",
 ok("visningen lagres pa kampens nokkel, ikke pa id-en",
    SATT[0].kampId === "2026-09-13-brann-bodoglimt", SATT[0].kampId);
 
-// Admin retter opp en runde uten a rore resten.
-const BLANDET = slaSammen(
-  [{ pub: "Carls", kampId: 99, kamp: "Gammel", dato: "2026-10-01T15:00:00Z", satt: "x" },
-   { pub: "Lincoln Pub", kampId: 11, kamp: "Brann – Bodø/Glimt", dato: "2026-09-13T15:00:00Z", satt: "x" }],
-  "Carls", [12], VKAMPER, VNAA);
-ok("andre puber rores ikke",
-   BLANDET.some((v) => v.pub === "Lincoln Pub" && v.kampId === 11), JSON.stringify(BLANDET));
-ok("kamper utenfor runden star igjen",
-   BLANDET.some((v) => v.pub === "Carls" && v.kampId === 99));
-ok("en kamp som ikke lenger er krysset av, forsvinner",
-   !BLANDET.some((v) => v.pub === "Carls" && v.kampId === 11));
-ok("den nye er med", BLANDET.some((v) => v.pub === "Carls" &&
-   v.kampId === "2026-09-14-molde-rosenborg"), JSON.stringify(BLANDET));
-// Radene som alt star i visninger.js ble skrevet med et tall, og de skal
-// virke ut kampen sin framfor a forsvinne ved utrullingen.
-ok("en rad med gammel id finnes fortsatt",
-   visningerFor(VKAMPER[0], [{ pub: "Lincoln Pub", kampId: 11, kamp: "x",
-     dato: VKAMPER[0].dato, satt: "x" }]).length === 1);
-ok("lista er sortert pa dato", BLANDET.every((v, i) =>
-   i === 0 || String(v.dato) >= String(BLANDET[i - 1].dato)), BLANDET.map((v) => v.dato).join(","));
-// Store og sma bokstaver skal ikke gi to rader for samme pub.
-ok("puben kjennes igjen uansett skrivemate",
-   slaSammen(SATT, "carls", [], VKAMPER, VNAA).length === 0);
+// Avkrysningene kommer som nokler fra portalen, i den rekkefolgen admin
+// trykket. Radene sorteres pa dato uansett.
+const TO = slaSammen("Carls",
+  ["2026-09-14-molde-rosenborg", "2026-09-13-brann-bodoglimt"], VKAMPER, VNAA);
+ok("bare de avkryssede blir rader",
+   TO.length === 2 && TO.every((v) => v.pub === "Carls"), JSON.stringify(TO));
+ok("lista er sortert pa dato",
+   TO[0].kampId === "2026-09-13-brann-bodoglimt" && TO[1].kampId === "2026-09-14-molde-rosenborg",
+   TO.map((v) => v.dato).join(","));
+// Tall-id-en fra den gamle visninger.js er borte med fila. En avkrysning
+// som bare barer kildens id velger derfor ingenting — den kan ikke
+// oppsta fra portalen, og skal ikke bli en rad ved et uhell.
+ok("kildens id alene velger ingenting", slaSammen("Carls", [11], VKAMPER, VNAA).length === 0);
+ok("ingen avkrysninger gir ingen rader", slaSammen("Carls", [], VKAMPER, VNAA).length === 0);
 
+// Radene slik de star i basen: med nokkel.
+const ALLE_VISNINGER = [
+  { pub: "Lincoln Pub", kampId: "2026-09-13-brann-bodoglimt", kamp: "Brann – Bodø/Glimt",
+    dato: "2026-09-13T15:00:00Z", satt: "x" },
+  { pub: "Carls", kampId: "2026-10-01-a-b", kamp: "Gammel", dato: "2026-10-01T15:00:00Z", satt: "x" },
+];
 ok("visninger for en kamp finnes",
-   visningerFor({ id: 11 }, BLANDET).length === 1 &&
-   visningerFor({ id: 11 }, BLANDET)[0].pub === "Lincoln Pub");
+   visningerFor(VKAMPER[0], ALLE_VISNINGER).length === 1 &&
+   visningerFor(VKAMPER[0], ALLE_VISNINGER)[0].pub === "Lincoln Pub");
+ok("en rad med kildens id treffer ikke",
+   visningerFor(VKAMPER[0], [{ pub: "Lincoln Pub", kampId: 11, kamp: "x",
+     dato: VKAMPER[0].dato, satt: "x" }]).length === 0);
 ok("ingen visninger gir tom liste",
-   visningerFor({ id: 77 }, BLANDET).length === 0 && visningerFor(null, BLANDET).length === 0);
+   visningerFor(VKAMPER[1], ALLE_VISNINGER).length === 0 &&
+   visningerFor(null, ALLE_VISNINGER).length === 0);
 
 // Lesersiden: hvem viser denne kampen, med det vi ellers vet om stedet.
-const BEK = bekreftetFor({ id: 11 }, BLANDET, KURATERTE);
+const BEK = bekreftetFor(VKAMPER[0], ALLE_VISNINGER, KURATERTE);
 ok("bekreftede puber hentes for kampen", BEK.length === 1 && BEK[0].navn === "Lincoln Pub",
    JSON.stringify(BEK.map((p) => p.navn)));
 ok("og de er merket som bekreftet", BEK[0].bekreftet === true);
 ok("de barer med seg det vi vet om stedet fra publista",
    typeof BEK[0].lat === "number" && !!BEK[0].bydel, JSON.stringify(BEK[0]));
 // En pub som er tatt ut av publista skal ikke forsvinne stumt.
-const UKJENT = bekreftetFor({ id: 11 },
-   [{ pub: "Nedlagt Pub", kampId: 11, kamp: "x", dato: "2026-09-20T15:00:00Z", satt: "x" }], KURATERTE);
+const UKJENT = bekreftetFor(VKAMPER[0],
+   [{ pub: "Nedlagt Pub", kampId: "2026-09-13-brann-bodoglimt", kamp: "x",
+      dato: "2026-09-20T15:00:00Z", satt: "x" }], KURATERTE);
 ok("en pub utenfor publista star med navnet sitt",
    UKJENT.length === 1 && UKJENT[0].navn === "Nedlagt Pub" && UKJENT[0].bekreftet === true);
 
@@ -1652,6 +1655,71 @@ const UTENLANDSK = rangerForslag({
 ok("uten posisjon og uten arena star stampuben igjen",
    UTENLANDSK.topp.length === 1 && UTENLANDSK.topp[0].navn === "Scotsman",
    JSON.stringify(UTENLANDSK.topp));
+/* ---------------- de kuraterte stedene i byen din ---------------- */
+
+// Meldt 19. september 2026: «jeg onsker a fa opp puben uavhengig om den
+// har lag RBK eller ikke». Radiusen er en SIRKEL, og en by er ikke det:
+// star du fire kilometer ut, faller din egen bys steder utenfor sirkelen
+// enda de apenbart er svaret. For en by med ett kuratert sted sto det da
+// ingenting igjen.
+const I_BYEN = [
+  { navn: "RBK-pubben", lat: 63.4286, lon: 10.3641 },   // Trondheim, Ila
+  { navn: "Lerkendalkroa", lat: 63.4130, lon: 10.4060 }, // Trondheim, lenger sor
+  { navn: "Oslo-puben", lat: 59.9139, lon: 10.7522 },   // Oslo
+  { navn: "Uten koordinat" },
+];
+// Fire og en halv kilometer ost for RBK-pubben, fortsatt i Trondheim.
+const UTKANT = { lat: 63.4286, lon: 10.4545 };
+
+const BY_TREFF = kuraterteIByen(I_BYEN, UTKANT);
+ok("et sted i byen din kommer med selv om det er utenfor radiusen",
+   BY_TREFF.some((p) => p.navn === "RBK-pubben"),
+   BY_TREFF.map((p) => p.navn).join(", ") || "(tom)");
+ok("og radiusen alene ville ikke tatt det",
+   !kuraterteNaer(I_BYEN, UTKANT, 3000).some((p) => p.navn === "RBK-pubben"),
+   kuraterteNaer(I_BYEN, UTKANT, 3000).map((p) => p.navn).join(", ") || "(tom)");
+
+// Dette er forskjellen fra stampubene, og grunnen til at denne kilden
+// BLIR staende nar posisjonen kommer: et lagtreff baerer ingen avstand,
+// et bytreff gjor det.
+ok("bytreffet baerer avstanden sin",
+   BY_TREFF.every((p) => Number.isFinite(p.avstand)),
+   JSON.stringify(BY_TREFF.map((p) => [p.navn, p.avstand])));
+ok("og naermeste star forst",
+   BY_TREFF.map((p) => p.avstand).every((a, i, r) => i === 0 || r[i - 1] <= a),
+   JSON.stringify(BY_TREFF.map((p) => p.avstand)));
+
+// Det som holder kilden aerlig: din by, ikke alle byer. Slapp Oslo-puben
+// gjennom her, sto den i Trondheim som om den la i nabogata — nettopp
+// den feilen stampubene ble tommet for a unnga.
+ok("men steder i en ANNEN by kommer ikke med",
+   !BY_TREFF.some((p) => p.navn === "Oslo-puben"),
+   BY_TREFF.map((p) => p.navn).join(", "));
+ok("og rader uten koordinat heller ikke",
+   !BY_TREFF.some((p) => p.navn === "Uten koordinat"),
+   BY_TREFF.map((p) => p.navn).join(", "));
+
+// Star du utenfor de seks byene, vet vi ikke hvilken by du er i, og da
+// er det ingenting a si. En liste her ville vaert gjetning.
+ok("utenfor byene gir den ingenting",
+   kuraterteIByen(I_BYEN, { lat: 62.0, lon: 7.0 }).length === 0,
+   JSON.stringify(kuraterteIByen(I_BYEN, { lat: 62.0, lon: 7.0 })));
+ok("og uten posisjon likesa",
+   kuraterteIByen(I_BYEN, null).length === 0 &&
+   kuraterteIByen(null, UTKANT).length === 0);
+
+// Plasseringen: etter de geografiske kildene, for karttreffene — samme
+// begrunnelse som stampubene. Et kuratert sted tvers over byen slar en
+// tilfeldig bar fra kartet, men taper for en fotballpub i nabogata.
+ok("kjenteIByen star etter de geografiske kildene",
+   FORSLAG_KILDER.indexOf("kjenteIByen") > FORSLAG_KILDER.indexOf("kjenteNaer") &&
+   FORSLAG_KILDER.indexOf("kjenteIByen") > FORSLAG_KILDER.indexOf("kjenteVedArena"),
+   FORSLAG_KILDER.join(","));
+ok("og for de rene karttreffene",
+   FORSLAG_KILDER.indexOf("kjenteIByen") < FORSLAG_KILDER.indexOf("naerDeg") &&
+   FORSLAG_KILDER.indexOf("kjenteIByen") < FORSLAG_KILDER.indexOf("vedArena"),
+   FORSLAG_KILDER.join(","));
+
 // En pub uten navn er ingen pub, og ville blitt en tom knapp.
 ok("rader uten navn faller bort",
    rangerForslag({ dine: [{ navn: "" }, { navn: "Ekte pub" }, null] }).topp.length === 1);
@@ -2454,6 +2522,39 @@ ok("alle testbyene har et koordinat i Norge",
    Object.values(BYER).every((b) =>
      b.lat > 57 && b.lat < 72 && b.lon > 4 && b.lon < 32 && b.navn),
    JSON.stringify(Object.values(BYER).map((b) => b.navn)));
+
+/* ---------------- nar posisjonen uteblir ---------------- */
+
+// Meldt 19. september 2026: «undersok hvorfor posisjon ikke slo inn».
+// Det gikk ikke an a undersoke fra skjermen, og DET var feilen: appen
+// handterte nei, tidsavbrudd og «fant ikke posisjonen» likt og stille.
+// Fire ulike arsaker ma gi fire ulike setninger, ellers er sporsmalet
+// ubesvarlig for den som star der.
+const GRUNNER = [0, 1, 2, 3].map((k) => posisjonsfeil(k));
+ok("hver arsak far sin egen setning",
+   new Set(GRUNNER).size === 4, GRUNNER.join(" | "));
+
+ok("et nei sier at det var DU som sa nei",
+   posisjonsfeil(1).indexOf("Du sa nei") === 0, posisjonsfeil(1));
+
+ok("et tidsavbrudd legger ikke skylda pa deg",
+   posisjonsfeil(3).indexOf("Du sa nei") === -1 &&
+   posisjonsfeil(3).indexOf("kom ikke fram i tide") > 0, posisjonsfeil(3));
+
+ok("en nettleser uten posisjon sier at det er nettleseren",
+   posisjonsfeil(0).indexOf("Nettleseren") === 0, posisjonsfeil(0));
+
+// En ukjent kode er fortsatt et svar. Kastet den, eller ga den tom
+// streng, ville skjermen vaert like taus som for.
+ok("en ukjent kode gir likevel en setning",
+   posisjonsfeil(99).length > 10 && posisjonsfeil(undefined).length > 10,
+   posisjonsfeil(99) + " | " + posisjonsfeil(undefined));
+
+// Hver setning ma si hva som mangler pa skjermen, ikke bare hva som
+// skjedde: «Du sa nei til posisjon» alene forklarer ikke den tomme lista.
+ok("hver setning navngir det som uteblir",
+   GRUNNER.concat([posisjonsfeil(99)])
+     .every((t) => t.indexOf("nær deg") > 0), GRUNNER.join(" | "));
 
 /* ---------------- hva en lagring faktisk endrer ---------------- */
 

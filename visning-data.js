@@ -11,19 +11,19 @@ function nokkelFor(kamp) {
   return String(kamp.nokkel || kampNokkel(kamp) || (kamp.id == null ? "" : kamp.id));
 }
 
-// Bade nokkelen og den gamle id-en treffer: radene som alt star i
-// visninger.js ble skrevet med en id, og de skal virke ut kampen sin.
+// Nokkelen er det eneste som treffer. Radene i basen skrives alltid med
+// nokkel; den gamle tall-id-en fra visninger.js i repoet er borte med
+// fila (#79), og en gren som ogsa godtok den var en gren ingen rad
+// lenger tok.
 function samme(kamp, v) {
   const n = nokkelFor(kamp);
-  return (n && String(v.kampId) === n) ||
-         (kamp.id != null && String(v.kampId) === String(kamp.id));
+  return !!n && String(v.kampId) === n;
 }
 
 export const VISNING_FELT = ["pub", "kampId", "kamp", "dato", "satt"];
 
 // Kamp-id-ene for kampene som sto pa skjermen. Tjenesten trenger dem for
-// a rydde bort puben sine rader for akkurat de kampene, og ingen andre —
-// det er den samme avgrensningen slaSammen gjor i minnet.
+// a rydde bort puben sine rader for akkurat de kampene, og ingen andre.
 export function kampIderFor(kamper) {
   return (kamper || []).map(nokkelFor).filter(Boolean);
 }
@@ -85,27 +85,23 @@ export function merkBekreftet(puber, bekreftede) {
     sett.has(normaliserLagnavn(p.navn)) ? Object.assign({}, p, { bekreftet: true }) : p);
 }
 
-// Setter visningene for en pub innenfor et kjent sett kamper, og lar
-// alle andre rader sta. Da kan admin rette opp en runde uten a rore
-// resten, og uten at en kamp som ikke var pa skjermen forsvinner.
-export function slaSammen(alle, pub, valgteIder, kamper, naa) {
-  const beholdt = (Array.isArray(alle) ? alle : []).filter((v) => {
-    if (normaliserLagnavn(v.pub) !== normaliserLagnavn(pub)) return true;
-    return !kamper.some((k) => samme(k, v));
-  });
+// Radene en pub far for de kampene admin krysset av, sortert pa dato.
+// Avkrysningene kommer som nokler fra portalen. Det som alt star i basen
+// rores ikke her: visninger.mjs sletter og skriver bare forskjellen
+// (visningsDiff), sa en kamp som ikke var pa skjermen star som for.
+export function slaSammen(pub, valgteIder, kamper, naa) {
   const tid = new Date(naa || Date.now()).toISOString();
-  const nye = kamper
-    .filter((k) => valgteIder.map(String).indexOf(nokkelFor(k)) > -1 ||
-                   valgteIder.map(String).indexOf(String(k.id)) > -1)
+  const valgt = (valgteIder || []).map(String);
+  return (kamper || [])
+    .filter((k) => valgt.indexOf(nokkelFor(k)) > -1)
     .map((k) => ({
       pub,
       kampId: nokkelFor(k),
       kamp: k.hjemme + " – " + k.borte,
       dato: k.dato,
       satt: tid,
-    }));
-  return beholdt.concat(nye).sort((a, b) =>
-    String(a.dato).localeCompare(String(b.dato)) || String(a.pub).localeCompare(String(b.pub)));
+    }))
+    .sort((a, b) => String(a.dato).localeCompare(String(b.dato)));
 }
 
 /* ---------- fra lageret ---------- */
