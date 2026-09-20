@@ -498,10 +498,10 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   er per kort, og kortene åpnes etter at radene står. Den settes fra
   `?posisjon=` ved oppstart (koster ingenting, spør ingen) og ellers fra
   `settPosisjon()` første gang et kort får en; da tegnes radene om.
-  Spurt blir den i `sporPosisjon()`, på trykket som **åpner kortet** — ikke
-  i `hentNaerDeg()`, som henger bak «Andre fotballpuber» og derfor aldri
-  ble nådd av den som bare lurte på hvem som viser kampen. `sporPosisjon`
-  slår ikke opp noe: Overpass hører til lista, ikke til filteret.
+  Spurt blir den i `hentNaerDeg()`, som `fyllForslag()` kaller på trykket
+  som **åpner kortet**. Til 20. september 2026 hang `fyllForslag` på
+  «Andre fotballpuber», og ble derfor aldri nådd av den som bare lurte på
+  hvem som viser kampen.
   Uten kjent avstand står **byen** ved navnet — i `viserlinje()` og i
   `stedRad()` — for linja under kampraden tegnes før noe kort er åpnet.
 - **Kortet har to lister, og `naerNok()` er skillet.** `tegnSteder()`

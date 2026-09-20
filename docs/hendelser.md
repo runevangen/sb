@@ -62,9 +62,10 @@ veien dit er det eneste en telefon har. Grønt av feil grunn, felle nummer
 to i `docs/testing.md`, denne gangen i syv tester samtidig.
 
 **To ting ble rettet, og bare sammen dekker de hullet.** `sporPosisjon()`
-henger nå på trykket som åpner kortet og gjør én ting: setter posisjonen.
-Den slår ikke opp puber — Overpass-kallet hører til lista, og lista hører
-til det trykket som ber om den.
+ble hengt på trykket som åpner kortet og gjorde én ting: satte posisjonen.
+Den sto i to timer. Da kortet fikk to lister og hentet dem ved åpning,
+spurte `hentNaerDeg` uansett — og to veier til samme posisjon er én for
+mye. Den som spør nå er den som også trenger svaret.
 
 Og linja under **kampraden** tegnes før noe kort er åpnet i det hele tatt.
 Den kan ikke vente på en posisjon som først kommer av et trykk. Derfor
