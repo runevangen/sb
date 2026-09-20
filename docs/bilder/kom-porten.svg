@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 430" width="1000" height="430"
+     font-family="Liberation Sans, DejaVu Sans, Helvetica, Arial, sans-serif">
+  <style>
+    .boks { fill:#ffffff; stroke:#c9d0e6; stroke-width:2; rx:10 }
+    .gron { fill:#eaf6ef; stroke:#1c7a4a; stroke-width:2; rx:10 }
+    .gul  { fill:#fff7e6; stroke:#b07d00; stroke-width:2; rx:10 }
+    .tit  { font-size:19px; font-weight:bold; fill:#14245c }
+    .h    { font-size:17px; font-weight:bold; fill:#14245c }
+    .txt  { font-size:15px; fill:#1b1f2a }
+    .lit  { font-size:13px; fill:#5a6074 }
+    .mono { font-family:"DejaVu Sans Mono", monospace; font-size:14px; fill:#1b1f2a }
+    .adv  { font-size:15px; font-weight:bold; fill:#b07d00 }
+    .pil  { stroke:#1f4fd6; stroke-width:2.5; fill:none; marker-end:url(#p) }
+  </style>
+  <defs>
+    <marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1f4fd6"/>
+    </marker>
+  </defs>
+
+  <text class="tit" x="20" y="28">To porter foran prod — og den ene er med vilje halv</text>
+
+  <rect class="gron" x="20" y="56" width="300" height="196"/>
+  <text class="h" x="40" y="88">Port 1: CI på pull request</text>
+  <text class="mono" x="40" y="122">node test/unit.mjs</text>
+  <text class="mono" x="40" y="146">node test/funksjon.mjs</text>
+  <text class="mono" x="40" y="170">node test/run.mjs</text>
+  <text class="txt" x="40" y="204">Alle tre. Grenbeskyttelsen på</text>
+  <text class="txt" x="40" y="226">main krever at denne er grønn.</text>
+
+  <rect class="gul" x="360" y="56" width="300" height="196"/>
+  <text class="h" x="380" y="88">Port 2: Netlifys bygg</text>
+  <text class="mono" x="380" y="122">node test/unit.mjs</text>
+  <text class="mono" x="380" y="146">node test/funksjon.mjs</text>
+  <text class="lit" x="380" y="172">(run.mjs er ikke med)</text>
+  <text class="adv" x="380" y="204">Halv port, med vilje:</text>
+  <text class="txt" x="380" y="226">run.mjs trenger Chromium.</text>
+
+  <rect class="boks" x="700" y="86" width="280" height="136"/>
+  <text class="h" x="720" y="118">Prod</text>
+  <text class="mono" x="720" y="150">mvp-sb.netlify.app</text>
+  <text class="txt" x="720" y="182">Feiler port 2, publiseres</text>
+  <text class="txt" x="720" y="204">ingenting. Forrige deploy står.</text>
+
+  <path class="pil" d="M324 154 H 356"/>
+  <path class="pil" d="M664 154 H 696"/>
+
+  <text class="txt" x="20" y="300">Derfor: kjør de to raske selv før du pusher. De tar under ett sekund, trenger verken</text>
+  <text class="txt" x="20" y="324">nett eller nøkler, og fanger det meste.</text>
+  <text class="txt" x="20" y="362">En feil som bare run.mjs ser, kan altså rulle ut før noen oppdager den. Det er prisen</text>
+  <text class="txt" x="20" y="386">for å slippe Chromium i byggemiljøet — og grunnen til at PR-en må være grønn først.</text>
+</svg>

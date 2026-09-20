@@ -713,6 +713,14 @@ spørsmål kode ikke kan svare på alene.
   ingenting annet, så et sammendrag kan sendes som vedlegg. Oversetter
   bare det Markdown-en i `docs/` faktisk bruker; en pakke for resten
   ville vært prosjektets første npm-avhengighet, for et vedlegg.
+  **Et skjermbilde og et diagram er ikke samme slags bilde.** `78mm` er
+  bredden på en telefon, og en tegning presset ned i den er en boks med
+  seks ord i, uleselig. Regelen slår på filendelsen: `.svg` i
+  `docs/bilder/` er tegninger, og de får tekstbredden.
+  **`--sideskift` er et valg per dokument, ikke en stil for alle.** Et
+  sammendrag skal flyte; et opplæringshefte leses avsnitt for avsnitt, og
+  da er luften nederst på sida en marg framfor et hull. Flagget gir ny
+  side per `##`, men ikke foran den første — ellers står tittelsida alene.
 
 ---
 
