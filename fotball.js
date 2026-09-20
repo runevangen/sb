@@ -1193,6 +1193,7 @@ function slaSammenRader(forst, andre) {
     });
     if (p.bekreftet) eks.bekreftet = true;
     if (p.viserFotball) eks.viserFotball = true;
+    if (p.min) eks.min = true;
   });
   return Array.from(sett.values());
 }
@@ -1466,8 +1467,12 @@ function fyllForslag(boks, kamp) {
 
   // Dine puber og de kjente ved arenaen ligger i koden: de star der uten
   // et eneste nettkall, ogsa nar Overpass er nede.
+  // `min: true` er mellomlaget i `sorterForslag`: et sted du alt har
+  // valgt skal ikke falle under en pub du aldri har vaert paa. Flagget
+  // settes HER, der vi vet at raden kom fra dine egne — lista i
+  // nettleseren baerer {navn, antall, sist} og ingenting mer.
   boks.kilder.dine = merkBekreftet(
-    puber.liste().map((p) => ({ navn: p.navn })), bekreftede);
+    puber.liste().map((p) => ({ navn: p.navn, min: true })), bekreftede);
 
   // Stampubene for lagene som spiller. Ogsa denne uten nett og uten
   // posisjon — og det er hele poenget: `kjenteNaer` krever at du sier ja
@@ -1951,9 +1956,12 @@ function kamprad(kamp, del, delbar) {
 function sendInnSted(pubFelt) {
   const boks = el("div", "sted-forslag");
 
-  const apne = el("button", "sted-forslag-apne", "Mangler stedet? Send det inn.");
-  apne.type = "button";
-  apne.setAttribute("aria-expanded", "false");
+  // Ingen egen «Mangler stedet? Send det inn.»-knapp lenger.
+  //
+  // Den sto rett under «Jeg er paa pub, legg inn her» og apnet det samme
+  // skjemaet — to knapper til én ting, i et kort som nettopp ble ryddet
+  // for nettopp det. Skjemaet apnes na av `.sted-pavei` og av
+  // `tilbyForslag()`, begge gjennom `apneMed()`.
 
   const skjema = el("div", "sted-forslag-skjema");
   skjema.hidden = true;
@@ -2011,15 +2019,6 @@ function sendInnSted(pubFelt) {
     + " verdt å stole på."));
   skjema.appendChild(melding);
 
-  apne.addEventListener("click", () => {
-    const pa = skjema.hidden;
-    skjema.hidden = !pa;
-    apne.setAttribute("aria-expanded", pa ? "true" : "false");
-    if (!pa) return;
-    // Har du alt skrevet et navn i feltet over, er det stedet du mener.
-    if (!navn.value && pubFelt && pubFelt.value.trim()) navn.value = pubFelt.value.trim();
-    navn.focus();
-  });
 
   send.addEventListener("click", async () => {
     const inn = {
@@ -2074,13 +2073,12 @@ function sendInnSted(pubFelt) {
     send.disabled = false;
   });
 
-  boks.appendChild(apne);
   boks.appendChild(skjema);
 
   // Veien inn hit fra et svar: har du nettopp sagt at du skal til et sted
   // vi ikke kjenner, er dette skjemaet svaret — og da skal du slippe a
-  // finne det selv. Navnet settes uansett hva som sto der fra for: det er
-  // stedet du nettopp valgte, ikke et halvskrevet sok.
+  // finne det selv.
+  //
   // «Jeg er paa pub, legg inn her» leser posisjonen forst. Staar du i
   // doera, er punktet ditt bedre enn det admin finner av gateadressen
   // etterpaa — Googles eget punkt ligger gjerne midt paa bygget.
@@ -2112,7 +2110,6 @@ function sendInnSted(pubFelt) {
 
   boks.apneMed = (stedsnavn) => {
     skjema.hidden = false;
-    apne.setAttribute("aria-expanded", "true");
     if (stedsnavn) navn.value = String(stedsnavn).slice(0, NAVN_MAKS);
     si("", "");
     (navn.value ? adresse : navn).focus();

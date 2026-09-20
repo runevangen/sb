@@ -748,6 +748,41 @@ ok("kjente steder merkes, resten star urort",
    MERKET[1].viserFotball === undefined, JSON.stringify(MERKET));
 ok("tom kuratert liste endrer ingenting", merkKuraterte(FRA_OSM, []) === FRA_OSM);
 
+// «Dine puber» baerer BARE et navn: dinePuber() lagrer {navn, antall,
+// sist} i nettleseren. Uten koordinat ga avstandTil() null, naerNok()
+// svarte ja, og Andy's Pub sto blant stedene naer en leser i Trondheim —
+// 390 km unna, uten by og uten km. Tallene sto i puber.js hele tiden.
+const BARE_NAVN = merkKuraterte([{ navn: "Andy's Pub" }], KURATERTE);
+ok("en rad med bare et navn far koordinatet fra lista",
+   Number.isFinite(BARE_NAVN[0].lat) && Number.isFinite(BARE_NAVN[0].lon),
+   JSON.stringify(BARE_NAVN[0]));
+ok("og bydelen, sa raden kan si hvor den er",
+   BARE_NAVN[0].bydel === "Sentrum", BARE_NAVN[0].bydel);
+
+// Men bare det som MANGLER fylles. Et treff fra kartet baerer sitt eget
+// punkt, og de to kan peke pa hver sin inngang — det er OSM-punktet raden
+// ble funnet paa.
+//
+// Punktet her er med vilje ET ANNET enn fila sitt. Forste utkast brukte
+// karttreffets egne tall fra FRA_OSM, som er NOYAKTIG de samme som i
+// puber.js — og da sto testen gronn ogsa naar koden overskrev. Ikke still
+// scenen der svaret er opplagt: se docs/testing.md.
+const OSM_ANNET = merkKuraterte([{ navn: "Carls", lat: 59.1, lon: 10.1 }], KURATERTE);
+ok("et karttreff beholder sitt eget koordinat",
+   OSM_ANNET[0].lat === 59.1 && OSM_ANNET[0].lon === 10.1,
+   OSM_ANNET[0].lat + ", " + OSM_ANNET[0].lon);
+// Bydelen er den samme regelen: fila sin brukes bare naar raden mangler.
+const OSM_BYDEL = merkKuraterte([{ navn: "Carls", bydel: "Et annet sted" }], KURATERTE);
+ok("og sin egen bydel", OSM_BYDEL[0].bydel === "Et annet sted", OSM_BYDEL[0].bydel);
+
+// Og et sted vi ikke kjenner far ingenting. Da VET vi ikke, og da skal
+// ingenting dempes: se naerNok i fotball.js.
+const UTENFOR_LISTA = merkKuraterte([{ navn: "Kroa til Kari" }], KURATERTE);
+ok("et sted utenfor lista far verken merke eller koordinat",
+   UTENFOR_LISTA[0].viserFotball === undefined &&
+   UTENFOR_LISTA[0].lat === undefined,
+   JSON.stringify(UTENFOR_LISTA[0]));
+
 /* ---------------- visninger ---------------- */
 
 const VKAMPER = [

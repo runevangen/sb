@@ -368,13 +368,33 @@ export function kuraterteIByen(liste, senter) {
 
 // Merker treff fra OpenStreetMap som vi vet viser fotball. Da star
 // «viser fotball» pa de vi er sikre pa, uten a skjule resten.
+//
+// **Og den fyller inn koordinatet nar raden mangler det.** «Dine puber»
+// er navn og ingenting annet — `dinePuber()` lagrer {navn, antall, sist}
+// i nettleseren — sa en pub du har delt for kom inn i kortet uten lat og
+// lon. Da ga `avstandTil()` null, `naerNok()` svarte ja (vi vet ikke), og
+// Andy's Pub sto blant stedene naer en leser i Trondheim, 390 km unna,
+// uten by og uten km pa raden. Meldt 20. september 2026 med skjermbilde.
+//
+// Regelen «ukjent avstand demper ingenting» er riktig — men den gjelder
+// nar vi IKKE KAN vite. Her sto tallene i `puber.js` hele tiden.
+//
+// **Bare det som mangler fylles, aldri det som star.** Et treff fra
+// kartet baerer sitt eget koordinat, og det skal ikke byttes ut med vart:
+// de to kan peke pa hver sin inngang, og OSM-punktet er det raden ble
+// funnet pa.
 export function merkKuraterte(puber, liste) {
   if (!Array.isArray(liste) || !liste.length) return puber;
   const kjent = new Map();
   liste.forEach((p) => kjent.set(normaliserLagnavn(p.navn), p));
   return puber.map((p) => {
     const traff = kjent.get(normaliserLagnavn(p.navn));
-    return traff ? Object.assign({}, p, { viserFotball: true, lag: traff.lag || [] }) : p;
+    if (!traff) return p;
+    const ut = Object.assign({}, p, { viserFotball: true, lag: traff.lag || [] });
+    if (!Number.isFinite(ut.lat) && Number.isFinite(traff.lat)) ut.lat = traff.lat;
+    if (!Number.isFinite(ut.lon) && Number.isFinite(traff.lon)) ut.lon = traff.lon;
+    if (!ut.bydel && traff.bydel) ut.bydel = traff.bydel;
+    return ut;
   });
 }
 
@@ -548,6 +568,7 @@ export function rangerForslag(kilder, maks = FORSLAG_MAKS) {
       // sagt at det viser kampen. Korteste avstand vinner.
       if (p.bekreftet) eks.bekreftet = true;
       if (p.viserFotball) eks.viserFotball = true;
+      if (p.min) eks.min = true;
       if (p.lag && p.lag.length && !(eks.lag && eks.lag.length)) eks.lag = p.lag;
       if (Number.isFinite(p.avstand) &&
           (!Number.isFinite(eks.avstand) || p.avstand < eks.avstand)) {

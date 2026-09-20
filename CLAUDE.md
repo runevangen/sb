@@ -108,6 +108,19 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   lista har samme høyde før og etter at du har svart. Åpen/lukket huskes
   på panelet — `tegnSteder` kjører på hvert svar, og en liste som lukker
   seg selv midt i en vurdering er verre enn ingen minimering.
+- **«Ukjent avstand demper ingenting» gjelder når vi ikke KAN vite.**
+  «Dine puber» bærer bare et navn — `dinePuber()` lagrer `{navn, antall,
+  sist}` i nettleseren — så en pub du har delt før kom inn i kortet uten
+  koordinat. Da ga `avstandTil()` null, `naerNok()` svarte ja, og Andy's
+  Pub sto blant stedene nær en leser i Trondheim, 390 km unna, uten by og
+  uten km. Tallene sto i `puber.js` hele tiden.
+  `merkKuraterte()` fyller derfor inn **lat, lon og bydel når raden
+  mangler dem** — og bare da. Et treff fra kartet bærer sitt eget punkt,
+  og de to kan peke på hver sin inngang.
+- **`min: true` settes der vi vet at raden er din**, i `boks.kilder.dine`.
+  Det er mellomlaget i `sorterForslag`, og flagget sto som en regel uten
+  en setter til 20. september 2026: enhetstesten lagde objektet for hånd og
+  var grønn, mens ingen pub i appen noen gang bar det.
 - **⚽ settes ett sted, ikke i hver kilde.** `kuraterteNaer()` kopierer
   raden rett fra `KJENTE` og vet ikke at den er kuratert, mens
   `stampuberFor()` går gjennom `merkKuraterte`. Sto merkingen i hver
@@ -324,7 +337,10 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   `pub_forslag`, og et menneske gjør raden ferdig. Det finnes ingen vei fra
   et skjema på nettet og rett inn i det leseren ser.
   [ADR 0019](docs/adr/0019-pubforslag.md)
-  **«Jeg er på pub, legg inn her» er veien inn nå.** Skjemaet lå bak to
+  **«Jeg er på pub, legg inn her» er veien inn nå, og den er alene.**
+  «Mangler stedet? Send det inn.» sto rett under den og åpnet det samme
+  skjemaet — to knapper til én ting, i et kort som nettopp var ryddet for
+  nettopp det. Skjemaet lå bak to
   knapper, og øyeblikket stedet faktisk mangler er øyeblikket du står i
   døra på det. Knappen leser posisjonen og legger den i **merknaden** —
   «Jeg står her: 63.4305, 10.3951 (±12 m)» — ikke som et koordinat på

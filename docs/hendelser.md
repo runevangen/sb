@@ -9,6 +9,42 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 20. september 2026 — en pub uten koordinat kan ikke plasseres
+
+**Meldt som:** «Puber ikke i by burde markeres. Dette søket er fra
+Trondheim», med skjermbilde. Under «Kampen vises hos:» sto Andy's Pub —
+uten by, uten avstand, mellom RBK-puben (3,8 km) og Brann Stadion.
+
+**Hva som faktisk var årsaken.** Andy's Pub ligger i Oslo og står i
+`puber.js` med lat 59.9135 og lon 10.7340. Raden som nådde kortet hadde
+dem ikke.
+
+Den kom fra **«dine puber»** — steder du har delt fra før.
+`dinePuber()` lagrer `{navn, antall, sist}` i nettleseren, og
+`boks.kilder.dine` gjorde det om til `{navn}`. Ingen koordinater. Da ga
+`avstandTil()` null, `naerNok()` svarte ja, og regelen «ukjent avstand
+demper ingenting» slapp den framme.
+
+**Regelen er riktig. Den gjelder bare når vi ikke KAN vite.** Her sto
+tallene i fila hele tiden — vi slo dem bare aldri opp.
+`merkKuraterte()` fyller nå inn lat, lon og bydel når raden mangler dem,
+og bare da: et treff fra kartet bærer sitt eget punkt, og de to kan peke
+på hver sin inngang.
+
+**Og testen fant noe den ikke lette etter.** Da scenen først kjørte, lå
+Andy's Pub riktignok i «andre byer» — men utenfor de fem som vises.
+`sorterForslag` har et mellomlag for dine egne puber, `p.min`, og
+**ingenting satte flagget**. Enhetstesten lagde objektet for hånd og var
+grønn, mens ingen pub i appen noen gang bar det. Regelen sto i
+`CLAUDE.md`, koden gjorde noe annet, og tallet i testfila så ikke
+forskjellen. Flagget settes nå i `boks.kilder.dine`.
+
+**Fanget av:** en scene med en delt pub i nettleserlageret og posisjon i
+Trondheim. Saboteres koordinatfyllet, sier den nøyaktig det skjermbildet
+viste: «⚽ Andy's Pub Sentrum — Jeg skal hit», uten avstand, blant de nære.
+
+---
+
 ## 20. september 2026 — søket levde i ett døgn
 
 **Ikke en feil, men verdt å huske.** Søkefeltet «Skriv stedet du skal»
