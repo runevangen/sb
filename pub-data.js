@@ -398,6 +398,25 @@ export function merkKuraterte(puber, liste) {
   });
 }
 
+// «usikker» er ikke lenger skjult — den er MERKET.
+//
+// Fram til 20. september 2026 falt et usikkert sted ut av lista appen
+// leser, og da var det ingen forskjell for leseren mellom «vi har sett
+// etter og er i tvil» og «stedet finnes ikke». Lista var 26 steder, alle
+// i Oslo, og resten av landet fikk «Fant ingen puber» — ikke fordi vi
+// hadde undersokt og ikke funnet noe, men fordi vi ikke hadde undersokt.
+//
+// Na star de der, med sine egne ord. **En antakelse som sier at den er en
+// antakelse, er sann** — og den er et bedre svar enn ingenting for den
+// som skal finne en skjerm i Bodo i kveld.
+//
+// Grensa gar ved `usikker`, ikke ved `sannsynlig`: det siste betyr at
+// noen har sett etter og trodd det, det forste at vi har gjettet.
+export function merkAntatte(liste) {
+  return (liste || []).map((p) => (p && p.sikkerhet === "usikker"
+    ? Object.assign({}, p, { antatt: true }) : p));
+}
+
 /* ---------- stampubene for lagene som spiller ---------- */
 
 // De kuraterte stedene nadde bare fram gjennom et geografisk filter:

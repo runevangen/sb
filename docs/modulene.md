@@ -516,6 +516,11 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   Noten er **én** for hele kortet (`panel.note`), og teller radene i
   begge. Taket er `NAER_MAKS` vanlige rader; ditt eget sted og stedene
   noen andre skal til kommer i tillegg.
+- **`merkAntatte()` merker framfor å skjule.** `kjenteAv()` filtrerte
+  bort `usikker`, og et usikkert sted var da ikke til å skille fra et som
+  ikke finnes. Nå setter den `antatt: true`, og `stedRad()` gir raden sitt
+  eget merke og ordene «Antatt — ikke bekreftet» — før `viserFotball`-grena,
+  ellers hadde ⚽ vunnet. [ADR 0022](adr/0022-antatte-steder.md)
 - **`merkKuraterte()` fyller koordinatet når raden mangler det.** Den
   merket bare `viserFotball` og `lag` før, og en rad fra «dine puber» —
   som bærer bare et navn — kom derfor inn uten lat og lon. Bare det som

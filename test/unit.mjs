@@ -43,7 +43,7 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
          sorterForslag, NAER_MAKS, ANDRE_MAKS,
          falskPosisjon, BYER,
          OVERPASS_SPEIL, overpassHeadere, restTid,
-         sjekkPubliste, kuraterteNaer, kuraterteIByen, merkKuraterte,
+         sjekkPubliste, kuraterteNaer, kuraterteIByen, merkKuraterte, merkAntatte,
          sjekkKontaktliste, kontaktFor, finnKontakt, KONTAKT_FELT, kildeHolder,
          pubNokkel, tolkPubRader, pubRadTilBase, slaSammenPuber, sjekkPubRad,
          osmNavnVask, osmNavnSporring, tolkNavnTreff, PUBTYPER, PUBSIKKERHET,
@@ -1679,6 +1679,36 @@ ok("tomt inn gir tomt ut", sorterForslag(null).length === 0);
 // kan bli uenige om hvor mange som vises.
 ok("fire naer deg, fem i andre byer", NAER_MAKS === 4 && ANDRE_MAKS === 5,
    NAER_MAKS + " / " + ANDRE_MAKS);
+
+/* ---- et sted vi har gjettet paa ---- */
+
+// «usikker» falt UT av lista appen leser til 20. september 2026, og da
+// var det ingen forskjell for leseren mellom «vi har sett etter og er i
+// tvil» og «stedet finnes ikke». Lista var 26 steder, alle i Oslo.
+const ANTATT = merkAntatte([
+  { navn: "Gjettet", sikkerhet: "usikker" },
+  { navn: "Sett etter", sikkerhet: "sannsynlig" },
+  { navn: "Statt i dora", sikkerhet: "bekreftet" },
+]);
+ok("et usikkert sted faller ikke ut lenger", ANTATT.length === 3, ANTATT.length);
+ok("det merkes som antatt", ANTATT[0].antatt === true, JSON.stringify(ANTATT[0]));
+
+// Grensa gar ved usikker, ikke ved sannsynlig: det siste betyr at noen
+// har sett etter og trodd det, det forste at vi har gjettet.
+ok("sannsynlig er ikke en antakelse",
+   ANTATT[1].antatt === undefined, JSON.stringify(ANTATT[1]));
+ok("og bekreftet heller ikke",
+   ANTATT[2].antatt === undefined, JSON.stringify(ANTATT[2]));
+
+// Raden kopieres framfor a rores: KURATERTE er delt, og et flagg satt paa
+// den ekte raden ville fulgt med overalt.
+ok("merkAntatte rorer ikke lista den far",
+   (function () {
+     const inn = [{ navn: "Gjettet", sikkerhet: "usikker" }];
+     merkAntatte(inn);
+     return inn[0].antatt === undefined;
+   })());
+ok("tomt inn gir tomt ut", merkAntatte(null).length === 0);
 
 /* ---- stampubene for lagene som spiller ---- */
 

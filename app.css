@@ -2106,6 +2106,20 @@ a.ad-cta:focus-visible {
   white-space: nowrap;
 }
 
+/* Et sted vi har gjettet paa. Merket er sitt eget, og ordene under raden
+   baerer forbeholdet: en antakelse som sier at den er en antakelse, er
+   sann. Dempet, ikke roed — dette er ikke en feil, det er et forbehold. */
+.sted-antatt-merke {
+  margin-right: 4px;
+  font-weight: 700;
+  color: var(--text-faint);
+}
+.sted-antatt-tekst {
+  font-size: calc(11px * var(--fs));
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
 /* Pubene i andre byer. Lukket til du trykker: for en kamp i kveld er de
    ikke et svar, for en kamp om tre dager er de hele svaret. */
 .sted-andre { margin-top: 8px; }
