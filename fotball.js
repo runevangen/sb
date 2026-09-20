@@ -872,6 +872,24 @@ function delPanel(kamp) {
     tilbud.hidden = false;
   };
 
+  // «De viser ikke fotball» — veien tilbake fra en antakelse.
+  //
+  // ADR 0022 satte et gjettet sted inn i lista med sitt eget merke og
+  // sine egne ord. Halve avgjoerelsen: uten en vei for «nei, de viser
+  // ikke fotball her» er et antatt sted bare gjetning med bedre
+  // typografi, og lista blir daarligere for hver by vi fyller.
+  //
+  // Knappen staar BARE paa et antatt sted (`stedRad`). Et sted noen har
+  // staatt i doera paa skal ikke kunne rettes bort av et trykk fra noen
+  // som gikk forbi — der er tipset en vurdering, og den hoerer i koen med
+  // en annen vekt.
+  panel.siFra = (sted) => {
+    forslagSkjema.tipsOm(sted);
+    // Skjemaet staar nederst i kortet, og raden du trykket paa kan vaere
+    // langt oppe. Uten dette skjer det ingenting du kan se.
+    forslagSkjema.scrollIntoView({ block: "center" });
+  };
+
   panel.appendChild(melding);
   panel.appendChild(tilbud);
 
@@ -1268,6 +1286,25 @@ function stedRad(kamp, panel, sted, form) {
       hvor.appendChild(el("span", "sted-bekreftet-tekst", "(bekreftet visning)"));
     } else if (sted.antatt) {
       hvor.appendChild(el("span", "sted-antatt-tekst", "Antatt — ikke bekreftet"));
+      // Og veien tilbake, paa raden der antakelsen staar.
+      //
+      // BARE her. Et sted noen har staatt i doera paa skal ikke kunne
+      // rettes bort av et trykk fra en som gikk forbi — og et sted vi har
+      // gjettet paa skal kunne det, for vi har ingenting aa forsvare.
+      //
+      // Ikke utlogget: databasen setter `foreslatt_av` fra oekta, saa en
+      // knapp som ikke kan levere er verre enn ingen. Samme grunn som
+      // `tilbyForslag()` tier da.
+      if (panel && panel.siFra && konto.okt()) {
+        const nei = el("button", "sted-si-fra", "De viser ikke fotball");
+        nei.type = "button";
+        nei.title = "Si fra, så tar vi stedet ut hvis du har rett.";
+        nei.addEventListener("click", (e) => {
+          e.stopPropagation();
+          panel.siFra(sted);
+        });
+        hvor.appendChild(nei);
+      }
     }
     venstre.appendChild(hvor);
   }
@@ -2003,12 +2040,26 @@ function sendInnSted(pubFelt) {
   merknad.setAttribute("aria-label", "Merknad");
   merknad.maxLength = MERKNAD_MAKS;
 
-  const merke = el("label", "sted-forslag-merke");
-  const kryss = el("input");
-  kryss.type = "checkbox";
-  kryss.checked = true;
-  merke.appendChild(kryss);
-  merke.appendChild(el("span", null, "De viser fotball"));
+  // Avkryssingsboksen «De viser fotball» sto her, avkrysset som standard.
+  //
+  // Den er ute. `viser_fotball` hadde to verdier og tre betydninger:
+  // portalen viste `false` som «uvisst om de viser fotball» — et ord
+  // dataene aldri sa — og ingen rad i basen har noen gang vaert `false`.
+  // Staar du i doera paa en pub og melder den inn herfra, er svaret paa
+  // «viser de fotball» at du bruker denne knappen.
+  //
+  // Da er `false` ledig, og den betyr det den ser ut som: tipset under.
+  // Ett felt, én betydning per verdi, og ingen ny kolonne aa holde i takt.
+
+  // Stedet dette er et TIPS om, eller null for et vanlig forslag. Den
+  // avgjoer bade det som sendes og det som staar paa skjermen, saa de to
+  // ikke kan komme i utakt.
+  let tips = null;
+
+  // Hva skjemaet er akkurat naa. To ulike handlinger i samme felt, og et
+  // skjema som ikke sier hvilken, er verre enn to skjemaer.
+  const tittel = el("p", "sted-forslag-tittel");
+  tittel.hidden = true;
 
   const send = el("button", "konto-send", "Send inn");
   send.type = "button";
@@ -2021,23 +2072,29 @@ function sendInnSted(pubFelt) {
     melding.className = "kamp-svar" + (art ? " " + art : "");
   };
 
+  // Noten sier hva som skjer etterpaa, og den sier to ulike ting: et
+  // forslag skal sjekkes foer det blir en rad, et tips skal sjekkes foer
+  // raden tas ut. Begge ganger er det et menneske som gjor det (ADR 0019).
+  const note = el("p", "sted-forslag-note");
+
+  skjema.appendChild(tittel);
   skjema.appendChild(navn);
   skjema.appendChild(adresse);
   skjema.appendChild(merknad);
-  skjema.appendChild(merke);
   skjema.appendChild(send);
-  skjema.appendChild(el("p", "sted-forslag-note",
-    "Vi sjekker adressen før stedet havner i lista. Det er derfor den er"
-    + " verdt å stole på."));
+  skjema.appendChild(note);
   skjema.appendChild(melding);
 
 
   send.addEventListener("click", async () => {
+    // `viserFotball: false` ER tipset — se `erTips` i pub-forslag-data.js.
+    // Feltet settes av tilstanden, ikke av en boks leseren kunne satt
+    // uavhengig av hva skjemaet sier at det gjor.
     const inn = {
       navn: navn.value,
       adresse: adresse.value,
       merknad: merknad.value,
-      viserFotball: kryss.checked,
+      viserFotball: !tips,
     };
 
     // Samme sjekk som tjenesten gjor, fra den samme fila: blir de to
@@ -2049,7 +2106,10 @@ function sendInnSted(pubFelt) {
     // Stedet star kanskje der alt, under et navn som skrives litt
     // annerledes. Da er det ingen feil — men det er unodvendig arbeid for
     // begge, og leseren skal slippe a vente pa et svar hen ikke trenger.
-    if (alleredeILista(inn.navn, KJENTE)) {
+    // Vakta gjelder bare et FORSLAG. Et tips handler om et sted som alt
+    // staar i lista — det er hele poenget med det — saa her ville den
+    // samme vakta avvist den ene meldinga vi trenger for aa rette lista.
+    if (!tips && alleredeILista(inn.navn, KJENTE)) {
       si("Det stedet står allerede i lista. Finner du det ikke over, er det"
         + " kanskje skrevet litt annerledes.", "");
       return;
@@ -2074,10 +2134,18 @@ function sendInnSted(pubFelt) {
       if (!respons.ok || data.feil) {
         si(data.feil || ("Tjenesten svarte " + respons.status), "feil");
       } else {
-        si(data.merknad || "Takk, vi ser på det.", "ok");
+        // Et tips skal ikke svares med «vi ser paa det» og saa ingenting.
+        // Stedet staar i lista mens vi ser paa det, og det skal leseren
+        // vite — ellers er svaret et loefte vi ikke holder foer neste gang
+        // et menneske aapner koen.
+        si(tips
+          ? "Takk. Vi tar stedet ut hvis du har rett — til da står det der,"
+            + " merket som antatt."
+          : (data.merknad || "Takk, vi ser på det."), "ok");
         navn.value = "";
         adresse.value = "";
         merknad.value = "";
+        tips = null;
       }
     } catch (err) {
       si("Fikk ikke sendt inn. Prøv igjen om litt.", "feil");
@@ -2120,12 +2188,54 @@ function sendInnSted(pubFelt) {
     }, { maximumAge: 300000, timeout: 10000 });
   };
 
+  // Skjemaet som et FORSLAG: et sted vi ikke har.
   boks.apneMed = (stedsnavn) => {
+    tips = null;
+    settModus();
     skjema.hidden = false;
     if (stedsnavn) navn.value = String(stedsnavn).slice(0, NAVN_MAKS);
     si("", "");
     (navn.value ? adresse : navn).focus();
   };
+
+  // Skjemaet som et TIPS: et sted vi har gjettet paa, og som du sier at
+  // ikke viser fotball.
+  //
+  // Navn og adresse fylles fra raden var. Adressen kan staa tom — en rad
+  // fra `byersjekk --rader` baerer navn og koordinat, ikke gateadresse —
+  // og da maa den fylles: `pub_forslag.adresse` er `not null` i basen, og
+  // `sjekkForslag` vokter det samme fra begge sider. Vi dikter den ikke
+  // opp; vi spor den som vet.
+  boks.tipsOm = (sted) => {
+    tips = sted || null;
+    settModus();
+    skjema.hidden = false;
+    navn.value = String((sted && sted.navn) || "").slice(0, NAVN_MAKS);
+    adresse.value = String((sted && sted.adresse) || "").slice(0, ADRESSE_MAKS);
+    merknad.value = "";
+    si("", "");
+    (adresse.value ? merknad : adresse).focus();
+  };
+
+  // Ordene paa skjermen settes av samme tilstand som det som sendes.
+  // Sto de hver for seg, kunne skjemaet sagt «send inn et sted» om en
+  // melding som tar et sted ut.
+  function settModus() {
+    tittel.hidden = !tips;
+    if (tips) {
+      tittel.textContent = "Viser de ikke fotball på «" + tips.navn + "»?";
+      send.textContent = "Send tipset";
+      note.textContent = "Vi har gjettet på dette stedet, og ikke sjekket det."
+        + " Sier du fra, tar et menneske det ut av lista.";
+      adresse.placeholder = "Gateadresse (så vi vet at det er samme sted)";
+    } else {
+      send.textContent = "Send inn";
+      note.textContent = "Vi sjekker adressen før stedet havner i lista."
+        + " Det er derfor den er verdt å stole på.";
+      adresse.placeholder = "Gateadresse";
+    }
+  }
+  settModus();
 
   return boks;
 }

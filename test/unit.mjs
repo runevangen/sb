@@ -54,7 +54,8 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
 import { PUBER_KONTAKT } from "../puber-kontakt.js";
 import { KANALER } from "../kanaler.js";
 import { KURATERTE } from "../puber.js";
-import { sjekkForslag, forslagRad, tolkForslag, alleredeILista, publisteRad }
+import { sjekkForslag, forslagRad, tolkForslag, alleredeILista, publisteRad,
+         erTips, forslagVekt, sorterForslagKo }
   from "../pub-forslag-data.js";
 import { sjekkVisninger, visningerFor, slaSammen, tolkVisninger, visningRad, kampIderFor,
          bekreftetFor, merkBekreftet, visningsHint, rundeTall,
@@ -1038,6 +1039,76 @@ ok("en merknad blir med nar den finnes",
 function publiste_med_merknad() {
   return publisteRad({ navn: "A", adresse: "B", merknad: "Storskjerm" });
 }
+
+/* ---- tipset om at stedet ikke viser fotball ---- */
+
+// ADR 0022 satte et gjettet sted inn i lista, merket som antatt. Uten en
+// vei tilbake er det gjetning med bedre typografi — og lista blir
+// daarligere for hver by vi fyller. Dette er veien tilbake.
+//
+// `viser_fotball` hadde to verdier og tre betydninger: portalen viste
+// `false` som «uvisst om de viser fotball», et ord dataene aldri sa. Ingen
+// rad i basen har noen gang vaert `false`, og boksen som kunne satt den er
+// ute av appen. Na er `false` tipset.
+ok("en uttrykt false er et tips", erTips({ viserFotball: false }));
+ok("true er ikke et tips", !erTips({ viserFotball: true }));
+// Den viktigste: et felt som MANGLER skal ikke leses som et tips. En glemt
+// linje hos den som kaller, ville ellers sagt at stedet er feil.
+ok("og et felt som mangler er ingenting", !erTips({ navn: "A" }));
+ok("null er ikke et tips", !erTips(null));
+
+// Samme vakt i raden som gar til basen: bare en uttrykt false skriver false.
+ok("forslagRad gjor ikke en glemt linje til et tips",
+   forslagRad({ navn: "A", adresse: "B" }).viser_fotball === true,
+   JSON.stringify(forslagRad({ navn: "A", adresse: "B" })));
+ok("og en uttrykt false blir staaende",
+   forslagRad({ navn: "A", adresse: "B", viserFotball: false }).viser_fotball === false);
+
+// Vekta: et tips om noe vi GJETTET paa koster oss ingenting aa ta imot, et
+// tips om noe noen har staatt i doera paa krever en vurdering. Den leses av
+// LISTA — `sikkerhet` staar der, og et felt ved siden av i koen kunne vaert
+// uenig med den.
+const LISTA_NA = [
+  { navn: "Gjettepuben", sikkerhet: "usikker" },
+  { navn: "Andy's Pub", sikkerhet: "bekreftet" },
+];
+ok("tips om et antatt sted veier tyngst",
+   forslagVekt({ navn: "Gjettepuben", viserFotball: false }, LISTA_NA) === 0);
+ok("tips om et bekreftet sted er en vurdering",
+   forslagVekt({ navn: "Andy's Pub", viserFotball: false }, LISTA_NA) === 1);
+// Foldes navnet ikke, ville «andys pub» falt i lag 1 fordi lista sier
+// «Andy's Pub» — samme folding som alleredeILista.
+ok("og navnet foldes som ellers",
+   forslagVekt({ navn: "andys pub", viserFotball: false }, LISTA_NA) === 1);
+ok("et tips om et sted vi ikke har er ogsa bare et tips",
+   forslagVekt({ navn: "Ukjent", viserFotball: false }, LISTA_NA) === 1);
+ok("og et vanlig forslag staar bakerst",
+   forslagVekt({ navn: "Gjettepuben", viserFotball: true }, LISTA_NA) === 2);
+
+// Koen: tipsene forst, og ELDST forst innenfor hvert lag. Koen er arbeid
+// som ligger, ikke et varsel — et forslag som stadig skyves ned av nyere
+// blir aldri behandlet.
+const KOEN = sorterForslagKo([
+  { navn: "Nytt sted", viserFotball: true, foreslatt: "2026-09-01" },
+  { navn: "Andy's Pub", viserFotball: false, foreslatt: "2026-09-10" },
+  { navn: "Gjettepuben", viserFotball: false, foreslatt: "2026-09-19" },
+  { navn: "Gjettepuben", viserFotball: false, foreslatt: "2026-09-12" },
+], LISTA_NA);
+ok("tipsene om antatte steder staar forst",
+   KOEN[0].foreslatt === "2026-09-12" && KOEN[1].foreslatt === "2026-09-19",
+   KOEN.map((f) => f.navn + "/" + f.foreslatt).join(" "));
+ok("saa tipset som krever en vurdering",
+   KOEN[2].navn === "Andy's Pub", KOEN[2].navn);
+ok("og forslaget bakerst, selv om det er eldst",
+   KOEN[3].navn === "Nytt sted", KOEN[3].navn);
+ok("koen rorer ikke lista den far",
+   (function () {
+     const inn = [{ navn: "B", viserFotball: true, foreslatt: "2" },
+                  { navn: "A", viserFotball: false, foreslatt: "1" }];
+     sorterForslagKo(inn, LISTA_NA);
+     return inn[0].navn === "B";
+   })());
+ok("tomt inn gir tomt ut", sorterForslagKo(null, LISTA_NA).length === 0);
 
 /* ---------------- fotball: lagnavn ---------------- */
 

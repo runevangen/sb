@@ -4,9 +4,9 @@
 kommandoene, men ikke tallene: de sto i tre filer og glei fire ganger på to
 dager. Legger du til tester, er det denne fila som skal rettes.
 
-    node test/unit.mjs      709 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      725 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  367 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       691 tester, 3–20 s, headless Chromium
+    node test/run.mjs       728 tester, 3–20 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
@@ -171,6 +171,21 @@ til angring, og hele fotballmodulen.
   veien. Testes det som skjer *fordi* posisjonen mangler, må scenen stå
   uten `?posisjon=` og stubbe `navigator.geolocation` selv — gjerne slik at
   svaret kan holdes tilbake, så skjermen kan måles både før og etter.
+
+- **Et tidspunkt i en stubb må ligge i samme *kalenderdøgn* som nå.**
+  `SAK_15` satte en økt til `Date.now() - 3600000` og krevde at cella leste
+  «I dag». Mellom midnatt og 01:00 i Oslo er én time siden i **går**, og da
+  sto to tester røde mens koden var riktig — `osloDogn()` i `pin-data.js`
+  regner nettopp kalenderdøgn, og gjør det rett. CI kjører i UTC, så vinduet
+  var 22–23 UTC hvert døgn: rødt én time om dagen, grønt de andre
+  tjuetre. Det er samme felle som feilen kolonnen ble laget for — «I dag
+  23:00» klokka 01:00 natt til dagen etter. **Et døgn er ikke 24 timer
+  bakover.** `iDagIOslo()` går en time tilbake, men aldri forbi ett minutt
+  etter Oslo-midnatt.
+
+  Verdt å merke seg *hvordan* den ble funnet: den slo til under en helt
+  annen kjøring, i det ene vinduet. En test som er rød én time i døgnet
+  ser ut som en flakete test, og «flake» er ingen årsak.
 
 - **Skriv aldri bakoverstrek i et testskript.** Skriptene limes inn i en
   template-streng, og `\d` er borte før nettleseren ser det — mønsteret

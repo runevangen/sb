@@ -23,7 +23,8 @@ import { KURATERTE } from "./puber.js";
 import { oktGyldig, kanFornyes } from "./konto-data.js";
 import { LIGAER, kampNokkel } from "./fotball-data.js";
 import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
-import { publisteRad, alleredeILista } from "./pub-forslag-data.js";
+import { publisteRad, alleredeILista, erTips, forslagVekt, sorterForslagKo }
+  from "./pub-forslag-data.js";
 import { PUBTYPER, PUBSIKKERHET, pubNokkel, sjekkPubRad, slaSammenPuber,
   koordinatFraLenke, BYER, byFor, PUBLISTE_FELT } from "./pub-data.js";
 import { visningsHint, rundeTall, lagreKnappTekst } from "./visning-data.js";
@@ -79,7 +80,13 @@ function lesOkt() {
 
 /* ---------- pubvelgeren ---------- */
 
-// «usikker» vises ikke i appen, og skal da ikke kunne settes her heller.
+// «usikker» kan ikke krysses av for en kamp.
+//
+// Grunnen var at den ikke ble vist i appen. Det stemmer ikke lenger — et
+// antatt sted staar i kortet med sitt eget merke (ADR 0022). Vakta staar
+// likevel, av en sterkere grunn: aa krysse av at et sted viser en bestemt
+// kamp er en paastand ADMIN gjor, og den kan ikke hvile paa en antakelse.
+// Vises kampen der, er stedet ikke antatt lenger.
 //
 // Velgeren tegnes to ganger: en gang av fila alene, sa den star der med
 // det samme, og en gang til nar rettelsene fra basen har landet (#80).
@@ -288,8 +295,19 @@ async function hentForslag() {
 }
 
 // Koen slik den sist ble hentet. Holdes fordi en lagring i stedskjemaet
-// ma kunne finne forslaget den svarer pa — se merkForslagLagtInn.
+// ma kunne finne raden den svarer pa — se merkForslagBehandlet.
 let forslagKo = [];
+
+// Koen tegnet paa nytt med det vi har. Kalles nar rettelsene fra basen
+// lander, for vekta og «staar allerede i lista» leses av den sammenslatte
+// lista — og den fantes ikke da koen ble tegnet.
+//
+// Er koen ikke hentet ennaa, skal det ikke tegnes noe: `tegnForslag([])`
+// ville skrevet «Ingen har foreslatt et sted ennaa» over en ko vi ikke har
+// spurt om.
+function tegnForslagIgjen() {
+  if (forslagKo.length) tegnForslag(forslagKo);
+}
 
 function tegnForslag(liste) {
   forslagKo = Array.isArray(liste) ? liste : [];
@@ -298,7 +316,15 @@ function tegnForslag(liste) {
 
   // Behandlede rader blir staende i basen, men koen viser bare det som
   // gjenstar: en liste som vokser med gamle avgjorelser blir ikke lest.
-  const nye = liste.filter((f) => f.status === "ny");
+  // Lista slik den faktisk er: fila med rettelsene oppa. Et antatt sted i
+  // en ny by ligger i BASEN, ikke i fila, og mot `KURATERTE` alene ville
+  // tipset om det veid som et vanlig forslag — og «staar allerede i lista»
+  // vaert usant. Det er nettopp de radene tipsene handler om.
+  const sammenslatt = slaSammenPuber(KURATERTE, pubRettelser);
+
+  // Tipsene foerst, og det eldste foerst innenfor hvert lag.
+  const nye = sorterForslagKo(liste.filter((f) => f.status === "ny"),
+                              sammenslatt);
   if (!nye.length) {
     felt("forslagHint").hidden = false;
     felt("forslagHint").textContent = liste.length
@@ -309,13 +335,20 @@ function tegnForslag(liste) {
   felt("forslagHint").hidden = true;
 
   nye.forEach((f) => {
+    // Et tips er ikke et forslag. Det ene ber om en ny rad, det andre sier
+    // at en rad vi har er usann — og det siste er det som haster.
+    const tips = erTips(f);
+    const gjettet = tips && forslagVekt(f, sammenslatt) === 0;
+
     const rad = document.createElement("div");
-    rad.className = "forslag";
+    rad.className = "forslag" + (tips ? " forslag-tips" : "");
 
     const tittel = document.createElement("p");
     tittel.className = "forslag-navn";
     tittel.textContent = f.navn;
-    if (alleredeILista(f.navn, KURATERTE)) {
+    // Lista som slas sammen, ikke fila alene: et antatt sted i en ny by
+    // ligger i basen, og «staar allerede i lista» ville vaert usant om det.
+    if (alleredeILista(f.navn, sammenslatt)) {
       const merke = document.createElement("span");
       merke.className = "forslag-merke";
       merke.textContent = "står allerede i lista";
@@ -325,8 +358,14 @@ function tegnForslag(liste) {
 
     const under = document.createElement("p");
     under.className = "forslag-under";
+    // «uvisst om de viser fotball» sto her for `false` — et ord dataene
+    // aldri sa. Feltet har én betydning per verdi na.
     under.textContent = f.adresse
-      + (f.viserFotball ? " · viser fotball" : " · uvisst om de viser fotball")
+      + (tips
+        ? (gjettet
+          ? " · TIPS: de viser ikke fotball. Stedet er antatt, ikke sjekket."
+          : " · TIPS: de viser ikke fotball. Stedet er bekreftet av oss — vurder.")
+        : " · viser fotball")
       + (f.merknad ? " · " + f.merknad : "");
     rad.appendChild(under);
 
@@ -336,44 +375,86 @@ function tegnForslag(liste) {
     //
     // Editoren under er den korte veien, og den vanlige. Fila er for det
     // som skal sta ogsa nar Supabase er nede.
-    const kode = document.createElement("pre");
-    kode.className = "forslag-kode";
-    kode.textContent = publisteRad(f);
-    rad.appendChild(kode);
+    // Raden ferdig formet gjelder bare et FORSLAG. Et tips ber ikke om en
+    // ny rad — det sier at en rad vi har er usann — og en klar-til-a-lime
+    // rad over det tipset ville pekt stikk motsatt vei.
+    if (!tips) {
+      const kode = document.createElement("pre");
+      kode.className = "forslag-kode";
+      kode.textContent = publisteRad(f);
+      rad.appendChild(kode);
+    }
 
     const knapper = document.createElement("div");
     knapper.className = "forslag-knapper";
+
+    // «Ta stedet ut» — den tydelige veien for et tips.
+    //
+    // Den apner stedet i editoren med haken satt, den LAGRER ikke. ADR
+    // 0019 og 0020 star: et menneske gjor raden ferdig, og det finnes
+    // ingen vei fra et skjema pa nettet og rett inn i det leseren ser. Et
+    // tips fra en forbipasserende er ikke et unntak fra den regelen — det
+    // er grunnen til at den finnes.
+    if (tips) {
+      const treff = sammenslatt.find((p) =>
+        pubNokkel(p.navn) === pubNokkel(f.navn));
+      const taUt = document.createElement("button");
+      taUt.className = "lenke";
+      taUt.type = "button";
+      taUt.textContent = treff ? "Ta stedet ut" : "Finner ikke stedet";
+      taUt.disabled = !treff;
+      // Stedet kan vaere tatt ut alt, eller skrevet annerledes enn tipset.
+      // En knapp som ikke fører noe sted er verre enn ingen, sa den sier
+      // hvorfor framfor aa se klikkbar ut.
+      if (!treff) taUt.title = "Ingen rad i lista har dette navnet.";
+      taUt.addEventListener("click", () => {
+        if (!treff) return;
+        apneSted(Object.assign({}, treff, { fjernet: true }),
+                 pubNokkel(treff.navn));
+        felt("stedSkjema").scrollIntoView({ block: "center" });
+      });
+      knapper.appendChild(taUt);
+    }
 
     // Forslaget rett inn i skjemaet, med navn og adresse fylt ut. Dette
     // er det eneste stedet et forslag og lista motes — og det er et
     // menneske som trykker, med koordinater og kilde igjen a fylle.
     // ADR 0019 star: det finnes ingen vei fra skjemaet pa nettet og rett
     // inn i det leseren ser.
-    const iEditor = document.createElement("button");
-    iEditor.className = "lenke";
-    iEditor.type = "button";
-    iEditor.textContent = "Åpne i editoren";
-    iEditor.addEventListener("click", () => {
-      apneSted({
-        navn: f.navn,
-        adresse: f.adresse,
-        type: f.viserFotball ? "sportsbar" : "pub",
-        merknad: f.merknad,
-      }, "");
-      felt("stedSkjema").scrollIntoView({ block: "center" });
-    });
-    knapper.appendChild(iEditor);
+    if (!tips) {
+      const iEditor = document.createElement("button");
+      iEditor.className = "lenke";
+      iEditor.type = "button";
+      iEditor.textContent = "Åpne i editoren";
+      iEditor.addEventListener("click", () => {
+        // `type` var `f.viserFotball ? "sportsbar" : "pub"`. Boksen som
+        // kunne satt den er ute av appen, og `false` betyr na noe helt
+        // annet — et tips, som ikke kommer hit. Et forslag er en pub til
+        // et menneske sier noe annet.
+        apneSted({
+          navn: f.navn,
+          adresse: f.adresse,
+          type: "pub",
+          merknad: f.merknad,
+        }, "");
+        felt("stedSkjema").scrollIntoView({ block: "center" });
+      });
+      knapper.appendChild(iEditor);
+    }
 
+    // Statusene er de samme tre; ordene er ikke. «Lagt inn» om et tips
+    // ville sagt at vi la inn noe, naar vi tok noe ut — og «Avvis» om et
+    // tips er en avgjorelse om at stedet BLIR staaende.
     const lagtInn = document.createElement("button");
     lagtInn.className = "lenke";
     lagtInn.type = "button";
-    lagtInn.textContent = "Lagt inn";
+    lagtInn.textContent = tips ? "Behandlet" : "Lagt inn";
     lagtInn.addEventListener("click", () => behandleForslag(f, "lagt-inn"));
 
     const avvis = document.createElement("button");
     avvis.className = "lenke";
     avvis.type = "button";
-    avvis.textContent = "Avvis";
+    avvis.textContent = tips ? "Stedet blir stående" : "Avvis";
     avvis.addEventListener("click", () => behandleForslag(f, "avvist"));
 
     knapper.appendChild(lagtInn);
@@ -390,10 +471,16 @@ async function behandleForslag(f, status) {
   try {
     await forslagKall({ handling: "behandle", id: f.id, status });
     m.textContent = status === "lagt-inn"
-      ? "«" + f.navn + "» er merket som lagt inn. Sjekk at stedet står under"
-        + " Steder — merket forsvinner herfra uansett, og det er ikke det"
-        + " samme som at raden finnes."
-      : "«" + f.navn + "» er avvist.";
+      ? (erTips(f)
+        ? "Tipset om «" + f.navn + "» er merket som behandlet. Sjekk under"
+          + " Steder at stedet faktisk er tatt ut — merket forsvinner herfra"
+          + " uansett, og det er ikke det samme."
+        : "«" + f.navn + "» er merket som lagt inn. Sjekk at stedet står under"
+          + " Steder — merket forsvinner herfra uansett, og det er ikke det"
+          + " samme som at raden finnes.")
+      : (erTips(f)
+        ? "Tipset om «" + f.navn + "» er avvist. Stedet blir stående."
+        : "«" + f.navn + "» er avvist.");
     m.className = "melding ok";
     hentForslag();
   } catch (err) {
@@ -1049,12 +1136,22 @@ async function hentSteder() {
     pubRettelser = data.puber || [];
     tegnSteder();
     tegnPubvelger();
+    // Og koen paa nytt. Det som kommer over nettet, lander etter at
+    // visningen staar ferdig — den samme leksa som `tegnSvar()` i appen og
+    // `tegnKjenteIgjen()` i kortet.
+    //
+    // Koen tegnes foer dette kallet er ferdig, og vekta leses av den
+    // sammenslatte lista: et antatt sted i en ny by ligger i BASEN. Uten
+    // dette sto tipset om det midt i koen som om stedet var bekreftet, og
+    // «staar allerede i lista» uteble paa den ene raden der det gjelder.
+    tegnForslagIgjen();
   } catch (err) {
     // Fila star uansett, sa lista tegnes med det vi har. Men det skal sta
     // at rettelsene ikke kom: en liste som ser komplett ut mens den ikke
     // er det, er verre enn en som sier ifra.
     pubRettelser = [];
     tegnSteder();
+    tegnForslagIgjen();
     felt("stedHint").hidden = false;
     felt("stedHint").textContent = "Viser bare puber.js: " + err.message;
   }
@@ -1205,8 +1302,15 @@ function stedRad(p, nokkel, rettelse) {
 //
 // Bare «ny» merkes. Et forslag som alt er avvist skal ikke vekkes til
 // live av at noen redigerer stedet et halvt ar senere.
-async function merkForslagLagtInn(navn) {
+//
+// **Og bare den SORTEN raden svarer paa.** Et tips sier at stedet er
+// usant, et forslag at det mangler — og de besvares av motsatte
+// handlinger. Merket vi begge, ville en redigering av stedet stilt tipset
+// som om noen hadde vurdert det, og en fjerning stilt forslaget som om
+// stedet var lagt inn. Begge veier er et felt som stille blir usant.
+async function merkForslagBehandlet(navn, somTips) {
   const treff = forslagKo.filter((f) => f.status === "ny"
+    && erTips(f) === somTips
     && pubNokkel(f.navn) === pubNokkel(navn));
   if (!treff.length) return null;
   try {
@@ -1216,10 +1320,12 @@ async function merkForslagLagtInn(navn) {
   } catch (err) {
     // Stedet ER lagret. En feilet merking skal sies, men ikke se ut som at
     // lagringen gikk galt — da ville admin provd igjen pa noe som sto.
-    return " Forslaget i køen ble ikke merket: " + err.message;
+    return " Køen ble ikke merket: " + err.message;
   }
   hentForslag();
-  return " Forslaget i køen er merket som lagt inn.";
+  return somTips
+    ? " Tipset i køen er merket som behandlet."
+    : " Forslaget i køen er merket som lagt inn.";
 }
 
 async function lagreSted() {
@@ -1243,9 +1349,12 @@ async function lagreSted() {
   stedMelding("Lagrer …", "");
   try {
     const data = await stedKall({ pub: p });
-    // Et sted som er tatt UT av lista svarer ikke pa et forslag om a ta
-    // det inn. Da skal koen sta urort.
-    const merket = p.fjernet ? null : await merkForslagLagtInn(p.navn);
+    // Hvilken rad i koen lagringen svarer paa, avgjores av hva lagringen
+    // GJOR. Tas stedet ut, er det tipset som er besvart; blir det staende,
+    // er det forslaget. Det sto `p.fjernet ? null` her — riktig da koen
+    // bare kunne si «ta dette inn», og en fjerning svarte ingen. Na er den
+    // fjerningen hele rettelsessloyfa (ADR 0023).
+    const merket = await merkForslagBehandlet(p.navn, !!p.fjernet);
     stedMelding((data.merknad || "Lagret.") + (merket || ""), "ok");
     lukkSted();
     await hentSteder();

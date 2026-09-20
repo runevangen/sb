@@ -47,9 +47,9 @@ skjerm som er av. Det er en ekte kostnad, og den er tatt med åpne øyne:
 alternativet er en tom liste, og en tom liste hjelper ingen.
 
 Derfor hører **rettelsessløyfa** med. Uten en vei for «de viser ikke
-fotball her» er dette bare gjetning med bedre typografi. Den veien
-bygges i egen omgang; denne beslutningen er halvparten, og den andre
-halvparten er det som gjør den forsvarlig.
+fotball her» er dette bare gjetning med bedre typografi. Denne
+beslutningen er halvparten, og den andre halvparten er det som gjør den
+forsvarlig — den står i [ADR 0023](0023-tipset-som-tar-et-sted-ut.md).
 
 ### Hva den ikke endrer
 Fila er fortsatt grunnfjellet ([ADR 0020](0020-stedene-i-portalen.md)), og

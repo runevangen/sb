@@ -2747,6 +2747,28 @@ const SAK_15 = kjor("admin", `
   var innlogging = null;
   var bedtOm = [];
   var brukerKall = [];
+
+  // Et tidspunkt som ALLTID ligger i samme Oslo-dogn som naa.
+  //
+  // Sto som Date.now() - 3600000, og testen krevde «I dag». Mellom midnatt
+  // og 01:00 i Oslo er én time siden i GAAR, og da sto testen rod mens
+  // koden var riktig — osloDogn i pin-data.js regner nettopp
+  // kalenderdogn, og gjor det rett. CI kjorer i UTC, saa dette traff
+  // mellom 22 og 23 UTC hvert dogn.
+  //
+  // Det er samme felle som feilen kolonnen ble laget for: «I dag 23:00»
+  // klokka 01:00 natt til dagen etter. Et dogn er ikke 24 timer bakover.
+  function iDagIOslo(msTilbake) {
+    var naa = Date.now();
+    // sv-SE gir «2026-09-21 00:04:12» — ISO-liknende, og lokaliseringen
+    // er det eneste vi trenger fra den.
+    var iOslo = new Date(naa).toLocaleString("sv-SE", { timeZone: "Europe/Oslo" });
+    var kl = iOslo.split(" ")[1].split(":");
+    var sidenMidnatt = ((+kl[0] * 60 + +kl[1]) * 60 + +kl[2]) * 1000;
+    // Ett minutt etter midnatt er grensa: da staar klokkeslettet fortsatt
+    // i dag, og testen maaler bucketet, ikke tallet.
+    return naa - Math.min(msTilbake, Math.max(0, sidenMidnatt - 60000));
+  }
   function svar(status, kropp) {
     return Promise.resolve({ ok: status < 400, status: status, text: function () {
       return Promise.resolve(JSON.stringify(kropp)); } });
@@ -2774,7 +2796,7 @@ const SAK_15 = kjor("admin", `
         return svar(200, { brukere: [
           { id: "11111111-2222-3333-4444-555555555555", navn: "Kari", slug: "kari",
             forst: "2026-09-01T10:00:00Z", sist: "2026-09-12T19:00:00Z",
-            aktiv: new Date(Date.now() - 3600000).toISOString() },
+            aktiv: new Date(iDagIOslo(3600000)).toISOString() },
           { id: "66666666-7777-8888-9999-000000000000", navn: "Ola", slug: "ola",
             forst: "2026-08-20T10:00:00Z", sist: "2026-08-20T10:00:00Z", aktiv: "" }
         ] });
@@ -4008,6 +4030,182 @@ const SAK_15D = kjor("admin-lagret-star", `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
 `, null, adminSide);
 
+/* ---------------- 15E. tipset i koen ---------------- */
+
+// ADR 0022 satte et gjettet sted inn i lista, merket som antatt. Den halve
+// avgjorelsen: uten en vei tilbake er det gjetning med bedre typografi.
+//
+// Her er den andre halvparten, sett fra portalen. Tre ting skal holde:
+// tipset staar FORST (det er den raden som er usann), det ser ut som noe
+// annet enn et forslag, og lagringen som tar stedet ut er det som merker
+// tipset — ikke et ekstra trykk.
+const SAK_15E = kjor("admin-tips", `
+  try {
+    localStorage.setItem("sb-konto", JSON.stringify({
+      token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
+      utloper: Date.now() + 3600000,
+    }));
+  } catch (e) { /* privat modus */ }
+
+  var lagret = [];
+  var forslagKall = [];
+
+  // Det antatte stedet ligger i BASEN, ikke i fila — det er veien et sted i
+  // en ny by kommer inn. Vekta maa derfor leses av den sammenslatte lista;
+  // mot puber.js alene fantes ikke stedet.
+  var iBasen = [{ nokkel: "gjettepuben", navn: "Gjettepuben", bydel: "Midtbyen",
+                  adresse: "Munkegata 1", lat: 63.4310, lon: 10.3955, type: "pub",
+                  lag: [], kilde: "Antatt fra kartet", sikkerhet: "usikker",
+                  sjekket: "2026-09-20", fjernet: false }];
+
+  // Tre rader i koen, med vilje i gal rekkefolge: det nyeste forslaget
+  // forst, tipset om det antatte stedet sist.
+  var koen = [
+    { id: 1, navn: "Nytt sted", adresse: "Storgata 1", viserFotball: true,
+      merknad: "", foreslatt: "2026-09-01", status: "ny" },
+    { id: 2, navn: "Andy's Pub", adresse: "Storgata 2", viserFotball: false,
+      merknad: "", foreslatt: "2026-09-10", status: "ny" },
+    { id: 3, navn: "Gjettepuben", adresse: "Munkegata 1", viserFotball: false,
+      merknad: "Var der i går, ingen skjerm", foreslatt: "2026-09-19", status: "ny" },
+  ];
+
+  function svar(status, kropp) {
+    return Promise.resolve({ ok: status < 400, status: status, text: function () {
+      return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("/api/pub-liste") === 0) {
+      var k = JSON.parse(opt.body);
+      if (k.handling === "liste") return svar(200, { puber: iBasen, klar: true });
+      if (k.handling === "sok") return svar(200, { kilde: "OpenStreetMap", treff: [] });
+      lagret.push(k.pub);
+      iBasen = iBasen.map(function (r) {
+        return r.nokkel === "gjettepuben"
+          ? Object.assign({}, r, k.pub, { nokkel: "gjettepuben" }) : r; });
+      return svar(200, { ok: true, pub: k.pub, merknad: "Lagret." });
+    }
+    if (u.indexOf("/api/visninger") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [] });
+      return svar(200, { ok: true });
+    }
+    if (u.indexOf("/api/brukere") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [] });
+      return svar(200, { brukere: [] });
+    }
+    if (u.indexOf("/api/pub-forslag") === 0) {
+      var f = JSON.parse((opt || {}).body || "{}");
+      forslagKall.push(f);
+      if (f.handling === "behandle") {
+        koen = koen.map(function (r) {
+          return r.id === f.id ? Object.assign({}, r, { status: f.status }) : r; });
+        return svar(200, { ok: true });
+      }
+      return svar(200, { forslag: koen });
+    }
+    if (u.indexOf("/api/fotball") === 0) {
+      return svar(200, { liga: "Eliteserien", kamper: [], runder: [] });
+    }
+    return svar(200, {});
+  };
+
+  function felt(id) { return document.getElementById(id); }
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    felt("passord").value = "hemmelig";
+    felt("loggInn").click();
+
+    setTimeout(function () { try {
+      var rader = felt("forslagListe").querySelectorAll(".forslag");
+      ok("alle tre radene staar i koen", rader.length === 3, rader.length);
+      if (rader.length !== 3) { ferdig(); return; }
+
+      // Kjernen i sorteringen: tipset om stedet vi GJETTET paa er den
+      // raden som er usann akkurat na, og den skal staa forst. Sto koen
+      // usortert, sto «Nytt sted» der — det eldste, og det minst viktige.
+      ok("tipset om det antatte stedet staar forst",
+         rader[0].querySelector(".forslag-navn").textContent.indexOf("Gjettepuben") === 0,
+         rader[0].querySelector(".forslag-navn").textContent);
+      ok("saa tipset som krever en vurdering",
+         rader[1].querySelector(".forslag-navn").textContent.indexOf("Andy's Pub") === 0,
+         rader[1].querySelector(".forslag-navn").textContent);
+      ok("og forslaget bakerst, selv om det er eldst",
+         rader[2].querySelector(".forslag-navn").textContent.indexOf("Nytt sted") === 0,
+         rader[2].querySelector(".forslag-navn").textContent);
+
+      // Et tips skal ikke se ut som et forslag. «uvisst om de viser
+      // fotball» sto her for viser_fotball = false — et ord dataene
+      // aldri sa.
+      ok("tipset er merket som et tips",
+         rader[0].className.indexOf("forslag-tips") > -1, rader[0].className);
+      ok("og sier med ord hva det paastar",
+         rader[0].querySelector(".forslag-under").textContent
+           .indexOf("de viser ikke fotball") > -1,
+         rader[0].querySelector(".forslag-under").textContent);
+      ok("og at stedet var antatt, ikke sjekket",
+         rader[0].querySelector(".forslag-under").textContent.indexOf("antatt") > -1,
+         rader[0].querySelector(".forslag-under").textContent);
+      ok("mens tipset om et bekreftet sted ber om en vurdering",
+         rader[1].querySelector(".forslag-under").textContent.indexOf("vurder") > -1,
+         rader[1].querySelector(".forslag-under").textContent);
+      ok("forslaget er ikke merket som tips",
+         rader[2].className.indexOf("forslag-tips") === -1, rader[2].className);
+
+      // Raden klar til aa limes inn peker stikk motsatt vei for et tips:
+      // det ber ikke om en ny rad, det sier at en rad vi har er usann.
+      ok("et tips far ingen klar-til-a-lime rad",
+         !rader[0].querySelector(".forslag-kode"));
+      ok("mens forslaget far den", !!rader[2].querySelector(".forslag-kode"));
+
+      // Knappene sier hva trykket gjor. «Lagt inn» om et tips ville sagt at
+      // vi la inn noe, naar vi tok noe ut.
+      var knapper0 = rader[0].querySelectorAll(".forslag-knapper button");
+      var tekster0 = Array.prototype.map.call(knapper0, function (b) { return b.textContent; });
+      ok("tipset har «Ta stedet ut»", tekster0.indexOf("Ta stedet ut") > -1, tekster0.join(" | "));
+      ok("og ikke «Apne i editoren»",
+         tekster0.indexOf("Åpne i editoren") === -1, tekster0.join(" | "));
+      ok("og «Avvis» heter at stedet blir staaende",
+         tekster0.indexOf("Stedet blir stående") > -1, tekster0.join(" | "));
+
+      // «Ta stedet ut» aapner stedet med haken satt. Den LAGRER ikke:
+      // ADR 0019 og 0020 star, og et tips fra en forbipasserende er ikke et
+      // unntak fra dem — det er grunnen til at de finnes.
+      knapper0[0].click();
+      setTimeout(function () { try {
+        ok("skjemaet aapnes med stedet i", felt("stedNavn").value === "Gjettepuben",
+           felt("stedNavn").value);
+        ok("og haken for «tatt ut» satt", felt("stedFjernet").checked === true);
+        ok("men ingenting er lagret av seg selv", lagret.length === 0,
+           JSON.stringify(lagret));
+        // Skjemaet maa si sant om sine egne krav: tas stedet ut, holder
+        // navnet — og atte stjerner ville vaert usant.
+        ok("og forklaringa sier at navnet holder",
+           felt("stedPakrevdNote").textContent.indexOf("holder det med navnet") > -1,
+           felt("stedPakrevdNote").textContent);
+
+        felt("stedLagre").click();
+        setTimeout(function () { try {
+          ok("lagringen tar stedet ut",
+             lagret.length === 1 && lagret[0].fjernet === true, JSON.stringify(lagret));
+
+          // Hele sloyfa: lagringen ER svaret paa tipset, sa tipset skal
+          // vaere merket uten et trykk til. Sto p.fjernet ? null igjen,
+          // ble tipset staaende i koen etter at stedet var tatt ut.
+          var behandlet = forslagKall.filter(function (k) {
+            return k.handling === "behandle"; });
+          ok("og merker tipset den svarer paa",
+             behandlet.length === 1 && behandlet[0].id === 3,
+             JSON.stringify(behandlet));
+          ok("og sier at det var et tips, ikke et forslag lagt inn",
+             felt("stedMelding").textContent.indexOf("Tipset i køen") > -1,
+             felt("stedMelding").textContent);
+          ferdig();
+        } catch (e) { ok("ingen unntak i lagringen", false, e.message); ferdig(); } }, 400);
+      } catch (e) { ok("ingen unntak i skjemaet", false, e.message); ferdig(); } }, 200);
+    } catch (e) { ok("ingen unntak i koen", false, e.message); ferdig(); } }, 500);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
+`, null, adminSide);
+
 /* ---------------- 16. puben bekrefter kampen ---------------- */
 
 // Visningene admin setter skal treffe leseren: pubene som viser nettopp
@@ -4526,6 +4724,163 @@ const SAK_16G = kjor("antatt-sted", FELLES + FOTBALL + `
       // Stjerna er en helt annen paastand og maa heller ikke laane seg ut.
       ok("og ikke stjerna heller", !rad.querySelector(".pub-bekreftet"));
       ferdig();
+    } catch (e) { ok("ingen unntak i kortet", false, e.message); ferdig(); } }, 900);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700); });
+`);
+
+
+/* ------- 16H. veien tilbake fra en antakelse ------- */
+
+// ADR 0022 satte et gjettet sted inn i lista med sine egne ord. Uten en vei
+// tilbake er det gjetning med bedre typografi, og lista blir daarligere for
+// hver by vi fyller. Dette er veien tilbake, sett fra leseren.
+//
+// Fire ting skal holde: knappen staar BARE paa et antatt sted, den fyller
+// skjemaet med stedet, den sender viserFotball: false — som ER tipset — og
+// vakta mot «det stedet staar allerede i lista» maa gaa motsatt vei her.
+const SAK_16H = kjor("antatt-si-fra", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "" }); });
+  history.replaceState(null, "", location.pathname + "?posisjon=trondheim");
+  window.__forslag = [];
+  try {
+    localStorage.setItem("sb-konto", JSON.stringify({
+      token: "okt-token", fornyer: "fornyer", bruker: "u-1", navn: "Rune",
+      utloper: Date.now() + 3600000 }));
+  } catch (e) { /* privat modus */ }
+
+  // To steder fra portalen: ett vi har GJETTET paa, og ett noen har staatt i
+  // doera paa. Bare det forste skal kunne rettes bort av et trykk.
+  var I_BASEN = [
+    { navn: "Gjettepuben", bydel: "Midtbyen", adresse: "Munkegata 1",
+      lat: 63.4310, lon: 10.3955, type: "pub", lag: [],
+      kilde: "Antatt fra kartet, ikke sjekket", sikkerhet: "usikker",
+      sjekket: "2026-09-20", fjernet: false },
+    { navn: "Sjekkepuben", bydel: "Midtbyen", adresse: "Munkegata 3",
+      lat: 63.4312, lon: 10.3957, type: "sportsbar", lag: [],
+      kilde: "Var innom 20.09.2026, storskjerm i baren", sikkerhet: "bekreftet",
+      sjekket: "2026-09-20", fjernet: false },
+  ];
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("/api/pub-forslag") === 0) {
+      window.__forslag.push(JSON.parse((opt || {}).body || "{}"));
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { ok: true, merknad: "Takk. Vi ser på det." })); } });
+    }
+    if (u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: true, status: 200, json: function () {
+        return Promise.resolve({ elements: [] }); } });
+    }
+    if (u.indexOf("/api/pub-liste") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { klar: true, puber: I_BASEN })); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { svar: [], visninger: [] })); } });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.querySelectorAll(".kamp.delbar")[0].querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    setTimeout(function () { try {
+      function radFor(navn) {
+        return Array.prototype.find.call(panel.querySelectorAll(".sted-rad-kort"),
+          function (c) { return c.querySelector(".sted-navn") &&
+            c.querySelector(".sted-navn").textContent === navn; });
+      }
+      var antatt = radFor("Gjettepuben");
+      var sjekket = radFor("Sjekkepuben");
+      ok("begge stedene staar i kortet", !!antatt && !!sjekket,
+         panel.textContent.slice(0, 200));
+      if (!antatt || !sjekket) { ferdig(); return; }
+
+      // Kjernen: knappen staar paa antakelsen, og BARE der. Et sted noen
+      // har staatt i doera paa skal ikke kunne rettes bort av et trykk fra
+      // en som gikk forbi.
+      var nei = antatt.querySelector(".sted-si-fra");
+      ok("det antatte stedet har en vei tilbake", !!nei,
+         antatt.textContent);
+      ok("og den sier hva den paastar",
+         !!nei && nei.textContent.indexOf("viser ikke fotball") > -1,
+         nei ? nei.textContent : "ingen knapp");
+      ok("det bekreftede stedet har den ikke",
+         !sjekket.querySelector(".sted-si-fra"), sjekket.innerHTML.slice(0, 160));
+      if (!nei) { ferdig(); return; }
+
+      nei.click();
+      var skjema = panel.querySelector(".sted-forslag-skjema");
+      var felter = skjema.querySelectorAll(".konto-felt");
+      ok("skjemaet aapnes", skjema.hidden === false, skjema.hidden ? "skjult" : "framme");
+      // Fylt fra raden var: leseren skal ikke skrive inn et navn vi alt har,
+      // og en skrivefeil der ville gjort tipset umulig aa knytte til stedet.
+      ok("med stedet fylt inn", felter[0].value === "Gjettepuben", felter[0].value);
+      ok("og adressen vi har", felter[1].value === "Munkegata 1", felter[1].value);
+      // Skjemaet maa si HVILKEN av de to handlingene det er. To ulike
+      // handlinger i samme felt, og et skjema som ikke sier hvilken, er
+      // verre enn to skjemaer.
+      var tittel = skjema.querySelector(".sted-forslag-tittel");
+      ok("og skjemaet sier at dette er et tips",
+         !!tittel && !tittel.hidden &&
+         tittel.textContent.indexOf("Gjettepuben") > -1,
+         tittel ? tittel.textContent : "ingen tittel");
+      ok("og at et menneske tar stedet ut",
+         skjema.querySelector(".sted-forslag-note").textContent
+           .indexOf("tar et menneske det ut") > -1,
+         skjema.querySelector(".sted-forslag-note").textContent);
+
+      skjema.querySelector(".konto-send").click();
+      setTimeout(function () { try {
+        // Vakta mot «det stedet staar allerede i lista» maa gaa MOTSATT vei
+        // her: et tips handler om et sted som alt staar der. Stod den som
+        // for, ble den ene meldinga vi trenger for aa rette lista avvist.
+        ok("tipset sendes selv om stedet staar i lista",
+           window.__forslag.length === 1, JSON.stringify(window.__forslag));
+        var f = window.__forslag[0] || {};
+        // DETTE er tipset: viser_fotball === false, ett felt med én
+        // betydning per verdi, og ingen ny kolonne aa holde i takt.
+        ok("og det er viserFotball: false som baerer det",
+           f.viserFotball === false, JSON.stringify(f));
+        ok("med navnet paa stedet", f.navn === "Gjettepuben", f.navn);
+        ok("og med din egen okt", f.token === "okt-token", f.token);
+        // Stedet staar i lista mens vi ser paa det, og det skal leseren
+        // vite — ellers er svaret et loefte vi ikke holder.
+        ok("svaret sier at stedet staar der til noen har sett paa det",
+           skjema.querySelector(".kamp-svar").textContent.indexOf("står det der") > -1,
+           skjema.querySelector(".kamp-svar").textContent);
+
+        // Og skjemaet skal ikke bli staaende i tipsmodus: neste gang du
+        // melder inn et sted, er det et forslag.
+        panel.querySelector(".sted-pavei").click();
+        ok("skjemaet faller tilbake til et vanlig forslag",
+           skjema.querySelector(".sted-forslag-tittel").hidden === true,
+           skjema.querySelector(".sted-forslag-tittel").textContent);
+        ok("og knappen heter det igjen",
+           skjema.querySelector(".konto-send").textContent === "Send inn",
+           skjema.querySelector(".konto-send").textContent);
+        ferdig();
+      } catch (e) { ok("ingen unntak i sendingen", false, e.message); ferdig(); } }, 400);
     } catch (e) { ok("ingen unntak i kortet", false, e.message); ferdig(); } }, 900);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700); });
 `);
@@ -6550,7 +6905,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
 let feilet = 0;
 
 for (const t of alle) {

@@ -9,6 +9,35 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 21. september 2026 — en test som var rød én time i døgnet
+
+**Fanget av:** en helt annen kjøring. `test/run.mjs` sto med to røde i
+`SAK_15` midt i arbeidet med tipssløyfa, på linjer ingen hadde rørt.
+
+**Hva som faktisk var årsaken.** Scenen satte en økt til
+`Date.now() - 3600000` og krevde at cella leste «I dag». Mellom midnatt og
+01:00 i Oslo er én time siden i **går**. Koden var riktig hele veien —
+`osloDogn()` i `pin-data.js` regner kalenderdøgn, og det er nettopp den
+funksjonen som ble skrevet for å rette «I dag 23:00» klokka 01:00 natt til
+dagen etter, meldt 15. september. Fella var flyttet fra koden til stubben,
+og der sto den.
+
+CI kjører i UTC, så vinduet var 22–23 UTC: rødt én time om dagen, grønt de
+andre tjuetre. Den ville slått til på #129 og #130 uten at noe var galt med
+dem.
+
+**Hvorfor den sto så lenge.** En test som er rød én time i døgnet leses som
+en flakete test, og den som møter den klokka 09:00 finner ingenting. Det er
+nøyaktig samme grunn som den opprinnelige feilen sto: den sa feil bare
+mellom midnatt og samme klokkeslett neste dag.
+
+`iDagIOslo()` går en time tilbake, men aldri forbi ett minutt etter
+Oslo-midnatt. Saboteringen ble gjort i det ene vinduet, klokka 00:09 i
+Oslo: den gamle linja var rød, den nye grønn. **Et døgn er ikke 24 timer
+bakover** står nå i [`testing.md`](testing.md).
+
+---
+
 ## 20. september 2026 — en pub uten koordinat kan ikke plasseres
 
 **Meldt som:** «Puber ikke i by burde markeres. Dette søket er fra
