@@ -516,6 +516,10 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   Noten er **én** for hele kortet (`panel.note`), og teller radene i
   begge. Taket er `NAER_MAKS` vanlige rader; ditt eget sted og stedene
   noen andre skal til kommer i tillegg.
+- **`merkKuraterte()` fyller koordinatet når raden mangler det.** Den
+  merket bare `viserFotball` og `lag` før, og en rad fra «dine puber» —
+  som bærer bare et navn — kom derfor inn uten lat og lon. Bare det som
+  mangler fylles: et karttreff beholder sitt eget punkt.
 - **`sendInnSted()` tar ingen felt lenger, men `hentPosisjon()`.**
   Knappen `.sted-pavei` leser posisjonen inn i merknadsfeltet. Feltet er
   synlig med vilje, og skjemaet sender `merknad` — som API-et alt tok
