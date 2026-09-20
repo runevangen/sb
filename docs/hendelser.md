@@ -9,6 +9,31 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 20. september 2026 — søket levde i ett døgn
+
+**Ikke en feil, men verdt å huske.** Søkefeltet «Skriv stedet du skal»
+landet 19. september for å løse «jeg er i Trondheim i dag, men i Oslo på
+fredag». Det virket, og det hadde tester.
+
+Det ble likevel tatt ut dagen etter, da kortet ble skrevet om til to
+lister. Grunnen er ikke at søket var galt, men at **«Puber i andre byer»
+svarer på det samme uten å kreve at du vet hva stedet heter.** Du åpner
+lista og ser dem, med avstand på hver rad.
+
+`sokKuraterte()` og `sokNokkel()` står igjen i `pub-data.js` med testene
+sine. De er ikke i bruk. Det er med vilje: foldingen i `sokNokkel` — NFD
+og `\p{M}`, fordi `normaliserLagnavn` ikke kan røres — er verdt å ha den
+dagen noe skal søke igjen.
+
+**Det som fulgte med ut var dyrere enn søket.** Feltet var også veien inn
+for et sted vi ikke kjenner: du skrev navnet og trykket «Jeg skal hit».
+Den veien finnes ikke lenger, og `tilbyForslag()` — «Vi kjenner ikke
+‹sted›. Send det inn?» — kan derfor bare nås fra en **delt lenke**.
+Testene som drev den gjennom feltet ble skrevet om til å gå den veien
+framfor å bli slettet: regelen lever, så testen skal det også.
+
+---
+
 ## 20. september 2026 — Bernie's sto der fortsatt, og filteret var riktig
 
 **Meldt som:** «Bernie kommer opp og jeg er i Trondheim.» Med skjermbilde,

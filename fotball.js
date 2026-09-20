@@ -968,11 +968,19 @@ function delPanel(kamp) {
     // De fjerne er ikke her. De staar i sin egen liste, «Puber i andre
     // byer», som svarer paa noe annet: hvem viser kampen ellers.
     const naere = rangerForslag(forslag.kilder, 0).topp.filter(naerNok);
-    const alle = sorterForslag(
-      slaSammenRader(stedKilder(kamp, bekreftede(), rad, egneSteder), naere));
+    // ⚽ «kjent for aa vise fotball» kommer fra puber.js, og settes HER
+    // framfor i hver kilde for seg: `kuraterteNaer` kopierer raden rett
+    // fra KJENTE og vet ikke at den er kuratert. Ett sted, sa merket ikke
+    // kan falle bort avhengig av hvilken kilde raden kom fra.
+    const alle = sorterForslag(merkKuraterte(
+      slaSammenRader(stedKilder(kamp, bekreftede(), rad, egneSteder), naere), KJENTE));
 
     const framme = [];
     const bak = [];
+    // Taket teller de VANLIGE radene. Ditt eget sted og stedene noen
+    // andre skal til kommer i tillegg: de er ikke rader blant mange, og
+    // en liste som skjover svaret ditt bak en knapp er ingen hjelp.
+    let vanlige = 0;
     alle.forEach((sted) => {
       const nokkel = stedNokkel(sted.navn);
       const erValgt = !!valgt && nokkel === valgt;
@@ -988,7 +996,7 @@ function delPanel(kamp) {
       if (!naerNok(sted)) return;
       // Fire rader, saa «Ekspander lista». Ingenting forsvinner — men en
       // liste du maa lese deg gjennom er ikke et svar.
-      if (framme.length < NAER_MAKS) framme.push(sted);
+      if (vanlige < NAER_MAKS) { vanlige += 1; framme.push(sted); }
       else bak.push(sted);
     });
 
@@ -1214,6 +1222,17 @@ function stedRad(kamp, panel, sted, form) {
   } else if (sted.stadion) {
     const merke = el("span", "sted-merke", "🏟");
     merke.setAttribute("aria-label", "på stadion");
+    topp.appendChild(merke);
+  } else if (sted.viserFotball) {
+    // ⚽ er «kjent for aa vise fotball», ★ er «viser DENNE kampen». To
+    // ulike paastander, og merkene holder dem fra hverandre — de kostet
+    // overskriftene lista hadde for.
+    const merke = el("span", "pub-merke", "⚽");
+    merke.setAttribute("aria-label", "kjent for å vise fotball");
+    const lag = (sted.lag || []).join(", ");
+    merke.title = lag
+      ? "Kjent for å vise fotball. Stampub for " + lag + "."
+      : "Kjent for å vise fotball.";
     topp.appendChild(merke);
   }
   topp.appendChild(el("span", "sted-navn", sted.navn));
@@ -1513,8 +1532,15 @@ function tegnForslag(boks) {
   // Stjerne forst, sa avstand — innenfor denne lista. Det er de fjerne
   // som staar her, og derfor er «bekreftet forst» trygt: ingen av dem
   // paastaar aa vaere i naerheten uansett.
+  // Kilden er hele den kuraterte lista, ikke bare det de geografiske
+  // kildene fant. Det er nettopp poenget: staar du i Trondheim, svarer
+  // ingen av dem paa Oslo — og det var der soket kom inn. Uten dette er
+  // lista over andre byer tom akkurat naar den trengs.
+  const kjenteFjerne = medAvstand(
+    merkBekreftet(merkKuraterte(KJENTE, KJENTE), boks.bekreftede || []));
   const alle = sorterForslag(
-    rangerForslag(boks.kilder, 0).topp.filter((p) => !naerNok(p)));
+    slaSammenRader(rangerForslag(boks.kilder, 0).topp, kjenteFjerne)
+      .filter((p) => !naerNok(p)));
   const tak = boks.alt ? alle.length : ANDRE_MAKS;
   const topp = alle.slice(0, tak);
   const resten = alle.slice(tak);

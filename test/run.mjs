@@ -1650,9 +1650,13 @@ const SAK_12 = kjor("kamp-deling", FELLES + FOTBALL + `
     // krever for a sporre om posisjon.
     ok("naer deg hentes med en gang, uten et trykk til",
        window.__overpassKall === 1, window.__overpassKall);
-    ok("forslagene star i én liste, ikke i grupper",
-       forslag.querySelectorAll(".sted-liste").length === 1,
-       forslag.querySelectorAll(".sted-liste").length);
+    // To lister, ikke seks grupper: stedene naer deg, og pubene i andre
+    // byer. Det var de seks gruppene med hver sin overskrift som gjorde
+    // panelet uleselig — og «andre byer» svarer paa et annet spoersmaal
+    // enn «hvor skal jeg», saa den er ikke en gruppe til av det samme.
+    ok("stedene staar i to lister, ikke i grupper",
+       panel.querySelectorAll(".sted-liste").length === 2,
+       panel.querySelectorAll(".sted-liste").length);
     ok("dine puber er med", navnene().indexOf("Pub X") > -1, navnene().join("|"));
 
     // Et annet panel apnes: det forste skal lukkes.
@@ -1681,15 +1685,30 @@ const SAK_12 = kjor("kamp-deling", FELLES + FOTBALL + `
       ok("og den star inne i rammen",
          vaerNa[0].closest(".kamp").classList.contains("valgt"));
 
-      var na = Array.prototype.map.call(forslag.querySelectorAll(".sted-rad-kort"),
-        function (c) { return c.querySelector("span").textContent; });
+      // Bare lista over stedene naer deg: den andre svarer paa noe annet,
+      // og teller ikke mot taket her.
+      // Bare lista over stedene naer deg, og bare de VANLIGE radene: ditt
+      // eget sted og stedene noen andre skal til kommer i tillegg til
+      // taket, og skal ikke telles mot det.
+      var naeListe = panel.querySelector(".sted-liste");
+      // .sted-resten ligger INNE i .sted-liste: radene bak «Ekspander
+      // lista» er ikke framme, og skal ikke telles som om de var det.
+      var alleRader = Array.prototype.filter.call(
+        naeListe.querySelectorAll(".sted-rad-kort"),
+        function (c) { return !c.closest(".sted-resten"); });
+      var na = alleRader.map(function (c) {
+        return c.querySelector(".sted-navn").textContent; });
+      var vanlige = alleRader.filter(function (c) {
+        return !c.classList.contains("valgt") && !c.querySelector(".sted-rad-folk");
+      });
       ok("naer deg sporr Overpass fra nettleseren med rundet posisjon",
          window.__overpassKall === 1 && window.__overpassBody.indexOf("around:800,63.431,10.395") > -1, window.__overpassBody);
       ok("puber naer deg vises", na.indexOf("Torgpuben") > -1, na.join("|"));
       ok("puber ved stadion og ved holdeplassen kommer fra funksjonen",
          na.indexOf("Stadionpuben") > -1, na.join("|"));
       // Taket finnes for at lista skal kunne leses pa en telefon.
-      ok("hoyst seks forslag star framme", na.length <= 6, na.length);
+      ok("hoyst fire vanlige steder staar framme, saa «Ekspander lista»",
+         vanlige.length <= 4, vanlige.length + " av " + na.length);
       // Det var dette som gjorde panelet uleselig: samme pub i flere lister.
       ok("ingen pub star der to ganger",
          na.length === na.filter(function (n, i) { return na.indexOf(n) === i; }).length,
@@ -1710,9 +1729,9 @@ const SAK_12 = kjor("kamp-deling", FELLES + FOTBALL + `
         return Array.prototype.find.call(panel.querySelectorAll(".sted-rad-kort"),
           function (c) { return c.textContent.indexOf(navn) === 0; });
       };
-      if (chip) chip.click();
+      if (chip) chip.querySelector(".sted-knapp").click();
       var pubX = finnChip("Pub X");
-      if (pubX) pubX.click();
+      if (pubX) pubX.querySelector(".sted-knapp").click();
       var valgtChip = finnChip("Pub X");
       // Raden er merket valgt. Den var en chip med aria-pressed for; na er
       // den en rad med en knapp inni, og merket ligger paa raden.
@@ -1929,9 +1948,10 @@ const SAK_14 = kjor("pub-feil", FELLES + FOTBALL + `
       ok("kjente fotballpuber vises uten nettverk",
          chips.length > 2 && forslag.textContent.indexOf("O'Learys Oslo Sentralstasjon") > -1,
          chips.length + " " + forslag.textContent.slice(0, 120));
-      ok("de er merket som kjent for fotball", !!forslag.querySelector(".pub-merke"));
+      ok("de er merket som kjent for fotball", !!forslag.querySelector(".pub-merke"),
+         forslag.querySelector(".sted-rad-kort") ? forslag.querySelector(".sted-rad-kort").innerHTML.slice(0, 160) : "ingen rad");
       ok("naermest star forst",
-         chips[0].textContent.indexOf("O'Learys Oslo Sentralstasjon") === 0, chips[0].textContent);
+         chips[0].textContent.indexOf("O'Learys Oslo Sentralstasjon") > -1, chips[0].textContent);
       ok("svikter funksjonen, star det hvorfor",
          forslag.textContent.indexOf("Fikk ikke puber ved Brann Stadion") > -1, forslag.textContent);
       // Hvem som sviktet, sa det kan meldes videre uten a grave i logger.
@@ -2140,7 +2160,7 @@ const SAK_14B = kjor("pub-stampub", FELLES + FOTBALL + `
       // Bohemen er stampub for Tottenham. Uten denne kilden star lista tom
       // her: ingen posisjon, ingen kjent arena, Overpass nede.
       ok("stampuben for laget star der uten posisjon og uten kjent arena",
-         navnene.some(function (n) { return n.indexOf("Bohemen Sportspub") === 0; }),
+         navnene.some(function (n) { return n.indexOf("Bohemen Sportspub") > -1; }),
          navnene.join(" | ") || "(tom liste)");
       // Merket er det samme ⚽ som ellers: «kjent for a vise fotball».
       // Stjerna ville lovet at stedet har bekreftet nettopp denne kampen,
@@ -2302,12 +2322,12 @@ const SAK_14E = kjor("pub-naer-radius", FELLES + FOTBALL + `
       // 2689 m fra Oslo sentrum, 2,1 km fra der vi star. Under den gamle
       // radiusen pa 1500 fantes den ikke.
       ok("et kuratert sted 2,1 km unna star i lista",
-         navnene.some(function (n) { return n.indexOf("The Old Irish Pub Majorstuen") === 0; }),
+         navnene.some(function (n) { return n.indexOf("The Old Irish Pub Majorstuen") > -1; }),
          navnene.join(" | ") || "(tom liste)");
       // Avstanden ma vaere pa brikka: en lengre liste er bare aerlig sa
       // lenge leseren ser hvor langt det er og kan forkaste den selv.
       var avstander = Array.prototype.map.call(
-        forslag.querySelectorAll(".pub-avstand"), function (a) { return a.textContent; });
+        forslag.querySelectorAll(".sted-avstand"), function (a) { return a.textContent; });
       ok("og den baerer avstanden sin, sa den kan forkastes",
          avstander.length > 0 && avstander.join("").length > 0,
          avstander.join(" | ") || "(ingen avstander)");
@@ -2381,7 +2401,7 @@ const SAK_14H = kjor("pub-rettelse-fra-sentrum", FELLES + FOTBALL + `
       ok("en rettelse fra portalen nas fra sentrum, ikke bare fra dora",
          tekst.indexOf("Pøbb") > -1, tekst.slice(0, 260) || "(tomt panel)");
       // Og den bærer avstanden sin, sa det gar an a vurdere den.
-      var avstand = forslag.querySelector(".pub-avstand");
+      var avstand = forslag.querySelector(".sted-avstand");
       ok("og den viser hvor langt det er",
          !!avstand && avstand.textContent.length > 0,
          avstand ? avstand.textContent : "(ingen avstand)");
@@ -2469,7 +2489,7 @@ const SAK_14F = kjor("pub-posisjon-hvorfor", FELLES + FOTBALL + `
         ok("og forsvinner nar posisjonen kommer",
            etterpa.indexOf("kom ikke fram i tide") === -1, etterpa);
         var navnene = Array.prototype.map.call(
-          panel.querySelectorAll(".pub-forslag .pub-chip"),
+          panel.querySelectorAll(".sted-rad-kort"),
           function (c) { return c.textContent; });
         ok("og da star stedene naer deg der",
            navnene.length > 0, navnene.join(" | ") || "(tom liste)");
@@ -2605,7 +2625,7 @@ const SAK_14I = kjor("pub-kjente-i-byen", FELLES + FOTBALL + `
          tekst.indexOf("Pøbb") > -1, tekst.slice(0, 260) || "(tomt panel)");
       // Og avstanden star pa: det er forskjellen fra et lagtreff, og
       // grunnen til at kilden far bli staende nar posisjonen finnes.
-      var avstand = forslag.querySelector(".pub-avstand");
+      var avstand = forslag.querySelector(".sted-avstand");
       ok("og den baerer avstanden sin",
          !!avstand && avstand.textContent.indexOf("km") > -1,
          avstand ? avstand.textContent : "(ingen avstand)");
@@ -4159,54 +4179,50 @@ const SAK_16D = kjor("sted-sok", FELLES + FOTBALL + `
 
     setTimeout(function () { try {
       var forslag = panel;
-      var felt = panel.querySelector(".kamp-pub");
-      var navnene = function () {
-        return Array.prototype.map.call(forslag.querySelectorAll(".sted-rad-kort"),
+      var naere = function () {
+        return Array.prototype.map.call(
+          panel.querySelectorAll(".sted-liste .sted-rad-kort"),
+          function (c) { return c.textContent; }).join(" | ");
+      };
+      var fjerne = function () {
+        return Array.prototype.map.call(
+          panel.querySelectorAll(".sted-andre .sted-rad-kort"),
           function (c) { return c.textContent; }).join(" | ");
       };
 
-      // Uten sok: ingenting fra Oslo, for leseren staar i Trondheim.
-      ok("uten sok staar ingen Oslo-pub i lista",
-         navnene().indexOf("Andy") === -1, navnene() || "(tom)");
+      // Leseren staar i Trondheim. Lista over stedene naer deg svarer paa
+      // det, og skal ikke ha en Oslo-pub i seg.
+      ok("ingen Oslo-pub blant stedene naer deg",
+         naere().indexOf("Andy") === -1, naere() || "(tom)");
 
-      // Ett felt, to jobber. Dette er det samme feltet som «Jeg skal hit»
-      // bruker — to tekstfelt ved siden av hverandre ville krevd at du
-      // gjettet hvilket som gjor hva.
-      felt.value = "oslo";
-      felt.dispatchEvent(new Event("input"));
-      var etter = navnene();
-      ok("sok paa by henter dem fram likevel",
-         etter.indexOf("Andy") > -1, etter.slice(0, 200) || "(tom)");
-      // Et treff paastaar ingenting om avstand — den staar paa brikka, sa
-      // du kan forkaste den selv.
-      ok("og avstanden staar paa dem", etter.indexOf("km") > -1, etter.slice(0, 200));
-      ok("linja sier hva lista er na",
-         forslag.querySelector(".pub-note").textContent.indexOf("treff på «oslo»") > -1,
-         forslag.querySelector(".pub-note").textContent);
-      // Den falske posisjonen gjelder like mye under et sok: avstandene
-      // males fra den.
-      ok("og merket for falsk posisjon staar fortsatt",
+      // Men kampen er om tre dager, og da er du i Oslo. Soket «Skriv
+      // stedet du skal» var svaret til 20. september 2026 — det krevde at
+      // du visste hva stedet het. Lista over andre byer krever ingenting.
+      // Lista viser fem, saa «Ekspander lista». Ingenting forsvinner.
+      var merAndre = panel.querySelector(".sted-andre .pub-mer");
+      ok("og en knapp teller resten", !!merAndre,
+         merAndre ? merAndre.textContent : "ingen knapp");
+      if (merAndre) merAndre.click();
+      ok("men de staar i lista over andre byer",
+         fjerne().indexOf("Andy") > -1, fjerne().slice(0, 200) || "(tom)");
+      // Avstanden staar paa raden, saa 391 km er noe du kan forkaste selv.
+      ok("og avstanden staar paa dem", fjerne().indexOf("km") > -1,
+         fjerne().slice(0, 200));
+
+      // Den falske posisjonen gjelder like mye her: avstandene males fra
+      // den, og en app som tier om det lyver med sin egen liste.
+      ok("og merket for falsk posisjon staar i noten",
          forslag.querySelector(".pub-note").textContent.indexOf("Falsk posisjon") === 0,
          forslag.querySelector(".pub-note").textContent);
 
-      // Soket tar ikke feltet fra deg: et sted vi ikke kjenner kan
-      // fortsatt skrives og brukes.
-      felt.value = "Kroa til Kari";
-      felt.dispatchEvent(new Event("input"));
-      ok("uten treff sies det, uten a kalle det en feil",
-         forslag.querySelector(".pub-note").textContent.indexOf("Ingen steder i lista") > -1,
-         forslag.querySelector(".pub-note").textContent);
-      ok("og feltet kan fortsatt brukes",
-         forslag.querySelector(".pub-note").textContent.indexOf("Jeg skal hit") > -1 &&
-         panel.querySelector(".sted-egen").disabled === false,
-         forslag.querySelector(".pub-note").textContent);
-
-      // Tomt felt: lista er tilbake til rangeringen.
-      felt.value = "";
-      felt.dispatchEvent(new Event("input"));
-      ok("tommer du feltet, er rangeringen tilbake",
-         forslag.querySelector(".pub-note").textContent.indexOf("treff på") === -1,
-         forslag.querySelector(".pub-note").textContent);
+      // Og du kan si at du skal dit. Det var hele grunnen til at de fjerne
+      // ble en LISTE og ikke en opplysning.
+      var andyRad = Array.prototype.find.call(
+        panel.querySelectorAll(".sted-andre .sted-rad-kort"),
+        function (c) { return c.textContent.indexOf("Andy") > -1; });
+      ok("og en pub i en annen by kan svares paa",
+         !!andyRad && !!andyRad.querySelector(".sted-knapp"),
+         andyRad ? andyRad.textContent : "ingen rad");
       ferdig();
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700); });
@@ -4406,11 +4422,13 @@ const SAK_16B = kjor("pub-rettelser", FELLES + FOTBALL + `
     // Forslagene ligger bak en lenke i kortet, og ingenting hentes for
     // den apnes. Ingen hermetegn i en selektor her: en bakoverstrek i en
     // template-streng er borte for nettleseren ser den, og da dor sida.
-    var apne = document.querySelector(".pub-apne");
+    var apne = document.querySelector(".sted-andre-apne");
     if (apne) apne.click();
 
     setTimeout(function () { try {
-      var boks = document.querySelector(".pub-forslag");
+      // Stedene staar framme i kortet na, ikke bak en lenke — sa det er
+      // hele panelet som skal maales, ikke boksen som laa bak den.
+      var boks = document.querySelector(".kamp-panel");
       ok("kortet star med kjente steder for rettelsene har landet",
          !!boks && !pubListeSvart, String(!!boks) + " " + pubListeSvart);
       var for_ = boks ? boks.textContent : "";
@@ -4420,7 +4438,7 @@ const SAK_16B = kjor("pub-rettelser", FELLES + FOTBALL + `
       // Na lander rettelsene, pa et kort som alt star ferdig.
       setTimeout(function () { try {
         ok("rettelsene har landet", pubListeSvart);
-        var etter = document.querySelector(".pub-forslag");
+        var etter = document.querySelector(".kamp-panel");
         var tekst = etter ? etter.textContent : "";
         ok("stedet som bare star i basen dukker opp pa kortet",
            tekst.indexOf("Nystedet") > -1, tekst.slice(0, 300));
@@ -4531,13 +4549,13 @@ const SAK_16 = kjor("pub-bekreftet", FELLES + FOTBALL + `
     document.querySelectorAll(".kamp-del")[0].click();
     var panel = document.querySelectorAll(".kamp-panel")[0];
 
-    // Etiketten sto «Et annet sted» til 17. september 2026, og det hortes
-    // ut som feltet der du skriver noe selv. Det som apner seg er
-    // fotballpuber som ikke har meldt inn denne kampen — og «andre» star
-    // bare fordi Lincoln Pub alt star over med stjerne.
-    var lenka = panel.querySelector(".pub-apne");
-    ok("med en bekreftet pub heter lenka «Andre fotballpuber»",
-       lenka.textContent === "Andre fotballpuber", lenka.textContent);
+    // Lenka «Andre fotballpuber» er borte (20. september 2026). Det som
+    // laa bak den staar framme, og det eneste som fortsatt er lukket er
+    // pubene i andre byer — som svarer paa noe annet enn «hvor skal jeg».
+    var lenka = panel.querySelector(".sted-andre-apne");
+    ok("den lukkede lista heter «Trykk her for puber i andre byer»",
+       !!lenka && lenka.textContent === "Trykk her for puber i andre byer",
+       lenka ? lenka.textContent : "ingen knapp");
     var _andre = panel.querySelector(".sted-andre-apne"); if (_andre) _andre.click();
     var forslag = panel;
     setTimeout(function () { try {
@@ -4545,7 +4563,7 @@ const SAK_16 = kjor("pub-bekreftet", FELLES + FOTBALL + `
       // Den eneste kilden som svarer pa *kampen* framfor pa stedet —
       // derfor forst i rangeringen.
       ok("puben som viser denne kampen star aller forst",
-         chips[0].textContent.indexOf("Lincoln Pub") === 0, chips[0].textContent);
+         chips[0].textContent.indexOf("Lincoln Pub") > -1, chips[0].textContent);
       ok("den er merket med stjerne",
          !!chips[0].querySelector(".pub-bekreftet")
          && chips[0].querySelector(".pub-bekreftet").textContent === "\u2605",
@@ -4558,17 +4576,30 @@ const SAK_16 = kjor("pub-bekreftet", FELLES + FOTBALL + `
            return c.textContent.indexOf("Carls") === 0 && !!c.querySelector(".pub-bekreftet");
          }), forslag.textContent.slice(0, 120));
 
-      // Samme pub kommer fra flere kilder, men skal sta ett sted.
-      var lincoln = Array.prototype.filter.call(chips,
-        function (c) { return c.textContent.indexOf("Lincoln Pub") === 0; });
+      // Samme pub kommer fra flere kilder, men skal sta ett sted — og i
+      // ÉN av de to listene, ikke i begge.
+      var lincoln = Array.prototype.filter.call(
+        panel.querySelectorAll(".sted-rad-kort"),
+        function (c) { return c.querySelector(".sted-navn") &&
+          c.querySelector(".sted-navn").textContent === "Lincoln Pub"; });
       ok("puben star ett sted, ikke i flere lister", lincoln.length === 1, lincoln.length);
-      // Ingenting forsvinner: resten ligger ett trykk unna.
-      var mer = forslag.querySelector(".pub-mer");
-      ok("resten ligger bak «Flere forslag»", !!mer, forslag.textContent.slice(0, 80));
+      // Ingenting forsvinner: resten ligger ett trykk unna. Knappen heter
+      // «Ekspander lista (N)» i begge listene.
+      var mer = panel.querySelector(".sted-mer") ||
+                panel.querySelector(".sted-andre .pub-mer");
+      ok("resten ligger bak «Ekspander lista»",
+         !!mer && mer.textContent.indexOf("Ekspander lista") === 0,
+         mer ? mer.textContent : panel.textContent.slice(0, 80));
+      var forTrykk = Array.prototype.filter.call(
+        panel.querySelectorAll(".sted-rad-kort"),
+        function (c) { return !c.closest(".sted-resten"); }).length;
       if (mer) mer.click();
-      var alle = forslag.querySelectorAll(".sted-rad-kort");
-      ok("og trykket henter dem fram", alle.length > chips.length,
-         chips.length + " → " + alle.length);
+      var alle = panel.querySelectorAll(".sted-rad-kort");
+      var etterTrykk = Array.prototype.filter.call(alle,
+        function (c) { return !c.closest(".sted-resten") ||
+          !c.closest(".sted-resten").hidden; }).length;
+      ok("og trykket henter dem fram", etterTrykk > forTrykk,
+         forTrykk + " → " + etterTrykk);
       var andre = Array.prototype.filter.call(alle,
         function (c) { return c.textContent.indexOf("Tilfeldig Bar") === 0; });
       ok("en pub uten visning er ikke merket",
@@ -4576,9 +4607,17 @@ const SAK_16 = kjor("pub-bekreftet", FELLES + FOTBALL + `
       chips = forslag.querySelectorAll(".sted-rad-kort");
 
       // Et trykk velger puben — ett trykk, ett sted, ogsa i forslagslista.
-      chips[0].click();
-      ok("et trykk velger puben", panel.querySelector(".kamp-pub").value === "Lincoln Pub",
-         panel.querySelector(".kamp-pub").value);
+      // Ett trykk, ett sted: raden ER svaret. Til 20. september 2026 fylte
+      // trykket et tekstfelt du maatte trykke en gang til for aa bruke.
+      chips[0].querySelector(".sted-knapp").click();
+      // Radene tegnes pa nytt etter hvert trykk, sa noden ma hentes igjen.
+      var valgtRad = Array.prototype.find.call(
+        panel.querySelectorAll(".sted-rad-kort"),
+        function (c) { return c.querySelector(".sted-navn") &&
+          c.querySelector(".sted-navn").textContent === "Lincoln Pub"; });
+      ok("et trykk velger puben",
+         !!valgtRad && valgtRad.classList.contains("valgt"),
+         valgtRad ? valgtRad.className : "ingen rad");
 
       // Andre kamp: en annen pub, og Lincoln skal ikke folge med. Ett
       // panel om gangen, sa det forrige er borte.
@@ -5066,16 +5105,16 @@ const SAK_19 = kjor("blir-med", FELLES + FOTBALL + `
          "Jeg skal til Brann Stadion",
        arena.querySelector(".sted-knapp").getAttribute("aria-label"));
 
-    // Et sted man skriver selv: samme svar, bare med et navn vi ikke
-    // hadde pa lista.
-    var _andre = panel.querySelector(".sted-andre-apne"); if (_andre) _andre.click();
-    var egen = panel.querySelector(".sted-egen");
-    ok("et tomt felt kan ikke sendes", egen.disabled);
-    var felt = panel.querySelector(".kamp-pub");
-    felt.value = "Pub X";
-    felt.dispatchEvent(new Event("input"));
-    ok("og et utfylt kan", !egen.disabled);
-    egen.click();
+    // Et sted vi ikke har i lista. Feltet du kunne skrive det i gikk ut
+    // med «Andre fotballpuber» 20. september 2026 — men veien finnes
+    // fortsatt: et sted fra en DELT LENKE staar som en rad i kortet, og
+    // den raden kan svares paa som alle andre.
+    rad.dataset.pektSted = "Pub X";
+    rad.dataset.pektHvor = "pub";
+    panel.tegnSteder();
+    var pubX0 = stedChip("Pub X");
+    ok("et sted fra en delt lenke staar som en rad", !!pubX0, "ingen rad");
+    pubX0.querySelector(".sted-knapp").click();
     setTimeout(function () { try {
       var skriv = window.__svar.filter(function (k) { return !!k.inn; });
       ok("svaret sendes med okta", skriv.length === 1 && skriv[0].inn.token === "okt-1",
@@ -5114,31 +5153,19 @@ const SAK_19 = kjor("blir-med", FELLES + FOTBALL + `
          pubX.querySelector(".sted-rad-folk").textContent.indexOf("Du") === 0,
          pubX.querySelector(".sted-rad-folk").textContent);
 
-      // Har du valgt et sted, er sporsmalet besvart. Da er de andre radene
-      // ikke et svar lenger, de er en liste du ma lese deg gjennom for a
-      // finne din egen. Meldt 19. september 2026.
-      var mer = panel.querySelector(".sted-mer");
-      ok("de andre stedene ligger bak én knapp",
-         !!mer && mer.textContent === "Ekspander lista (1)", mer ? mer.textContent : "ingen knapp");
+      // Minimeringa er taket na. «Har du valgt et sted, minimeres de
+      // andre» og «hoyst fire rader» var to regler om det samme, og
+      // 20. september 2026 vant taket: lista har samme hoyde for og etter
+      // at du har svart. Ditt eget sted og stedene noen andre skal til
+      // faller aldri bak knappen — det er ikke en rad blant mange.
+      ok("ditt eget sted star framme", !pubX.closest(".sted-resten"),
+         pubX.className);
       var arenaEtter = stedChip("Brann Stadion");
-      ok("og stadion er blant dem",
-         !!arenaEtter && !!arenaEtter.closest(".sted-resten"),
-         arenaEtter ? arenaEtter.className : "ingen arena-rad");
-      // Guardet, ikke kjedet: er knappen borte, er det NETTOPP det denne
-      // testen skal fange — og da skal den si det framfor a velte paa null.
-      var resten = panel.querySelector(".sted-resten");
-      ok("som faktisk er skjult", !!resten && resten.hidden === true,
-         resten ? "star framme" : "ingen skjult liste");
-      // Ditt eget sted star fortsatt framme: det er svaret.
-      ok("mens ditt eget sted star framme", !pubX.closest(".sted-resten"));
-      if (mer && resten) {
-        mer.click();
-        ok("ett trykk viser dem",
-           resten.hidden === false && mer.textContent === "Skjul lista", mer.textContent);
-        mer.click();
-      } else {
-        ok("ett trykk viser dem", false, "ingen knapp a trykke pa");
-      }
+      ok("og med faerre enn fire steder er ingenting minimert",
+         !!arenaEtter && !arenaEtter.closest(".sted-resten") &&
+         !panel.querySelector(".sted-mer"),
+         panel.querySelector(".sted-mer")
+           ? panel.querySelector(".sted-mer").textContent : "ingen knapp");
 
       // «Vi kjenner ikke stedet. Send det inn?»
       //
@@ -5561,31 +5588,41 @@ const SAK_19D = kjor("sted-minimering", FELLES + FOTBALL + `
        stedChip("Karis Kjeller").querySelector(".sted-rad-folk")
          .textContent.indexOf("Kari") > -1,
        stedChip("Karis Kjeller").textContent);
-    // Stadion er en plass man kan dra, men ingen skal dit og du har valgt.
-    ok("mens stadion gaar bak knappen",
-       !!stedChip("Brann Stadion") && !!stedChip("Brann Stadion").closest(".sted-resten"),
+    // Stadion staar framme ogsa etter at du har valgt: taket er tre rader
+    // unna, og et svar minimerer ingenting lenger (20. september 2026).
+    ok("mens stadion blir staaende",
+       !!stedChip("Brann Stadion") && !stedChip("Brann Stadion").closest(".sted-resten"),
        stedChip("Brann Stadion") ? stedChip("Brann Stadion").className : "ingen rad");
-    var mer = panel.querySelector(".sted-mer");
-    ok("og knappen teller dem", !!mer && mer.textContent === "Ekspander lista (1)",
-       mer ? mer.textContent : "ingen knapp");
+    ok("og ingen knapp teller noe som ikke er minimert",
+       !panel.querySelector(".sted-mer"),
+       panel.querySelector(".sted-mer")
+         ? panel.querySelector(".sted-mer").textContent : "ingen knapp");
 
-    // Angrer du, er sporsmalet aapent igjen — og da skal alt staa framme.
+    // Angrer du, staar alt fortsatt framme — nettopp fordi taket, ikke
+    // svaret, avgjor hva som vises.
     stedChip("Pub X").querySelector(".sted-knapp").click();
     setTimeout(function () { try {
-      ok("melder du deg av, er ingenting minimert",
-         !panel.querySelector(".sted-mer"),
-         panel.querySelector(".sted-mer") ? panel.querySelector(".sted-mer").textContent : "");
+      // Taket avgjor, ikke svaret: lista ser lik ut for og etter. Ditt
+      // eget sted og stedet Kari skal til staar framme uansett.
+      ok("melder du deg av, staar de samme stedene framme",
+         !!stedChip("Pub X") && !stedChip("Pub X").closest(".sted-resten") &&
+         !!stedChip("Karis Kjeller") &&
+         !stedChip("Karis Kjeller").closest(".sted-resten"),
+         stedChip("Pub X") ? stedChip("Pub X").className : "ingen rad");
       ok("og stadion star framme igjen",
          !!stedChip("Brann Stadion") && !stedChip("Brann Stadion").closest(".sted-resten"));
       // Tilbudet om a sende inn stedet horer til et svar. For det kan
       // testes at det RYDDES, maa det ha vaert framme — en test som
       // sjekker at noe er skjult uten at det noen gang sto framme, er
       // gronn uansett hva koden gjor.
-      var _andre = panel.querySelector(".sted-andre-apne"); if (_andre) _andre.click();
-      var felt = panel.querySelector(".kamp-pub");
-      felt.value = "Ukjent Kro";
-      felt.dispatchEvent(new Event("input"));
-      panel.querySelector(".sted-egen").click();
+      // Et sted vi ikke kjenner kommer inn fra en DELT LENKE. Feltet man
+      // kunne skrive det i gikk ut 20. september 2026, men raden fra lenka
+      // gjor det ikke — og den kan svares paa som alle andre.
+      var kampRad = panel.closest(".kamp");
+      kampRad.dataset.pektSted = "Ukjent Kro";
+      kampRad.dataset.pektHvor = "pub";
+      panel.tegnSteder();
+      stedChip("Ukjent Kro").querySelector(".sted-knapp").click();
       setTimeout(function () { try {
         var tilbud = panel.querySelector(".sted-tilbud");
         ok("et ukjent sted gir tilbudet",
@@ -5602,13 +5639,22 @@ const SAK_19D = kjor("sted-minimering", FELLES + FOTBALL + `
           // Det motsatte: sier du at du skal til et sted som ALT staar i
           // puber.js, er det ingenting a melde inn. Uten den vakta ville
           // appen bedt deg sende inn en pub den selv har i lista.
-          felt.value = "Bohemen Sportspub";
-          felt.dispatchEvent(new Event("input"));
-          panel.querySelector(".sted-egen").click();
+          //
+          // Raden finnes uten noen delt lenke — den er kuratert, og ⚽ er
+          // nettopp merket for det. Testen plukker den paa merket framfor
+          // paa et navn, saa den ikke avhenger av hvilken pub som ligger
+          // naermest i akkurat denne scenen.
+          var kjentRad = Array.prototype.find.call(
+            panel.querySelectorAll(".sted-rad-kort"),
+            function (c) { return !!c.querySelector(".pub-merke"); });
+          ok("en kuratert pub staar i kortet", !!kjentRad, "ingen kuratert rad");
+          if (!kjentRad) { ferdig(); return; }
+          var kjentNavn = kjentRad.querySelector(".sted-navn").textContent;
+          kjentRad.querySelector(".sted-knapp").click();
           setTimeout(function () { try {
             ok("svaret gikk gjennom",
                panel.querySelector(".kamp-svar").textContent
-                 .indexOf("Bohemen Sportspub") > -1,
+                 .indexOf(kjentNavn) > -1,
                panel.querySelector(".kamp-svar").textContent);
             ok("men et sted vi alt kjenner tilbys ikke",
                tilbud.hidden === true, tilbud.textContent);
@@ -6094,24 +6140,28 @@ const SAK_22 = kjor("pub-forslag", FELLES + FOTBALL + `
     document.querySelector(".kamp.delbar .kamp-del").click();
     setTimeout(function () { try {
       var panel = document.querySelector(".kamp-panel");
-      // Skjulingen ligger i .pub-utvidet, ikke i at elementet mangler — sa
-      // testen maler synlighet, ikke tilstedevaerelse. Forste utkast sto
-      // rodt pa noe som virket.
-      var utvidet = panel && panel.querySelector(".pub-utvidet");
-      ok("skjemaet star ikke framme uoppfordret", !!utvidet && utvidet.hidden,
-         utvidet ? "synlig" : "ingen panel");
+      // Skjulingen ligger i .sted-forslag-skjema, ikke i at elementet
+      // mangler — sa testen maler synlighet, ikke tilstedevaerelse. Forste
+      // utkast sto rodt pa noe som virket.
+      var skjulte = panel && panel.querySelector(".sted-forslag-skjema");
+      ok("skjemaet star ikke framme uoppfordret", !!skjulte && skjulte.hidden,
+         skjulte ? "synlig" : "ingen panel");
 
-      var _andre = panel.querySelector(".sted-andre-apne"); if (_andre) _andre.click();
       setTimeout(function () { try {
-        var apne = panel.querySelector(".sted-forslag-apne");
-        ok("og dukker opp nar stedene apnes", !!apne);
-        if (!apne) { ferdig(); return; }
+        // «Jeg er paa pub, legg inn her» staar nederst i kortet na, ikke
+        // bak to knapper. Skjemaet apnes av den.
+        var pavei = panel.querySelector(".sted-pavei");
+        ok("og veien inn staar nederst i kortet", !!pavei,
+           pavei ? pavei.textContent : "ingen knapp");
+        if (!pavei) { ferdig(); return; }
 
-        panel.querySelector(".kamp-pub").value = "Bar Boca";
-        apne.click();
+        pavei.click();
         var skjema = panel.querySelector(".sted-forslag-skjema");
         var felter = skjema.querySelectorAll(".konto-felt");
-        ok("navnet du alt skrev er fylt inn", felter[0].value === "Bar Boca", felter[0].value);
+        ok("og skjemaet star framme etterpa", skjema.hidden === false,
+           skjema.hidden ? "skjult" : "framme");
+        felter[0].value = "Bar Boca";
+        ok("navnet kan skrives", felter[0].value === "Bar Boca", felter[0].value);
 
         // Adressen er ikke pynt: uten den kan ikke stedet sorteres etter
         // avstand. Sjekken er den samme fila tjenesten bruker.
