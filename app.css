@@ -2432,6 +2432,10 @@ a.ad-cta:focus-visible {
 
 .pub-avstand { font-size: 11px; color: var(--text-faint); }
 .pub-merke { font-size: 11px; line-height: 1; }
+/* 📺 «Sender Eliteserien». Samme storrelse som ⚽, for de er samme slags
+   opplysning om stedet — ikke om kampen. Ingen display-regel, sa
+   [hidden] fra nettleserens eget stilark star urort. */
+.pub-liga { font-size: 11px; line-height: 1; }
 
 /* En pub som har meldt at den viser nettopp denne kampen. Stjerna er
    gronn og ikke bare enda et symbol: den svarer pa kampen, mens ballen
