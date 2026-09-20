@@ -135,6 +135,19 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   aldri om posisjon for å tegne en rad** — trykket som åpner kortet er
   handlingen telefonen krever, og lander posisjonen etterpå, tegnes radene
   om (`settPosisjon`).
+  **Og derfor spør kortet om posisjon når det åpnes.** `sporPosisjon()`
+  henger på det trykket og gjør én ting: setter posisjonen. Den ble hentet
+  i `hentNaerDeg()` til 20. september 2026 — bak «Andre fotballpuber», ett
+  trykk lenger inn — og da sto Bernie's øverst i Trondheim med filteret på
+  plass og virksomt: `naerNok()` svarer ja når vi ikke vet, og vi spurte
+  aldri. Den slår ikke opp puber: Overpass-kallet hører til lista, og lista
+  hører til det trykket som ber om den. Kommer posisjonen først derfra,
+  spør `hentNaerDeg` ikke om igjen.
+  **Men linja under kampraden rekker ikke å vente på den**, for den tegnes
+  før noe kort er åpnet. En bekreftet visning uten kjent avstand bærer
+  derfor byen ved navnet — «Bernie's (Oslo)» — både i linja og på raden i
+  kortet. Det er det eneste vi kan stå inne for uten å vite hvor leseren
+  er, og det koster ingen tillatelsesboks.
 - **Kortet rangerer etter hvor du står *nå*, og søket er veien utenom.**
   For en kamp i kveld er «nå» og «ved avspark» det samme. For en kamp om
   tre dager er det en gjetning, og for den som reiser feil gjetning: «jeg
