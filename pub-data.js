@@ -561,6 +561,39 @@ export function rangerForslag(kilder, maks = FORSLAG_MAKS) {
   return { topp: alle.slice(0, tak), resten: alle.slice(tak) };
 }
 
+// Hvor mange rader hver av de to listene i kortet viser for «Ekspander
+// lista». Fire naer deg, fem i andre byer: den forste er et valg du skal
+// ta, den andre er en opplysning du blar i.
+export const NAER_MAKS = 4;
+export const ANDRE_MAKS = 5;
+
+// Stjerne forst, sa avstand — INNENFOR én liste.
+//
+// «Forst» er ikke «overst uansett». En bekreftet visning 392 km unna
+// horer ikke hjemme blant stedene du kan dra til, og den skal vaere tatt
+// ut for denne sorteringa kjorer (se `naerNok` i fotball.js). Av det som
+// star igjen er «noen har meldt at de viser kampen» et bedre svar enn
+// «ligger naermest».
+//
+// Tre lag, ikke to. Dine egne puber ligger mellom: det er et valg du alt
+// har tatt, og det slar en pub du aldri har vaert pa. Samme grunn som at
+// ditt eget sted alltid star framme i lista over hvem som skal hvor.
+//
+// Ukjent avstand sorteres SIST innenfor sitt lag, og det er ikke en
+// demping: raden star der, i sin gruppe, med alt vi vet om den. Men et
+// tall vi ikke har kan ikke slaa et tall noen andre har.
+export function sorterForslag(liste) {
+  const lag = (p) => (p && p.bekreftet ? 0 : (p && p.min ? 1 : 2));
+  const km = (p) => (Number.isFinite(p && p.avstand) ? p.avstand : Infinity);
+  return (liste || []).slice().sort((a, b) => {
+    const l = lag(a) - lag(b);
+    if (l) return l;
+    const d = km(a) - km(b);
+    if (d) return d;
+    return String(a.navn || "").localeCompare(String(b.navn || ""), "nb");
+  });
+}
+
 /* ---------- nar posisjonen uteblir ---------- */
 
 // Fire helt ulike ting kan ha skjedd, og de krever ulike ting av den som

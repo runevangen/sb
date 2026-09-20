@@ -498,12 +498,28 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   er per kort, og kortene åpnes etter at radene står. Den settes fra
   `?posisjon=` ved oppstart (koster ingenting, spør ingen) og ellers fra
   `settPosisjon()` første gang et kort får en; da tegnes radene om.
-  Spurt blir den i `sporPosisjon()`, på trykket som **åpner kortet** — ikke
-  i `hentNaerDeg()`, som henger bak «Andre fotballpuber» og derfor aldri
-  ble nådd av den som bare lurte på hvem som viser kampen. `sporPosisjon`
-  slår ikke opp noe: Overpass hører til lista, ikke til filteret.
+  Spurt blir den i `hentNaerDeg()`, som `fyllForslag()` kaller på trykket
+  som **åpner kortet**. Til 20. september 2026 hang `fyllForslag` på
+  «Andre fotballpuber», og ble derfor aldri nådd av den som bare lurte på
+  hvem som viser kampen.
   Uten kjent avstand står **byen** ved navnet — i `viserlinje()` og i
   `stedRad()` — for linja under kampraden tegnes før noe kort er åpnet.
+- **Kortet har to lister, og `naerNok()` er skillet.** `tegnSteder()`
+  tegner stedene nær deg: `stedKilder()` slått sammen med de nære
+  forslagene (`slaSammenRader`), merket med `merkKuraterte` i ett kall, og
+  sortert av `sorterForslag()`. `tegnForslag()` tegner resten — de fjerne
+  — og leser hele `KJENTE`, ikke bare det kildene fant: står du i
+  Trondheim svarer ingen geografisk kilde på Oslo.
+  **Én vei, ikke to:** `tegnSteder` kaller `tegnForslag`, aldri motsatt.
+  `tegnKortet()` er inngangen for alt som lander data, så en kilde som
+  kommer sent tegner begge listene.
+  Noten er **én** for hele kortet (`panel.note`), og teller radene i
+  begge. Taket er `NAER_MAKS` vanlige rader; ditt eget sted og stedene
+  noen andre skal til kommer i tillegg.
+- **`sendInnSted()` tar ingen felt lenger, men `hentPosisjon()`.**
+  Knappen `.sted-pavei` leser posisjonen inn i merknadsfeltet. Feltet er
+  synlig med vilje, og skjemaet sender `merknad` — som API-et alt tok
+  imot, så ingenting i basen måtte endres.
   `naerNok()` svarer **ja når vi ikke vet** — uten posisjon, eller uten
   koordinater på stedet — så ingenting gjemmes i blinde. `NAER_M` er 50 km,
   ikke `NAER_RADIUS`: det siste er gangavstand, og en pub tvers over byen er
