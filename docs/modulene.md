@@ -498,6 +498,12 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   er per kort, og kortene åpnes etter at radene står. Den settes fra
   `?posisjon=` ved oppstart (koster ingenting, spør ingen) og ellers fra
   `settPosisjon()` første gang et kort får en; da tegnes radene om.
+  Spurt blir den i `sporPosisjon()`, på trykket som **åpner kortet** — ikke
+  i `hentNaerDeg()`, som henger bak «Andre fotballpuber» og derfor aldri
+  ble nådd av den som bare lurte på hvem som viser kampen. `sporPosisjon`
+  slår ikke opp noe: Overpass hører til lista, ikke til filteret.
+  Uten kjent avstand står **byen** ved navnet — i `viserlinje()` og i
+  `stedRad()` — for linja under kampraden tegnes før noe kort er åpnet.
   `naerNok()` svarer **ja når vi ikke vet** — uten posisjon, eller uten
   koordinater på stedet — så ingenting gjemmes i blinde. `NAER_M` er 50 km,
   ikke `NAER_RADIUS`: det siste er gangavstand, og en pub tvers over byen er

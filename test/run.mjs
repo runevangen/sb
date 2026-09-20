@@ -4211,6 +4211,132 @@ const SAK_16D = kjor("sted-sok", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700); });
 `);
 
+/* ------- 16E. posisjonen ble aldri spurt om ------- */
+
+// Meldt 20. september 2026, med skjermbilde, igjen: «Bernie kommer opp og
+// jeg er i Trondheim.»
+//
+// Filteret fra 16C var pa plass og virket. Det fikk bare aldri vite hvor
+// leseren sto: posisjonen ble hentet i hentNaerDeg(), som henger bak
+// «Andre fotballpuber» — ett trykk LENGER INN enn kortet. Uten posisjon
+// svarer naerNok() ja (ukjent avstand demper ingenting), og Bernie's sto
+// oeverst som svaret paa «hvor skal du se den?».
+//
+// Alle de sju posisjonstestene var groenne, for de setter ?posisjon= i
+// URL-en — og den snarveien setter posisjonen ved oppstart, foer noe kort
+// aapnes. De beviste at filteret virker naar posisjonen finnes, og
+// ingenting om veien dit. Denne scenen har derfor INGEN ?posisjon=.
+const SAK_16E = kjor("posisjon-ved-kortapning", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var VISNINGER = [
+    { pub: "Bernie's", kampId: "2026-09-20-brann-bodoglimt", kamp: "Brann – Bodo/Glimt",
+      dato: "2026-09-20T17:00:00+00:00", satt: "2026-09-11T10:00:00.000Z" }
+  ];
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "" }); });
+
+  // Telefonen svarer ikke av seg selv: vi holder paa tilbakekallet, sa
+  // scenen kan se hva skjermen sier BADE for og etter at posisjonen lander.
+  var spurt = 0;
+  var gi = null;
+  Object.defineProperty(navigator, "geolocation", { configurable: true, value: {
+    getCurrentPosition: function (traff) { spurt += 1; gi = traff; }
+  } });
+
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: true, status: 200, json: function () {
+        return Promise.resolve({ elements: [] }); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { svar: [], visninger: VISNINGER })); } });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 ||
+        u.indexOf("/api/pub-liste") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var rad = document.querySelectorAll(".kamp.delbar")[0];
+    var viser = rad && rad.querySelector(".kamp-viser");
+    ok("linja under kampraden staar", !!viser);
+    if (!viser) { ferdig(); return; }
+
+    // Regelen som ikke skal vike: vi ber ALDRI om posisjon for a tegne en
+    // rad. Runden staar ferdig, og telefonen er ikke spurt om noe.
+    ok("ingen ber om posisjon for a tegne runden", spurt === 0, "spurt " + spurt);
+
+    // Og da kan linja ikke pastaa naerhet. Byen staar ved navnet: det er
+    // det eneste vi kan staa inne for uten a vite hvor leseren er.
+    ok("men navnet baerer byen naar avstanden er ukjent",
+       viser.textContent.indexOf("Bernie's (Oslo)") > -1, viser.textContent);
+
+    // Trykket som apner kortet ER handlingen telefonen krever.
+    rad.querySelector(".kamp-del").click();
+    ok("og kortet spor om posisjon naar det apnes", spurt === 1, "spurt " + spurt);
+
+    var panel = document.querySelector(".kamp-panel");
+    var stedChip = function (navn) {
+      return Array.prototype.find.call(panel.querySelectorAll(".sted-rad-kort"),
+        function (c) { return c.querySelector(".sted-navn") &&
+          c.querySelector(".sted-navn").textContent === navn; });
+    };
+    var bernies = stedChip("Bernie's");
+    ok("raden staar i kortet mens vi venter paa svaret", !!bernies, "ingen rad");
+    ok("med byen paa, ikke bare navnet",
+       !!bernies && !!bernies.querySelector(".sted-by") &&
+       bernies.querySelector(".sted-by").textContent === "Oslo",
+       bernies && bernies.querySelector(".sted-by")
+         ? bernies.querySelector(".sted-by").textContent : "ingen by");
+
+    // Na svarer telefonen: leseren staar i Trondheim.
+    ok("telefonen har et tilbakekall a svare med", !!gi, "ingen");
+    if (!gi) { ferdig(); return; }
+    gi({ coords: { latitude: 63.4305, longitude: 10.3951 } });
+
+    setTimeout(function () { try {
+      var viser2 = document.querySelectorAll(".kamp.delbar")[0]
+        .querySelector(".kamp-viser");
+      ok("og da slutter linja a navngi puben",
+         !!viser2 && viser2.textContent.indexOf("Denne kampen vises på: Bernie") === -1,
+         viser2 ? viser2.textContent : "ingen linje");
+      ok("den sier at ingen er i naerheten",
+         !!viser2 && viser2.textContent.indexOf("ingen i nærheten") > -1,
+         viser2 ? viser2.textContent : "ingen linje");
+
+      var panel2 = document.querySelector(".kamp-panel");
+      var bernies2 = panel2 && Array.prototype.find.call(
+        panel2.querySelectorAll(".sted-rad-kort"),
+        function (c) { return c.querySelector(".sted-navn") &&
+          c.querySelector(".sted-navn").textContent === "Bernie's"; });
+      ok("og raden i kortet gaar bak «Vis de andre»",
+         !!bernies2 && !!bernies2.closest(".sted-resten"),
+         bernies2 ? bernies2.className : "ingen rad");
+      ok("med avstanden paa, ikke byen",
+         !!bernies2 && !!bernies2.querySelector(".sted-avstand"),
+         bernies2 && bernies2.querySelector(".sted-avstand")
+           ? bernies2.querySelector(".sted-avstand").textContent : "ingen avstand");
+      ferdig();
+    } catch (e) { ok("ingen unntak etter posisjonen", false, e.message); ferdig(); } }, 700);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700); });
+`);
+
 /* ------- 16B. rettelsene fra portalen treffer leseren ------- */
 
 // Det som kommer over nettet, lander etter at visningen star ferdig.
@@ -6197,7 +6323,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
 let feilet = 0;
 
 for (const t of alle) {

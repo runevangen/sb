@@ -632,6 +632,15 @@ function delKnapp(kamp, rad) {
     // det den ene kampen man faktisk lurer pa. hentVaer husker per kamp,
     // sa a apne den samme igjen koster ingenting.
     if (kamp.arena) rad.appendChild(vaerlinje(kamp));
+    // Og posisjonen spor vi om HER. Dette trykket er handlingen telefonen
+    // krever, og det er det eneste stedet kortet faar den: filteret som
+    // skjuler en bekreftet visning 392 km unna kan ikke vite noe for
+    // posisjonen finnes, og fram til 20. september 2026 ble den hentet
+    // bak «Andre fotballpuber» — ett trykk lenger inn enn kortet. Derfor
+    // sto Bernie's paa Gronland oeverst for en leser i Trondheim, med
+    // filteret fra #122 pa plass og virksomt: `naerNok()` svarer ja naar
+    // vi ikke vet, og vi spurte aldri.
+    sporPosisjon();
     const panel = delPanel(kamp);
     rad.appendChild(panel);
     knapp.setAttribute("aria-expanded", "true");
@@ -1161,6 +1170,15 @@ function stedRad(kamp, panel, sted, form) {
   // «Bernie's 392 km» er to ulike svar, og bare det andre kan leses.
   if (Number.isFinite(sted.avstand)) {
     topp.appendChild(el("span", "sted-avstand", avstandtekst(sted.avstand)));
+  } else if (sted.bekreftet) {
+    // Uten avstand er byen det eneste vi kan si om HVOR. En bekreftet
+    // visning svarer paa kampen og kjenner ingen geografi: uten posisjon
+    // staar den i lista fordi `naerNok()` svarer ja naar vi ikke vet, og
+    // da maa raden i det minste si Oslo. Bare de bekreftede baerer
+    // koordinater hit (se `stedKilder`) — de andre kildene har enten
+    // avstand eller ingenting aa si.
+    const by = byenTil(sted);
+    if (by) topp.appendChild(el("span", "sted-by", by));
   }
   venstre.appendChild(topp);
 
@@ -1684,6 +1702,25 @@ function settPosisjon(p) {
   if (forst) tegnSvar(document.getElementById("fotballInnhold"));
 }
 
+// Posisjonen alene, uten aa slaa opp noe.
+//
+// Den henger paa trykket som aapner kortet, og gjor én ting: setter
+// `sisteKjentePosisjon`. Overpass-kallet hoerer til lista over puber naer
+// deg, og den lista hoerer til det trykket som ber om den — vi henter ikke
+// tjue puber fordi noen lurte paa hvem som viser kampen.
+//
+// Feiler den, staar det ingenting her. Det er med vilje: uten avstand
+// demper vi ingenting (se `naerNok`), og da er det byen ved navnet som
+// baerer sannheten — «Bernie's (Oslo)». Aarsaken til at posisjonen uteble
+// staar fortsatt i panelet, der den forklarer en tom liste; her ville den
+// forklart noe som ikke mangler.
+function sporPosisjon() {
+  if (sisteKjentePosisjon || !navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition((pos) => {
+    settPosisjon(rundPosisjon(pos.coords.latitude, pos.coords.longitude));
+  }, () => {}, { maximumAge: 300000, timeout: 10000 });
+}
+
 const naerHusket = new Map();
 
 function hentNaerDeg(boks, bekreftede) {
@@ -1697,6 +1734,16 @@ function hentNaerDeg(boks, bekreftede) {
     boks.falskPosisjon = falsk;
     boks.venter += 1;
     naerDegFra(boks, bekreftede, rundPosisjon(falsk.lat, falsk.lon));
+    return;
+  }
+  // Posisjonen kan alt vaere hentet: kortet spurte om den da det ble
+  // aapnet. Da slaar vi opp med det svaret vi har framfor aa sporre en
+  // gang til — to veier til samme posisjon er én vei for mye, og den ene
+  // av dem ville vaert et spoersmaal leseren alt har svart paa.
+  if (sisteKjentePosisjon) {
+    boks.posisjonsfeil = "";
+    boks.venter += 1;
+    naerDegFra(boks, bekreftede, sisteKjentePosisjon);
     return;
   }
   // Et nytt forsok viser bort svaret fra forrige: star det «Du sa nei»
@@ -2024,8 +2071,14 @@ function viserlinje(kamp) {
   merke.setAttribute("aria-hidden", "true");
   linje.appendChild(merke);
 
-  const pubKnapp = (p, medSted) => {
-    const sted = medSted ? (byenTil(p) || avstandtekst(avstandTil(p) || 0)) : "";
+  // Byen staar ved navnet i to tilfeller, og de er ikke det samme:
+  // naar vi VET at stedet er langt unna, og naar vi ikke vet noe. Det
+  // siste er en leser uten posisjon: da staar puben blant de naere fordi
+  // `naerNok()` svarer ja naar vi ikke vet, og «Bernie's» alene leses som
+  // «i naerheten». «Bernie's (Oslo)» er det vi faktisk kan staa inne for.
+  const pubKnapp = (p, fjern) => {
+    const sted = fjern ? (byenTil(p) || avstandtekst(avstandTil(p) || 0))
+      : (avstandTil(p) === null ? byenTil(p) : "");
     const knapp = el("button", "kamp-viser-pub", p.navn + (sted ? " (" + sted + ")" : ""));
     knapp.type = "button";
     knapp.title = "Meldt inn til oss. Trykk for å dele at du ser kampen her.";

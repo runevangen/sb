@@ -2078,6 +2078,16 @@ a.ad-cta:focus-visible {
   white-space: nowrap;
 }
 
+/* Byen, naar vi ikke kjenner avstanden. Samme plass og samme vekt som
+   avstanden: det er det samme spoersmaalet — hvor er dette stedet — bare
+   besvart med det vi har. */
+.sted-by {
+  margin-left: 6px;
+  font-size: calc(11px * var(--fs));
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
 /* Bekreftede visninger langt unna, bak en knapp i linja under kampen.
    Stiplet, som .pub-mer: den er en vei videre, ikke et sted. */
 .kamp-viser-mer {

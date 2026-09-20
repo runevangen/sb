@@ -9,6 +9,51 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 20. september 2026 — Bernie's sto der fortsatt, og filteret var riktig
+
+**Meldt som:** «Bernie kommer opp og jeg er i Trondheim.» Med skjermbilde,
+fra prod, med filteret fra saken under utrullet og virksomt.
+
+**Hva som faktisk var årsaken.** Ingenting galt med filteret. `naerNok()`
+gjorde nøyaktig det den skal: den svarer **ja når vi ikke vet**, og vi
+visste ikke. Posisjonen ble hentet i `hentNaerDeg()`, som kalles fra
+`fyllForslag()` — og den henger på **«Andre fotballpuber»**-knappen. Et
+trykk lenger inn enn kortet.
+
+Så: du åpner kortet, `sisteKjentePosisjon` er `null`, `avstandTil()` gir
+`null`, og Bernie's står øverst som om den var i nabogata. Forklaringa —
+«Du sa nei til posisjon», «Puber nær deg»-knappen — ligger inne i den
+samme sammenslåtte seksjonen du ikke har åpnet.
+
+Kommentaren i koden sa alt riktig: *«trykket som åpner kortet er
+handlingen telefonen krever»*. Det var meningen. Trykket som faktisk
+utløste spørsmålet var et annet.
+
+**Hvorfor ingen test så det.** Alle sju posisjonstestene i `run.mjs`
+setter `?posisjon=…` i URL-en, og den snarveien setter posisjonen **ved
+oppstart**, før noe kort åpnes (`fotball.js`, i oppsettet). De beviser at
+filteret virker når posisjonen finnes. De sier ingenting om veien dit — og
+veien dit er det eneste en telefon har. Grønt av feil grunn, felle nummer
+to i `docs/testing.md`, denne gangen i syv tester samtidig.
+
+**To ting ble rettet, og bare sammen dekker de hullet.** `sporPosisjon()`
+henger nå på trykket som åpner kortet og gjør én ting: setter posisjonen.
+Den slår ikke opp puber — Overpass-kallet hører til lista, og lista hører
+til det trykket som ber om den.
+
+Og linja under **kampraden** tegnes før noe kort er åpnet i det hele tatt.
+Den kan ikke vente på en posisjon som først kommer av et trykk. Derfor
+bærer en bekreftet visning uten kjent avstand nå byen ved navnet:
+«Bernie's (Oslo)». Det er det eneste vi kan stå inne for uten å vite hvor
+leseren er — og det koster ingen tillatelsesboks.
+
+**Fanget av:** en scene uten `?posisjon=`, med `navigator.geolocation`
+stubbet slik at svaret holdes tilbake. Den måler skjermen både før og
+etter at posisjonen lander, og krever at ingen har spurt telefonen om noe
+mens runden bare ble tegnet.
+
+---
+
 ## 20. september 2026 — Bernie's sto øverst i Trondheim, 392 km unna
 
 **Meldt som:** «hvorfor kommer bernies opp når jeg er i trondheim», med
