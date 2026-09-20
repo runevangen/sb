@@ -4,6 +4,7 @@
 //
 //     node verktoy/lag-pdf.mjs                      # docs/kampdag-flyt.md
 //     node verktoy/lag-pdf.mjs docs/annen-fil.md    # en annen
+//     node verktoy/lag-pdf.mjs docs/fil.md --sideskift   # ny side per ##
 //
 // PDF-en legges ved siden av kilden, med samme navn. Bilder lenkes
 // relativt til dokumentet (`bilder/…`), som i GitHub-visningen.
@@ -23,7 +24,14 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 const kjorProsess = promisify(execFile);
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-const kilde = resolve(process.argv[2] || join(root, "docs", "kampdag-flyt.md"));
+const argv = process.argv.slice(2);
+// `--sideskift` gir en ny side per `##`. Det er et valg per dokument, ikke
+// en stil for alle: et sammendrag som kampdag-flyt skal flyte, mens et
+// opplaeringshefte leses avsnitt for avsnitt — og da er luften nederst pa
+// sida en marg framfor et hull.
+const sideskift = argv.includes("--sideskift");
+const kilde = resolve(argv.find((a) => !a.startsWith("--")) ||
+                      join(root, "docs", "kampdag-flyt.md"));
 const mal = kilde.replace(/\.md$/, ".pdf");
 
 // Samme liste som test/run.mjs, sa det som kjorer testene lager PDF-en.
@@ -158,6 +166,12 @@ const STIL = `
   tr { page-break-inside: avoid; }
   figure { margin: 3mm auto 5mm; text-align: center; page-break-inside: avoid; }
   figure img { max-width: 78mm; max-height: 200mm; border: 1px solid #d5dae8; border-radius: 4mm; }
+  /* Skjermbildene er telefonformat, og 78 mm er en telefon. Et diagram er
+     ikke det: presset ned i samme bredde blir en boks med seks ord i
+     uleselig. SVG-ene i docs/bilder/ er tegninger, ikke skjermbilder, og
+     de bar sin egen ramme fra for — sa de far tekstbredden og ingen
+     ramme rundt ramma. */
+  figure img[src$=".svg"] { max-width: 100%; border: 0; border-radius: 0; }
   figcaption { font-size: 8.5pt; color: #5a6074; margin-top: 1.5mm; max-width: 120mm;
                margin-left: auto; margin-right: auto; }
   blockquote { border-left: 3px solid #c9d0e6; margin: 0 0 3mm; padding: 1mm 0 1mm 4mm; color: #3a4054; }
@@ -166,8 +180,12 @@ const STIL = `
 
 const md = readFileSync(kilde, "utf8");
 const tittel = (md.match(/^#\s+(.*)$/m) || [, basename(kilde)])[1];
+const SIDESKIFT = "\n  h2 { page-break-before: always; }\n" +
+  "  body > h2:first-of-type { page-break-before: auto; }\n";
+
 const html = '<!doctype html><html lang="nb"><head><meta charset="utf-8"><title>' +
-  esc(tittel) + "</title><style>" + STIL + "</style></head><body>" +
+  esc(tittel) + "</title><style>" + STIL + (sideskift ? SIDESKIFT : "") +
+  "</style></head><body>" +
   '<base href="' + pathToFileURL(dirname(kilde) + "/").href + '">' +
   tilHtml(md) + "</body></html>";
 

@@ -47,6 +47,7 @@ modul for modul.
     bilder/         annonsebilder, ett ferdig utsnitt per form
     docs/           adr/, modulene.md, hendelser.md, testing.md,
                     nokler-og-tokens.md, oppsett.sql, kampdag-dypdykk.md
+                    kom-i-gang.md: veien inn for en ny person, som PDF
     BACKLOGG.md     peker til issues, som er den ekte backloggen
 
 **Mønsteret:** `*-data.js` er rene funksjoner — ingen DOM, ingen
@@ -527,6 +528,12 @@ skjedde 20. september: den ene grenen innførte en sirkel for «nær nok»
 mens den andre nettopp hadde landet «radiusen er en sirkel, og en by er
 ikke det». Les hva den andre siden faktisk gjorde før du løser konflikten;
 noen ganger er svaret å ta ut sitt eget.
+
+**En ny person leser [`docs/kom-i-gang.md`](docs/kom-i-gang.md) først.**
+Den er veien inn — koble seg på, runden fra gren til flettet PR, og de
+fellene som har kostet noe. Reglene her er fortsatt fasit; heftet er
+rekkefølgen å møte dem i. PDF-en lages med
+`node verktoy/lag-pdf.mjs docs/kom-i-gang.md --sideskift`.
 
 **Hemmelighetene ligger i Netlify, ikke i repoet**, og det er derfor repoet
 kan deles fritt. `node test/unit.mjs && node test/funksjon.mjs` kjører uten

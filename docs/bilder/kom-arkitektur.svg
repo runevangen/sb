@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 430" width="1000" height="430"
+     font-family="Liberation Sans, DejaVu Sans, Helvetica, Arial, sans-serif">
+  <style>
+    .boks  { fill:#ffffff; stroke:#c9d0e6; stroke-width:2; rx:10 }
+    .lys   { fill:#eef1f8; stroke:#c9d0e6; stroke-width:2; rx:10 }
+    .tit   { font-size:19px; font-weight:bold; fill:#14245c }
+    .txt   { font-size:16px; fill:#1b1f2a }
+    .lit   { font-size:14px; fill:#5a6074 }
+    .mono  { font-family:"DejaVu Sans Mono", monospace; font-size:14px; fill:#1b1f2a }
+    .pil   { stroke:#1f4fd6; stroke-width:2.5; fill:none; marker-end:url(#p) }
+    .merk  { font-size:14px; fill:#1f4fd6 }
+    .adv   { font-size:14px; font-weight:bold; fill:#b4341f }
+  </style>
+  <defs>
+    <marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1f4fd6"/>
+    </marker>
+  </defs>
+
+  <rect class="boks" x="14" y="130" width="170" height="150"/>
+  <text class="tit" x="99" y="166" text-anchor="middle">Leseren</text>
+  <text class="lit" x="99" y="194" text-anchor="middle">mobil, nettleser</text>
+  <text class="lit" x="99" y="216" text-anchor="middle">ingen innlogging</text>
+  <text class="lit" x="99" y="238" text-anchor="middle">kreves for å lese</text>
+
+  <rect class="lys" x="234" y="40" width="300" height="330"/>
+  <text class="tit" x="384" y="74" text-anchor="middle">Netlify: mvp-sb</text>
+  <text class="lit" x="384" y="96" text-anchor="middle">hele repoet publiseres som det er</text>
+  <rect class="boks" x="256" y="112" width="256" height="110"/>
+  <text class="txt" x="272" y="138">Appen (det leseren får)</text>
+  <text class="mono" x="272" y="164">index.html  app.css  app.js</text>
+  <text class="mono" x="272" y="186">fotball.js  puber.js  sw.js</text>
+  <text class="lit" x="272" y="208">Ingen bundler. Ingen node_modules.</text>
+  <rect class="boks" x="256" y="238" width="256" height="112"/>
+  <text class="txt" x="272" y="264">Funksjonene (tjenersiden)</text>
+  <text class="mono" x="272" y="290">netlify/functions/*.mjs</text>
+  <text class="mono" x="272" y="312">nås som /api/fotball, /api/svar, …</text>
+  <text class="adv" x="272" y="336">Nøklene bor HER, ikke i repoet.</text>
+
+  <rect class="boks" x="604" y="30" width="382" height="86"/>
+  <text class="txt" x="622" y="60">sportsbibelen.no (WordPress)</text>
+  <text class="lit" x="622" y="86">Artiklene. Smal proxy: bare /posts og /categories.</text>
+  <text class="lit" x="622" y="106">Vi endrer aldri noe der.</text>
+
+  <rect class="boks" x="604" y="140" width="382" height="86"/>
+  <text class="txt" x="622" y="170">Supabase</text>
+  <text class="lit" x="622" y="196">Brukere (fornavn + PIN), kampsvar, puber,</text>
+  <text class="lit" x="622" y="216">visninger, innsendte forslag.</text>
+
+  <rect class="boks" x="604" y="250" width="382" height="110"/>
+  <text class="txt" x="622" y="280">Åpne tjenester</text>
+  <text class="lit" x="622" y="306">TheSportsDB (kamper), Overpass (puber i</text>
+  <text class="lit" x="622" y="326">nærheten), MET (vær), Entur (transport).</text>
+  <text class="lit" x="622" y="348">Ingen av dem vet hvem leseren er.</text>
+
+  <path class="pil" d="M188 205 H 230"/>
+  <path class="pil" d="M516 300 C 560 300, 560 80, 600 74"/>
+  <path class="pil" d="M516 300 C 560 300, 560 190, 600 184"/>
+  <path class="pil" d="M516 300 H 600"/>
+  <text class="merk" x="192" y="196">HTTPS</text>
+  <text class="merk" x="500" y="400" text-anchor="middle">Bare funksjonene snakker utover — nettleseren kaller /api/… og ingenting annet.</text>
+</svg>

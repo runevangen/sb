@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 420" width="1000" height="420"
+     font-family="Liberation Sans, DejaVu Sans, Helvetica, Arial, sans-serif">
+  <style>
+    .boks { fill:#ffffff; stroke:#c9d0e6; stroke-width:2; rx:10 }
+    .midt { fill:#eef1f8; stroke:#14245c; stroke-width:2.5; rx:10 }
+    .tit  { font-size:19px; font-weight:bold; fill:#14245c }
+    .h    { font-size:17px; font-weight:bold; fill:#14245c }
+    .txt  { font-size:15px; fill:#1b1f2a }
+    .lit  { font-size:13px; fill:#5a6074 }
+    .mono { font-family:"DejaVu Sans Mono", monospace; font-size:15px; fill:#1b1f2a }
+    .adv  { font-size:15px; font-weight:bold; fill:#b4341f }
+    .pil  { stroke:#1f4fd6; stroke-width:2.5; fill:none; marker-end:url(#p) }
+  </style>
+  <defs>
+    <marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1f4fd6"/>
+    </marker>
+  </defs>
+
+  <text class="tit" x="20" y="28">Mønsteret du må kjenne: én regel, tre lesere</text>
+
+  <rect class="midt" x="330" y="58" width="340" height="126"/>
+  <text class="mono" x="500" y="92" text-anchor="middle">pub-data.js</text>
+  <text class="txt" x="500" y="122" text-anchor="middle">Rene funksjoner:</text>
+  <text class="lit" x="500" y="146" text-anchor="middle">ingen DOM, ingen nettverk, ingen lagring.</text>
+  <text class="lit" x="500" y="168" text-anchor="middle">Samme svar hver gang, på samme inndata.</text>
+
+  <rect class="boks" x="20" y="256" width="280" height="108"/>
+  <text class="h" x="40" y="288">Appen</text>
+  <text class="mono" x="40" y="316">fotball.js</text>
+  <text class="lit" x="40" y="342">viser regelen for leseren</text>
+
+  <rect class="boks" x="360" y="256" width="280" height="108"/>
+  <text class="h" x="380" y="288">Netlify-funksjonen</text>
+  <text class="mono" x="380" y="316">netlify/functions/</text>
+  <text class="lit" x="380" y="342">håndhever regelen på tjeneren</text>
+
+  <rect class="boks" x="700" y="256" width="280" height="108"/>
+  <text class="h" x="720" y="288">Testene</text>
+  <text class="mono" x="720" y="316">test/unit.mjs</text>
+  <text class="lit" x="720" y="342">beviser regelen, på millisekunder</text>
+
+  <path class="pil" d="M420 190 C 380 220, 200 220, 160 250"/>
+  <path class="pil" d="M500 190 V 250"/>
+  <path class="pil" d="M580 190 C 620 220, 800 220, 840 250"/>
+
+  <text class="adv" x="20" y="400">Hører en regel hjemme her, legg den her. Blir appen og tjenesten uenige, får leseren en feilmelding som ikke stemmer.</text>
+</svg>

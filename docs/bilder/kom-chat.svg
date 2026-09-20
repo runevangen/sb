@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 560" width="1000" height="560"
+     font-family="Liberation Sans, DejaVu Sans, Helvetica, Arial, sans-serif">
+  <style>
+    .du    { fill:#1f4fd6; rx:14 }
+    .dut   { font-size:16px; fill:#ffffff }
+    .cl    { fill:#eef1f8; stroke:#c9d0e6; stroke-width:2; rx:14 }
+    .clt   { font-size:16px; fill:#1b1f2a }
+    .tit   { font-size:19px; font-weight:bold; fill:#14245c }
+    .lit   { font-size:14px; fill:#5a6074 }
+    .navn  { font-size:13px; font-weight:bold; fill:#5a6074 }
+    .mono  { font-family:"DejaVu Sans Mono", monospace; font-size:15px; fill:#1b1f2a }
+    .monod { font-family:"DejaVu Sans Mono", monospace; font-size:15px; fill:#ffffff }
+    .ok    { font-size:15px; fill:#1c7a4a }
+  </style>
+
+  <text class="tit" x="20" y="28">Den første økta: be om en omvisning før du endrer noe</text>
+
+  <text class="navn" x="980" y="58" text-anchor="end">DU</text>
+  <rect class="du" x="330" y="66" width="650" height="62"/>
+  <text class="dut" x="352" y="92">Les CLAUDE.md i dette repoet og forklar meg reglene.</text>
+  <text class="dut" x="352" y="114">Ikke endre noe ennå.</text>
+
+  <text class="navn" x="24" y="158">CLAUDE</text>
+  <rect class="cl" x="20" y="166" width="700" height="128"/>
+  <text class="clt" x="42" y="194">Leser CLAUDE.md, docs/modulene.md og docs/adr/ …</text>
+  <text class="clt" x="42" y="222">Her er reglene som gjelder, og hvorfor hver av dem</text>
+  <text class="clt" x="42" y="244">finnes. De viktigste: ingen byggesteg, alt går gjennom</text>
+  <text class="clt" x="42" y="266">pull request, og testtallene måles — aldri legges sammen.</text>
+
+  <text class="tit" x="20" y="348">Og når du faktisk skal gjøre noe</text>
+
+  <text class="navn" x="980" y="378" text-anchor="end">DU</text>
+  <rect class="du" x="240" y="386" width="740" height="84"/>
+  <text class="dut" x="262" y="412">Lag en ny gren, gjør «…», kjør enhets- og</text>
+  <text class="dut" x="262" y="434">funksjonstestene, og åpne en pull request.</text>
+  <text class="dut" x="262" y="456">Ikke push til main.</text>
+
+  <text class="navn" x="24" y="500">CLAUDE</text>
+  <rect class="cl" x="20" y="508" width="700" height="44"/>
+  <text class="ok" x="42" y="536">Gren laget · alle tester grønne · PR åpnet</text>
+  <text class="lit" x="740" y="536">Du gjør ingenting i terminalen.</text>
+</svg>

@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 520" width="1000" height="520"
+     font-family="Liberation Sans, DejaVu Sans, Helvetica, Arial, sans-serif">
+  <style>
+    .boks { fill:#ffffff; stroke:#c9d0e6; stroke-width:2; rx:10 }
+    .lys  { fill:#eef1f8; stroke:#c9d0e6; stroke-width:2; rx:10 }
+    .tit  { font-size:19px; font-weight:bold; fill:#14245c }
+    .h    { font-size:16px; font-weight:bold; fill:#14245c }
+    .mono { font-family:"DejaVu Sans Mono", monospace; font-size:14px; fill:#1b1f2a }
+    .lit  { font-size:13px; fill:#5a6074 }
+  </style>
+
+  <text class="tit" x="20" y="28">Hvor ting bor</text>
+
+  <rect class="boks" x="20" y="50" width="470" height="196"/>
+  <text class="h" x="40" y="80">Appen (rota av repoet)</text>
+  <text class="mono" x="40" y="108">index.html</text><text class="lit" x="230" y="108">markup, meta, temaskriptet</text>
+  <text class="mono" x="40" y="130">app.css</text><text class="lit" x="230" y="130">all stil, variabler i :root</text>
+  <text class="mono" x="40" y="152">app.js</text><text class="lit" x="230" y="152">appen, lastet som modul</text>
+  <text class="mono" x="40" y="174">lib.js</text><text class="lit" x="230" y="174">rene funksjoner uten DOM</text>
+  <text class="mono" x="40" y="196">fotball.js</text><text class="lit" x="230" y="196">fotballmodulen — den største</text>
+  <text class="mono" x="40" y="218">puber.js</text><text class="lit" x="230" y="218">den kuraterte pubelista</text>
+
+  <rect class="boks" x="510" y="50" width="470" height="196"/>
+  <text class="h" x="530" y="80">Tjenersiden</text>
+  <text class="mono" x="530" y="108">netlify/functions/</text><text class="lit" x="740" y="108">alt som har nøkler</text>
+  <text class="mono" x="530" y="130">netlify.toml</text><text class="lit" x="740" y="130">proxy + byggekommando</text>
+  <text class="mono" x="530" y="152">sw.js</text><text class="lit" x="740" y="152">service worker</text>
+  <text class="mono" x="530" y="174">admin.html</text><text class="lit" x="740" y="174">portalen</text>
+  <text class="mono" x="530" y="196">admin.js</text><text class="lit" x="740" y="196">— og logikken bak den</text>
+  <text class="lit" x="530" y="222">Funksjonene leser miljøet ved utrulling. Ny variabel = ny deploy.</text>
+
+  <rect class="lys" x="20" y="266" width="470" height="222"/>
+  <text class="h" x="40" y="296">Dokumentasjonen — les denne først</text>
+  <text class="mono" x="40" y="324">CLAUDE.md</text><text class="lit" x="230" y="324">reglene som gjelder NÅ</text>
+  <text class="mono" x="40" y="346">docs/adr/</text><text class="lit" x="230" y="346">hvorfor de er slik</text>
+  <text class="mono" x="40" y="368">docs/modulene.md</text><text class="lit" x="230" y="368">fil for fil, funksjon for funksjon</text>
+  <text class="mono" x="40" y="390">docs/hendelser.md</text><text class="lit" x="230" y="390">hva som har gått galt før</text>
+  <text class="mono" x="40" y="412">docs/testing.md</text><text class="lit" x="230" y="412">testtallene — og bare her</text>
+  <text class="mono" x="40" y="434">docs/kampdag-flyt.md</text><text class="lit" x="230" y="434">hele kampdagen forklart</text>
+  <text class="lit" x="40" y="466">Er du i tvil om HVORFOR noe er slik, står svaret i docs/ — ikke i koden.</text>
+
+  <rect class="boks" x="510" y="266" width="470" height="222"/>
+  <text class="h" x="530" y="296">Testene</text>
+  <text class="mono" x="530" y="324">test/unit.mjs</text><text class="lit" x="740" y="324">rene funksjoner, millisekunder</text>
+  <text class="mono" x="530" y="346">test/funksjon.mjs</text><text class="lit" x="740" y="346">funksjonene, stubbet fetch</text>
+  <text class="mono" x="530" y="368">test/run.mjs</text><text class="lit" x="740" y="368">alt med DOM, Chromium</text>
+  <text class="lit" x="530" y="400">Tallet testene skriver ut er sjekken på at en ny test</text>
+  <text class="lit" x="530" y="420">faktisk kjørte. Grønt på en test som aldri kjørte er</text>
+  <text class="lit" x="530" y="440">verre enn rødt.</text>
+  <text class="mono" x="530" y="470">verktoy/</text><text class="lit" x="740" y="470">diagnostikk, kjøres for hånd</text>
+</svg>
