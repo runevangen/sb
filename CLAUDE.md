@@ -47,6 +47,7 @@ modul for modul.
     bilder/         annonsebilder, ett ferdig utsnitt per form
     docs/           adr/, modulene.md, hendelser.md, testing.md,
                     nokler-og-tokens.md, oppsett.sql, kampdag-dypdykk.md
+                    kom-i-gang.md: veien inn for en ny person, som PDF
     BACKLOGG.md     peker til issues, som er den ekte backloggen
 
 **Mønsteret:** `*-data.js` er rene funksjoner — ingen DOM, ingen
@@ -86,14 +87,52 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   sted å sende den. Hvor teksten havner er leserens valg i
   delingsmenyen, så knappen heter «Del» og svaret «Kopiert. Lim inn der du
   vil.»
-- **Har du valgt et sted, minimeres de andre — men ikke der noen skal.**
-  Sto du med ditt eget sted blant seks, var lista noe å lese seg gjennom
-  framfor et svar. Framme står **ditt sted** og **stedene noen andre skal
-  til**: det siste er det eneste som kan endre svaret ditt. At det finnes
-  fire puber til, er det ikke. Resten ligger bak «Vis de andre (N)», og
-  åpen/lukket huskes på panelet — `tegnSteder` kjører på hvert svar, og en
-  liste som lukker seg selv midt i en vurdering er verre enn ingen
-  minimering. Melder du deg av, står alt framme igjen.
+- **Kortet har to lister, og de svarer på hvert sitt spørsmål.**
+  «Kampen vises hos:» er stedene **nær deg** — svaret på «hvor skal jeg».
+  «Trykk her for puber i andre byer» er resten, lukket til du trykker:
+  svaret på «hvem viser kampen ellers». En bekreftet visning 392 km unna
+  hører hjemme i den andre, ikke i den første, og `naerNok()` er skillet.
+  Begge sorteres av `sorterForslag()`: **bekreftet, så dine egne puber, så
+  avstand** — «først» betyr først *innenfor* lista, ikke øverst uansett.
+  Ukjent avstand sorteres sist i sitt lag; raden står der, men et tall vi
+  ikke har kan ikke slå et tall noen andre har.
+  **Den andre lista leser hele `KJENTE`**, ikke bare det de geografiske
+  kildene fant. Står du i Trondheim, svarer ingen av dem på Oslo — og da
+  ville lista vært tom akkurat når den trengs.
+- **Fire rader framme, så «Ekspander lista (N)» — og taket teller bare de
+  vanlige.** Ditt eget sted og stedene noen andre skal til kommer i
+  tillegg: de er ikke rader blant mange, og en liste som skyver svaret
+  ditt bak en knapp er ingen hjelp. Andre byer viser fem.
+  Regelen sa «har du valgt et sted, minimeres de andre» til
+  20. september 2026. Da var det to regler om det samme, og taket vant:
+  lista har samme høyde før og etter at du har svart. Åpen/lukket huskes
+  på panelet — `tegnSteder` kjører på hvert svar, og en liste som lukker
+  seg selv midt i en vurdering er verre enn ingen minimering.
+- **«Ukjent avstand demper ingenting» gjelder når vi ikke KAN vite.**
+  «Dine puber» bærer bare et navn — `dinePuber()` lagrer `{navn, antall,
+  sist}` i nettleseren — så en pub du har delt før kom inn i kortet uten
+  koordinat. Da ga `avstandTil()` null, `naerNok()` svarte ja, og Andy's
+  Pub sto blant stedene nær en leser i Trondheim, 390 km unna, uten by og
+  uten km. Tallene sto i `puber.js` hele tiden.
+  `merkKuraterte()` fyller derfor inn **lat, lon og bydel når raden
+  mangler dem** — og bare da. Et treff fra kartet bærer sitt eget punkt,
+  og de to kan peke på hver sin inngang.
+- **`min: true` settes der vi vet at raden er din**, i `boks.kilder.dine`.
+  Det er mellomlaget i `sorterForslag`, og flagget sto som en regel uten
+  en setter til 20. september 2026: enhetstesten lagde objektet for hånd og
+  var grønn, mens ingen pub i appen noen gang bar det.
+- **⚽ settes ett sted, ikke i hver kilde.** `kuraterteNaer()` kopierer
+  raden rett fra `KJENTE` og vet ikke at den er kuratert, mens
+  `stampuberFor()` går gjennom `merkKuraterte`. Sto merkingen i hver
+  kilde, forsvant ⚽ avhengig av hvilken vei raden kom. `tegnSteder`
+  merker hele lista i ett kall.
+- **Én note for hele kortet, ikke én per liste.** Den teller radene i
+  **begge**: sto den bare over de fjerne, ville «Fant ingen puber» stått
+  over en liste med fire. En posisjon som uteble forklarer begge listene,
+  og to linjer med samme forklaring er én for mye.
+  Veien videre er knappen nederst. Til 20. september 2026 sto «Skriv
+  navnet selv», om et felt som nå er borte — en setning som peker et sted
+  som ikke finnes er verre enn ingen.
 - **Sier du at du skal til et sted vi ikke kjenner, blir du spurt om å
   sende det inn.** Skjemaet har stått der hele tiden, bak «Mangler stedet?
   Send det inn.» — en knapp du måtte legge merke til. Øyeblikket stedet
@@ -135,10 +174,43 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   aldri om posisjon for å tegne en rad** — trykket som åpner kortet er
   handlingen telefonen krever, og lander posisjonen etterpå, tegnes radene
   om (`settPosisjon`).
-- **«Andre fotballpuber» er stedene i lista som *ikke* har bekreftet.**
-  ★ betyr «viser denne kampen» og settes av admin; ⚽ betyr «kjent for å
-  vise fotball» og kommer fra `puber.js`. De to er ulike påstander,
-  og merkene holder dem fra hverandre.
+  **Og derfor spør kortet om posisjon når det åpnes.** `fyllForslag()`
+  kalles fra `delKnapp`, og `hentNaerDeg()` spør derfra. Til
+  20. september 2026 hang den på «Andre fotballpuber» — ett trykk lenger
+  inn enn kortet — og da sto Bernie's øverst i Trondheim med filteret på
+  plass og virksomt: `naerNok()` svarer ja når vi ikke vet, og vi spurte
+  aldri. `sporPosisjon()` var det første forsøket, og sto i to timer: da
+  lista flyttet framme i kortet, spurte `hentNaerDeg` uansett, og to veier
+  til samme posisjon er én for mye. **Én som spør**, og det er den som
+  også trenger svaret.
+  **Men linja under kampraden rekker ikke å vente på den**, for den tegnes
+  før noe kort er åpnet. En bekreftet visning uten kjent avstand bærer
+  derfor byen ved navnet — «Bernie's (Oslo)» — både i linja og på raden i
+  kortet. Det er det eneste vi kan stå inne for uten å vite hvor leseren
+  er, og det koster ingen tillatelsesboks.
+- **Kortet rangerer etter hvor du står *nå*, og andre byer er veien
+  utenom.** For en kamp i kveld er «nå» og «ved avspark» det samme. For en
+  kamp om tre dager er det en gjetning, og for den som reiser feil
+  gjetning: «jeg er i Trondheim i dag, men i Oslo på fredag». Da svarer
+  ingen av de geografiske kildene.
+  **Søkefeltet var svaret til 20. september 2026**, og det krevde at du
+  visste hva stedet het. «Puber i andre byer» krever ingenting: du åpner
+  lista og ser dem, med avstand på hver rad. `sokKuraterte()` og
+  `sokNokkel()` står igjen i `pub-data.js` med testene sine, men appen
+  bruker dem ikke lenger.
+  **Et treff påstår ingenting om avstand** — den står på raden der vi
+  kjenner den, så «391 km» er noe du kan forkaste selv. Og du kan si at du
+  skal dit: det var hele grunnen til at de fjerne ble en **liste** og ikke
+  en opplysning.
+- **★ og ⚽ er to ulike påstander.** ★ betyr «viser denne kampen» og
+  settes av admin; ⚽ betyr «kjent for å vise fotball» og kommer fra
+  `puber.js`. Merkene holder dem fra hverandre, og «(bekreftet visning)»
+  står i ord ved siden av stjerna: merket alene er en konvensjon du må
+  lære, ordene er ikke.
+  Lenka **«Andre fotballpuber»** sto til 20. september 2026 med hele
+  forslagslista, søket, fritekstsvaret og innsendingsskjemaet bak seg —
+  én knapp du måtte legge merke til, med svaret på innsiden. Den er borte;
+  innholdet ligger i de to listene, og kildene hentes når kortet åpnes.
   De kuraterte stedene nådde lenge bare fram gjennom et **geografisk
   filter** — `kjenteNaer` krever posisjonen din, `kjenteVedArena` at
   arenaen er en vi kjenner. Utenlandsk kamp *og* nei til posisjon ga en
@@ -284,6 +356,21 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   `pub_forslag`, og et menneske gjør raden ferdig. Det finnes ingen vei fra
   et skjema på nettet og rett inn i det leseren ser.
   [ADR 0019](docs/adr/0019-pubforslag.md)
+  **«Jeg er på pub, legg inn her» er veien inn nå, og den er alene.**
+  «Mangler stedet? Send det inn.» sto rett under den og åpnet det samme
+  skjemaet — to knapper til én ting, i et kort som nettopp var ryddet for
+  nettopp det. Skjemaet lå bak to
+  knapper, og øyeblikket stedet faktisk mangler er øyeblikket du står i
+  døra på det. Knappen leser posisjonen og legger den i **merknaden** —
+  «Jeg står her: 63.4305, 10.3951 (±12 m)» — ikke som et koordinat på
+  raden: `pub_forslag` har ingen koordinatkolonner, og et punkt fra en
+  telefon er en opplysning til mennesket som gjør raden ferdig. Feltet er
+  synlig: en opplysning vi sender videre om deg, skal du kunne lese og
+  slette. Nøyaktigheten står med, for fire desimaler ser like presise ut
+  enten de er på tolv meter eller to kilometer.
+  **Og `tilbyForslag()` lever fortsatt**, men bare for et sted fra en
+  **delt lenke**: feltet du kunne skrive et ukjent navn i er borte, så det
+  er den eneste veien et navn vi ikke kjenner kommer inn i kortet.
   **Men lagringen merker forslaget den svarer på.** Lagring og merking var
   to handlinger for én avgjørelse, og den naturlige er lagringen — så
   forslaget ble stående i køen etter at stedet var lagt inn.
@@ -443,8 +530,13 @@ Detaljer og feller: [`docs/testing.md`](docs/testing.md).
 
 ## Arbeidsflyt
 
-Små, trygge endringer kan pushes rett til `main` — Netlify deployer på
-push, og CI kjører der også.
+**Alt går gjennom pull request.** `main` er beskyttet: PR kreves, og
+`regresjonstester` må være grønn.
+
+Regelen sa «små, trygge endringer kan pushes rett til `main`» til
+20. september 2026, og den var skrevet for én person. Prosjektet er nå to,
+og push til `main` deployer til prod — det er den ene handlingen der et
+uhell er ute hos leseren før noen rekker å se det.
 
 **Enhets- og funksjonstestene er porten foran prod.** De kjører som
 byggekommando i `netlify.toml`; feiler de, publiseres ingenting og forrige
@@ -453,7 +545,44 @@ filer og ser på exit-koden.
 
 **Men `test/run.mjs` er ikke med.** Den trenger Chromium, som
 ikke er noe å regne med i Netlifys byggemiljø. En DOM-regresjon kan fortsatt
-rulle ut, og fanges bare av CI — etterpå. Halv port, med vilje.
+rulle ut, og fanges bare av CI — etterpå. Halv port, med vilje. Det er
+derfor `regresjonstester` er den sjekken grenbeskyttelsen krever: den er
+den eneste som kjører alle tre.
 
-Bruk pull request for alt som endrer arkitektur, sikkerhet eller flere
-filer samtidig.
+### Når dere er to
+
+**Antallet i `docs/testing.md` glir.** Det gled fire ganger på to dager med
+én person — to økter som lander arbeid samme time treffer det i ulik
+rekkefølge. Regelen står allerede: tallet telles av testene, det legges
+aldri sammen. Etter en fletting **måles det på nytt** framfor å regnes ut.
+
+**Tre filer kolliderer oftere enn resten**, fordi alle legger til på
+toppen eller i en liste: `CLAUDE.md`, `docs/hendelser.md` og
+`docs/testing.md`. I `hendelser.md` skal begge oppføringer stå — det er en
+logg, ikke en tilstand. I `testing.md` er svaret å kjøre suitene og skrive
+det de sier.
+
+**En fletting kan være ekte uenighet, ikke bare to linjer som møtes.** Det
+skjedde 20. september: den ene grenen innførte en sirkel for «nær nok»
+mens den andre nettopp hadde landet «radiusen er en sirkel, og en by er
+ikke det». Les hva den andre siden faktisk gjorde før du løser konflikten;
+noen ganger er svaret å ta ut sitt eget.
+
+**En ny person leser [`docs/kom-i-gang.md`](docs/kom-i-gang.md) først.**
+Den er veien inn — koble seg på, runden fra gren til flettet PR, og de
+fellene som har kostet noe. Reglene her er fortsatt fasit; heftet er
+rekkefølgen å møte dem i. PDF-en lages med
+`node verktoy/lag-pdf.mjs docs/kom-i-gang.md --sideskift`.
+
+**Hemmelighetene ligger i Netlify, ikke i repoet**, og det er derfor repoet
+kan deles fritt. `node test/unit.mjs && node test/funksjon.mjs` kjører uten
+nett og uten en eneste nøkkel — hele porten foran prod kan kjøres av noen
+som ikke har tilgang til noe som helst. `test/run.mjs` trenger bare
+Chromium.
+
+**`SECRETS_SCAN_OMIT_PATHS` dekker `docs/**` og `test/**`**, fordi
+dokumentasjonen nevner plassholdere som «hemmelig-pepper». Følgen: en ekte
+nøkkel i en testfil blir **ikke** fanget av Netlifys skanner.
+
+**`PIN_PEPPER` kan ikke endres.** Et nytt pepper låser alle ute. Det er den
+ene miljøvariabelen som ikke tåler et forsøk.

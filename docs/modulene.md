@@ -156,6 +156,13 @@ kreditering, og den står der pubene vises.
   geografiske kildene og **før** de rene karttreffene: en stampub tvers
   over byen er et dårligere svar enn en fotballpub i nabogata, men et bedre
   svar enn en tilfeldig bar Overpass fant.
+- **`sokKuraterte()` er veien utenom geografien.** Kortet rangerer etter
+  hvor du står nå; søket leter i hele den kuraterte lista på navn, bydel og
+  by. Det folder med `sokNokkel()` — NFD pluss `\p{M}` — og **ikke** med
+  `normaliserLagnavn`, som har en håndskrevet bokstavliste og mistet ü-en i
+  «Grünerløkka». Den kan ikke rettes der: den går inn i `kampNokkel()`.
+  Navnetreff rangerer over treff på by og bydel; innenfor hver gruppe
+  nærmest først, og alfabetisk når vi ikke vet hvor leseren er.
 - **`rangerForslag()` gir én liste, ikke seks grupper.** Før sto forslagene
   under hver sin overskrift, samme pub i tre av dem, og den ene gruppa som
   faktisk svarte på kampen druknet. Nå havner hver pub ett sted, og merkene
@@ -491,12 +498,47 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   er per kort, og kortene åpnes etter at radene står. Den settes fra
   `?posisjon=` ved oppstart (koster ingenting, spør ingen) og ellers fra
   `settPosisjon()` første gang et kort får en; da tegnes radene om.
+  Spurt blir den i `hentNaerDeg()`, som `fyllForslag()` kaller på trykket
+  som **åpner kortet**. Til 20. september 2026 hang `fyllForslag` på
+  «Andre fotballpuber», og ble derfor aldri nådd av den som bare lurte på
+  hvem som viser kampen.
+  Uten kjent avstand står **byen** ved navnet — i `viserlinje()` og i
+  `stedRad()` — for linja under kampraden tegnes før noe kort er åpnet.
+- **Kortet har to lister, og `naerNok()` er skillet.** `tegnSteder()`
+  tegner stedene nær deg: `stedKilder()` slått sammen med de nære
+  forslagene (`slaSammenRader`), merket med `merkKuraterte` i ett kall, og
+  sortert av `sorterForslag()`. `tegnForslag()` tegner resten — de fjerne
+  — og leser hele `KJENTE`, ikke bare det kildene fant: står du i
+  Trondheim svarer ingen geografisk kilde på Oslo.
+  **Én vei, ikke to:** `tegnSteder` kaller `tegnForslag`, aldri motsatt.
+  `tegnKortet()` er inngangen for alt som lander data, så en kilde som
+  kommer sent tegner begge listene.
+  Noten er **én** for hele kortet (`panel.note`), og teller radene i
+  begge. Taket er `NAER_MAKS` vanlige rader; ditt eget sted og stedene
+  noen andre skal til kommer i tillegg.
+- **`merkKuraterte()` fyller koordinatet når raden mangler det.** Den
+  merket bare `viserFotball` og `lag` før, og en rad fra «dine puber» —
+  som bærer bare et navn — kom derfor inn uten lat og lon. Bare det som
+  mangler fylles: et karttreff beholder sitt eget punkt.
+- **`sendInnSted()` tar ingen felt lenger, men `hentPosisjon()`.**
+  Knappen `.sted-pavei` leser posisjonen inn i merknadsfeltet. Feltet er
+  synlig med vilje, og skjemaet sender `merknad` — som API-et alt tok
+  imot, så ingenting i basen måtte endres.
   `naerNok()` svarer **ja når vi ikke vet** — uten posisjon, eller uten
   koordinater på stedet — så ingenting gjemmes i blinde. `NAER_M` er 50 km,
   ikke `NAER_RADIUS`: det siste er gangavstand, og en pub tvers over byen er
   fortsatt et godt svar. Her er en sirkel riktig, til forskjell fra
   `kjenteNaer`: 30 km er den bredeste byen, 160 km det nærmeste bypar, og
   femti ligger rent imellom.
+- **Søket ligger på feltet som alt finnes.** `kamp-pub` het «Et annet
+  sted?» og var der du skrev et sted vi ikke kjente; nå søker det også i
+  lista mens du skriver. To tekstfelt ved siden av hverandre ville krevd at
+  du gjettet hvilket som gjorde hva. Søket **erstatter** forslagslista mens
+  det er aktivt, og et valg **avslutter** det — satte vi søket til navnet,
+  tømte lista seg for hvert treff som kom fra kartet framfor fra vår egen
+  liste. `falskmerke()` er skilt ut av `notetekst()` fordi søket har sin
+  egen linje og merket gjelder like mye der: avstandene måles fra den
+  falske posisjonen.
 - **Et trykk på et sted er svaret.** Før var det tre steg og et navnefelt
   på hver kamp. Navnet kommer nå fra innloggingen — et felt man måtte fylle
   ville betydd at «ett trykk» ikke var sant.
@@ -697,6 +739,14 @@ spørsmål kode ikke kan svare på alene.
   ingenting annet, så et sammendrag kan sendes som vedlegg. Oversetter
   bare det Markdown-en i `docs/` faktisk bruker; en pakke for resten
   ville vært prosjektets første npm-avhengighet, for et vedlegg.
+  **Et skjermbilde og et diagram er ikke samme slags bilde.** `78mm` er
+  bredden på en telefon, og en tegning presset ned i den er en boks med
+  seks ord i, uleselig. Regelen slår på filendelsen: `.svg` i
+  `docs/bilder/` er tegninger, og de får tekstbredden.
+  **`--sideskift` er et valg per dokument, ikke en stil for alle.** Et
+  sammendrag skal flyte; et opplæringshefte leses avsnitt for avsnitt, og
+  da er luften nederst på sida en marg framfor et hull. Flagget gir ny
+  side per `##`, men ikke foran den første — ellers står tittelsida alene.
 
 ---
 

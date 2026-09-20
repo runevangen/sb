@@ -374,13 +374,33 @@ export function kuraterteIByen(liste, senter) {
 
 // Merker treff fra OpenStreetMap som vi vet viser fotball. Da star
 // «viser fotball» pa de vi er sikre pa, uten a skjule resten.
+//
+// **Og den fyller inn koordinatet nar raden mangler det.** «Dine puber»
+// er navn og ingenting annet — `dinePuber()` lagrer {navn, antall, sist}
+// i nettleseren — sa en pub du har delt for kom inn i kortet uten lat og
+// lon. Da ga `avstandTil()` null, `naerNok()` svarte ja (vi vet ikke), og
+// Andy's Pub sto blant stedene naer en leser i Trondheim, 390 km unna,
+// uten by og uten km pa raden. Meldt 20. september 2026 med skjermbilde.
+//
+// Regelen «ukjent avstand demper ingenting» er riktig — men den gjelder
+// nar vi IKKE KAN vite. Her sto tallene i `puber.js` hele tiden.
+//
+// **Bare det som mangler fylles, aldri det som star.** Et treff fra
+// kartet baerer sitt eget koordinat, og det skal ikke byttes ut med vart:
+// de to kan peke pa hver sin inngang, og OSM-punktet er det raden ble
+// funnet pa.
 export function merkKuraterte(puber, liste) {
   if (!Array.isArray(liste) || !liste.length) return puber;
   const kjent = new Map();
   liste.forEach((p) => kjent.set(normaliserLagnavn(p.navn), p));
   return puber.map((p) => {
     const traff = kjent.get(normaliserLagnavn(p.navn));
-    return traff ? Object.assign({}, p, { viserFotball: true, lag: traff.lag || [] }) : p;
+    if (!traff) return p;
+    const ut = Object.assign({}, p, { viserFotball: true, lag: traff.lag || [] });
+    if (!Number.isFinite(ut.lat) && Number.isFinite(traff.lat)) ut.lat = traff.lat;
+    if (!Number.isFinite(ut.lon) && Number.isFinite(traff.lon)) ut.lon = traff.lon;
+    if (!ut.bydel && traff.bydel) ut.bydel = traff.bydel;
+    return ut;
   });
 }
 
@@ -426,6 +446,80 @@ export function stampuberFor(kamp, kjente) {
 }
 
 /* ---------- ett sporsmal, ett svar ---------- */
+
+// Sok i den kuraterte lista.
+//
+// Kortet rangerer etter hvor du staar NAA, og det er riktig for en kamp i
+// kveld. For en kamp om tre dager er det en gjetning — og for den som
+// reiser, feil gjetning: «jeg er i Trondheim i dag, men i Oslo paa
+// fredag». Da er ingen av de geografiske kildene et svar, og stedet du
+// leter etter finnes i lista uten a vaere naaabart.
+//
+// Soket er veien utenom geografien. Et treff **paastaar ingenting om
+// avstand** — det sier bare at stedet finnes hos oss — og derfor trenger
+// det ingen ny regel om hva som er naer nok.
+//
+// Det leter i navn, bydel OG by: «oslo» skal gi Oslo-stedene, selv om
+// ingen rad baerer byen som et felt. Byen leses av koordinatet, som
+// ellers (byFor).
+// Foldingen soket bruker, og den er IKKE normaliserLagnavn.
+//
+// Den har en handskrevet liste — o, a, ae — og alt annet strykes som om
+// det ikke var en bokstav. «Grunerlokka» ble «grnerlokka», og et sok pa
+// bydelen ga null treff pa fem steder som ligger der. Samme feilklasse
+// som osmNavnVask hadde: en liste over hvilke tegn som er bokstaver,
+// mangler alltid noen.
+//
+// Og den kan ikke rettes DER: normaliserLagnavn gar inn i kampNokkel(),
+// som er id-en hver eneste lagrede rad staar paa (ADR 0008). Derfor en
+// egen folding her, som lagnokkel() i stampuberFor — en sammenlikning som
+// bare gjelder ett sted, hoerer hjemme det stedet.
+//
+// NFD skiller bokstaven fra tegnet over den, og \p{M} tar tegnet: u blir
+// u, e blir e, a blir a. De to norske som ikke dekomponerer — o og ae —
+// staar igjen som de eneste to unntakene.
+function sokNokkel(verdi) {
+  return String(verdi || "")
+    .normalize("NFD")
+    .replace(/\p{M}+/gu, "")
+    .toLowerCase()
+    .replace(/ø/g, "o").replace(/æ/g, "ae")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+export function sokKuraterte(liste, sporring, senter) {
+  const ord = String(sporring || "").trim().split(/\s+/)
+    .map((o) => sokNokkel(o)).filter(Boolean);
+  if (!Array.isArray(liste) || !ord.length) return [];
+
+  return liste
+    .map((p) => {
+      const by = byFor(Number(p.lat), Number(p.lon));
+      // Hoystakken er alt som identifiserer stedet for et menneske.
+      const hoystakk = sokNokkel(
+        [p.navn, p.bydel, by ? BYER[by].navn : ""].filter(Boolean).join(" "));
+      if (!ord.every((o) => hoystakk.indexOf(o) > -1)) return null;
+      const avstand = senter && Number.isFinite(Number(p.lat)) &&
+        Number.isFinite(Number(p.lon)) ? avstandM(senter, p) : null;
+      // Treff paa NAVNET rangerer over treff paa by eller bydel: skriver
+      // du «andy», leter du etter Andy's — ikke etter alt i den bydelen.
+      const iNavn = ord.every((o) => sokNokkel(p.navn).indexOf(o) > -1);
+      return Object.assign({}, p, avstand === null ? {} : { avstand },
+        { sokINavn: iNavn });
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (a.sokINavn !== b.sokINavn) return a.sokINavn ? -1 : 1;
+      // Sa naermest forst der vi vet. Uten posisjon: alfabetisk, sa lista
+      // er den samme hver gang framfor a folge rekkefolgen i fila.
+      const aa = Number.isFinite(a.avstand) ? a.avstand : null;
+      const bb = Number.isFinite(b.avstand) ? b.avstand : null;
+      if (aa !== null && bb !== null && aa !== bb) return aa - bb;
+      if (aa !== null && bb === null) return -1;
+      if (aa === null && bb !== null) return 1;
+      return String(a.navn).localeCompare(String(b.navn), "no");
+    });
+}
 
 // Hvor mange forslag som star framme. Resten ligger bak «Flere forslag»,
 // sa ingenting forsvinner — men seks er sa mange som lar seg lese pa en
@@ -493,6 +587,7 @@ export function rangerForslag(kilder, maks = FORSLAG_MAKS) {
       // Ligamerket ma samles som de andre: vinner `bekreftede` plassen,
       // ligger flagget i en kilde lenger ned, og uten dette forsvant det.
       if (p.senderLigaen && !eks.senderLigaen) eks.senderLigaen = p.senderLigaen;
+      if (p.min) eks.min = true;
       if (p.lag && p.lag.length && !(eks.lag && eks.lag.length)) eks.lag = p.lag;
       if (Number.isFinite(p.avstand) &&
           (!Number.isFinite(eks.avstand) || p.avstand < eks.avstand)) {
@@ -570,6 +665,39 @@ export function ligapuberAv(kandidater, kamp, naa) {
 export function ligamerkeTekst(nokkel) {
   const liga = ligaFor(nokkel);
   return liga ? "Sender " + liga.navn : "";
+}
+
+// Hvor mange rader hver av de to listene i kortet viser for «Ekspander
+// lista». Fire naer deg, fem i andre byer: den forste er et valg du skal
+// ta, den andre er en opplysning du blar i.
+export const NAER_MAKS = 4;
+export const ANDRE_MAKS = 5;
+
+// Stjerne forst, sa avstand — INNENFOR én liste.
+//
+// «Forst» er ikke «overst uansett». En bekreftet visning 392 km unna
+// horer ikke hjemme blant stedene du kan dra til, og den skal vaere tatt
+// ut for denne sorteringa kjorer (se `naerNok` i fotball.js). Av det som
+// star igjen er «noen har meldt at de viser kampen» et bedre svar enn
+// «ligger naermest».
+//
+// Tre lag, ikke to. Dine egne puber ligger mellom: det er et valg du alt
+// har tatt, og det slar en pub du aldri har vaert pa. Samme grunn som at
+// ditt eget sted alltid star framme i lista over hvem som skal hvor.
+//
+// Ukjent avstand sorteres SIST innenfor sitt lag, og det er ikke en
+// demping: raden star der, i sin gruppe, med alt vi vet om den. Men et
+// tall vi ikke har kan ikke slaa et tall noen andre har.
+export function sorterForslag(liste) {
+  const lag = (p) => (p && p.bekreftet ? 0 : (p && p.min ? 1 : 2));
+  const km = (p) => (Number.isFinite(p && p.avstand) ? p.avstand : Infinity);
+  return (liste || []).slice().sort((a, b) => {
+    const l = lag(a) - lag(b);
+    if (l) return l;
+    const d = km(a) - km(b);
+    if (d) return d;
+    return String(a.navn || "").localeCompare(String(b.navn || ""), "nb");
+  });
 }
 
 /* ---------- nar posisjonen uteblir ---------- */

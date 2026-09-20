@@ -9,6 +9,113 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 20. september 2026 — en pub uten koordinat kan ikke plasseres
+
+**Meldt som:** «Puber ikke i by burde markeres. Dette søket er fra
+Trondheim», med skjermbilde. Under «Kampen vises hos:» sto Andy's Pub —
+uten by, uten avstand, mellom RBK-puben (3,8 km) og Brann Stadion.
+
+**Hva som faktisk var årsaken.** Andy's Pub ligger i Oslo og står i
+`puber.js` med lat 59.9135 og lon 10.7340. Raden som nådde kortet hadde
+dem ikke.
+
+Den kom fra **«dine puber»** — steder du har delt fra før.
+`dinePuber()` lagrer `{navn, antall, sist}` i nettleseren, og
+`boks.kilder.dine` gjorde det om til `{navn}`. Ingen koordinater. Da ga
+`avstandTil()` null, `naerNok()` svarte ja, og regelen «ukjent avstand
+demper ingenting» slapp den framme.
+
+**Regelen er riktig. Den gjelder bare når vi ikke KAN vite.** Her sto
+tallene i fila hele tiden — vi slo dem bare aldri opp.
+`merkKuraterte()` fyller nå inn lat, lon og bydel når raden mangler dem,
+og bare da: et treff fra kartet bærer sitt eget punkt, og de to kan peke
+på hver sin inngang.
+
+**Og testen fant noe den ikke lette etter.** Da scenen først kjørte, lå
+Andy's Pub riktignok i «andre byer» — men utenfor de fem som vises.
+`sorterForslag` har et mellomlag for dine egne puber, `p.min`, og
+**ingenting satte flagget**. Enhetstesten lagde objektet for hånd og var
+grønn, mens ingen pub i appen noen gang bar det. Regelen sto i
+`CLAUDE.md`, koden gjorde noe annet, og tallet i testfila så ikke
+forskjellen. Flagget settes nå i `boks.kilder.dine`.
+
+**Fanget av:** en scene med en delt pub i nettleserlageret og posisjon i
+Trondheim. Saboteres koordinatfyllet, sier den nøyaktig det skjermbildet
+viste: «⚽ Andy's Pub Sentrum — Jeg skal hit», uten avstand, blant de nære.
+
+---
+
+## 20. september 2026 — søket levde i ett døgn
+
+**Ikke en feil, men verdt å huske.** Søkefeltet «Skriv stedet du skal»
+landet 19. september for å løse «jeg er i Trondheim i dag, men i Oslo på
+fredag». Det virket, og det hadde tester.
+
+Det ble likevel tatt ut dagen etter, da kortet ble skrevet om til to
+lister. Grunnen er ikke at søket var galt, men at **«Puber i andre byer»
+svarer på det samme uten å kreve at du vet hva stedet heter.** Du åpner
+lista og ser dem, med avstand på hver rad.
+
+`sokKuraterte()` og `sokNokkel()` står igjen i `pub-data.js` med testene
+sine. De er ikke i bruk. Det er med vilje: foldingen i `sokNokkel` — NFD
+og `\p{M}`, fordi `normaliserLagnavn` ikke kan røres — er verdt å ha den
+dagen noe skal søke igjen.
+
+**Det som fulgte med ut var dyrere enn søket.** Feltet var også veien inn
+for et sted vi ikke kjenner: du skrev navnet og trykket «Jeg skal hit».
+Den veien finnes ikke lenger, og `tilbyForslag()` — «Vi kjenner ikke
+‹sted›. Send det inn?» — kan derfor bare nås fra en **delt lenke**.
+Testene som drev den gjennom feltet ble skrevet om til å gå den veien
+framfor å bli slettet: regelen lever, så testen skal det også.
+
+---
+
+## 20. september 2026 — Bernie's sto der fortsatt, og filteret var riktig
+
+**Meldt som:** «Bernie kommer opp og jeg er i Trondheim.» Med skjermbilde,
+fra prod, med filteret fra saken under utrullet og virksomt.
+
+**Hva som faktisk var årsaken.** Ingenting galt med filteret. `naerNok()`
+gjorde nøyaktig det den skal: den svarer **ja når vi ikke vet**, og vi
+visste ikke. Posisjonen ble hentet i `hentNaerDeg()`, som kalles fra
+`fyllForslag()` — og den henger på **«Andre fotballpuber»**-knappen. Et
+trykk lenger inn enn kortet.
+
+Så: du åpner kortet, `sisteKjentePosisjon` er `null`, `avstandTil()` gir
+`null`, og Bernie's står øverst som om den var i nabogata. Forklaringa —
+«Du sa nei til posisjon», «Puber nær deg»-knappen — ligger inne i den
+samme sammenslåtte seksjonen du ikke har åpnet.
+
+Kommentaren i koden sa alt riktig: *«trykket som åpner kortet er
+handlingen telefonen krever»*. Det var meningen. Trykket som faktisk
+utløste spørsmålet var et annet.
+
+**Hvorfor ingen test så det.** Alle sju posisjonstestene i `run.mjs`
+setter `?posisjon=…` i URL-en, og den snarveien setter posisjonen **ved
+oppstart**, før noe kort åpnes (`fotball.js`, i oppsettet). De beviser at
+filteret virker når posisjonen finnes. De sier ingenting om veien dit — og
+veien dit er det eneste en telefon har. Grønt av feil grunn, felle nummer
+to i `docs/testing.md`, denne gangen i syv tester samtidig.
+
+**To ting ble rettet, og bare sammen dekker de hullet.** `sporPosisjon()`
+ble hengt på trykket som åpner kortet og gjorde én ting: satte posisjonen.
+Den sto i to timer. Da kortet fikk to lister og hentet dem ved åpning,
+spurte `hentNaerDeg` uansett — og to veier til samme posisjon er én for
+mye. Den som spør nå er den som også trenger svaret.
+
+Og linja under **kampraden** tegnes før noe kort er åpnet i det hele tatt.
+Den kan ikke vente på en posisjon som først kommer av et trykk. Derfor
+bærer en bekreftet visning uten kjent avstand nå byen ved navnet:
+«Bernie's (Oslo)». Det er det eneste vi kan stå inne for uten å vite hvor
+leseren er — og det koster ingen tillatelsesboks.
+
+**Fanget av:** en scene uten `?posisjon=`, med `navigator.geolocation`
+stubbet slik at svaret holdes tilbake. Den måler skjermen både før og
+etter at posisjonen lander, og krever at ingen har spurt telefonen om noe
+mens runden bare ble tegnet.
+
+---
+
 ## 20. september 2026 — Bernie's sto øverst i Trondheim, 392 km unna
 
 **Meldt som:** «hvorfor kommer bernies opp når jeg er i trondheim», med

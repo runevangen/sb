@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 490" width="1000" height="490"
+     font-family="Liberation Sans, DejaVu Sans, Helvetica, Arial, sans-serif">
+  <style>
+    .boks { fill:#ffffff; stroke:#c9d0e6; stroke-width:2; rx:10 }
+    .lys  { fill:#eef1f8; stroke:#c9d0e6; stroke-width:2; rx:10 }
+    .gron { fill:#eaf6ef; stroke:#1c7a4a; stroke-width:2; rx:10 }
+    .laas { fill:#fdeeea; stroke:#b4341f; stroke-width:2; rx:10 }
+    .tit  { font-size:19px; font-weight:bold; fill:#14245c }
+    .h    { font-size:17px; font-weight:bold; fill:#14245c }
+    .txt  { font-size:15px; fill:#1b1f2a }
+    .lit  { font-size:13px; fill:#5a6074 }
+    .adv  { font-size:16px; font-weight:bold; fill:#b4341f }
+    .okt  { font-size:15px; font-weight:bold; fill:#1c7a4a }
+    .pil  { stroke:#1f4fd6; stroke-width:2.5; fill:none; marker-end:url(#p) }
+    .num  { fill:#14245c }
+    .numt { font-size:15px; font-weight:bold; fill:#ffffff }
+  </style>
+  <defs>
+    <marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1f4fd6"/>
+    </marker>
+  </defs>
+
+  <text class="tit" x="20" y="28">Runden du gjentar — den er alltid den samme</text>
+
+  <rect class="boks" x="20" y="58" width="220" height="112"/>
+  <circle class="num" cx="46" cy="84" r="14"/><text class="numt" x="46" y="90" text-anchor="middle">1</text>
+  <text class="h" x="68" y="90">Ny gren</text>
+  <text class="txt" x="38" y="122">Aldri jobb direkte</text>
+  <text class="txt" x="38" y="144">på main.</text>
+  <text class="lit" x="38" y="164">Claude lager den for deg.</text>
+
+  <rect class="boks" x="280" y="58" width="220" height="112"/>
+  <circle class="num" cx="306" cy="84" r="14"/><text class="numt" x="306" y="90" text-anchor="middle">2</text>
+  <text class="h" x="328" y="90">Skriv i chatten</text>
+  <text class="txt" x="298" y="122">Hva du vil ha gjort,</text>
+  <text class="txt" x="298" y="144">på norsk.</text>
+  <text class="lit" x="298" y="164">Claude endrer filene.</text>
+
+  <rect class="lys" x="540" y="58" width="220" height="112"/>
+  <circle class="num" cx="566" cy="84" r="14"/><text class="numt" x="566" y="90" text-anchor="middle">3</text>
+  <text class="h" x="588" y="90">Kjør testene</text>
+  <text class="txt" x="558" y="122">Før du pusher.</text>
+  <text class="txt" x="558" y="144">Tar under ett sekund.</text>
+  <text class="lit" x="558" y="164">unit + funksjon, ingen nøkler.</text>
+
+  <rect class="boks" x="800" y="58" width="180" height="112"/>
+  <circle class="num" cx="826" cy="84" r="14"/><text class="numt" x="826" y="90" text-anchor="middle">4</text>
+  <text class="h" x="848" y="90">Push</text>
+  <text class="txt" x="818" y="122">Grena di går opp</text>
+  <text class="txt" x="818" y="144">til GitHub.</text>
+
+  <path class="pil" d="M244 114 H 276"/>
+  <path class="pil" d="M504 114 H 536"/>
+  <path class="pil" d="M764 114 H 796"/>
+  <path class="pil" d="M890 176 V 234"/>
+
+  <rect class="boks" x="800" y="240" width="180" height="112"/>
+  <circle class="num" cx="826" cy="266" r="14"/><text class="numt" x="826" y="272" text-anchor="middle">5</text>
+  <text class="h" x="848" y="272">Pull request</text>
+  <text class="txt" x="818" y="304">Åpnes mot main.</text>
+  <text class="lit" x="818" y="326">Rune ser hva du har gjort.</text>
+
+  <rect class="gron" x="460" y="240" width="300" height="112"/>
+  <circle class="num" cx="486" cy="266" r="14" fill="#1c7a4a"/><text class="numt" x="486" y="272" text-anchor="middle">6</text>
+  <text class="h" x="508" y="272">CI kjører</text>
+  <text class="okt" x="478" y="304">regresjonstester</text>
+  <text class="txt" x="478" y="328">Alle tre suitene. Må bli grønn.</text>
+
+  <rect class="gron" x="140" y="240" width="240" height="112"/>
+  <circle class="num" cx="166" cy="266" r="14" fill="#1c7a4a"/><text class="numt" x="166" y="272" text-anchor="middle">7</text>
+  <text class="h" x="188" y="272">Flettet</text>
+  <text class="txt" x="158" y="304">Netlify ruller ut til prod.</text>
+  <text class="lit" x="158" y="326">Du trykker «flett» når alt er grønt.</text>
+
+  <path class="pil" d="M796 296 H 766"/>
+  <path class="pil" d="M456 296 H 386"/>
+
+  <rect class="laas" x="20" y="382" width="960" height="88"/>
+  <text class="adv" x="44" y="414">main er låst — og det er en vakt, ikke en avtale</text>
+  <text class="txt" x="44" y="444">Ingen kan pushe rett til main: ikke Rune, ikke Claude, ikke du. Alt må gjennom en pull request</text>
+  <text class="txt" x="44" y="464">med grønn regresjonstester. Det er derfor et uhell aldri rekker ut til leseren.</text>
+</svg>

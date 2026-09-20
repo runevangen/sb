@@ -2078,6 +2078,77 @@ a.ad-cta:focus-visible {
   white-space: nowrap;
 }
 
+/* Overskrifta over stedene naer deg. Lista sto uten navn for, og da leste
+   du den som et svar uten aa vite hva slags svar. */
+.sted-overskrift {
+  margin: 10px 0 4px;
+  font-size: calc(14px * var(--fs));
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Hvor stedet er, paa sin egen linje under navnet: by, avstand, og om
+   noen har meldt inn kampen. */
+.sted-rad-hvor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 2px;
+}
+.sted-rad-hvor[hidden] { display: none; }
+
+/* «(bekreftet visning)» ved siden av stjerna. Merket alene er en
+   konvensjon du maa laere; ordene er ikke. */
+.sted-bekreftet-tekst {
+  font-size: calc(11px * var(--fs));
+  color: var(--bekreftet);
+  white-space: nowrap;
+}
+
+/* Pubene i andre byer. Lukket til du trykker: for en kamp i kveld er de
+   ikke et svar, for en kamp om tre dager er de hele svaret. */
+.sted-andre { margin-top: 8px; }
+.sted-andre-apne {
+  display: block;
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: calc(13px * var(--fs));
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.pub-forslag[hidden] { display: none; }
+
+/* «Jeg er paa pub, legg inn her». Skjemaet laa bak to knapper for; na
+   staar veien inn nederst i kortet, der du er naar du staar i doera. */
+.sted-pavei {
+  display: block;
+  width: 100%;
+  margin: 10px 0 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-raised);
+  font-size: calc(14px * var(--fs));
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* Byen, naar vi ikke kjenner avstanden. Samme plass og samme vekt som
+   avstanden: det er det samme spoersmaalet — hvor er dette stedet — bare
+   besvart med det vi har. */
+.sted-by {
+  margin-left: 6px;
+  font-size: calc(11px * var(--fs));
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
 /* Bekreftede visninger langt unna, bak en knapp i linja under kampen.
    Stiplet, som .pub-mer: den er en vei videre, ikke et sted. */
 .kamp-viser-mer {
@@ -2418,29 +2489,6 @@ a.ad-cta:focus-visible {
 
 .kamp-svar:empty { display: none; }
 
-/* «Mangler stedet? Send det inn.» Ligger nederst i pubdelen av kortet,
-   under feltet der man alt har skrevet et navn selv — det er der man
-   oppdager at stedet mangler. Tekstknapp og ikke en fylt flate: den skal
-   vaere der for den som trenger den, uten a konkurrere med stedene over. */
-.sted-forslag {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border-faint);
-}
-
-.sted-forslag-apne {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--text-dim);
-  font-family: inherit;
-  font-size: calc(12px * var(--fs));
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-
-.sted-forslag-apne:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .sted-forslag-skjema {
   display: flex;
