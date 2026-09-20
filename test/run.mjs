@@ -4119,6 +4119,107 @@ const VISNINGER_FRA_TJENESTEN = [
     dato: "2026-09-21T17:00:00+00:00", satt: "2026-09-11T10:00:00.000Z" },
 ];
 
+/* ------- 16C. en bekreftet visning 392 km unna ------- */
+
+// Meldt 20. september 2026, med skjermbilde: «hvorfor kommer bernies opp
+// naar jeg er i trondheim».
+//
+// Fordi kilden svarer paa KAMPEN og kjenner ingen geografi. Bernie's paa
+// Gronland i Oslo hadde meldt inn kampen, og sto derfor oeverst som svaret
+// paa «hvor skal du se den?» — 392 km unna. Regelen var riktig saa lenge
+// lista var Oslo.
+const SAK_16C = kjor("bekreftet-langt-unna", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var VISNINGER = [
+    { pub: "Bernie's", kampId: "2026-09-20-brann-bodoglimt", kamp: "Brann – Bodo/Glimt",
+      dato: "2026-09-20T17:00:00+00:00", satt: "2026-09-11T10:00:00.000Z" }
+  ];
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "" }); });
+  // Leseren staar i Trondheim. Bernie's staar i puber.js, paa Gronland.
+  history.replaceState(null, "", location.pathname + "?posisjon=trondheim");
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: true, status: 200, json: function () {
+        return Promise.resolve({ elements: [] }); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { svar: [], visninger: VISNINGER })); } });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 ||
+        u.indexOf("/api/pub-liste") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var rad = document.querySelectorAll(".kamp.delbar")[0];
+    var viser = rad && rad.querySelector(".kamp-viser");
+    ok("linja staar fortsatt: noen viser kampen", !!viser);
+    if (!viser) { ferdig(); return; }
+
+    // Kjernen. Navnet skal IKKE staa der som svaret paa hvor du skal.
+    ok("men den navngir ikke en pub 392 km unna",
+       viser.textContent.indexOf("Denne kampen vises på: Bernie") === -1,
+       viser.textContent);
+    ok("den sier at ingen er i naerheten",
+       viser.textContent.indexOf("ingen i nærheten") > -1, viser.textContent);
+
+    // Skjult, ikke borte: en bekreftet visning er et faktum noen har foert
+    // inn, og det skal ga an a se det.
+    var mer = viser.querySelector(".kamp-viser-mer");
+    ok("og en knapp viser hvor", !!mer && mer.textContent === "Vis hvor",
+       mer ? mer.textContent : "ingen knapp");
+    var fjerne = viser.querySelector(".kamp-viser-fjerne");
+    ok("som er skjult til den trykkes", !!fjerne && fjerne.hidden === true);
+    if (mer) mer.click();
+    ok("ett trykk viser puben", !!fjerne && fjerne.hidden === false);
+    // «Tydelig hvor den er»: byen staar ved navnet.
+    ok("med byen ved navnet",
+       !!fjerne && fjerne.textContent.indexOf("Bernie's (Oslo)") > -1,
+       fjerne ? fjerne.textContent : "");
+
+    // I kortet: raden finnes, men den er ikke svaret oeverst.
+    rad.querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    setTimeout(function () { try {
+      var stedChip = function (navn) {
+        return Array.prototype.find.call(panel.querySelectorAll(".sted-rad-kort"),
+          function (c) { return c.querySelector(".sted-navn") &&
+            c.querySelector(".sted-navn").textContent === navn; });
+      };
+      var bernies = stedChip("Bernie's");
+      ok("raden finnes i kortet", !!bernies, "ingen rad");
+      ok("men ligger bak «Vis de andre»",
+         !!bernies && !!bernies.closest(".sted-resten"),
+         bernies ? bernies.className : "");
+      // Avstanden staar paa raden: «Bernie's» og «Bernie's 392 km» er to
+      // ulike svar, og bare det andre kan leses.
+      ok("og avstanden staar paa den",
+         !!bernies && !!bernies.querySelector(".sted-avstand") &&
+         bernies.querySelector(".sted-avstand").textContent.indexOf("km") > -1,
+         bernies && bernies.querySelector(".sted-avstand")
+           ? bernies.querySelector(".sted-avstand").textContent : "ingen avstand");
+      ferdig();
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700); });
+`);
+
 /* ------- 16B. rettelsene fra portalen treffer leseren ------- */
 
 // Det som kommer over nettet, lander etter at visningen star ferdig.
@@ -6105,7 +6206,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_16C, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
 let feilet = 0;
 
 for (const t of alle) {

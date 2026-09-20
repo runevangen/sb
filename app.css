@@ -2069,6 +2069,34 @@ a.ad-cta:focus-visible {
   gap: 6px;
 }
 
+/* Avstanden til et sted, paa raden. «Bernie's» og «Bernie's 392 km» er to
+   ulike svar, og bare det andre kan leses. */
+.sted-avstand {
+  margin-left: 6px;
+  font-size: calc(11px * var(--fs));
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* Bekreftede visninger langt unna, bak en knapp i linja under kampen.
+   Stiplet, som .pub-mer: den er en vei videre, ikke et sted. */
+.kamp-viser-mer {
+  padding: 0 6px;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: calc(11px * var(--fs));
+  cursor: pointer;
+}
+
+.kamp-viser-mer:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* `[hidden]` maa sies her: regelen over setter ingen display, men neste
+   som legger en her ma vite det. */
+.kamp-viser-fjerne[hidden] { display: none; }
+
 /* Har du valgt et sted, ligger resten bak denne. Stiplet, som .pub-mer, sa
    den ikke ser ut som enda et sted. */
 .sted-mer {
