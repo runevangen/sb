@@ -444,8 +444,13 @@ Detaljer og feller: [`docs/testing.md`](docs/testing.md).
 
 ## Arbeidsflyt
 
-Små, trygge endringer kan pushes rett til `main` — Netlify deployer på
-push, og CI kjører der også.
+**Alt går gjennom pull request.** `main` er beskyttet: PR kreves, og
+`regresjonstester` må være grønn.
+
+Regelen sa «små, trygge endringer kan pushes rett til `main`» til
+20. september 2026, og den var skrevet for én person. Prosjektet er nå to,
+og push til `main` deployer til prod — det er den ene handlingen der et
+uhell er ute hos leseren før noen rekker å se det.
 
 **Enhets- og funksjonstestene er porten foran prod.** De kjører som
 byggekommando i `netlify.toml`; feiler de, publiseres ingenting og forrige
@@ -454,7 +459,38 @@ filer og ser på exit-koden.
 
 **Men `test/run.mjs` er ikke med.** Den trenger Chromium, som
 ikke er noe å regne med i Netlifys byggemiljø. En DOM-regresjon kan fortsatt
-rulle ut, og fanges bare av CI — etterpå. Halv port, med vilje.
+rulle ut, og fanges bare av CI — etterpå. Halv port, med vilje. Det er
+derfor `regresjonstester` er den sjekken grenbeskyttelsen krever: den er
+den eneste som kjører alle tre.
 
-Bruk pull request for alt som endrer arkitektur, sikkerhet eller flere
-filer samtidig.
+### Når dere er to
+
+**Antallet i `docs/testing.md` glir.** Det gled fire ganger på to dager med
+én person — to økter som lander arbeid samme time treffer det i ulik
+rekkefølge. Regelen står allerede: tallet telles av testene, det legges
+aldri sammen. Etter en fletting **måles det på nytt** framfor å regnes ut.
+
+**Tre filer kolliderer oftere enn resten**, fordi alle legger til på
+toppen eller i en liste: `CLAUDE.md`, `docs/hendelser.md` og
+`docs/testing.md`. I `hendelser.md` skal begge oppføringer stå — det er en
+logg, ikke en tilstand. I `testing.md` er svaret å kjøre suitene og skrive
+det de sier.
+
+**En fletting kan være ekte uenighet, ikke bare to linjer som møtes.** Det
+skjedde 20. september: den ene grenen innførte en sirkel for «nær nok»
+mens den andre nettopp hadde landet «radiusen er en sirkel, og en by er
+ikke det». Les hva den andre siden faktisk gjorde før du løser konflikten;
+noen ganger er svaret å ta ut sitt eget.
+
+**Hemmelighetene ligger i Netlify, ikke i repoet**, og det er derfor repoet
+kan deles fritt. `node test/unit.mjs && node test/funksjon.mjs` kjører uten
+nett og uten en eneste nøkkel — hele porten foran prod kan kjøres av noen
+som ikke har tilgang til noe som helst. `test/run.mjs` trenger bare
+Chromium.
+
+**`SECRETS_SCAN_OMIT_PATHS` dekker `docs/**` og `test/**`**, fordi
+dokumentasjonen nevner plassholdere som «hemmelig-pepper». Følgen: en ekte
+nøkkel i en testfil blir **ikke** fanget av Netlifys skanner.
+
+**`PIN_PEPPER` kan ikke endres.** Et nytt pepper låser alle ute. Det er den
+ene miljøvariabelen som ikke tåler et forsøk.
