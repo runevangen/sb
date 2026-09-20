@@ -1614,30 +1614,30 @@ const SAK_12 = kjor("kamp-deling", FELLES + FOTBALL + `
     ok("stadion star som et sted man kan dra til",
        steder().indexOf("Brann Stadion") > -1, steder().join("|"));
 
-    // Forslagene ligger bak en lenke i kortet: de fleste kamper trenger
-    // dem ikke, og de var storsteparten av stoyen. Ingenting hentes for
-    // den apnes — for kostet et trykk pa «pa pub» to nettkall.
-    var apne = panel.querySelector(".pub-apne");
-    var utvidet = panel.querySelector(".pub-utvidet");
-    ok("pubene som pleier a vise fotball ligger bak en lenke",
-       apne && utvidet.hidden && apne.getAttribute("aria-expanded") === "false",
-       apne && apne.textContent);
-    // Har ingen meldt inn noe, er det ingen a vaere «andre» enn — da sier
-    // lenka hva som ligger bak framfor a telle noe som ikke finnes.
-    ok("og uten en bekreftet pub heter den ikke «andre» noe",
-       apne && apne.textContent === "Puber som pleier å vise fotball",
-       apne && apne.textContent);
-    // Klassen .sted-rad-annet la her til 17. september 2026 og gjorde
-    // ingenting: .pub-apne vant hver egenskap. Den skal ikke tilbake.
-    ok("lenka barer ingen klasse fra det gamle raddesignet",
-       apne && apne.className === "pub-apne", apne && apne.className);
-    ok("og ingen puber hentes for lenka apnes",
-       window.__overpassKall === 0 && window.__puberKall === 0,
+    // Stedene staar FRAMME i kortet na. «Puber som pleier a vise fotball»
+    // var en lenke du maatte legge merke til, med forslagslista, soeket og
+    // innsendingsskjemaet bak seg — og den er borte (20. september 2026).
+    ok("stedene staar framme, ikke bak en lenke",
+       !panel.querySelector(".pub-apne") && !panel.querySelector(".pub-utvidet"),
+       panel.querySelector(".pub-apne") ? "lenka staar der" : "");
+    // Lista over andre byer er det eneste som fortsatt er lukket: for en
+    // kamp i kveld er den ikke et svar.
+    var apne = panel.querySelector(".sted-andre-apne");
+    ok("puber i andre byer ligger bak en knapp",
+       !!apne && apne.getAttribute("aria-expanded") === "false" &&
+       apne.textContent === "Trykk her for puber i andre byer",
+       apne ? apne.textContent : "ingen knapp");
+    // Og kildene hentes naar kortet apnes. Motsatt av for: da kostet et
+    // trykk paa kortet ingenting, men posisjonen kom aldri — og uten den
+    // sto en bekreftet visning 392 km unna oeverst.
+    ok("kildene hentes naar kortet apnes",
+       window.__overpassKall > 0 || window.__puberKall > 0,
        window.__overpassKall + "/" + window.__puberKall);
 
     apne.click();
-    ok("lenka ekspanderer stedene ut i kortet",
-       !utvidet.hidden && apne.getAttribute("aria-expanded") === "true");
+    ok("knappen ekspanderer de andre byene",
+       apne.getAttribute("aria-expanded") === "true" &&
+       !panel.querySelector(".pub-forslag").hidden);
     // Ett sporsmal, ett svar: en rangert liste, ikke seks grupper.
     var forslag = panel;
     ok("pubforslagene star der da", forslag && !forslag.hidden);
@@ -1714,9 +1714,11 @@ const SAK_12 = kjor("kamp-deling", FELLES + FOTBALL + `
       var pubX = finnChip("Pub X");
       if (pubX) pubX.click();
       var valgtChip = finnChip("Pub X");
+      // Raden er merket valgt. Den var en chip med aria-pressed for; na er
+      // den en rad med en knapp inni, og merket ligger paa raden.
       ok("stedet man trykker pa blir valgt",
-         valgtChip && valgtChip.getAttribute("aria-pressed") === "true",
-         valgtChip && valgtChip.getAttribute("aria-pressed"));
+         valgtChip && valgtChip.classList.contains("valgt"),
+         valgtChip && valgtChip.className);
       ok("og utlogget star det hvorfor man ikke kommer pa lista",
          panel.querySelector(".kamp-svar").textContent.indexOf("Logg inn") === 0,
          panel.querySelector(".kamp-svar").textContent);
@@ -1941,7 +1943,6 @@ const SAK_14 = kjor("pub-feil", FELLES + FOTBALL + `
       // Naer deg feiler, men sier hvem som sviktet.
       ok("naer deg forklarer hvem som sviktet",
          forslag.textContent.indexOf("overpass-api.de svarte 504") > -1, forslag.textContent);
-      ok("pubfeltet kan fortsatt brukes", !!panel.querySelector(".kamp-pub"));
       ferdig();
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });

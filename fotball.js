@@ -784,6 +784,11 @@ function delPanel(kamp) {
   andre.appendChild(forslag);
   panel.forslag = forslag;
 
+  // Én note for hele kortet, under begge listene: se notetekst.
+  const note = el("p", "pub-note");
+  panel.appendChild(note);
+  panel.note = note;
+
   const melding = el("p", "kamp-svar");
   melding.setAttribute("aria-live", "polite");
 
@@ -997,6 +1002,7 @@ function delPanel(kamp) {
       });
     };
 
+    panel.naereAntall = framme.length + bak.length;
     framme.forEach((sted) => steder.appendChild(tegn(sted)));
 
     if (bak.length) {
@@ -1521,7 +1527,12 @@ function tegnForslag(boks) {
     boks.appendChild(rad);
   }
 
-  boks.appendChild(el("p", "pub-note", notetekst(boks, topp)));
+  // Noten horer til hele kortet, og teller radene i BEGGE listene.
+  if (panel && panel.note) {
+    panel.note.textContent = notetekst(boks, (panel.naereAntall || 0) + alle.length);
+  } else {
+    boks.appendChild(el("p", "pub-note", notetekst(boks, alle.length)));
+  }
 
   // Veien tilbake nar posisjonen ble avslatt eller kartet sviktet. Den
   // sto for alltid der; na star den bare nar den har noe a gjore.
@@ -1570,19 +1581,32 @@ function falskmerke(boks) {
     : "";
 }
 
-function notetekst(boks, topp) {
+// Én linje for HELE kortet, ikke én per liste.
+//
+// Kortet har to lister na — stedene naer deg og pubene i andre byer — og
+// noten horer til begge: en posisjon som uteble forklarer begge, og en
+// tjeneste som sviktet gjorde det ogsa. To linjer med samme forklaring er
+// én for mye i et kort som nettopp ble ryddet.
+//
+// `antall` er radene i BEGGE listene. Sto det bare de fjerne her, ville
+// «Fant ingen puber» statt over en liste med fire.
+//
+// Og veien videre er knappen nederst. Til 20. september 2026 sto «Skriv
+// navnet selv», om et felt som na er borte — en setning som peker et sted
+// som ikke finnes er verre enn ingen.
+function notetekst(boks, antall) {
   const falsk = falskmerke(boks);
   // Posisjonsfeilen forst: uteble posisjonen, er det DEN som forklarer
   // hvorfor resten er tynt, og de andre linjene er folger av den.
   const feil = [boks.posisjonsfeil].concat(boks.feil)
     .filter(Boolean).join(" ");
-  if (!topp.length) {
+  if (!antall) {
     if (boks.venter > 0) return falsk + "Finner puber …";
-    return falsk + (feil || "Fant ingen puber i nærheten. Skriv navnet selv.");
+    return falsk + (feil || "Fant ingen puber. Står du på en, legg den inn nederst.");
   }
   // Lisensen (ODbL) krever kreditering der treff fra kartet vises.
   const kreditt = boks.kart ? "© OpenStreetMap-bidragsytere. " : "";
-  return falsk + kreditt + (feil || "Står ikke puben her, skriv den selv.");
+  return falsk + kreditt + (feil || "Står ikke puben her, legg den inn nederst.");
 }
 
 // «(overpass-api.de svarte 406)» — nok til a se hva som feiler, uten a
