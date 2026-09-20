@@ -49,7 +49,7 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
          delAdresse, osmAdresseSporring, tolkAdresseTreff, koordinatFraLenke,
          SOK_SEKUNDER, SOK_TAK, overpassFeiltekst,
          OSLO_RAMME, rammeFor, byFor, bynavn, BY_RADIUS_KM,
-         posisjonsfeil } from "../pub-data.js";
+         posisjonsfeil, sokKuraterte } from "../pub-data.js";
 import { PUBER_KONTAKT } from "../puber-kontakt.js";
 import { KANALER } from "../kanaler.js";
 import { KURATERTE } from "../puber.js";
@@ -2649,6 +2649,96 @@ ok("og lengden har et tak",
 // sviktet, som er nettopp det `forsok` finnes for.
 ok("og den er lang nok til at et speil rekker a svare",
    SOK_SEKUNDER * 1000 > 6480, SOK_SEKUNDER * 1000);
+
+/* ---------------- sok i den kuraterte lista ---------------- */
+
+// Kortet rangerer etter hvor du staar NAA. Meldt 20. september 2026: «jeg
+// er i dag i Trondheim men planlegger kamp om 3 dager. Da er jeg i Oslo.»
+// Da er ingen av de geografiske kildene et svar, og stedet du leter etter
+// finnes i lista uten a vaere naaabart.
+const SOKBARE = [
+  { navn: "Andy's Pub", bydel: "Sentrum", lat: 59.9135, lon: 10.7340,
+    type: "sportsbar", kilde: "https://x.no/", sikkerhet: "bekreftet", sjekket: "2026-09-11" },
+  { navn: "Pokalen Vulkan", bydel: "Gr\u00fcnerl\u00f8kka", lat: 59.9230, lon: 10.7510,
+    type: "pub", kilde: "https://x.no/", sikkerhet: "bekreftet", sjekket: "2026-09-11" },
+  { navn: "Lerkendal Pub", bydel: "Lerkendal", lat: 63.4126, lon: 10.4076,
+    type: "pub", kilde: "https://x.no/", sikkerhet: "bekreftet", sjekket: "2026-09-11" },
+  // Heter «Sentrum» og ligger LENGER unna enn Andy's, som bare har det som
+  // bydel. Uten navneregelen ville Andy's staatt forst.
+  { navn: "Sentrum Sportsbar", bydel: "Frogner", lat: 59.9000, lon: 10.7000,
+    type: "sportsbar", kilde: "https://x.no/", sikkerhet: "bekreftet", sjekket: "2026-09-11" },
+];
+const TRH = { lat: 63.430, lon: 10.395 };
+const navnene = (t) => t.map((p) => p.navn).join(", ");
+
+// Alle tre Oslo-stedene, naermest forst — Pokalen ligger lengst nord.
+ok("sok paa bynavn gir stedene i den byen",
+   navnene(sokKuraterte(SOKBARE, "oslo", TRH))
+     === "Pokalen Vulkan, Andy's Pub, Sentrum Sportsbar",
+   navnene(sokKuraterte(SOKBARE, "oslo", TRH)));
+// Ingen rad baerer byen som et felt — byFor leser den ut av koordinatet.
+ok("og byen staar ikke paa raden",
+   SOKBARE.every((p) => p.by === undefined));
+ok("sok paa navn treffer navnet",
+   navnene(sokKuraterte(SOKBARE, "andy", TRH)) === "Andy's Pub",
+   navnene(sokKuraterte(SOKBARE, "andy", TRH)));
+ok("sok paa bydel treffer bydelen",
+   navnene(sokKuraterte(SOKBARE, "lerkendal", TRH)) === "Lerkendal Pub",
+   navnene(sokKuraterte(SOKBARE, "lerkendal", TRH)));
+
+// normaliserLagnavn har en handskrevet bokstavliste, og u staar ikke i
+// den: «Grunerlokka» ble «grnerlokka», og et sok paa bydelen ga null
+// treff. Den kan ikke rettes der — den gaar inn i kampNokkel (ADR 0008) —
+// sa soket har sin egen folding.
+ok("bokstaver soket ikke kjenner folder likevel",
+   navnene(sokKuraterte(SOKBARE, "grunerlokka", TRH)) === "Pokalen Vulkan",
+   navnene(sokKuraterte(SOKBARE, "grunerlokka", TRH)));
+ok("og skrevet med tegnene over gir det samme",
+   navnene(sokKuraterte(SOKBARE, "gr\u00fcnerl\u00f8kka", TRH)) === "Pokalen Vulkan");
+ok("normaliserLagnavn ville mistet u-en",
+   normaliserLagnavn("Gr\u00fcnerl\u00f8kka") === "grnerlokka",
+   normaliserLagnavn("Gr\u00fcnerl\u00f8kka"));
+
+// Flere ord: alle maa finnes, i hvilken som helst rekkefolge.
+ok("flere ord krever alle", 
+   navnene(sokKuraterte(SOKBARE, "pub sentrum", TRH)) === "Andy's Pub",
+   navnene(sokKuraterte(SOKBARE, "pub sentrum", TRH)));
+
+// Treff paa NAVNET rangerer over treff paa by eller bydel: skriver du
+// «sentrum», leter du etter et sted som heter det — ikke etter alt som
+// ligger i den bydelen.
+//
+// Sentrum Sportsbar ligger LENGER unna enn Andy's, som bare har «Sentrum»
+// som bydel. Uten navneregelen ville avstanden satt Andy's forst, og
+// testen ville ikke kunne skille de to reglene fra hverandre.
+const SOKRANG = sokKuraterte(SOKBARE, "sentrum", TRH);
+ok("navnetreff staar over treff paa bydel",
+   navnene(SOKRANG) === "Sentrum Sportsbar, Andy's Pub", navnene(SOKRANG));
+ok("og avstanden sier at det ikke var den som avgjorde",
+   SOKRANG[0].avstand > SOKRANG[1].avstand,
+   Math.round(SOKRANG[0].avstand) + " mot " + Math.round(SOKRANG[1].avstand));
+// Naermest forst BLANT navnetreffene: Lerkendal er i Trondheim.
+ok("og naermest forst der navnet treffer begge",
+   navnene(sokKuraterte(SOKBARE, "pub", TRH)) === "Lerkendal Pub, Andy's Pub",
+   navnene(sokKuraterte(SOKBARE, "pub", TRH)));
+
+// Et treff paastaar ingenting om avstand — den staar paa, sa den som
+// leser kan forkaste den selv.
+ok("treffene baerer avstand naar vi vet hvor leseren er",
+   Number.isFinite(sokKuraterte(SOKBARE, "andy", TRH)[0].avstand));
+ok("og ingen avstand naar vi ikke vet",
+   sokKuraterte(SOKBARE, "andy", null)[0].avstand === undefined);
+// Uten posisjon er rekkefolgen alfabetisk, ikke fila sin: lista skal se
+// lik ut hver gang.
+ok("uten posisjon er rekkefolgen alfabetisk",
+   navnene(sokKuraterte(SOKBARE, "pub", null)) === "Andy's Pub, Lerkendal Pub",
+   navnene(sokKuraterte(SOKBARE, "pub", null)));
+
+ok("tomt sok gir ingenting a vise",
+   sokKuraterte(SOKBARE, "", TRH).length === 0 &&
+   sokKuraterte(SOKBARE, "   ", TRH).length === 0);
+ok("og et sok uten treff gir tom liste, ikke en feil",
+   sokKuraterte(SOKBARE, "finnesikke", TRH).length === 0);
 
 /* ---------------- dokumentasjonen holder folge ---------------- */
 

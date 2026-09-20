@@ -421,6 +421,80 @@ export function stampuberFor(kamp, kjente) {
 
 /* ---------- ett sporsmal, ett svar ---------- */
 
+// Sok i den kuraterte lista.
+//
+// Kortet rangerer etter hvor du staar NAA, og det er riktig for en kamp i
+// kveld. For en kamp om tre dager er det en gjetning — og for den som
+// reiser, feil gjetning: «jeg er i Trondheim i dag, men i Oslo paa
+// fredag». Da er ingen av de geografiske kildene et svar, og stedet du
+// leter etter finnes i lista uten a vaere naaabart.
+//
+// Soket er veien utenom geografien. Et treff **paastaar ingenting om
+// avstand** — det sier bare at stedet finnes hos oss — og derfor trenger
+// det ingen ny regel om hva som er naer nok.
+//
+// Det leter i navn, bydel OG by: «oslo» skal gi Oslo-stedene, selv om
+// ingen rad baerer byen som et felt. Byen leses av koordinatet, som
+// ellers (byFor).
+// Foldingen soket bruker, og den er IKKE normaliserLagnavn.
+//
+// Den har en handskrevet liste — o, a, ae — og alt annet strykes som om
+// det ikke var en bokstav. «Grunerlokka» ble «grnerlokka», og et sok pa
+// bydelen ga null treff pa fem steder som ligger der. Samme feilklasse
+// som osmNavnVask hadde: en liste over hvilke tegn som er bokstaver,
+// mangler alltid noen.
+//
+// Og den kan ikke rettes DER: normaliserLagnavn gar inn i kampNokkel(),
+// som er id-en hver eneste lagrede rad staar paa (ADR 0008). Derfor en
+// egen folding her, som lagnokkel() i stampuberFor — en sammenlikning som
+// bare gjelder ett sted, hoerer hjemme det stedet.
+//
+// NFD skiller bokstaven fra tegnet over den, og \p{M} tar tegnet: u blir
+// u, e blir e, a blir a. De to norske som ikke dekomponerer — o og ae —
+// staar igjen som de eneste to unntakene.
+function sokNokkel(verdi) {
+  return String(verdi || "")
+    .normalize("NFD")
+    .replace(/\p{M}+/gu, "")
+    .toLowerCase()
+    .replace(/ø/g, "o").replace(/æ/g, "ae")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+export function sokKuraterte(liste, sporring, senter) {
+  const ord = String(sporring || "").trim().split(/\s+/)
+    .map((o) => sokNokkel(o)).filter(Boolean);
+  if (!Array.isArray(liste) || !ord.length) return [];
+
+  return liste
+    .map((p) => {
+      const by = byFor(Number(p.lat), Number(p.lon));
+      // Hoystakken er alt som identifiserer stedet for et menneske.
+      const hoystakk = sokNokkel(
+        [p.navn, p.bydel, by ? BYER[by].navn : ""].filter(Boolean).join(" "));
+      if (!ord.every((o) => hoystakk.indexOf(o) > -1)) return null;
+      const avstand = senter && Number.isFinite(Number(p.lat)) &&
+        Number.isFinite(Number(p.lon)) ? avstandM(senter, p) : null;
+      // Treff paa NAVNET rangerer over treff paa by eller bydel: skriver
+      // du «andy», leter du etter Andy's — ikke etter alt i den bydelen.
+      const iNavn = ord.every((o) => sokNokkel(p.navn).indexOf(o) > -1);
+      return Object.assign({}, p, avstand === null ? {} : { avstand },
+        { sokINavn: iNavn });
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (a.sokINavn !== b.sokINavn) return a.sokINavn ? -1 : 1;
+      // Sa naermest forst der vi vet. Uten posisjon: alfabetisk, sa lista
+      // er den samme hver gang framfor a folge rekkefolgen i fila.
+      const aa = Number.isFinite(a.avstand) ? a.avstand : null;
+      const bb = Number.isFinite(b.avstand) ? b.avstand : null;
+      if (aa !== null && bb !== null && aa !== bb) return aa - bb;
+      if (aa !== null && bb === null) return -1;
+      if (aa === null && bb !== null) return 1;
+      return String(a.navn).localeCompare(String(b.navn), "no");
+    });
+}
+
 // Hvor mange forslag som star framme. Resten ligger bak «Flere forslag»,
 // sa ingenting forsvinner — men seks er sa mange som lar seg lese pa en
 // telefon uten a rulle.

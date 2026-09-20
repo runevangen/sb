@@ -17,7 +17,7 @@ import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
          rangerForslag, FORSLAG_MAKS, tolkPubRader, slaSammenPuber,
          posisjonsfeil, kuraterteIByen,
-         stampuberFor, falskPosisjon, avstandM, byFor, BYER }
+         stampuberFor, falskPosisjon, avstandM, byFor, BYER, sokKuraterte }
   from "./pub-data.js";
 import { KURATERTE } from "./puber.js";
 import { sjekkForslag, alleredeILista, NAVN_MAKS, ADRESSE_MAKS }
@@ -748,10 +748,21 @@ function delPanel(kamp) {
   // Et sted du skriver selv. Feltet og forslagene ligger bak lenka
   // under: de fleste kamper trenger dem ikke, og de var storsteparten av
   // stoyen i kortet.
+  // Ett felt, to jobber — og det er med vilje ett.
+  //
+  // Feltet har alltid vaert «skriv stedet du skal». Na soker det OGSAA i
+  // den kuraterte lista mens du skriver. To tekstfelt ved siden av
+  // hverandre, ett til a soke og ett til a skrive, er verre enn ingen
+  // sok: du maa gjette hvilket som gjor hva.
+  //
+  // Og soket tar ikke feltet fra deg. Finner det ingenting, staar «Jeg
+  // skal hit» der like fullt og bruker navnet du skrev — det er fortsatt
+  // veien inn for et sted vi ikke kjenner.
   const pubFelt = el("input", "kamp-pub");
   pubFelt.type = "text";
-  pubFelt.placeholder = "Et annet sted?";
-  pubFelt.setAttribute("aria-label", "Skriv stedet du skal se kampen");
+  pubFelt.placeholder = "Søk eller skriv et sted";
+  pubFelt.setAttribute("aria-label",
+    "Søk i lista, eller skriv stedet du skal se kampen");
   pubFelt.maxLength = STED_MAKS;
 
   const forslag = pubForslag(kamp, pubFelt);
@@ -760,6 +771,10 @@ function delPanel(kamp) {
   egen.disabled = true;
   pubFelt.addEventListener("input", () => {
     egen.disabled = !pubFelt.value.trim();
+    // Soket gaar mot lista i minnet: ingen kall, ingen venting, ingen
+    // grunn til a vente paa at du slutter a skrive.
+    forslag.sok = pubFelt.value.trim();
+    if (forslag.dataset.fylt) tegnForslag(forslag);
   });
 
   const utvidet = el("div", "pub-utvidet");
@@ -1007,6 +1022,11 @@ function delPanel(kamp) {
   forslag.velg = (pub) => {
     pubFelt.value = pub.navn;
     egen.disabled = false;
+    // Et valg AVSLUTTER soket. Satte vi soket til navnet i stedet, tomte
+    // lista seg for hvert treff som ikke staar i den kuraterte lista — en
+    // pub fra kartet finnes ikke der, og da sto du igjen med ingenting
+    // rett etter at du trykket paa den.
+    forslag.sok = "";
     svarSted(kamp, panel, "pub", pub.navn, melding);
   };
 
@@ -1415,6 +1435,35 @@ function tegnForslag(boks) {
   // Merket folger svaret jeg har gitt, ikke det som star i feltet: et
   // forslag er merket fordi jeg skal dit, ikke fordi jeg skrev navnet.
   const valgt = boks.mittSted || "";
+
+  // Soker du, ERSTATTER treffene lista — de legges ikke til.
+  //
+  // Rangeringen svarer paa «hvor er du naa». Det er riktig for en kamp i
+  // kveld, og en gjetning for en kamp om tre dager: «jeg er i Trondheim i
+  // dag, men i Oslo paa fredag». Da er ingen av de geografiske kildene et
+  // svar, og da skal de heller ikke staa i veien for det du leter etter.
+  //
+  // Et treff paastaar ingenting om avstand. Den staar paa brikka naar vi
+  // kjenner den — 391 km er et svar du kan forkaste selv.
+  if (boks.sok) {
+    const treff = merkBekreftet(
+      merkKuraterte(sokKuraterte(KJENTE, boks.sok, sisteKjentePosisjon), KJENTE),
+      boks.bekreftede || []);
+    boks.replaceChildren();
+    if (treff.length) {
+      const rad = el("div", "pub-liste");
+      treff.forEach((pub) => rad.appendChild(pubChip(pub, boks, valgt)));
+      boks.appendChild(rad);
+    }
+    // Ingen treff er ikke en feil, og feltet er ikke tatt fra deg: det du
+    // skrev er fortsatt et sted du kan si at du skal til.
+    boks.appendChild(el("p", "pub-note", falskmerke(boks) + (treff.length
+      ? treff.length + " treff på «" + boks.sok + "» i lista vår."
+      : "Ingen steder i lista vår heter «" + boks.sok + "»."
+        + " Trykk «Jeg skal hit» for å bruke navnet likevel.")));
+    return;
+  }
+
   const { topp, resten } = rangerForslag(boks.kilder, boks.alt ? 0 : FORSLAG_MAKS);
   boks.replaceChildren();
 
@@ -1453,13 +1502,21 @@ function tegnForslag(boks) {
 // si at ingenting finnes; er alt tomt og ingenting venter, star det
 // hvorfor. Tre «fant ingen»-linjer, en per kilde, var det som gjorde
 // panelet uleselig.
-function notetekst(boks, topp) {
-  // Star den falske posisjonen pa, skal det sta pa skjermen sa lenge den
-  // gjor det. En app som viser puber et annet sted enn du er, og tier om
-  // det, sier noe usant med sin egen liste.
-  const falsk = boks.falskPosisjon
+// Star den falske posisjonen pa, skal det sta pa skjermen sa lenge den
+// gjor det. En app som viser puber et annet sted enn du er, og tier om
+// det, sier noe usant med sin egen liste.
+//
+// Den staar HER og ikke inni notetekst, fordi soket har sin egen linje og
+// merket gjelder like mye der: avstandene paa treffene maales fra den
+// falske posisjonen.
+function falskmerke(boks) {
+  return boks.falskPosisjon
     ? "Falsk posisjon: " + boks.falskPosisjon.navn + ". "
     : "";
+}
+
+function notetekst(boks, topp) {
+  const falsk = falskmerke(boks);
   // Posisjonsfeilen forst: uteble posisjonen, er det DEN som forklarer
   // hvorfor resten er tynt, og de andre linjene er folger av den.
   const feil = [boks.posisjonsfeil].concat(boks.feil)

@@ -156,6 +156,13 @@ kreditering, og den står der pubene vises.
   geografiske kildene og **før** de rene karttreffene: en stampub tvers
   over byen er et dårligere svar enn en fotballpub i nabogata, men et bedre
   svar enn en tilfeldig bar Overpass fant.
+- **`sokKuraterte()` er veien utenom geografien.** Kortet rangerer etter
+  hvor du står nå; søket leter i hele den kuraterte lista på navn, bydel og
+  by. Det folder med `sokNokkel()` — NFD pluss `\p{M}` — og **ikke** med
+  `normaliserLagnavn`, som har en håndskrevet bokstavliste og mistet ü-en i
+  «Grünerløkka». Den kan ikke rettes der: den går inn i `kampNokkel()`.
+  Navnetreff rangerer over treff på by og bydel; innenfor hver gruppe
+  nærmest først, og alfabetisk når vi ikke vet hvor leseren er.
 - **`rangerForslag()` gir én liste, ikke seks grupper.** Før sto forslagene
   under hver sin overskrift, samme pub i tre av dem, og den ene gruppa som
   faktisk svarte på kampen druknet. Nå havner hver pub ett sted, og merkene
@@ -497,6 +504,15 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   fortsatt et godt svar. Her er en sirkel riktig, til forskjell fra
   `kjenteNaer`: 30 km er den bredeste byen, 160 km det nærmeste bypar, og
   femti ligger rent imellom.
+- **Søket ligger på feltet som alt finnes.** `kamp-pub` het «Et annet
+  sted?» og var der du skrev et sted vi ikke kjente; nå søker det også i
+  lista mens du skriver. To tekstfelt ved siden av hverandre ville krevd at
+  du gjettet hvilket som gjorde hva. Søket **erstatter** forslagslista mens
+  det er aktivt, og et valg **avslutter** det — satte vi søket til navnet,
+  tømte lista seg for hvert treff som kom fra kartet framfor fra vår egen
+  liste. `falskmerke()` er skilt ut av `notetekst()` fordi søket har sin
+  egen linje og merket gjelder like mye der: avstandene måles fra den
+  falske posisjonen.
 - **Et trykk på et sted er svaret.** Før var det tre steg og et navnefelt
   på hver kamp. Navnet kommer nå fra innloggingen — et felt man måtte fylle
   ville betydd at «ett trykk» ikke var sant.
