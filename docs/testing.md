@@ -4,9 +4,9 @@
 kommandoene, men ikke tallene: de sto i tre filer og glei fire ganger på to
 dager. Legger du til tester, er det denne fila som skal rettes.
 
-    node test/unit.mjs      690 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      698 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  367 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       677 tester, 3–20 s, headless Chromium
+    node test/run.mjs       682 tester, 3–20 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
@@ -161,6 +161,16 @@ til angring, og hele fotballmodulen.
   sammenslåinga virket, ikke at stedet kunne nås. Er det geografi som
   testes, still deg der en leser faktisk står, ikke på punktet raden
   lagres med.
+
+- **`?posisjon=` setter posisjonen ved oppstart — og hopper over veien
+  dit.** Snarveien er laget for å kunne prøve appen utenfor Oslo, og den
+  setter `sisteKjentePosisjon` før noe kort åpnes. Alle sju
+  posisjonsscenene brukte den, og alle sju var grønne mens appen aldri
+  spurte telefonen om noe: de beviste at filteret virker **når** posisjonen
+  finnes, og ingenting om hvordan den kommer. En telefon har bare den ene
+  veien. Testes det som skjer *fordi* posisjonen mangler, må scenen stå
+  uten `?posisjon=` og stubbe `navigator.geolocation` selv — gjerne slik at
+  svaret kan holdes tilbake, så skjermen kan måles både før og etter.
 
 - **Skriv aldri bakoverstrek i et testskript.** Skriptene limes inn i en
   template-streng, og `\d` er borte før nettleseren ser det — mønsteret

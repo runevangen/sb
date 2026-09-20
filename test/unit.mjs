@@ -40,6 +40,7 @@ import { ARENAER, arenaFor, vaerSti, foltTemp, tolkVarsel, klerad, vaertekst }
 import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, enturNaermest,
          tolkHoldeplasser, grupperPuber, ofteBrukt, noterPub,
          rangerForslag, FORSLAG_MAKS, stampuberFor, FORSLAG_KILDER,
+         sorterForslag, NAER_MAKS, ANDRE_MAKS,
          falskPosisjon, BYER,
          OVERPASS_SPEIL, overpassHeadere, restTid,
          sjekkPubliste, kuraterteNaer, kuraterteIByen, merkKuraterte,
@@ -1593,6 +1594,56 @@ ok("uten tak kommer alle med",
    rangerForslag({ naerDeg: [{ navn: "a" }, { navn: "b" }, { navn: "c" }] }, 0).topp.length === 3);
 ok("tomt inn gir tomt ut",
    rangerForslag(null).topp.length === 0 && rangerForslag({}).resten.length === 0);
+
+/* ---- stjerne forst, sa avstand, innenfor én liste ---- */
+
+// Kortet har to lister na: stedene naer deg, og pubene i andre byer.
+// Sorteringa er den samme i begge, og «forst» betyr forst INNENFOR den
+// lista — ikke overst uansett. En bekreftet visning 392 km unna er tatt
+// ut for dette, av naerNok i fotball.js.
+const SORT = sorterForslag([
+  { navn: "Karttreff naer", avstand: 500 },
+  { navn: "Bekreftet langt", bekreftet: true, avstand: 9000 },
+  { navn: "Min pub", min: true },
+  { navn: "Karttreff naermest", avstand: 100 },
+]);
+ok("den bekreftede star forst, ogsa naar en annen er naermere",
+   SORT[0].navn === "Bekreftet langt", SORT.map((p) => p.navn).join(" "));
+ok("sa min egen pub, som er et valg jeg alt har tatt",
+   SORT[1].navn === "Min pub", SORT.map((p) => p.navn).join(" "));
+ok("og resten pa avstand, naermest forst",
+   SORT[2].navn === "Karttreff naermest" && SORT[3].navn === "Karttreff naer",
+   SORT.map((p) => p.navn).join(" "));
+
+// Ukjent avstand star sist i sitt eget lag. Det er ingen demping — raden
+// star der, i gruppa si — men et tall vi ikke har kan ikke sla et tall
+// noen andre har.
+const SORT_UKJENT = sorterForslag([
+  { navn: "Uten avstand" }, { navn: "Med avstand", avstand: 4000 },
+]);
+ok("uten avstand sorteres sist blant sine egne",
+   SORT_UKJENT[0].navn === "Med avstand", SORT_UKJENT.map((p) => p.navn).join(" "));
+
+// Lik avstand ma gi lik rekkefolge hver gang: en liste som stokker seg
+// selv mellom to tegninger er en liste du ma lese pa nytt.
+const SORT_LIK = sorterForslag([
+  { navn: "Bodega", avstand: 300 }, { navn: "Antikvariatet", avstand: 300 },
+]);
+ok("lik avstand sorteres pa navn, sa lista ikke stokker seg",
+   SORT_LIK[0].navn === "Antikvariatet", SORT_LIK.map((p) => p.navn).join(" "));
+
+ok("sorterForslag rorer ikke lista den far",
+   (function () {
+     const inn = [{ navn: "b", avstand: 2 }, { navn: "a", avstand: 1 }];
+     sorterForslag(inn);
+     return inn[0].navn === "b";
+   })());
+ok("tomt inn gir tomt ut", sorterForslag(null).length === 0);
+
+// Tallene star i koden, ett sted, sa lista og «Ekspander lista (N)» ikke
+// kan bli uenige om hvor mange som vises.
+ok("fire naer deg, fem i andre byer", NAER_MAKS === 4 && ANDRE_MAKS === 5,
+   NAER_MAKS + " / " + ANDRE_MAKS);
 
 /* ---- stampubene for lagene som spiller ---- */
 

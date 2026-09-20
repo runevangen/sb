@@ -17,10 +17,11 @@ import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
          rangerForslag, FORSLAG_MAKS, tolkPubRader, slaSammenPuber,
          posisjonsfeil, kuraterteIByen,
-         stampuberFor, falskPosisjon, avstandM, byFor, BYER, sokKuraterte }
+         stampuberFor, falskPosisjon, avstandM, byFor, BYER,
+         sorterForslag, ANDRE_MAKS, NAER_MAKS }
   from "./pub-data.js";
 import { KURATERTE } from "./puber.js";
-import { sjekkForslag, alleredeILista, NAVN_MAKS, ADRESSE_MAKS }
+import { sjekkForslag, alleredeILista, NAVN_MAKS, ADRESSE_MAKS, MERKNAD_MAKS }
   from "./pub-forslag-data.js";
 import { bekreftetFor, merkBekreftet, tolkVisninger } from "./visning-data.js";
 import { arenaFor } from "./vaer-data.js";
@@ -217,7 +218,7 @@ function tegnKjenteIgjen() {
       boks.kilder.stampuber = merkBekreftet(
         merkKuraterte(stampuberFor(boks.kamp, KJENTE), KJENTE), bekreftede);
     }
-    tegnForslag(boks);
+    tegnKortet(boks);
   });
 }
 
@@ -640,6 +641,16 @@ function delKnapp(kamp, rad) {
     // delt lenke ligger pa raden, og den finnes ikke for panelet er
     // festet. Tegnet vi for, ville det stedet mangle i lista.
     panel.tegnSteder();
+    // Kildene hentes HER, paa trykket som apner kortet.
+    //
+    // De laa bak «Andre fotballpuber» til 20. september 2026, og med dem
+    // laa posisjonen: `naerNok()` svarer ja naar vi ikke vet, saa Bernie's
+    // paa Gronland sto oeverst for en leser i Trondheim med filteret fra
+    // #122 pa plass og virksomt. Vi spurte aldri.
+    //
+    // Dette trykket er handlingen telefonen krever, og `hentNaerDeg` er
+    // den ene som spoer: én vei til posisjonen, ikke to.
+    fyllForslag(panel.forslag, kamp);
     tegnPanelListe(kamp);
     // Fokus pa det forste stedet — det er handlingen. Har kampen ingen
     // steder enna, star lenka til forslagene der i stedet.
@@ -739,8 +750,44 @@ function delPanel(kamp) {
   const kanal = kanallinje(kamp);
   if (kanal) panel.appendChild(kanal);
 
+  // Overskrifta sto ikke der for, og lista under var uten navn: du leste
+  // den som et svar uten a vite hva slags svar.
+  panel.appendChild(el("p", "sted-overskrift", "Kampen vises hos:"));
   const steder = el("div", "sted-liste");
   panel.appendChild(steder);
+
+  // Pubene i andre byer. De svarer paa «hvem viser kampen ellers», ikke
+  // paa «hvor skal jeg» — og derfor er de en egen liste framfor de
+  // neste radene i den forste. Lukket til du trykker: for en kamp i kveld
+  // er de ikke et svar, og for en kamp om tre dager er de hele svaret.
+  const andre = el("div", "sted-andre");
+  panel.appendChild(andre);
+
+  // Boksen er den samme som for — den baerer kildene, posisjonen og
+  // feilene — men den tegner na den ENE lista den svarer paa: stedene
+  // som ikke er naer deg. De naere lofter `tegnSteder` opp i lista over.
+  const forslag = pubForslag(kamp);
+  forslag.panel = panel;
+  const andreApne = el("button", "sted-andre-apne",
+    "Trykk her for puber i andre byer");
+  andreApne.type = "button";
+  andreApne.setAttribute("aria-expanded", "false");
+  forslag.hidden = true;
+  andreApne.addEventListener("click", () => {
+    const pa = forslag.hidden;
+    forslag.hidden = !pa;
+    andreApne.setAttribute("aria-expanded", pa ? "true" : "false");
+    andreApne.textContent = pa
+      ? "Skjul puber i andre byer" : "Trykk her for puber i andre byer";
+  });
+  andre.appendChild(andreApne);
+  andre.appendChild(forslag);
+  panel.forslag = forslag;
+
+  // Én note for hele kortet, under begge listene: se notetekst.
+  const note = el("p", "pub-note");
+  panel.appendChild(note);
+  panel.note = note;
 
   const melding = el("p", "kamp-svar");
   melding.setAttribute("aria-live", "polite");
@@ -748,71 +795,40 @@ function delPanel(kamp) {
   // Et sted du skriver selv. Feltet og forslagene ligger bak lenka
   // under: de fleste kamper trenger dem ikke, og de var storsteparten av
   // stoyen i kortet.
-  // Ett felt, to jobber — og det er med vilje ett.
+  // Skjemaet for et sted vi ikke kjenner.
   //
-  // Feltet har alltid vaert «skriv stedet du skal». Na soker det OGSAA i
-  // den kuraterte lista mens du skriver. To tekstfelt ved siden av
-  // hverandre, ett til a soke og ett til a skrive, er verre enn ingen
-  // sok: du maa gjette hvilket som gjor hva.
+  // Det laa bak to knapper: «Andre fotballpuber», og saa «Mangler stedet?
+  // Send det inn.» Oeyeblikket stedet faktisk mangler er oeyeblikket du
+  // staar i doera paa det, og da er to knapper unna for langt. Na staar
+  // det nederst i kortet, bak «Jeg er paa pub, legg inn her».
   //
-  // Og soket tar ikke feltet fra deg. Finner det ingenting, staar «Jeg
-  // skal hit» der like fullt og bruker navnet du skrev — det er fortsatt
-  // veien inn for et sted vi ikke kjenner.
-  const pubFelt = el("input", "kamp-pub");
-  pubFelt.type = "text";
-  pubFelt.placeholder = "Søk eller skriv et sted";
-  pubFelt.setAttribute("aria-label",
-    "Søk i lista, eller skriv stedet du skal se kampen");
-  pubFelt.maxLength = STED_MAKS;
+  // Soekefeltet «Skriv stedet du skal» stod her ogsaa, og gaar ut med
+  // seksjonen: «Puber i andre byer» svarer paa det samme — «jeg er i
+  // Trondheim i dag, men i Oslo paa fredag» — med ett element faerre paa
+  // kortet.
+  const forslagSkjema = sendInnSted(null);
 
-  const forslag = pubForslag(kamp, pubFelt);
-  const egen = el("button", "sted-egen", "Jeg skal hit");
-  egen.type = "button";
-  egen.disabled = true;
-  pubFelt.addEventListener("input", () => {
-    egen.disabled = !pubFelt.value.trim();
-    // Soket gaar mot lista i minnet: ingen kall, ingen venting, ingen
-    // grunn til a vente paa at du slutter a skrive.
-    forslag.sok = pubFelt.value.trim();
-    if (forslag.dataset.fylt) tegnForslag(forslag);
-  });
-
-  const utvidet = el("div", "pub-utvidet");
-  utvidet.hidden = true;
-  utvidet.appendChild(forslag);
-  utvidet.appendChild(pubFelt);
-  utvidet.appendChild(egen);
-  // Star du pa en pub som ikke finnes i lista, har du til na ikke hatt
-  // noen vei til a si fra (#80). Skjemaet star her og ikke lenger opp:
-  // det er nettopp nar du har skrevet et navn selv at stedet mangler.
-  const forslagSkjema = sendInnSted(pubFelt);
-  utvidet.appendChild(forslagSkjema);
-
-  // Lenka ut til pubene som pleier a vise fotball. Har ingen meldt inn
-  // noe pa denne kampen, er det den eneste veien videre — da sier lenka
-  // det, og listen star apen med en gang.
+  // «Jeg er paa pub, legg inn her».
   //
-  // Sto «Et annet sted» til 17. september 2026, og det var feil ord.
-  // «Et annet sted» hoeres ut som feltet der du skriver noe selv. Det
-  // som apner seg er en liste over **fotballpuber som ikke har meldt inn
-  // denne kampen** — steder du kan regne med a fa se fotball, bare uten
-  // at noen har sagt noe om akkurat denne. Etiketten skal si det.
+  // Her sto «Andre fotballpuber» — en lenke som gjemte forslagslista,
+  // soeket, fritekstsvaret og innsendingsskjemaet bak ett trykk du maatte
+  // legge merke til. Lista staar na framme i kortet, i to: stedene naer
+  // deg, og pubene i andre byer. Det eneste som blir igjen bak en knapp,
+  // er det som krever at du skriver noe.
   //
-  // «Andre» star bare nar det finnes en forste: har ingen bekreftet noe,
-  // er det ingen a vaere annen enn.
-  const apne = el("button", "pub-apne");
-  apne.type = "button";
-  apne.setAttribute("aria-expanded", "false");
-  const apneTekst = () => (bekreftede().length
-    ? "Andre fotballpuber" : "Puber som pleier å vise fotball");
-  apne.textContent = apneTekst();
-  const vis = (pa) => {
-    utvidet.hidden = !pa;
-    apne.setAttribute("aria-expanded", pa ? "true" : "false");
-    apne.textContent = pa ? "Skjul stedene" : apneTekst();
-    if (pa) fyllForslag(forslag, kamp);
+  // Knappen leser posisjonen foerst. Staar du i doera, er koordinatet
+  // ditt bedre enn det admin finner av gateadressen etterpaa — og
+  // noeyaktigheten foelger med, for fire desimaler ser like presise ut
+  // enten de er paa tolv meter eller to kilometer.
+  const pavei = el("button", "sted-pavei", "Jeg er på pub, legg inn her");
+  pavei.type = "button";
+  const apneSkjema = (stedsnavn) => {
+    forslagSkjema.apneMed(stedsnavn || "");
   };
-  apne.addEventListener("click", () => vis(utvidet.hidden));
+  pavei.addEventListener("click", () => {
+    apneSkjema("");
+    forslagSkjema.hentPosisjon();
+  });
 
   // «Vi kjenner ikke stedet. Send det inn?»
   //
@@ -831,9 +847,7 @@ function delPanel(kamp) {
   tilbudKnapp.addEventListener("click", () => {
     const stedsnavn = tilbud.dataset.sted || "";
     tilbud.hidden = true;
-    // Skjemaet ligger bak lenka: den maa apnes foer feltet kan faa fokus.
-    vis(true);
-    forslagSkjema.apneMed(stedsnavn);
+    apneSkjema(stedsnavn);
   });
 
   panel.tilbyForslag = (hvor, stedsnavn) => {
@@ -858,8 +872,6 @@ function delPanel(kamp) {
 
   panel.appendChild(melding);
   panel.appendChild(tilbud);
-  panel.appendChild(apne);
-  panel.appendChild(utvidet);
 
   // Vennene nederst, gruppert etter stedet de skal til: «List opp nederst
   // venner som har planlagt turen dit». Et navn uten et sted sier ikke
@@ -874,6 +886,9 @@ function delPanel(kamp) {
   // chat, og en knapp som navngir noe appen ikke har, lover et sted a
   // sende den. Hvor teksten havner er leserens valg i delingsmenyen —
   // gruppechatten, e-post, en notis — og «Del» er sant om alle.
+  panel.appendChild(pavei);
+  panel.appendChild(forslagSkjema);
+
   const send = el("button", "kamp-send", "Del");
   send.type = "button";
   panel.appendChild(send);
@@ -906,6 +921,21 @@ function delPanel(kamp) {
     egneSteder.push({ hvor, navn: sted });
   };
 
+  // Én radtype for begge listene. En pub i Oslo skal kunne svares paa
+  // akkurat som en pub i nabogata — det var nettopp derfor «andre byer»
+  // ble en liste og ikke en opplysning.
+  panel.andreRad = (pub) => {
+    const eget = mitt();
+    const valgt = eget && eget.sted ? stedNokkel(eget.sted) : "";
+    const nokkel = stedNokkel(pub.navn);
+    return stedRad(kamp, panel, pub, {
+      valgt: !!valgt && nokkel === valgt,
+      paaLista: !!konto.okt(),
+      pekt: false,
+      melding,
+    });
+  };
+
   panel.tegnSteder = () => {
     const rad = panel.closest(".kamp");
     const pekt = rad ? stedNokkel(rad.dataset.pektSted || "") : "";
@@ -930,20 +960,43 @@ function delPanel(kamp) {
     // Resten ligger bak én knapp som sier hvor mange. Ingenting skjules —
     // men det du alt har bestemt, skal ikke konkurrere med det du har
     // valgt bort.
-    const alle = stedKilder(kamp, bekreftede(), rad, egneSteder);
+    // Lista er de bekreftede, arenaen, stedene noen alt skal til, dine
+    // egne trykk — OG forslagene naer deg. De siste laa bak «Andre
+    // fotballpuber» til 20. september 2026: en knapp du maatte legge
+    // merke til, med hele svaret bak seg.
+    //
+    // De fjerne er ikke her. De staar i sin egen liste, «Puber i andre
+    // byer», som svarer paa noe annet: hvem viser kampen ellers.
+    const naere = rangerForslag(forslag.kilder, 0).topp.filter(naerNok);
+    // ⚽ «kjent for aa vise fotball» kommer fra puber.js, og settes HER
+    // framfor i hver kilde for seg: `kuraterteNaer` kopierer raden rett
+    // fra KJENTE og vet ikke at den er kuratert. Ett sted, sa merket ikke
+    // kan falle bort avhengig av hvilken kilde raden kom fra.
+    const alle = sorterForslag(merkKuraterte(
+      slaSammenRader(stedKilder(kamp, bekreftede(), rad, egneSteder), naere), KJENTE));
+
     const framme = [];
     const bak = [];
+    // Taket teller de VANLIGE radene. Ditt eget sted og stedene noen
+    // andre skal til kommer i tillegg: de er ikke rader blant mange, og
+    // en liste som skjover svaret ditt bak en knapp er ingen hjelp.
+    let vanlige = 0;
     alle.forEach((sted) => {
       const nokkel = stedNokkel(sted.navn);
       const erValgt = !!valgt && nokkel === valgt;
-      // Ditt eget sted og stedene noen skal til staar alltid framme.
+      // Ditt eget sted og stedene noen skal til staar alltid framme, ogsa
+      // naar de faller utenfor taket: det er ikke en rad blant mange, det
+      // er svaret ditt.
       if (erValgt || sted.harFolk) { framme.push(sted); return; }
-      // Et sted vi VET er langt unna, er ikke et svar paa «hvor skal jeg».
-      // En bekreftet visning kjenner ingen geografi — den svarer paa
-      // kampen — og sto derfor oeverst 392 km unna. Ukjent avstand demper
-      // ingenting: se naerNok.
-      if (!naerNok(sted)) { bak.push(sted); return; }
-      if (!valgt) framme.push(sted);
+      // Et sted vi VET er langt unna, er ikke et svar paa «hvor skal
+      // jeg». En bekreftet visning kjenner ingen geografi — den svarer paa
+      // kampen — og sto derfor oeverst 392 km unna. Den er ikke borte: den
+      // staar i «Puber i andre byer», som svarer paa nettopp det.
+      // Ukjent avstand demper ingenting: se naerNok.
+      if (!naerNok(sted)) return;
+      // Fire rader, saa «Ekspander lista». Ingenting forsvinner — men en
+      // liste du maa lese deg gjennom er ikke et svar.
+      if (vanlige < NAER_MAKS) { vanlige += 1; framme.push(sted); }
       else bak.push(sted);
     });
 
@@ -957,6 +1010,7 @@ function delPanel(kamp) {
       });
     };
 
+    panel.naereAntall = framme.length + bak.length;
     framme.forEach((sted) => steder.appendChild(tegn(sted)));
 
     if (bak.length) {
@@ -970,7 +1024,7 @@ function delPanel(kamp) {
       const mer = el("button", "sted-mer");
       mer.type = "button";
       const merTekst = () => (panel.visAlleSteder
-        ? "Skjul de andre" : "Vis de andre (" + bak.length + ")");
+        ? "Skjul lista" : "Ekspander lista (" + bak.length + ")");
       mer.textContent = merTekst();
       mer.setAttribute("aria-expanded", panel.visAlleSteder ? "true" : "false");
       mer.addEventListener("click", () => {
@@ -986,7 +1040,6 @@ function delPanel(kamp) {
 
     // Ingen steder a trykke pa: da er forslagene ikke et tillegg, de er
     // hele svaret, og de skal sta apne.
-    if (!steder.children.length && utvidet.hidden) vis(true);
 
     // Egen linje med «Du skal til X» trengs ikke lenger: raden du staar
     // paa sier det tydeligere enn en setning under lista gjorde. «Du» staar
@@ -1010,23 +1063,11 @@ function delPanel(kamp) {
     }
   };
 
-  // Et sted du skrev selv. Samme svar som en chip, bare med et navn vi
-  // ikke hadde pa lista.
-  egen.addEventListener("click", () => {
-    const navn = pubFelt.value.trim();
-    if (!navn) return;
-    svarSted(kamp, panel, "pub", navn, melding);
-  });
-
-  // Chipene i forslagslista svarer som chipene over: ett trykk, ett sted.
+  // Et sted du trykker paa i lista over andre byer svarer som en rad i
+  // lista over: trykket ER svaret. Feltet du kunne skrive et navn i er
+  // borte, og med det knappen som brukte det — et sted vi ikke kjenner
+  // meldes inn nederst i kortet i stedet.
   forslag.velg = (pub) => {
-    pubFelt.value = pub.navn;
-    egen.disabled = false;
-    // Et valg AVSLUTTER soket. Satte vi soket til navnet i stedet, tomte
-    // lista seg for hvert treff som ikke staar i den kuraterte lista — en
-    // pub fra kartet finnes ikke der, og da sto du igjen med ingenting
-    // rett etter at du trykket paa den.
-    forslag.sok = "";
     svarSted(kamp, panel, "pub", pub.navn, melding);
   };
 
@@ -1129,6 +1170,33 @@ function kanallinje(kamp) {
   return linje;
 }
 
+// To lister over de samme stedene, slatt sammen paa foldet navn.
+//
+// Raden fra den forste lista vinner: den baerer svaret ditt, folka som
+// skal dit og merket fra stedKilder. Den andre fyller BARE ut det som
+// mangler — avstand, koordinat, bydel — og loefter merkene, for et treff
+// fra kartet skal ikke skjule at stedet alt har meldt inn kampen.
+function slaSammenRader(forst, andre) {
+  const sett = new Map();
+  (forst || []).forEach((p) => {
+    const nokkel = stedNokkel(p.navn);
+    if (nokkel) sett.set(nokkel, Object.assign({}, p));
+  });
+  (andre || []).forEach((p) => {
+    const nokkel = stedNokkel(p.navn);
+    if (!nokkel) return;
+    const eks = sett.get(nokkel);
+    if (!eks) { sett.set(nokkel, Object.assign({ hvor: "pub" }, p)); return; }
+    Object.keys(p).forEach((k) => {
+      if (k === "navn" || p[k] === undefined || p[k] === null) return;
+      if (eks[k] === undefined || eks[k] === null) eks[k] = p[k];
+    });
+    if (p.bekreftet) eks.bekreftet = true;
+    if (p.viserFotball) eks.viserFotball = true;
+  });
+  return Array.from(sett.values());
+}
+
 function stedRad(kamp, panel, sted, form) {
   const rad = el("div", "sted-rad-kort");
   if (sted.bekreftet) rad.classList.add("bekreftet");
@@ -1155,14 +1223,41 @@ function stedRad(kamp, panel, sted, form) {
     const merke = el("span", "sted-merke", "🏟");
     merke.setAttribute("aria-label", "på stadion");
     topp.appendChild(merke);
+  } else if (sted.viserFotball) {
+    // ⚽ er «kjent for aa vise fotball», ★ er «viser DENNE kampen». To
+    // ulike paastander, og merkene holder dem fra hverandre — de kostet
+    // overskriftene lista hadde for.
+    const merke = el("span", "pub-merke", "⚽");
+    merke.setAttribute("aria-label", "kjent for å vise fotball");
+    const lag = (sted.lag || []).join(", ");
+    merke.title = lag
+      ? "Kjent for å vise fotball. Stampub for " + lag + "."
+      : "Kjent for å vise fotball.";
+    topp.appendChild(merke);
   }
   topp.appendChild(el("span", "sted-navn", sted.navn));
-  // Avstanden staar paa raden, ikke bare i rekkefolgen. «Bernie's» og
-  // «Bernie's 392 km» er to ulike svar, og bare det andre kan leses.
-  if (Number.isFinite(sted.avstand)) {
-    topp.appendChild(el("span", "sted-avstand", avstandtekst(sted.avstand)));
-  }
   venstre.appendChild(topp);
+
+  // Hvor stedet er, paa sin egen linje: by og avstand.
+  //
+  // Avstanden staar paa raden, ikke bare i rekkefolgen — «Bernie's» og
+  // «Bernie's 392 km» er to ulike svar, og bare det andre kan leses.
+  // Byen staar der ogsaa naar avstanden mangler: uten posisjon staar en
+  // bekreftet visning i lista fordi `naerNok()` svarer ja naar vi ikke
+  // vet, og da maa raden i det minste si Oslo.
+  const by = byenTil(sted) || (sted.bydel ? String(sted.bydel) : "");
+  const km = Number.isFinite(sted.avstand) ? avstandtekst(sted.avstand) : "";
+  if (by || km || sted.bekreftet) {
+    const hvor = el("div", "sted-rad-hvor");
+    if (by) hvor.appendChild(el("span", "sted-by", by));
+    if (km) hvor.appendChild(el("span", "sted-avstand", km));
+    // «(bekreftet visning)» ved siden av stjerna. Merket alene er en
+    // konvensjon du maa laere; ordene er ikke.
+    if (sted.bekreftet) {
+      hvor.appendChild(el("span", "sted-bekreftet-tekst", "(bekreftet visning)"));
+    }
+    venstre.appendChild(hvor);
+  }
 
   const folk = sisteSvar.filter((s) => s.kampId === kampNokkelFor(kamp) &&
     s.sted && stedNokkel(s.sted) === stedNokkel(sted.navn));
@@ -1302,11 +1397,7 @@ async function svarSted(kamp, panel, hvor, sted, melding, avmeld) {
   } catch (err) {
     melding.textContent = err.message;
   } finally {
-    panel.querySelectorAll(".sted-chip, .pub-chip, .sted-egen")
-      .forEach((k) => { k.disabled = false; });
-    const felt = panel.querySelector(".kamp-pub");
-    const egen = panel.querySelector(".sted-egen");
-    if (felt && egen) egen.disabled = !felt.value.trim();
+    panel.querySelectorAll(".sted-knapp").forEach((k) => { k.disabled = false; });
   }
 }
 
@@ -1333,7 +1424,7 @@ const puberHusket = new Map();
 // nar den gas gjennom: et lukket kort er ute av dokumentet.
 const apneBokser = new Set();
 
-function pubForslag(kamp, pubFelt) {
+function pubForslag(kamp) {
   const boks = el("div", "pub-forslag");
   apneBokser.add(boks);
   // Kampen huskes fordi tre av kildene regnes ut AV den og av KJENTE:
@@ -1341,7 +1432,6 @@ function pubForslag(kamp, pubFelt) {
   // ma alle tre regnes om — ikke bare de to arenaen og posisjonen gir.
   boks.kamp = kamp;
   boks.dataset.arena = kamp.arena || "";
-  boks.pubFelt = pubFelt;
   boks.kilder = {};
   // Hvor mange kilder som fortsatt er underveis. Venter noe, er det for
   // tidlig a si at ingenting finnes.
@@ -1393,7 +1483,7 @@ function fyllForslag(boks, kamp) {
       kuraterteNaer(KJENTE, arena, ARENA_RADIUS), bekreftede);
   }
 
-  tegnForslag(boks);
+  tegnKortet(boks);
 
   // Naer deg hentes med en gang: kampen spilles ofte et annet sted enn
   // der man ser den. Trykket som valgte «pa pub» er handlingen telefonen
@@ -1425,77 +1515,79 @@ function fyllForslag(boks, kamp) {
         boks.kilder.vedArena = merkBekreftet(merkKuraterte(flate, KJENTE), bekreftede);
         if (flate.length) boks.kart = true;
       }
-      tegnForslag(boks);
+      tegnKortet(boks);
     });
   }
 }
 
-// Ett sted som bestemmer hva som star pa skjermen.
+// Lista over puber i ANDRE byer. De naere lofter `tegnSteder` opp i lista
+// over — her staar resten.
+//
+// Soket «Skriv stedet du skal» sto her til 20. september 2026, og loste
+// det samme problemet: «jeg er i Trondheim i dag, men i Oslo paa fredag».
+// Denne lista svarer paa det uten at du maa vite hva stedet heter.
 function tegnForslag(boks) {
-  // Merket folger svaret jeg har gitt, ikke det som star i feltet: et
-  // forslag er merket fordi jeg skal dit, ikke fordi jeg skrev navnet.
-  const valgt = boks.mittSted || "";
+  const panel = boks.panel;
 
-  // Soker du, ERSTATTER treffene lista — de legges ikke til.
-  //
-  // Rangeringen svarer paa «hvor er du naa». Det er riktig for en kamp i
-  // kveld, og en gjetning for en kamp om tre dager: «jeg er i Trondheim i
-  // dag, men i Oslo paa fredag». Da er ingen av de geografiske kildene et
-  // svar, og da skal de heller ikke staa i veien for det du leter etter.
-  //
-  // Et treff paastaar ingenting om avstand. Den staar paa brikka naar vi
-  // kjenner den — 391 km er et svar du kan forkaste selv.
-  if (boks.sok) {
-    const treff = merkBekreftet(
-      merkKuraterte(sokKuraterte(KJENTE, boks.sok, sisteKjentePosisjon), KJENTE),
-      boks.bekreftede || []);
-    boks.replaceChildren();
-    if (treff.length) {
-      const rad = el("div", "pub-liste");
-      treff.forEach((pub) => rad.appendChild(pubChip(pub, boks, valgt)));
-      boks.appendChild(rad);
-    }
-    // Ingen treff er ikke en feil, og feltet er ikke tatt fra deg: det du
-    // skrev er fortsatt et sted du kan si at du skal til.
-    boks.appendChild(el("p", "pub-note", falskmerke(boks) + (treff.length
-      ? treff.length + " treff på «" + boks.sok + "» i lista vår."
-      : "Ingen steder i lista vår heter «" + boks.sok + "»."
-        + " Trykk «Jeg skal hit» for å bruke navnet likevel.")));
-    return;
-  }
+  // Stjerne forst, sa avstand — innenfor denne lista. Det er de fjerne
+  // som staar her, og derfor er «bekreftet forst» trygt: ingen av dem
+  // paastaar aa vaere i naerheten uansett.
+  // Kilden er hele den kuraterte lista, ikke bare det de geografiske
+  // kildene fant. Det er nettopp poenget: staar du i Trondheim, svarer
+  // ingen av dem paa Oslo — og det var der soket kom inn. Uten dette er
+  // lista over andre byer tom akkurat naar den trengs.
+  const kjenteFjerne = medAvstand(
+    merkBekreftet(merkKuraterte(KJENTE, KJENTE), boks.bekreftede || []));
+  const alle = sorterForslag(
+    slaSammenRader(rangerForslag(boks.kilder, 0).topp, kjenteFjerne)
+      .filter((p) => !naerNok(p)));
+  const tak = boks.alt ? alle.length : ANDRE_MAKS;
+  const topp = alle.slice(0, tak);
+  const resten = alle.slice(tak);
 
-  const { topp, resten } = rangerForslag(boks.kilder, boks.alt ? 0 : FORSLAG_MAKS);
   boks.replaceChildren();
 
-  if (topp.length) {
-    const rad = el("div", "pub-liste");
-    topp.forEach((pub) => rad.appendChild(pubChip(pub, boks, valgt)));
+  if (topp.length && panel && panel.andreRad) {
+    const rad = el("div", "sted-liste");
+    topp.forEach((pub) => rad.appendChild(panel.andreRad(pub)));
     boks.appendChild(rad);
   }
 
-  boks.appendChild(el("p", "pub-note", notetekst(boks, topp)));
+  // Noten horer til hele kortet, og teller radene i BEGGE listene.
+  if (panel && panel.note) {
+    panel.note.textContent = notetekst(boks, (panel.naereAntall || 0) + alle.length);
+  } else {
+    boks.appendChild(el("p", "pub-note", notetekst(boks, alle.length)));
+  }
 
   // Veien tilbake nar posisjonen ble avslatt eller kartet sviktet. Den
-  // sto for alltid der; na star den bare nar den har noe a gjore — det
-  // var en av de seks tingene som fylte panelet.
+  // sto for alltid der; na star den bare nar den har noe a gjore.
   if (boks.proveNaer) {
     const igjen = el("button", "pub-naer", "Puber nær deg");
     igjen.type = "button";
     igjen.addEventListener("click", () => {
       boks.proveNaer = false;
       hentNaerDeg(boks, boks.bekreftede || []);
-      tegnForslag(boks);
+      tegnKortet(boks);
     });
     boks.appendChild(igjen);
   }
 
   // Ingenting forsvinner: resten ligger ett trykk unna.
   if (resten.length) {
-    const mer = el("button", "pub-mer", "Flere forslag (" + resten.length + ")");
+    const mer = el("button", "pub-mer", "Ekspander lista (" + resten.length + ")");
     mer.type = "button";
     mer.addEventListener("click", () => { boks.alt = true; tegnForslag(boks); });
     boks.appendChild(mer);
   }
+}
+
+// Kildene er felles for de to listene, sa en kilde som lander skal tegne
+// begge. Panelet eier rekkefolgen: `tegnSteder` tegner de naere og kaller
+// `tegnForslag` for resten. Én vei, sa de ikke kan kalle hverandre i ring.
+function tegnKortet(boks) {
+  if (boks.panel && boks.panel.tegnSteder) { boks.panel.tegnSteder(); return; }
+  tegnForslag(boks);
 }
 
 // Én linje, aldri flere. Venter en kilde fortsatt, er det for tidlig a
@@ -1515,57 +1607,32 @@ function falskmerke(boks) {
     : "";
 }
 
-function notetekst(boks, topp) {
+// Én linje for HELE kortet, ikke én per liste.
+//
+// Kortet har to lister na — stedene naer deg og pubene i andre byer — og
+// noten horer til begge: en posisjon som uteble forklarer begge, og en
+// tjeneste som sviktet gjorde det ogsa. To linjer med samme forklaring er
+// én for mye i et kort som nettopp ble ryddet.
+//
+// `antall` er radene i BEGGE listene. Sto det bare de fjerne her, ville
+// «Fant ingen puber» statt over en liste med fire.
+//
+// Og veien videre er knappen nederst. Til 20. september 2026 sto «Skriv
+// navnet selv», om et felt som na er borte — en setning som peker et sted
+// som ikke finnes er verre enn ingen.
+function notetekst(boks, antall) {
   const falsk = falskmerke(boks);
   // Posisjonsfeilen forst: uteble posisjonen, er det DEN som forklarer
   // hvorfor resten er tynt, og de andre linjene er folger av den.
   const feil = [boks.posisjonsfeil].concat(boks.feil)
     .filter(Boolean).join(" ");
-  if (!topp.length) {
+  if (!antall) {
     if (boks.venter > 0) return falsk + "Finner puber …";
-    return falsk + (feil || "Fant ingen puber i nærheten. Skriv navnet selv.");
+    return falsk + (feil || "Fant ingen puber. Står du på en, legg den inn nederst.");
   }
   // Lisensen (ODbL) krever kreditering der treff fra kartet vises.
   const kreditt = boks.kart ? "© OpenStreetMap-bidragsytere. " : "";
-  return falsk + kreditt + (feil || "Står ikke puben her, skriv den selv.");
-}
-
-function pubChip(pub, boks, valgt) {
-  const b = el("button", "pub-chip");
-  b.type = "button";
-  b.appendChild(el("span", null, pub.navn));
-
-  // Bekreftet star forst av merkene: det svarer pa kampen, ikke bare pa
-  // stedet. Stjerna er «denne kampen vises her», ballen «stedet pleier a
-  // vise fotball».
-  if (pub.bekreftet) {
-    b.classList.add("bekreftet");
-    const stjerne = el("span", "pub-bekreftet", "★");
-    stjerne.setAttribute("aria-label", "viser denne kampen");
-    b.appendChild(stjerne);
-  }
-  if (pub.viserFotball || pub.sikkerhet) {
-    const merke = el("span", "pub-merke", "⚽");
-    merke.setAttribute("aria-label", "kjent for å vise fotball");
-    b.appendChild(merke);
-    const lag = (pub.lag || []).join(", ");
-    b.title = lag ? "Kjent for å vise fotball. Stampub for " + lag + "." : "Kjent for å vise fotball.";
-  }
-  if (Number.isFinite(pub.avstand)) {
-    b.appendChild(el("span", "pub-avstand", avstandtekst(pub.avstand)));
-  }
-
-  b.setAttribute("aria-pressed",
-    valgt && stedNokkel(pub.navn) === valgt ? "true" : "false");
-  // Ett trykk, ett sted — ogsa her. Et forslag oppforer seg som et sted i
-  // kortet over: trykket *er* svaret, ikke en utfylling av et felt man
-  // ma trykke en gang til for a bruke.
-  b.addEventListener("click", () => {
-    if (boks.velg) { boks.velg(pub); return; }
-    boks.pubFelt.value = pub.navn;
-    boks.pubFelt.dispatchEvent(new Event("input"));
-  });
-  return b;
+  return falsk + kreditt + (feil || "Står ikke puben her, legg den inn nederst.");
 }
 
 // «(overpass-api.de svarte 406)» — nok til a se hva som feiler, uten a
@@ -1699,6 +1766,16 @@ function hentNaerDeg(boks, bekreftede) {
     naerDegFra(boks, bekreftede, rundPosisjon(falsk.lat, falsk.lon));
     return;
   }
+  // Posisjonen kan alt vaere hentet: kortet spurte om den da det ble
+  // aapnet. Da slaar vi opp med det svaret vi har framfor aa sporre en
+  // gang til — to veier til samme posisjon er én vei for mye, og den ene
+  // av dem ville vaert et spoersmaal leseren alt har svart paa.
+  if (sisteKjentePosisjon) {
+    boks.posisjonsfeil = "";
+    boks.venter += 1;
+    naerDegFra(boks, bekreftede, sisteKjentePosisjon);
+    return;
+  }
   // Et nytt forsok viser bort svaret fra forrige: star det «Du sa nei»
   // mens vi sporr pa nytt, sier skjermen noe om fortida som fortsatt
   // handler om na.
@@ -1709,7 +1786,7 @@ function hentNaerDeg(boks, bekreftede) {
     // skal sta hvorfor, ellers er «Fant ingen puber i naerheten» det
     // eneste leseren far — og den setningen er ikke sann.
     boks.posisjonsfeil = posisjonsfeil(0);
-    tegnForslag(boks);
+    tegnKortet(boks);
     return;
   }
   boks.venter += 1;
@@ -1726,7 +1803,7 @@ function hentNaerDeg(boks, bekreftede) {
     boks.venter -= 1;
     boks.posisjonsfeil = posisjonsfeil(err && err.code);
     boks.proveNaer = true;
-    tegnForslag(boks);
+    tegnKortet(boks);
   }, { maximumAge: 300000, timeout: 10000 });
 }
 
@@ -1757,7 +1834,7 @@ async function naerDegFra(boks, bekreftede, p) {
   // samme: det er den manglende avstanden som gjor stampuben til et
   // darligere svar, ikke hvilken by den ligger i.
   boks.kilder.stampuber = [];
-  tegnForslag(boks);
+  tegnKortet(boks);
 
   const nokkel = p.lat + "," + p.lon;
   try {
@@ -1772,7 +1849,7 @@ async function naerDegFra(boks, bekreftede, p) {
     boks.proveNaer = true;
   }
   boks.venter -= 1;
-  tegnForslag(boks);
+  tegnKortet(boks);
 }
 
 // Samme tjenere som funksjonen bruker, og de sporres samtidig: den
@@ -1895,6 +1972,17 @@ function sendInnSted(pubFelt) {
   adresse.setAttribute("aria-label", "Gateadresse");
   adresse.maxLength = ADRESSE_MAKS;
 
+  // Posisjonen din, som en MERKNAD — ikke som et koordinat paa raden.
+  // `puber` i Supabase er rettelser et menneske har gjort ferdig, og et
+  // punkt fra en telefon er en opplysning til det mennesket. Feltet staar
+  // synlig: en opplysning vi sender videre om deg, skal du kunne lese og
+  // slette.
+  const merknad = el("input", "konto-felt");
+  merknad.type = "text";
+  merknad.placeholder = "Merknad (valgfritt)";
+  merknad.setAttribute("aria-label", "Merknad");
+  merknad.maxLength = MERKNAD_MAKS;
+
   const merke = el("label", "sted-forslag-merke");
   const kryss = el("input");
   kryss.type = "checkbox";
@@ -1915,6 +2003,7 @@ function sendInnSted(pubFelt) {
 
   skjema.appendChild(navn);
   skjema.appendChild(adresse);
+  skjema.appendChild(merknad);
   skjema.appendChild(merke);
   skjema.appendChild(send);
   skjema.appendChild(el("p", "sted-forslag-note",
@@ -1928,7 +2017,7 @@ function sendInnSted(pubFelt) {
     apne.setAttribute("aria-expanded", pa ? "true" : "false");
     if (!pa) return;
     // Har du alt skrevet et navn i feltet over, er det stedet du mener.
-    if (!navn.value && pubFelt.value.trim()) navn.value = pubFelt.value.trim();
+    if (!navn.value && pubFelt && pubFelt.value.trim()) navn.value = pubFelt.value.trim();
     navn.focus();
   });
 
@@ -1936,6 +2025,7 @@ function sendInnSted(pubFelt) {
     const inn = {
       navn: navn.value,
       adresse: adresse.value,
+      merknad: merknad.value,
       viserFotball: kryss.checked,
     };
 
@@ -1976,6 +2066,7 @@ function sendInnSted(pubFelt) {
         si(data.merknad || "Takk, vi ser på det.", "ok");
         navn.value = "";
         adresse.value = "";
+        merknad.value = "";
       }
     } catch (err) {
       si("Fikk ikke sendt inn. Prøv igjen om litt.", "feil");
@@ -1990,6 +2081,35 @@ function sendInnSted(pubFelt) {
   // vi ikke kjenner, er dette skjemaet svaret — og da skal du slippe a
   // finne det selv. Navnet settes uansett hva som sto der fra for: det er
   // stedet du nettopp valgte, ikke et halvskrevet sok.
+  // «Jeg er paa pub, legg inn her» leser posisjonen forst. Staar du i
+  // doera, er punktet ditt bedre enn det admin finner av gateadressen
+  // etterpaa — Googles eget punkt ligger gjerne midt paa bygget.
+  //
+  // Noyaktigheten staar med: fire desimaler ser like presise ut enten de
+  // er paa tolv meter eller to kilometer.
+  //
+  // Feiler den, er det ingen blindvei: adressefeltet staar der, og
+  // setningen sier hvilken av de fire tingene som gikk galt.
+  boks.hentPosisjon = () => {
+    if (!navigator.geolocation) {
+      si(posisjonsfeil(0) + " Skriv adressen i stedet.", "");
+      navn.focus();
+      return;
+    }
+    si("Leser posisjonen …", "");
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const punkt = rundPosisjon(pos.coords.latitude, pos.coords.longitude);
+      const m = Math.round(Number(pos.coords.accuracy) || 0);
+      merknad.value = "Jeg står her: " + punkt.lat + ", " + punkt.lon
+        + (m ? " (±" + m + " m)" : "");
+      si("Posisjonen er med. Skriv navnet på stedet.", "ok");
+      navn.focus();
+    }, (err) => {
+      si(posisjonsfeil(err && err.code) + " Skriv adressen i stedet.", "");
+      navn.focus();
+    }, { maximumAge: 300000, timeout: 10000 });
+  };
+
   boks.apneMed = (stedsnavn) => {
     skjema.hidden = false;
     apne.setAttribute("aria-expanded", "true");
@@ -2024,8 +2144,14 @@ function viserlinje(kamp) {
   merke.setAttribute("aria-hidden", "true");
   linje.appendChild(merke);
 
-  const pubKnapp = (p, medSted) => {
-    const sted = medSted ? (byenTil(p) || avstandtekst(avstandTil(p) || 0)) : "";
+  // Byen staar ved navnet i to tilfeller, og de er ikke det samme:
+  // naar vi VET at stedet er langt unna, og naar vi ikke vet noe. Det
+  // siste er en leser uten posisjon: da staar puben blant de naere fordi
+  // `naerNok()` svarer ja naar vi ikke vet, og «Bernie's» alene leses som
+  // «i naerheten». «Bernie's (Oslo)» er det vi faktisk kan staa inne for.
+  const pubKnapp = (p, fjern) => {
+    const sted = fjern ? (byenTil(p) || avstandtekst(avstandTil(p) || 0))
+      : (avstandTil(p) === null ? byenTil(p) : "");
     const knapp = el("button", "kamp-viser-pub", p.navn + (sted ? " (" + sted + ")" : ""));
     knapp.type = "button";
     knapp.title = "Meldt inn til oss. Trykk for å dele at du ser kampen her.";
