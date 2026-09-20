@@ -9,6 +9,62 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 20. september 2026 — Bernie's sto øverst i Trondheim, 392 km unna
+
+**Meldt som:** «hvorfor kommer bernies opp når jeg er i trondheim», med
+skjermbilde. Øverst i kortet sto «★ Denne kampen vises på: Bernie's».
+
+**Hva som faktisk var årsaken.** Bernie's *hadde* meldt inn at de viser den
+kampen. Kilden var riktig — den var bare ikke et svar på spørsmålet kortet
+stiller.
+
+`bekreftetFor()` er den eneste kilden som svarer på **kampen** framfor på
+**stedet**, og det er nettopp derfor den står først i `FORSLAG_KILDER`. Men
+ingenting filtrerte den, og den regnet aldri avstand. Bernie's ligger på
+Grønland i Oslo, 392 km fra Trondheim sentrum, og sto likevel som svaret på
+«Hvor skal du se den?».
+
+Setningen som allerede sto i `CLAUDE.md` om stampubene gjaldt ordrett her:
+*et lagtreff bærer ingen avstand, og en stampub i en annen by står da i
+lista som om den var i nabogata.* Forskjellen er at en stampub er en
+gjetning, mens en bekreftet visning er et faktum noen har ført inn — den
+skal ikke skjules, bare ikke være toppsvaret.
+
+**Tredje gang samme antagelse kostet noe denne uka:** regelen var riktig så
+lenge lista var Oslo. Først `puber-oslo.js` og ramma i `sjekkPubliste`, så
+stampubene, nå de bekreftede.
+
+**Hva som ble gjort.** Linja under kampraden navngir bare de nære. Er ingen
+i nærheten, sier den «Vises ett sted, ingen i nærheten» og legger puben bak
+«Vis hvor» — der står byen ved navnet. I kortet går de fjerne bak «Vis de
+andre», med avstanden på raden.
+
+**Posisjonen måtte flyttes ut av kortet.** `boks.sistePosisjon` er per kort,
+og radene tegnes før noe kort er åpent. `sisteKjentePosisjon` settes fra
+`?posisjon=` ved oppstart — den koster ingenting og spør ingen — og ellers
+første gang et kort faktisk får en; da tegnes radene om. Vi ber aldri om
+posisjon for å tegne en rad: trykket som åpner kortet er handlingen
+telefonen krever, og den regelen står.
+
+**`naerNok()` svarer ja når vi ikke vet.** Uten posisjon, eller uten
+koordinater på stedet, VET vi ikke — og en liste som gjemmer noe fordi den
+mangler opplysninger, gjemmer det uten grunn. Sabotasjen som snur den
+regelen feller fem tester som ikke handler om dette i det hele tatt.
+
+**Og en sirkel er riktig her.** Terskelen ble først skrevet med byen først,
+som `kuraterteIByen()` fra dagen før — «radiusen er en sirkel, og en by er
+ikke det». Men sabotasjen som fjernet bydelen felte ingenting: den bredeste
+byen i `BYER` er tretti kilometer tvers over, og de to nærmeste byene
+ligger hundre og seksti fra hverandre. Med femti kilometer finnes det ingen
+inndata der de to reglene er uenige. Byveien ble tatt ut igjen — to veier
+til samme svar er én vei for mye, og den ene som ikke kan testes er den som
+skal bort.
+
+**Hva som fanget det.** Ingenting. Alle tester på den linja sto med leseren
+i Oslo og puben i Oslo — den ene kombinasjonen der feilen ikke finnes.
+
+---
+
 ## 19. september 2026 — radiusen er en sirkel, og en by er ikke det
 
 **Meldt som:** «jeg ønsker å få opp puben uavhengig om den har lag RBK

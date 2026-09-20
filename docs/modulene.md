@@ -486,6 +486,17 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
 - **En knapp i en knapp finnes ikke.** Kamplinja løser trykkflata med en
   utstrakt knapp (`.kamp-del`) framfor å være en selv; stedsraden har en
   knapp inni seg og er derfor ingen knapp.
+- **Bekreftede visninger bærer avstand, og de fjerne dempes.**
+  `sisteKjentePosisjon` er posisjonen radene tegnes med — `boks.sistePosisjon`
+  er per kort, og kortene åpnes etter at radene står. Den settes fra
+  `?posisjon=` ved oppstart (koster ingenting, spør ingen) og ellers fra
+  `settPosisjon()` første gang et kort får en; da tegnes radene om.
+  `naerNok()` svarer **ja når vi ikke vet** — uten posisjon, eller uten
+  koordinater på stedet — så ingenting gjemmes i blinde. `NAER_M` er 50 km,
+  ikke `NAER_RADIUS`: det siste er gangavstand, og en pub tvers over byen er
+  fortsatt et godt svar. Her er en sirkel riktig, til forskjell fra
+  `kjenteNaer`: 30 km er den bredeste byen, 160 km det nærmeste bypar, og
+  femti ligger rent imellom.
 - **Et trykk på et sted er svaret.** Før var det tre steg og et navnefelt
   på hver kamp. Navnet kommer nå fra innloggingen — et felt man måtte fylle
   ville betydd at «ett trykk» ikke var sant.
