@@ -43,7 +43,7 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
          sorterForslag, NAER_MAKS, ANDRE_MAKS,
          falskPosisjon, BYER,
          OVERPASS_SPEIL, overpassHeadere, restTid,
-         sjekkPubliste, kuraterteNaer, kuraterteIByen, merkKuraterte,
+         sjekkPubliste, kuraterteNaer, kuraterteIByen, merkKuraterte, merkAntatte,
          ligaflaggGjelder, ligapuberAv, ligamerkeTekst, sjekkLigaflagg,
          ligaflaggTilBase,
          sjekkKontaktliste, kontaktFor, finnKontakt, KONTAKT_FELT, kildeHolder,
@@ -1682,6 +1682,36 @@ ok("tomt inn gir tomt ut", sorterForslag(null).length === 0);
 ok("fire naer deg, fem i andre byer", NAER_MAKS === 4 && ANDRE_MAKS === 5,
    NAER_MAKS + " / " + ANDRE_MAKS);
 
+/* ---- et sted vi har gjettet paa ---- */
+
+// «usikker» falt UT av lista appen leser til 20. september 2026, og da
+// var det ingen forskjell for leseren mellom «vi har sett etter og er i
+// tvil» og «stedet finnes ikke». Lista var 26 steder, alle i Oslo.
+const ANTATT = merkAntatte([
+  { navn: "Gjettet", sikkerhet: "usikker" },
+  { navn: "Sett etter", sikkerhet: "sannsynlig" },
+  { navn: "Statt i dora", sikkerhet: "bekreftet" },
+]);
+ok("et usikkert sted faller ikke ut lenger", ANTATT.length === 3, ANTATT.length);
+ok("det merkes som antatt", ANTATT[0].antatt === true, JSON.stringify(ANTATT[0]));
+
+// Grensa gar ved usikker, ikke ved sannsynlig: det siste betyr at noen
+// har sett etter og trodd det, det forste at vi har gjettet.
+ok("sannsynlig er ikke en antakelse",
+   ANTATT[1].antatt === undefined, JSON.stringify(ANTATT[1]));
+ok("og bekreftet heller ikke",
+   ANTATT[2].antatt === undefined, JSON.stringify(ANTATT[2]));
+
+// Raden kopieres framfor a rores: KURATERTE er delt, og et flagg satt paa
+// den ekte raden ville fulgt med overalt.
+ok("merkAntatte rorer ikke lista den far",
+   (function () {
+     const inn = [{ navn: "Gjettet", sikkerhet: "usikker" }];
+     merkAntatte(inn);
+     return inn[0].antatt === undefined;
+   })());
+ok("tomt inn gir tomt ut", merkAntatte(null).length === 0);
+
 /* ---- stampubene for lagene som spiller ---- */
 
 // De kuraterte stedene nadde bare fram gjennom et geografisk filter:
@@ -2690,6 +2720,31 @@ ok("bare stedene med et gyldig flagg kommer med",
    LIGAPUBER.map((p) => p.navn).join(",") || "(tom)");
 ok("en kamp uten liga gir ingen",
    ligapuberAv(KANDIDATER, {}, LIGADAG("2026-09-19")).length === 0);
+
+// Et ANTATT sted kan ikke sende en liga.
+//
+// Avgjort i flettinga 21. september 2026, da ligaflagget og de antatte
+// stedene motte hverandre. Kilden ligger rett etter `bekreftede`, saa uten
+// dette ville en gjetning blitt LOFTET over alt geografisk — et sted vi
+// ikke har sjekket i det hele tatt, staaende der det sterkeste svaret
+// skulle vaert.
+//
+// Det holdt ikke aa sette «?» foran 📺 i merkekjeden: rekkefolgen i lista
+// avgjores her, ikke av hvilket tegn raden faar.
+const ANTATT_MED_FLAGG = ligapuberAv(
+  [{ navn: "Gjettepuben", sikkerhet: "usikker", ligaer: FLAGG },
+   { navn: "Sjekkepuben", sikkerhet: "bekreftet", ligaer: FLAGG },
+   { navn: "Sett etter", sikkerhet: "sannsynlig", ligaer: FLAGG }],
+  { liga: "eliteserien" }, LIGADAG("2026-09-19"));
+ok("et antatt sted sender ingen liga, flagg eller ei",
+   ANTATT_MED_FLAGG.map((p) => p.navn).indexOf("Gjettepuben") === -1,
+   ANTATT_MED_FLAGG.map((p) => p.navn).join(",") || "(tom)");
+// Grensa gaar ved `usikker`, som ellers: `sannsynlig` betyr at noen har
+// sett etter og trodd det, og det er nok til aa baere et flagg noen har
+// datert og kildebelagt.
+ok("men et sannsynlig og et bekreftet gjor",
+   ANTATT_MED_FLAGG.length === 2,
+   ANTATT_MED_FLAGG.map((p) => p.navn).join(",") || "(tom)");
 
 // Merket NAVNGIR ligaen. «Viser vanligvis kamper» ville latt leseren tro
 // det gjaldt kampen hen ser pa, ogsa nar stedet ikke sender den ligaen.

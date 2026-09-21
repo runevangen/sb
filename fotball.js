@@ -18,7 +18,7 @@ import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          rangerForslag, FORSLAG_MAKS, tolkPubRader, slaSammenPuber,
          posisjonsfeil, kuraterteIByen, ligapuberAv, ligamerkeTekst,
          stampuberFor, falskPosisjon, avstandM, byFor, BYER,
-         sorterForslag, ANDRE_MAKS, NAER_MAKS }
+         sorterForslag, ANDRE_MAKS, NAER_MAKS, merkAntatte }
   from "./pub-data.js";
 import { KURATERTE } from "./puber.js";
 import { sjekkForslag, alleredeILista, NAVN_MAKS, ADRESSE_MAKS, MERKNAD_MAKS }
@@ -50,8 +50,10 @@ let KJENTE = kjenteAv(KURATERTE);
 const NAER_RADIUS = 3000;
 const ARENA_RADIUS = 1500;
 
+// Se `merkAntatte` i pub-data.js: usikre steder skjules ikke lenger, de
+// merkes. Navnet star igjen fordi KJENTE er det alle kildene leser.
 function kjenteAv(liste) {
-  return liste.filter((p) => p.sikkerhet !== "usikker");
+  return merkAntatte(liste);
 }
 import { timeAgo, listeTekst } from "./lib.js";
 
@@ -1227,6 +1229,25 @@ function stedRad(kamp, panel, sted, form) {
     const merke = el("span", "sted-merke", "🏟");
     merke.setAttribute("aria-label", "på stadion");
     topp.appendChild(merke);
+  } else if (sted.antatt) {
+    // Et sted vi har GJETTET paa. Merket er sitt eget, og ordene under
+    // raden sier det med bokstaver: et merke alene er en konvensjon du
+    // maa laere, og her er det nettopp forbeholdet som er poenget.
+    //
+    // Den staar FOER 📺 fordi «Sender Eliteserien» er en sterkere paastand
+    // enn «pleier aa vise fotball», og et sted vi ikke har sjekket kan
+    // ikke baere den.
+    //
+    // Men VAKTA ligger ikke her — den ligger i `ligapuberAv`, som ikke
+    // slipper et `usikker`-sted gjennom i det hele tatt. Merkerekkefolgen
+    // alene ville bare skjult tegnet: kilden ligger rett etter
+    // `bekreftede` i FORSLAG_KILDER, saa raden ville fortsatt blitt loftet
+    // over alt geografisk. Rekkefolgen her er hvor grena hoerer hjemme,
+    // ikke regelen som haandheves.
+    const merke = el("span", "sted-antatt-merke", "?");
+    merke.setAttribute("aria-label", "antatt, ikke bekreftet");
+    merke.title = "Vi har ikke sjekket dette stedet.";
+    topp.appendChild(merke);
   } else if (sted.senderLigaen) {
     // 📺 «Sender Eliteserien» star MELLOM ★ og ⚽, for den er akkurat det
     // den ser ut som: sterkere enn «pleier a vise fotball», svakere enn
@@ -1260,7 +1281,7 @@ function stedRad(kamp, panel, sted, form) {
   // vet, og da maa raden i det minste si Oslo.
   const by = byenTil(sted) || (sted.bydel ? String(sted.bydel) : "");
   const km = Number.isFinite(sted.avstand) ? avstandtekst(sted.avstand) : "";
-  if (by || km || sted.bekreftet) {
+  if (by || km || sted.bekreftet || sted.antatt) {
     const hvor = el("div", "sted-rad-hvor");
     if (by) hvor.appendChild(el("span", "sted-by", by));
     if (km) hvor.appendChild(el("span", "sted-avstand", km));
@@ -1268,6 +1289,8 @@ function stedRad(kamp, panel, sted, form) {
     // konvensjon du maa laere; ordene er ikke.
     if (sted.bekreftet) {
       hvor.appendChild(el("span", "sted-bekreftet-tekst", "(bekreftet visning)"));
+    } else if (sted.antatt) {
+      hvor.appendChild(el("span", "sted-antatt-tekst", "Antatt — ikke bekreftet"));
     }
     venstre.appendChild(hvor);
   }

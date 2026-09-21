@@ -404,6 +404,25 @@ export function merkKuraterte(puber, liste) {
   });
 }
 
+// «usikker» er ikke lenger skjult — den er MERKET.
+//
+// Fram til 20. september 2026 falt et usikkert sted ut av lista appen
+// leser, og da var det ingen forskjell for leseren mellom «vi har sett
+// etter og er i tvil» og «stedet finnes ikke». Lista var 26 steder, alle
+// i Oslo, og resten av landet fikk «Fant ingen puber» — ikke fordi vi
+// hadde undersokt og ikke funnet noe, men fordi vi ikke hadde undersokt.
+//
+// Na star de der, med sine egne ord. **En antakelse som sier at den er en
+// antakelse, er sann** — og den er et bedre svar enn ingenting for den
+// som skal finne en skjerm i Bodo i kveld.
+//
+// Grensa gar ved `usikker`, ikke ved `sannsynlig`: det siste betyr at
+// noen har sett etter og trodd det, det forste at vi har gjettet.
+export function merkAntatte(liste) {
+  return (liste || []).map((p) => (p && p.sikkerhet === "usikker"
+    ? Object.assign({}, p, { antatt: true }) : p));
+}
+
 /* ---------- stampubene for lagene som spiller ---------- */
 
 // De kuraterte stedene nadde bare fram gjennom et geografisk filter:
@@ -656,7 +675,24 @@ export function ligapuberAv(kandidater, kamp, naa) {
   const nokkel = kamp && kamp.liga;
   if (!nokkel) return [];
   return (Array.isArray(kandidater) ? kandidater : [])
-    .filter((p) => p && ligaflaggGjelder(p.ligaer, nokkel, naa));
+    // Et ANTATT sted kan ikke sende en liga.
+    //
+    // Avgjort i flettinga 21. september 2026, da ligaflagget og de antatte
+    // stedene motte hverandre. «Vi sender Eliteserien» er den sterkeste
+    // paastanden et sted kan baere uten at et menneske har sett pa nettopp
+    // denne kampen — og `usikker` betyr at vi ikke har sjekket at stedet
+    // viser fotball i det hele tatt.
+    //
+    // Uten dette holdt det ikke aa sette «?» foran 📺 i merkekjeden:
+    // kilden ligger rett etter `bekreftede` i FORSLAG_KILDER, saa en
+    // gjetning ville blitt LOFTET over alt geografisk. Samme form som den
+    // bekreftede visningen 392 km unna — en svak paastand som star der den
+    // sterkeste skulle vaert.
+    //
+    // Samme regel som portalens pubvelger (ADR 0022): en paastand admin
+    // gjor, kan ikke hvile pa en antakelse.
+    .filter((p) => p && p.sikkerhet !== "usikker"
+      && ligaflaggGjelder(p.ligaer, nokkel, naa));
 }
 
 // Teksten pa merket. Den NAVNGIR ligaen med vilje: «viser vanligvis

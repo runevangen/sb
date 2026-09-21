@@ -4559,6 +4559,109 @@ const SAK_16F = kjor("din-pub-annen-by", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700); });
 `);
 
+/* ------- 16G. et sted vi har gjettet paa ------- */
+
+// «usikker» falt ut av lista appen leser til 20. september 2026, og da var
+// det ingen forskjell for leseren mellom «vi har sett etter og er i tvil»
+// og «stedet finnes ikke». Lista var 26 steder, alle i Oslo, og resten av
+// landet fikk «Fant ingen puber» — ikke fordi vi hadde undersokt.
+//
+// Na staar de der, med sine egne ord. Raden kommer fra portalen, som er
+// veien et sted i en ny by faktisk kommer inn.
+const SAK_16G = kjor("antatt-sted", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "" }); });
+  history.replaceState(null, "", location.pathname + "?posisjon=trondheim");
+  // Slik PostgREST sender raden videre gjennom /api/pub-liste.
+  // Raden baerer et GYLDIG ligaflagg — kilde og dato paa plass. Det er
+  // nettopp den kombinasjonen flettinga 21. september 2026 maatte avgjore:
+  // et sted vi har gjettet paa, som noen har krysset av for en hel liga.
+  var I_BASEN = [{ navn: "Gjettepuben", bydel: "Midtbyen",
+    adresse: "Munkegata 1", lat: 63.4310, lon: 10.3955, type: "pub", lag: [],
+    kilde: "Antatt fra kartet, ikke sjekket", sikkerhet: "usikker",
+    sjekket: "2026-09-20", fjernet: false,
+    ligaer: { sender: ["eliteserien"], kilde: "https://example.test/tv",
+              sjekket: "2026-09-20" } }];
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: true, status: 200, json: function () {
+        return Promise.resolve({ elements: [] }); } });
+    }
+    if (u.indexOf("/api/pub-liste") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { klar: true, puber: I_BASEN })); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { svar: [], visninger: [] })); } });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.querySelectorAll(".kamp.delbar")[0].querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    setTimeout(function () { try {
+      var rad = Array.prototype.find.call(panel.querySelectorAll(".sted-rad-kort"),
+        function (c) { return c.querySelector(".sted-navn") &&
+          c.querySelector(".sted-navn").textContent === "Gjettepuben"; });
+
+      // Kjernen: den skal staa der i det hele tatt.
+      ok("et usikkert sted staar i kortet", !!rad,
+         panel.textContent.slice(0, 200));
+      if (!rad) { ferdig(); return; }
+
+      // Og den skal si hva den er. Et merke alene er en konvensjon du maa
+      // laere; her er det nettopp forbeholdet som er poenget.
+      ok("med ord som sier at den er antatt",
+         !!rad.querySelector(".sted-antatt-tekst") &&
+         rad.querySelector(".sted-antatt-tekst").textContent
+           .indexOf("ikke bekreftet") > -1,
+         rad.querySelector(".sted-antatt-tekst")
+           ? rad.querySelector(".sted-antatt-tekst").textContent : "ingen ord");
+
+      // Og den skal IKKE baere det samme merket som et sted noen har
+      // sjekket. ⚽ er «kjent for aa vise fotball» — det er en paastand.
+      ok("og ikke merket for kjent fotballpub",
+         !rad.querySelector(".pub-merke") && !!rad.querySelector(".sted-antatt-merke"),
+         rad.innerHTML.slice(0, 140));
+
+      // Stjerna er en helt annen paastand og maa heller ikke laane seg ut.
+      ok("og ikke stjerna heller", !rad.querySelector(".pub-bekreftet"));
+
+      // Og HELLER IKKE 📺, enda raden baerer et gyldig ligaflagg.
+      //
+      // «Sender Eliteserien» er den sterkeste paastanden et sted kan baere
+      // uten at et menneske har sett paa nettopp denne kampen, og
+      // usikker betyr at vi ikke har sjekket at stedet viser fotball i
+      // det hele tatt. Vant 📺, sto en gjetning og lovet en hel liga.
+      ok("og ikke ligamerket, enda flagget staar paa raden",
+         !rad.querySelector(".pub-liga"), rad.innerHTML.slice(0, 200));
+      ok("ordene om antakelsen staar fortsatt",
+         !!rad.querySelector(".sted-antatt-tekst"));
+      ferdig();
+    } catch (e) { ok("ingen unntak i kortet", false, e.message); ferdig(); } }, 900);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700); });
+`);
+
 /* ------- 16B. rettelsene fra portalen treffer leseren ------- */
 
 // Det som kommer over nettet, lander etter at visningen star ferdig.
@@ -6579,7 +6682,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
 let feilet = 0;
 
 for (const t of alle) {

@@ -121,6 +121,29 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   Det er mellomlaget i `sorterForslag`, og flagget sto som en regel uten
   en setter til 20. september 2026: enhetstesten lagde objektet for hånd og
   var grønn, mens ingen pub i appen noen gang bar det.
+- **Et antatt sted vises, og sier at det er antatt.** `usikker` ble
+  filtrert bort før lista nådde leseren, og da var det ingen forskjell
+  mellom «vi har sett etter og er i tvil» og «stedet finnes ikke». Lista
+  var 26 steder, alle i Oslo, og resten av landet fikk «Fant ingen puber»
+  — ikke fordi vi hadde undersøkt.
+  `merkAntatte()` setter `antatt: true` framfor å skjule, og raden får sitt
+  eget merke og **ord**: «Antatt — ikke bekreftet». Ikke ⚽, som er en
+  påstand vi ikke har dekning for. En antakelse som sier at den er en
+  antakelse, er sann. Grensa går ved `usikker`, ikke ved `sannsynlig`.
+  **Portalens pubvelger filtrerer fortsatt bort `usikker`:** å krysse av at
+  et sted viser en bestemt kamp er en påstand admin gjør, og den kan ikke
+  hvile på en antakelse. [ADR 0022](docs/adr/0022-antatte-steder.md)
+  **Og et antatt sted sender ingen liga.** `ligapuberAv()` slipper ikke et
+  `usikker`-sted gjennom, uansett hvor godt datert flagget er. «Sender
+  Eliteserien» er den sterkeste påstanden et sted kan bære uten at et
+  menneske har sett på nettopp denne kampen, og `usikker` betyr at vi ikke
+  har sjekket at stedet viser fotball i det hele tatt.
+  **Vakta ligger i kilden, ikke i merket.** `ligapuber` står rett etter
+  `bekreftede` i `FORSLAG_KILDER`, så en rad som slapp gjennom ville blitt
+  *løftet* over alt geografisk — samme form som den bekreftede visningen
+  392 km unna. Å sette «?» foran 📺 i merkekjeden skjuler bare tegnet.
+  Avgjort i flettinga 21. september 2026, da ligaflagget og de antatte
+  stedene møttes for første gang.
 - **⚽ settes ett sted, ikke i hver kilde.** `kuraterteNaer()` kopierer
   raden rett fra `KJENTE` og vet ikke at den er kuratert, mens
   `stampuberFor()` går gjennom `merkKuraterte`. Sto merkingen i hver
