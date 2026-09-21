@@ -15,9 +15,35 @@
 // Hver eneste handling krever ADMIN_PASSORD, sammenliknet i konstant tid,
 // som i visninger.mjs — et feil passord nar aldri Supabase.
 //
-// Miljoet: SUPABASE_URL, SUPABASE_SERVICE_KEY og ADMIN_PASSORD. Uten dem
-// svarer funksjonen 503 og sier hvilken som mangler. Husk at funksjonene
-// leser miljoet ved utrulling: en ny variabel krever en ny deploy.
+// **Og siden #140: passordet alene holder ikke.** Det gjorde det for, og
+// da sto den svakeste dora foran det sterkeste rommet: de fire andre
+// funksjonene som sjekker det samme passordet har TO laser — `visninger`
+// og `pub-liste` krever i tillegg at din egen Supabase-okt star i
+// `visning_skrivere`, og RLS avgjor skrivingen. Her gir et gjettet
+// passord liste over alle kontoer, ny PIN pa hvem som helst, og
+// sletting.
+//
+// Her kan ikke RLS avgjore: handlingene GAR gjennom service_role, som
+// per definisjon gar utenom RLS. Vi ma sjekke selv — og da er
+// sporsmalet hvor lista over hvem som far lov skal ligge.
+//
+// **Ikke i `visning_skrivere`.** Den lista er MENT a vokse: #65 handler
+// om at puber skal kunne krysse av sine egne kamper. Den dagen ville en
+// pubeier fatt brukerregisteret med pa kjopet, stille. To ulike makter i
+// én liste, og ingenting som sier fra.
+//
+// **Og ikke i en ny tabell ved siden av:** to lister som ligner blir til
+// «legg dem inn i begge», og da er vi tilbake der vi startet.
+//
+// `ADMIN_UID` ligger i Netlify, ved siden av ADMIN_PASSORD, der
+// hemmelighetene vare ellers bor. Den vokser ikke av seg selv. Og et
+// oppsett som mangler den STENGER framfor a apne — funksjonen svarer 503,
+// som for de andre variablene.
+//
+// Miljoet: SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY,
+// ADMIN_PASSORD og ADMIN_UID. Uten dem svarer funksjonen 503 og sier
+// hvilken som mangler. Husk at funksjonene leser miljoet ved utrulling:
+// en ny variabel krever en ny deploy.
 
 import { tolkBrukere, normaliserPin, gyldigPin, pinPassord, PIN_MIN, PIN_MAKS }
   from "../../pin-data.js";
@@ -48,6 +74,12 @@ export default async (req) => {
   if (!likeStrenger(String(inn.passord || ""), process.env.ADMIN_PASSORD)) {
     return svar({ feil: "Feil passord" }, 401);
   }
+
+  // Den andre lasa: en ekte Supabase-okt, og en som star i ADMIN_UID.
+  // Passordet er delt og kan gjettes; en okt kan ikke gjettes, den ma
+  // vaere utstedt av Supabase til en konto som finnes.
+  const dor = await slippInn(String(inn.token || ""));
+  if (!dor.ok) return svar({ feil: dor.feil, forsok: dor.forsok }, 401);
 
   if (inn.handling === "liste") return hentBrukere();
   if (inn.handling === "pin") return settPin(inn);
@@ -117,6 +149,75 @@ async function slettBruker(inn) {
   const r = await hosSupabase("DELETE", "/auth/v1/admin/users/" + id);
   if (!r.ok) return tjenestefeil(r, "Fikk ikke slettet brukeren");
   return svar({ slettet: true }, 200);
+}
+
+/* ---------- den andre lasa ---------- */
+
+// Er okta ekte, og hoerer den til en som far administrere kontoer?
+//
+// To sporsmal, og de svares av hver sin part. Om okta er ekte, svarer
+// Supabase: tokenet er signert av dem, og /auth/v1/user forkaster et
+// utlopt eller oppdiktet et. Om personen far lov, svarer ADMIN_UID.
+//
+// Kallet gar med ANON-nokkelen som apikey, ikke service_role: sporsmalet
+// er «hvem er denne okta», og det skal besvares med leserens egen
+// fullmakt. Service_role ville svart uansett hvem som spurte.
+async function slippInn(token) {
+  if (!token) {
+    return { ok: false, feil: "Logg inn i appen først. Brukerlista krever din"
+      + " egen økt i tillegg til passordet." };
+  }
+
+  const r = await hvemErDette(token);
+  if (!r.ok) {
+    return { ok: false, forsok: r.forsok, feil: r.status === 401 || r.status === 403
+      ? "Økten gjelder ikke lenger. Logg inn på nytt i appen."
+      : "Fikk ikke sjekket økten. Prøv igjen om litt." };
+  }
+
+  const uid = String((r.json && r.json.id) || "");
+  if (!uid || !staarIAdminlista(uid)) {
+    return { ok: false, feil: "Kontoen din står ikke i ADMIN_UID. Passordet"
+      + " åpner skjemaet, men brukerlista krever at du står der." };
+  }
+  return { ok: true, uid };
+}
+
+// Uid-en er ingen hemmelighet — den star i okta den som spor nettopp
+// beviste at hen eier — sa her trengs ingen konstant-tid-sammenlikning.
+// Den ville vaert et rituale uten et angrep a verge seg mot.
+//
+// Flere enn én: ADMIN_UID tar en kommaliste. Prosjektet er to personer,
+// og en variabel som bare tar én ville blitt lost med en tabell.
+function staarIAdminlista(uid) {
+  return String(process.env.ADMIN_UID || "")
+    .split(",")
+    .map((d) => d.trim())
+    .filter(Boolean)
+    .indexOf(uid) > -1;
+}
+
+async function hvemErDette(token) {
+  const forsok = { kilde: "Supabase Auth", sti: "/auth/v1/user" };
+  try {
+    const respons = await fetch(base() + "/auth/v1/user", {
+      headers: {
+        "apikey": String(process.env.SUPABASE_ANON_KEY || ""),
+        "Authorization": "Bearer " + token,
+        "Accept": "application/json",
+      },
+    });
+    forsok.status = respons.status;
+    const tekst = await respons.text().catch(() => "");
+    let json = null;
+    try { json = tekst ? JSON.parse(tekst) : null; } catch (err) { json = null; }
+    const melding = kortMelding(json);
+    if (melding) forsok.melding = melding;
+    return { ok: respons.ok, status: respons.status, json, forsok: [forsok] };
+  } catch (err) {
+    forsok.utfall = String((err && err.message) || err).slice(0, 80);
+    return { ok: false, status: 0, json: null, forsok: [forsok] };
+  }
 }
 
 /* ---------- tjenesten ---------- */
@@ -201,6 +302,12 @@ function manglerIOppsettet() {
   if (!process.env.SUPABASE_URL) mangler.push("SUPABASE_URL");
   if (!process.env.SUPABASE_SERVICE_KEY) mangler.push("SUPABASE_SERVICE_KEY");
   if (!process.env.ADMIN_PASSORD) mangler.push("ADMIN_PASSORD");
+  // Den andre lasa. Anon-nokkelen brukes til a sporre Supabase hvem okta
+  // tilhorer; ADMIN_UID er lista over hvem det da skal slippe inn.
+  // Mangler én av dem, stenger funksjonen — en las uten liste apner for
+  // alle, og det er den motsatte feilen av den vi retter.
+  if (!process.env.SUPABASE_ANON_KEY) mangler.push("SUPABASE_ANON_KEY");
+  if (!process.env.ADMIN_UID) mangler.push("ADMIN_UID");
   // Uten pepperet blir en ny PIN satt med feil passord, og personen ville
   // ikke kommet inn med den PIN-en admin nettopp ga dem.
   if (!process.env.PIN_PEPPER) mangler.push("PIN_PEPPER");

@@ -8,6 +8,7 @@
 // ikke er ren logikk — statuskoder, cache-headere og at nokkelen gar til
 // API-et og ikke til leseren — uten a deploye noe.
 
+import { readdirSync, readFileSync } from "node:fs";
 import fotball from "../netlify/functions/fotball.mjs";
 import vaer from "../netlify/functions/vaer.mjs";
 import puber from "../netlify/functions/puber.mjs";
@@ -35,11 +36,12 @@ import tsdbsonde from "../netlify/functions/tsdbsonde.mjs";
 //
 // Tester som trenger en variabel satt, setter den selv. Derfor er
 // baselinja tom, og den er nodt til a settes her, for den forste testen.
-[
-  "THESPORTSDB_KEY", "API_FOOTBALL_KEY", "api_football_key",
-  "ADMIN_PASSORD", "PIN_PEPPER", "MET_KONTAKT",
+const BASELINJE = [
+  "THESPORTSDB_KEY", "thesportsdb_key", "API_FOOTBALL_KEY", "api_football_key",
+  "ADMIN_PASSORD", "ADMIN_UID", "PIN_PEPPER", "MET_KONTAKT",
   "SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_KEY",
-].forEach((navn) => { delete process.env[navn]; });
+];
+BASELINJE.forEach((navn) => { delete process.env[navn]; });
 
 let feilet = 0;
 let kjort = 0;
@@ -1148,9 +1150,32 @@ delete process.env.SUPABASE_ANON_KEY;
 // visningRader er eget: /api/svar sporr bade kampsvar og visninger i
 // samme kall (#79), og en stubb som svarte likt pa begge kunne ikke se
 // forskjell pa dem — da hadde testen bevist noe annet enn den trodde.
+// Den andre lasa i brukerlista (#140): /api/brukere sporr Supabase hvem
+// okta tilhorer, for den rorer service_role. Stubbene svarer pa det nar
+// `oktSvar` er satt, og bare da — ellers oppforer de seg som for.
+//
+// Og oktkallet telles for seg, i `oktKall`. Assertene rundt
+// service_role-kallene leser `kall[0]`, og skulle oktoppslaget ligget
+// der, ville hver eneste av dem maattet flyttes én plass — en endring som
+// ser ut som ny dekning uten a vaere det.
+let oktSvar = null;
+let oktKall = [];
+
+function oktLaget(u, opsjoner) {
+  if (!oktSvar || u.indexOf("/auth/v1/user") === -1) return null;
+  oktKall.push({ url: u, opsjoner: opsjoner || {} });
+  return new Response(JSON.stringify(oktSvar.kropp), {
+    status: oktSvar.status || 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 function stubSupabase(svar, status, visningRader) {
   const kall = [];
+  oktKall = [];
   global.fetch = async (url, opsjoner) => {
+    const okt = oktLaget(String(url), opsjoner);
+    if (okt) return okt;
     kall.push({ url: String(url), opsjoner: opsjoner || {} });
     if (String(url).indexOf("/visninger") > -1) {
       return new Response(JSON.stringify(visningRader || []), {
@@ -1531,16 +1556,25 @@ delete process.env.PIN_PEPPER;
 
 /* ---------------- brukerlista i adminportalen ---------------- */
 
+// Okta folger med som standard: etter #140 har brukerlista to laser, og
+// hver av de tre handlingene krever begge. Sendes `token: null` inn, blir
+// feltet staende tomt — det er slik den forste lasa provdes alene.
 function brukerBe(kropp, metode) {
+  const med = kropp && kropp.token === undefined
+    ? Object.assign({ token: ADMIN_TOKEN }, kropp)
+    : kropp;
   return new Request("https://mvp-sb.netlify.app/api/brukere", {
     method: metode || "POST",
     headers: { "Content-Type": "application/json" },
-    body: metode === "GET" ? undefined : JSON.stringify(kropp),
+    body: metode === "GET" ? undefined : JSON.stringify(med),
   });
 }
 
 const SVC = "hemmelig-service-nokkel";
 const BRUKER_ID = "11111111-2222-3333-4444-555555555555";
+const ADMIN_ID = "99999999-8888-7777-6666-555555555555";
+const ADMIN_TOKEN = "okt-som-tilhorer-admin";
+const OKT_OK = { status: 200, kropp: { id: ADMIN_ID } };
 
 // Egen stubb for brukerlista. Den generelle gir det samme svaret pa hvert
 // kall, og da ville okt-oppslaget fatt brukerlista tilbake som «okter» —
@@ -1548,8 +1582,11 @@ const BRUKER_ID = "11111111-2222-3333-4444-555555555555";
 // endepunktene hver for seg, som hos Supabase.
 function stubBrukere(brukerRader, oktRader, utfall) {
   const kall = [];
+  oktKall = [];
   global.fetch = async (url, opsjoner) => {
     const u = String(url);
+    const okt = oktLaget(u, opsjoner);
+    if (okt) return okt;
     kall.push({ url: u, opsjoner: opsjoner || {} });
     if (u.indexOf("/rest/v1/rpc/sist_inne") > -1) {
       if (utfall === "okt-nede") {
@@ -1576,6 +1613,11 @@ ok("503-svaret navngir det som mangler",
    brukerUoppsatt.feil.indexOf("SUPABASE_SERVICE_KEY") > -1 &&
    brukerUoppsatt.feil.indexOf("ADMIN_PASSORD") > -1 &&
    brukerUoppsatt.feil.indexOf("PIN_PEPPER") > -1, brukerUoppsatt.feil);
+// En las uten liste apner for alle. Mangler ADMIN_UID, skal funksjonen
+// stenge og si hvilken variabel det er — ikke slippe gjennom paa
+// passordet alene, som var tilstanden #140 meldte.
+ok("og ADMIN_UID er én av dem",
+   brukerUoppsatt.feil.indexOf("ADMIN_UID") > -1, brukerUoppsatt.feil);
 
 r = await brukere(brukerBe(null, "GET"));
 ok("GET sier at brukerlista ikke er klar",
@@ -1583,8 +1625,11 @@ ok("GET sier at brukerlista ikke er klar",
 
 process.env.SUPABASE_URL = "https://prosjekt.supabase.co/";
 process.env.SUPABASE_SERVICE_KEY = SVC;
+process.env.SUPABASE_ANON_KEY = "anon-nokkel";
 process.env.ADMIN_PASSORD = "riktig-passord";
+process.env.ADMIN_UID = ADMIN_ID;
 process.env.PIN_PEPPER = PEPPER;
+oktSvar = OKT_OK;
 
 // Et feil passord skal aldri fore til et kall mot Supabase. Nokkelen her
 // kan gjore hva som helst med hvem som helst; passordet er det eneste som
@@ -1593,6 +1638,84 @@ kall = stubSupabase([]);
 r = await brukere(brukerBe({ passord: "feil", handling: "liste" }));
 ok("feil passord gir 401", r.status === 401, r.status);
 ok("og narmer seg aldri tjenesten", kall.length === 0, kall.length);
+
+/* ---- den andre lasa: passordet alene holder ikke (#140) ---- */
+
+// Fire funksjoner sjekker ADMIN_PASSORD, og tre av dem krever i tillegg
+// en okt. Denne gjorde ikke det — og det er den med service_role bak
+// seg: liste, ny PIN og sletting pa hvem som helst. Den svakeste dora
+// sto foran det sterkeste rommet.
+//
+// Legg merke til hva `kall.length === 0` betyr her: service_role-kallet
+// skjer ALDRI. Det er hele poenget. Et 401 etter at brukerne var hentet
+// ville vaert en las pa utsiden av et apent rom.
+
+kall = stubSupabase([]);
+r = await brukere(brukerBe({ passord: "riktig-passord", handling: "liste", token: null }));
+let dor = await r.json();
+ok("riktig passord uten okt gir 401", r.status === 401, r.status);
+ok("og tjenesten rores ikke", kall.length === 0, kall.length);
+ok("og okta sporres det ikke om heller — det er ingenting a sporre om",
+   oktKall.length === 0, oktKall.length);
+ok("meldinga sier hva som mangler",
+   dor.feil.indexOf("Logg inn i appen") > -1, dor.feil);
+
+// En okt Supabase ikke vil vedkjenne seg. Det er dem som avgjor: tokenet
+// er signert av dem, og et utlopt eller oppdiktet et forkastes der.
+oktSvar = { status: 401, kropp: { msg: "JWT expired" } };
+kall = stubSupabase([]);
+r = await brukere(brukerBe({ passord: "riktig-passord", handling: "liste" }));
+dor = await r.json();
+ok("en okt Supabase avviser gir 401", r.status === 401, r.status);
+ok("og tjenesten rores ikke da heller", kall.length === 0, kall.length);
+ok("meldinga ber deg logge inn pa nytt",
+   dor.feil.indexOf("Logg inn på nytt") > -1, dor.feil);
+
+// En EKTE okt, men en som ikke star i ADMIN_UID. Det er tilfellet #65
+// lager: puber som skal kunne krysse av sine egne kamper har en gyldig
+// okt, og skal ikke fa brukerregisteret med pa kjopet.
+oktSvar = { status: 200, kropp: { id: BRUKER_ID } };
+kall = stubSupabase([]);
+r = await brukere(brukerBe({ passord: "riktig-passord", handling: "liste" }));
+dor = await r.json();
+ok("en gyldig okt utenfor ADMIN_UID gir 401", r.status === 401, r.status);
+ok("og tjenesten rores ikke", kall.length === 0, kall.length);
+ok("meldinga navngir lista", dor.feil.indexOf("ADMIN_UID") > -1, dor.feil);
+
+// Lasa gjelder ALLE tre handlingene, ikke bare lesingen. Sletting er den
+// som ikke kan angres.
+oktSvar = { status: 200, kropp: { id: BRUKER_ID } };
+kall = stubSupabase({});
+r = await brukere(brukerBe({ passord: "riktig-passord", handling: "slett", id: BRUKER_ID }));
+ok("og den gjelder slettingen ogsa", r.status === 401, r.status);
+ok("ingen blir slettet", kall.length === 0, kall.length);
+
+kall = stubSupabase({});
+r = await brukere(brukerBe({ passord: "riktig-passord", handling: "pin",
+  id: BRUKER_ID, pin: "4567" }));
+ok("og ny PIN ogsa", r.status === 401, r.status);
+ok("ingen PIN blir satt", kall.length === 0, kall.length);
+
+// Oktoppslaget gar med ANON-nokkelen, ikke service_role. Sporsmalet er
+// «hvem er denne okta», og det skal besvares med leserens egen fullmakt:
+// service_role ville svart uansett hvem som spurte.
+oktSvar = OKT_OK;
+kall = stubSupabase([]);
+r = await brukere(brukerBe({ passord: "riktig-passord", handling: "liste" }));
+ok("okta sjekkes hos Supabase", oktKall.length === 1, oktKall.length);
+ok("med leserens eget token som Bearer",
+   oktKall[0].opsjoner.headers.Authorization === "Bearer " + ADMIN_TOKEN,
+   oktKall[0].opsjoner.headers.Authorization);
+ok("og anon-nokkelen som apikey, ikke service_role",
+   oktKall[0].opsjoner.headers.apikey === "anon-nokkel",
+   oktKall[0].opsjoner.headers.apikey);
+
+// ADMIN_UID tar en kommaliste: prosjektet er to personer.
+process.env.ADMIN_UID = BRUKER_ID + " , " + ADMIN_ID;
+kall = stubSupabase([]);
+r = await brukere(brukerBe({ passord: "riktig-passord", handling: "liste" }));
+ok("ADMIN_UID tar flere, med mellomrom rundt", r.status === 200, r.status);
+process.env.ADMIN_UID = ADMIN_ID;
 
 kall = stubSupabase([
   { id: BRUKER_ID, email: "ola@pin.mvp-sb.netlify.app",
@@ -2456,6 +2579,36 @@ ok("sonden caches aldri",
 
 delete process.env.ADMIN_PASSORD;
 delete process.env.THESPORTSDB_KEY;
+
+/* ---------------- vakt: baselinja maa dekke alt funksjonene leser ---- */
+
+// Denne suiten er halve porten foran prod — den kjorer som byggekommando
+// i netlify.toml. Leser en funksjon en miljovariabel som IKKE staar i
+// baselinja over, ser testene den EKTE verdien fra Netlifys byggemiljo,
+// og en test som maaler «uten oppsett» maaler da noe annet enn den tror.
+//
+// Det skjedde 21. september 2026 med ADMIN_UID: variabelen ble satt i
+// Netlify samme kveld som den ble tatt i bruk, bygget feilet paa én test,
+// og #156 ble staaende upublisert. Lokalt og i CI var alt gront — der
+// finnes ingen av nokklene, og det er nettopp derfor de ikke kan fange
+// dette.
+//
+// Vakta ser `process.env.NAVN`. Et oppslag gjennom en variabel
+// (`process.env[navn]`, som apiNokkel bruker) er usynlig for den, og maa
+// staa i lista for haand — de to API-Football-navnene gjor det.
+const FUNKSJONSMAPPE = new URL("../netlify/functions/", import.meta.url);
+const LESTE = new Set();
+for (const fil of readdirSync(FUNKSJONSMAPPE)) {
+  if (!fil.endsWith(".mjs")) continue;
+  const tekst = readFileSync(new URL(fil, FUNKSJONSMAPPE), "utf8");
+  for (const treff of tekst.matchAll(/process\.env\.([A-Za-z_][A-Za-z0-9_]*)/g)) {
+    LESTE.add(treff[1]);
+  }
+}
+const UTENFOR = [...LESTE].filter((navn) => BASELINJE.indexOf(navn) === -1).sort();
+ok("hver miljovariabel funksjonene leser staar i baselinja",
+   UTENFOR.length === 0, UTENFOR.join(", "));
+ok("og vakta fant faktisk noe a lese", LESTE.size > 5, LESTE.size + " navn");
 
 /* ---------------- rapport ---------------- */
 

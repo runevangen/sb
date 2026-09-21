@@ -817,6 +817,14 @@ Se [`nokler-og-tokens.md`](nokler-og-tokens.md).
   annens konto eller sette en annens PIN *er* å handle på vegne av andre, og
   Supabase Auth har ingen annen vei. Nøkkelen importeres ikke og deles
   ikke. Hver handling krever `ADMIN_PASSORD`, sammenliknet i konstant tid.
+  **Og siden #140: en ekte Supabase-økt i tillegg**, hvis uid står i
+  `ADMIN_UID`. `slippInn()` spør `/auth/v1/user` med **anon**-nøkkelen som
+  `apikey` og leserens eget token som `Bearer` — spørsmålet er «hvem er
+  denne økta», og service_role ville svart uansett hvem som spurte.
+  Sjekken ligger før dispatchen, så et avvist kall aldri når Supabase
+  Auth; det gjelder alle tre handlingene, ikke bare lesingen.
+  Lista ligger i miljøet og ikke i `visning_skrivere`, som er ment å vokse
+  med pubene i #65; mangler `ADMIN_UID`, stenger funksjonen med 503.
   «Sist inne» kommer fra `public.sist_inne()` som et **tillegg**: svikter
   den, står kolonnen tom og resten står.
 - **`pub-forslag.mjs`** — en kø, ikke lista. Skrivingen går med leserens
