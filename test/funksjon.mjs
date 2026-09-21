@@ -8,6 +8,7 @@
 // ikke er ren logikk — statuskoder, cache-headere og at nokkelen gar til
 // API-et og ikke til leseren — uten a deploye noe.
 
+import { readdirSync, readFileSync } from "node:fs";
 import fotball from "../netlify/functions/fotball.mjs";
 import vaer from "../netlify/functions/vaer.mjs";
 import puber from "../netlify/functions/puber.mjs";
@@ -35,11 +36,12 @@ import tsdbsonde from "../netlify/functions/tsdbsonde.mjs";
 //
 // Tester som trenger en variabel satt, setter den selv. Derfor er
 // baselinja tom, og den er nodt til a settes her, for den forste testen.
-[
-  "THESPORTSDB_KEY", "API_FOOTBALL_KEY", "api_football_key",
-  "ADMIN_PASSORD", "PIN_PEPPER", "MET_KONTAKT",
+const BASELINJE = [
+  "THESPORTSDB_KEY", "thesportsdb_key", "API_FOOTBALL_KEY", "api_football_key",
+  "ADMIN_PASSORD", "ADMIN_UID", "PIN_PEPPER", "MET_KONTAKT",
   "SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_KEY",
-].forEach((navn) => { delete process.env[navn]; });
+];
+BASELINJE.forEach((navn) => { delete process.env[navn]; });
 
 let feilet = 0;
 let kjort = 0;
@@ -2577,6 +2579,36 @@ ok("sonden caches aldri",
 
 delete process.env.ADMIN_PASSORD;
 delete process.env.THESPORTSDB_KEY;
+
+/* ---------------- vakt: baselinja maa dekke alt funksjonene leser ---- */
+
+// Denne suiten er halve porten foran prod — den kjorer som byggekommando
+// i netlify.toml. Leser en funksjon en miljovariabel som IKKE staar i
+// baselinja over, ser testene den EKTE verdien fra Netlifys byggemiljo,
+// og en test som maaler «uten oppsett» maaler da noe annet enn den tror.
+//
+// Det skjedde 21. september 2026 med ADMIN_UID: variabelen ble satt i
+// Netlify samme kveld som den ble tatt i bruk, bygget feilet paa én test,
+// og #156 ble staaende upublisert. Lokalt og i CI var alt gront — der
+// finnes ingen av nokklene, og det er nettopp derfor de ikke kan fange
+// dette.
+//
+// Vakta ser `process.env.NAVN`. Et oppslag gjennom en variabel
+// (`process.env[navn]`, som apiNokkel bruker) er usynlig for den, og maa
+// staa i lista for haand — de to API-Football-navnene gjor det.
+const FUNKSJONSMAPPE = new URL("../netlify/functions/", import.meta.url);
+const LESTE = new Set();
+for (const fil of readdirSync(FUNKSJONSMAPPE)) {
+  if (!fil.endsWith(".mjs")) continue;
+  const tekst = readFileSync(new URL(fil, FUNKSJONSMAPPE), "utf8");
+  for (const treff of tekst.matchAll(/process\.env\.([A-Za-z_][A-Za-z0-9_]*)/g)) {
+    LESTE.add(treff[1]);
+  }
+}
+const UTENFOR = [...LESTE].filter((navn) => BASELINJE.indexOf(navn) === -1).sort();
+ok("hver miljovariabel funksjonene leser staar i baselinja",
+   UTENFOR.length === 0, UTENFOR.join(", "));
+ok("og vakta fant faktisk noe a lese", LESTE.size > 5, LESTE.size + " navn");
 
 /* ---------------- rapport ---------------- */
 

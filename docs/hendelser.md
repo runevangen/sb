@@ -9,6 +9,41 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 21. september 2026 — variabelen som stoppet sin egen utrulling
+
+**Meldt som:** ingenting. Prod ble stående på forrige deploy etter at
+#156 var merget, og det var innsjekken som oppdaget det.
+
+**Hva som skjedde.** `ADMIN_UID` ble innført i #156 og satt i Netlify
+samme kveld, med scopet `builds` og `functions`. Byggekommandoen er
+`node test/unit.mjs && node test/funksjon.mjs` — så byggemiljøet hadde
+variabelen satt når testene kjørte.
+
+Den nye testen måler at `/api/brukere` svarer 503 og **navngir** det som
+mangler. Med `ADMIN_UID` satt manglet den ikke lenger. Testen falt,
+kommandoen returnerte 1, og Netlify publiserte ingenting.
+
+**Hvorfor CI var grønn.** GitHub Actions har ingen av nøklene. Det er
+hele grunnen til at `funksjon.mjs` sletter en baseline av miljøvariabler
+før første test — en vane som kom av nøyaktig den samme feilen med
+`THESPORTSDB_KEY` i #77. `ADMIN_UID` ble lagt i koden og glemt i den
+lista.
+
+**Det som ble gjort.** `ADMIN_UID` inn i baselinja. Og en vakt som gjør
+det umulig å glemme neste gang: den leser `process.env.NAVN` ut av hver
+fil i `netlify/functions/` og krever at hvert navn står i baselinja.
+
+Vakta fant en til på første kjøring: `thesportsdb_key` med små
+bokstaver, lest av sonden som reserve, sto ikke der. Den hadde ventet på
+den dagen noen satte *den* skrivemåten i Netlify.
+
+**Lærdommen:** en port foran prod som kan feile av miljøet den står i, er
+verre enn ingen port — og den setningen sto allerede i fila. Regelen
+fantes; mekanismen som håndhever den gjorde ikke. En liste noen må huske
+å fylle, blir ikke fylt.
+
+---
+
 ## 21. september 2026 — «ser ingen forskjell på admin?»
 
 **Meldt som:** «ser ingen forskjell på admin?» — etter at «Ikke denne
