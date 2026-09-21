@@ -98,6 +98,33 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 - **En knapp som ser ut som den gir noe den ikke gir, er verre enn en som
   sier hva den er.** Gjelder «Venner», «Meldt inn til oss», og
   «Valgt for deling» utlogget.
+- **En sak er en lenke, ikke en knapp.** Kortene i feeden og de relaterte
+  radene er `<a href="#/sak/<slug>">`. Ruten fantes fra før — den pushes,
+  leses ved oppstart og ved tilbakeknappen, og en ukjent slug hentes fra
+  WordPress — men ingen lenke bar den, så «åpne i ny fane», «kopier
+  lenkeadresse» og statuslinja fantes ikke. `<button>` sto der til
+  22. september 2026.
+  **`preventDefault()` bare på et vanlig venstreklikk.** Ctrl, Cmd, Shift,
+  Alt og midtklikk går til nettleseren; fanger vi dem, har vi gitt lenka
+  med den ene handa og tatt ny fane med den andre — og det var nettopp det
+  som manglet. `sakHash()` står ett sted, så kortet og historikken aldri
+  kan peke hver sin vei.
+- **En sak kan deles på to måter, og de er ikke det samme.**
+  «Del saken» sender sportsbibelen.no-adressen; den er den ENESTE som kan
+  bli et kort med bilde og overskrift der den limes inn, fordi en hash
+  aldri når en tjener. «Del i appen» sender app-adressen: den åpner saken
+  her, men står naken overalt den limes inn. Regelen om at to knapper til
+  én ting er én for mye gjelder to knapper som gjør det **samme** — disse
+  svarer på hvert sitt spørsmål, og **følgen står i knappen**, ikke bare i
+  navnet. Mangler `post.link`, står «Del saken» ikke der.
+  **Kvitteringen står i artikkelen, ikke i `#actionNote`.** Det feltet
+  ligger inne i menypanelet, som er lukket når en sak er åpen — en beskjed
+  leseren aldri ville sett. `settNotat()` deles mellom de to stedene, så
+  de ikke rekker å bli uenige.
+  **Og menyens «Del appen» ble ikke kontekstsensitiv.** #148 ba om det,
+  men `.detail-wrap` er `position: fixed` over hele skjermen: menyknappen
+  er **målt** dekket mens en sak står åpen, så koden ville aldri kunne
+  nås. En test holder den målingen, så antagelsen ikke må gjøres på nytt.
 - **Lenka i delingsfallbacken er en ekte `<a>`.** «Kopier lenken selv: …»
   er beskjeden som kommer **når** utklippstavla sviktet — da er teksten
   det eneste leseren har, og den sto som ren tekst i et 12px-avsnitt til
