@@ -16,7 +16,7 @@ import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
 import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          OVERPASS_SPEIL, overpassHeadere, kuraterteNaer, merkKuraterte,
          rangerForslag, FORSLAG_MAKS, tolkPubRader, slaSammenPuber,
-         posisjonsfeil, kuraterteIByen,
+         posisjonsfeil, kuraterteIByen, ligapuberAv, ligamerkeTekst,
          stampuberFor, falskPosisjon, avstandM, byFor, BYER,
          sorterForslag, ANDRE_MAKS, NAER_MAKS, merkAntatte }
   from "./pub-data.js";
@@ -220,6 +220,9 @@ function tegnKjenteIgjen() {
       boks.kilder.stampuber = merkBekreftet(
         merkKuraterte(stampuberFor(boks.kamp, KJENTE), KJENTE), bekreftede);
     }
+    // SJETTE kilden som leser KJENTE — og den ma regnes SIST, for den
+    // siler de geografiske som nettopp ble regnet om over.
+    boks.kilder.ligapuber = ligapuberIBoks(boks, bekreftede);
     tegnKortet(boks);
   });
 }
@@ -1248,9 +1251,29 @@ function stedRad(kamp, panel, sted, form) {
     // Et sted vi har GJETTET paa. Merket er sitt eget, og ordene under
     // raden sier det med bokstaver: et merke alene er en konvensjon du
     // maa laere, og her er det nettopp forbeholdet som er poenget.
+    //
+    // Den staar FOER 📺 fordi «Sender Eliteserien» er en sterkere paastand
+    // enn «pleier aa vise fotball», og et sted vi ikke har sjekket kan
+    // ikke baere den.
+    //
+    // Men VAKTA ligger ikke her — den ligger i `ligapuberAv`, som ikke
+    // slipper et `usikker`-sted gjennom i det hele tatt. Merkerekkefolgen
+    // alene ville bare skjult tegnet: kilden ligger rett etter
+    // `bekreftede` i FORSLAG_KILDER, saa raden ville fortsatt blitt loftet
+    // over alt geografisk. Rekkefolgen her er hvor grena hoerer hjemme,
+    // ikke regelen som haandheves.
     const merke = el("span", "sted-antatt-merke", "?");
     merke.setAttribute("aria-label", "antatt, ikke bekreftet");
     merke.title = "Vi har ikke sjekket dette stedet.";
+    topp.appendChild(merke);
+  } else if (sted.senderLigaen) {
+    // 📺 «Sender Eliteserien» star MELLOM ★ og ⚽, for den er akkurat det
+    // den ser ut som: sterkere enn «pleier a vise fotball», svakere enn
+    // «viser denne kampen». Den navngir ligaen, er datert, og utloper ved
+    // sesongslutt — men ingen har sagt noe om NETTOPP denne kampen.
+    const merke = el("span", "pub-liga", "📺");
+    merke.setAttribute("aria-label", sted.senderLigaen);
+    merke.title = sted.senderLigaen + ".";
     topp.appendChild(merke);
   } else if (sted.viserFotball) {
     // ⚽ er «kjent for aa vise fotball», ★ er «viser DENNE kampen». To
@@ -1536,6 +1559,7 @@ function fyllForslag(boks, kamp) {
     boks.kilder.kjenteVedArena = merkBekreftet(
       kuraterteNaer(KJENTE, arena, ARENA_RADIUS), bekreftede);
   }
+  boks.kilder.ligapuber = ligapuberIBoks(boks, bekreftede);
 
   tegnKortet(boks);
 
@@ -1574,6 +1598,27 @@ function fyllForslag(boks, kamp) {
   }
 }
 
+// Stedene som sender ligaen kampen spilles i. Kandidatene er de
+// geografiske kildene som ALT star i boksen — ikke hele KJENTE: et sted i
+// Oslo som sender Eliteserien er ikke et svar for den som star i
+// Trondheim. Flagget loefter stedene som svarer pa kampen, det apner
+// ingen ny doer inn i lista.
+function ligapuberIBoks(boks, bekreftede) {
+  if (!boks.kamp) return [];
+  const naer = boks.kilder.kjenteNaer || [];
+  const iByen = boks.kilder.kjenteIByen || [];
+  const vedArena = boks.kilder.kjenteVedArena || [];
+  const sett = new Map();
+  naer.concat(iByen, vedArena).forEach((p) => {
+    if (p && p.navn && !sett.has(p.navn)) sett.set(p.navn, p);
+  });
+  const tekst = ligamerkeTekst(boks.kamp.liga);
+  return merkBekreftet(
+    ligapuberAv(Array.from(sett.values()), boks.kamp)
+      .map((p) => Object.assign({}, p, { senderLigaen: tekst })), bekreftede);
+}
+
+// Ett sted som bestemmer hva som star pa skjermen.
 // Lista over puber i ANDRE byer. De naere lofter `tegnSteder` opp i lista
 // over — her staar resten.
 //
@@ -1876,6 +1921,8 @@ async function naerDegFra(boks, bekreftede, p) {
   // by er ikke det: star du fire kilometer ut, faller din egen bys steder
   // utenfor sirkelen enda de apenbart er svaret.
   boks.kilder.kjenteIByen = merkBekreftet(kuraterteIByen(KJENTE, p), bekreftede);
+  // Etter de geografiske: kilden siler DEM, sa den ma regnes etterpa.
+  boks.kilder.ligapuber = ligapuberIBoks(boks, bekreftede);
 
   // Stampubene er en UTVEI, ikke et tillegg: de finnes for tilfellet der
   // geografien ikke gir noe. Vet vi hvor du star, er geografien svaret, og

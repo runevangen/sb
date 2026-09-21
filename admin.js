@@ -27,7 +27,8 @@ import { publisteRad, alleredeILista, erTips, forslagVekt, sorterForslagKo }
   from "./pub-forslag-data.js";
 import { PUBTYPER, PUBSIKKERHET, pubNokkel, sjekkPubRad, slaSammenPuber,
   koordinatFraLenke, BYER, byFor, PUBLISTE_FELT } from "./pub-data.js";
-import { visningsHint, rundeTall, lagreKnappTekst } from "./visning-data.js";
+import { visningsHint, rundeTall, lagreKnappTekst,
+         rundeKnappTekst } from "./visning-data.js";
 
 const felt = (id) => document.getElementById(id);
 let kamper = [];
@@ -698,13 +699,33 @@ function tegnKamper() {
       sisteRunde = k.runde;
       const skille = document.createElement("li");
       skille.className = "runde-skille";
-      skille.textContent = k.runde;
+      // Navnet i sitt eget element, sa det kan ta plassen som blir til
+      // overs og la tallet og knappen sta samlet til hoyre. En ren
+      // tekstnode kan ikke det.
+      const navn = document.createElement("span");
+      navn.className = "runde-navn";
+      navn.textContent = k.runde;
+      skille.appendChild(navn);
       // Tallet star her fordi lista er lengre enn skjermen. Uten det ma
       // admin rulle gjennom hele for a vite om noe er krysset av lenger
       // nede — og tre synlige avkryssinger av fem ser ut som tap.
       const tall = document.createElement("span");
       tall.className = "runde-tall";
       skille.appendChild(tall);
+      // Ett trykk for hele runden. Selve PASTANDEN star urort: hver rad
+      // er fortsatt per kamp, satt av et menneske. Det er bare klikkinga
+      // som blir billigere.
+      const alle = document.createElement("button");
+      alle.type = "button";
+      alle.className = "runde-alle";
+      alle.addEventListener("click", () => {
+        const bokser = rundensBokser(skille);
+        // Er alt krysset av, fjerner trykket. Ellers fyller det opp.
+        const fyll = bokser.some((b) => !b.checked);
+        bokser.forEach((b) => { b.checked = fyll; });
+        oppdaterLagreknapp();
+      });
+      skille.appendChild(alle);
       liste.appendChild(skille);
     }
     const rad = document.createElement("li");
@@ -741,12 +762,31 @@ function settKamptittel() {
 
 // Tallene per runde regnes av boksene selv, ikke av et tall vi forer:
 // en teller ved siden av sannheten glir fra den.
+// Boksene som hoerer til én runde: radene mellom denne overskrifta og
+// den neste. Lista er flat — overskriftene er sosken av kampradene, ikke
+// foreldre — sa runden leses ved a ga framover til neste skille.
+function rundensBokser(skille) {
+  const ut = [];
+  let rad = skille.nextElementSibling;
+  while (rad && !rad.classList.contains("runde-skille")) {
+    const boks = rad.querySelector(".kamp input");
+    if (boks) ut.push(boks);
+    rad = rad.nextElementSibling;
+  }
+  return ut;
+}
+
 function oppdaterRundetall() {
   let skille = null;
   let valgt = 0;
   let alle = 0;
   const skriv = () => {
-    if (skille) skille.querySelector(".runde-tall").textContent = rundeTall(valgt, alle);
+    if (!skille) return;
+    skille.querySelector(".runde-tall").textContent = rundeTall(valgt, alle);
+    // Teksten ma folge haken: krysser du av den siste selv, skal knappen
+    // si «Fjern alle» — ikke fortsatt love et trykk som ikke finnes.
+    const knapp = skille.querySelector(".runde-alle");
+    if (knapp) knapp.textContent = rundeKnappTekst(valgt, alle);
   };
   Array.from(felt("kamper").children).forEach((rad) => {
     if (rad.classList.contains("runde-skille")) {
@@ -934,8 +974,46 @@ function stedFelt() {
     sikkerhet: felt("stedSikkerhet").value,
     sjekket: felt("stedSjekket").value,
     merknad: felt("stedMerknad").value,
+    // Flagget settes bare nar noe FAKTISK er krysset av. Et tomt flagg og
+    // «ingen pastand» skal vaere den samme raden — ellers ligger det en
+    // tom struktur i basen som ser ut som en pastand ingen har gjort.
+    ligaer: valgteLigaer().length ? {
+      sender: valgteLigaer(),
+      kilde: felt("stedLigaKilde").value,
+      // Datoen deles med resten av raden. Sesongen regnes AV den gjennom
+      // sesongFor(), sa flagget utloeper ved sesongslutt uten et eget
+      // felt som kunne sagt noe annet.
+      sjekket: felt("stedSjekket").value,
+    } : null,
     fjernet: felt("stedFjernet").checked,
   };
+}
+
+function valgteLigaer() {
+  return Array.from(felt("stedLigaer").querySelectorAll("input:checked"))
+    .map((b) => b.value);
+}
+
+// Hakeboksene bygges AV LIGAER, ikke skrevet i markupen: en liste i
+// HTML-en kunne glidd fra den appen faktisk kjenner, og da ville portalen
+// lagret en liga ingen kamp har. Samme grunn som PUBTYPER og
+// PUBSIKKERHET fyller sine to velgere.
+function byggLigavalg() {
+  const liste = felt("stedLigaer");
+  liste.replaceChildren();
+  Object.keys(LIGAER).forEach((nokkel) => {
+    const rad = document.createElement("li");
+    const boks = document.createElement("input");
+    boks.type = "checkbox";
+    boks.value = nokkel;
+    boks.id = "stedLiga-" + nokkel;
+    const merke = document.createElement("label");
+    merke.setAttribute("for", boks.id);
+    merke.textContent = LIGAER[nokkel].navn;
+    rad.appendChild(boks);
+    rad.appendChild(merke);
+    liste.appendChild(rad);
+  });
 }
 
 function fyllSted(p) {
@@ -954,6 +1032,12 @@ function fyllSted(p) {
   felt("stedSjekket").value = new Date().toISOString().slice(0, 10);
   felt("stedMerknad").value = (p && p.merknad) || "";
   felt("stedFjernet").checked = !!(p && p.fjernet);
+  const flagg = (p && p.ligaer) || null;
+  const sender = (flagg && Array.isArray(flagg.sender)) ? flagg.sender : [];
+  Array.from(felt("stedLigaer").querySelectorAll("input")).forEach((b) => {
+    b.checked = sender.indexOf(b.value) > -1;
+  });
+  felt("stedLigaKilde").value = (flagg && flagg.kilde) || "";
   felt("stedTreff").textContent = "";
   felt("stedSokHint").hidden = true;
 }
@@ -972,6 +1056,7 @@ PUBSIKKERHET.forEach((sk) => {
   valg.textContent = sk + (sk === "usikker" ? " (vises ikke i appen)" : "");
   felt("stedSikkerhet").appendChild(valg);
 });
+byggLigavalg();
 
 /* ---------------- feltene som MA fylles ut ---------------- */
 

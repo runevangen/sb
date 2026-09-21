@@ -532,6 +532,11 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   Noten er **én** for hele kortet (`panel.note`), og teller radene i
   begge. Taket er `NAER_MAKS` vanlige rader; ditt eget sted og stedene
   noen andre skal til kommer i tillegg.
+- **`ligapuberAv()` slipper ikke et antatt sted gjennom.** Kilden ligger
+  rett etter `bekreftede`, så en `usikker`-rad med et gyldig ligaflagg
+  ville blitt løftet over alt geografisk. Vakta ligger her og ikke i
+  merkekjeden: rekkefølgen på tegnene skjuler bare tegnet.
+  [ADR 0022](adr/0022-antatte-steder.md)
 - **`merkAntatte()` merker framfor å skjule.** `kjenteAv()` filtrerte
   bort `usikker`, og et usikkert sted var da ikke til å skille fra et som
   ikke finnes. Nå setter den `antatt: true`, og `stedRad()` gir raden sitt
