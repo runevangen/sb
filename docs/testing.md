@@ -6,7 +6,7 @@ dager. Legger du til tester, er det denne fila som skal rettes.
 
     node test/unit.mjs      811 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  386 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       816 tester, 3–20 s, headless Chromium
+    node test/run.mjs       829 tester, 3–20 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
@@ -268,5 +268,14 @@ til angring, og hele fotballmodulen.
   argument list» eller «Invalid left-hand side expression in postfix
   operation», det siste fordi `--noe` da leses som en dekrement.
   Skriv kodeord uten fnutter inne i en scene.
+- **En test som KASTER velter scenen, og da rapporteres ingenting.**
+  Symptomet er ikke en rød påstand, men `«<scene>: testsiden rapporterte
+  ingenting»` — og i en sabotasje leses det som «ingenting falt», altså
+  det motsatte av hva som skjedde. Det traff 22. september 2026: en
+  sabotasje fjernet en av to delingsknapper, og testen leste `folger[1]`
+  på en liste med ett element. **Les alltid av en liste null-sikkert**, og
+  sjekk `length` framfor å stole på at den har det du ventet. Regelen står
+  allerede i `run.mjs` ved snarvei-testen; den koster noe hver gang den
+  glemmes.
 - **En `pull_request`-kjøring tester grenen flettet med `main`.** En test
   som er ny på main kjører der før den finnes lokalt.

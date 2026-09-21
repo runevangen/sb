@@ -678,14 +678,12 @@ async function visRelaterte(post, boks) {
 
       boks.appendChild(el("h3", "relatert-tittel", "Mer fra " + kategori.name));
       saker.forEach((sak) => {
-        const rad = el("button", "relatert-rad");
-        rad.type = "button";
-        rad.appendChild(el("span", "relatert-navn", getTitle(sak)));
-        rad.appendChild(timeEl(sak, "relatert-tid"));
-        rad.addEventListener("click", () => {
+        const rad = sakLenke("relatert-rad", sak, () => {
           closeDetail();
           visArtikkel(sak);
         });
+        rad.appendChild(el("span", "relatert-navn", getTitle(sak)));
+        rad.appendChild(timeEl(sak, "relatert-tid"));
         boks.appendChild(rad);
       });
       return;
@@ -863,9 +861,37 @@ function favorittLinje() {
   return knapp;
 }
 
+// Adressen en sak har. Samme form som visArtikkel() pusher, og den staar
+// ETT sted: sto den begge steder, kunne kortet peke ett sted og
+// historikken et annet — og da ville «kopier lenkeadresse» gitt en adresse
+// appen ikke kjente igjen.
+function sakHash(post) {
+  return "#/sak/" + encodeURIComponent(post.slug || String(post.id));
+}
+
+// Kortene var <button> til 22. september 2026, og da fantes ikke «apne i
+// ny fane», «kopier lenkeadresse» eller statuslinja som viser hvor du er
+// pa vei (#146). Ruten fantes hele tiden — det var bare ingen lenke som
+// bar den.
+//
+// **preventDefault bare pa et vanlig venstreklikk.** Ctrl, Cmd, Shift,
+// midtklikk og hoyreklikk skal ga til nettleseren; fanger vi dem, har vi
+// gitt lenka med den ene handa og tatt ny fane med den andre — og det var
+// nettopp det som manglet.
+function sakLenke(klasse, post, apne) {
+  const a = el("a", klasse);
+  a.href = sakHash(post);
+  a.addEventListener("click", (e) => {
+    if (e.defaultPrevented) return;
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    apne(a);
+  });
+  return a;
+}
+
 function buildHero(post) {
-  const button = el("button", "card-btn hero");
-  button.type = "button";
+  const button = sakLenke("card-btn hero", post, (a) => visArtikkel(post, a));
 
   const img = getImage(post);
   if (img) button.appendChild(imageEl(img, false));
@@ -876,14 +902,11 @@ function buildHero(post) {
   overlay.appendChild(el("h2", "hero-title", getTitle(post)));
   overlay.appendChild(timeEl(post, "meta"));
   button.appendChild(overlay);
-
-  button.addEventListener("click", () => visArtikkel(post, button));
   return button;
 }
 
 function buildRow(post) {
-  const button = el("button", "card-btn row");
-  button.type = "button";
+  const button = sakLenke("card-btn row", post, (a) => visArtikkel(post, a));
 
   const img = getImage(post);
   button.appendChild(img ? imageEl(img, true) : el("div", "thumb-empty"));
@@ -894,8 +917,6 @@ function buildRow(post) {
   body.appendChild(el("h3", "row-title", getTitle(post)));
   body.appendChild(timeEl(post, "row-meta"));
   button.appendChild(body);
-
-  button.addEventListener("click", () => visArtikkel(post, button));
   return button;
 }
 
@@ -1191,13 +1212,22 @@ let installasjonsvarsel = null;
 // regelen om at fremmed HTML ikke parses star uansett, og et unntak er
 // noe noen kopierer.
 function visNotat(tekst, lenke) {
-  const notat = document.getElementById("actionNote");
+  settNotat(document.getElementById("actionNote"), tekst, lenke);
+}
+
+// Skriver et notat med URL-en som en ekte <a>. Delt mellom menyens
+// #actionNote og artikkelens egen kvittering: begge sier det samme naar
+// utklippstavla sviktet, og to kopier ville rukket aa bli uenige.
+// Bygget med createElement, aldri innerHTML: URL-en er var egen, men
+// regelen om at fremmed HTML ikke parses staar uansett, og et unntak er
+// noe noen kopierer.
+function settNotat(notat, tekst, lenke) {
   notat.textContent = tekst || "";
   if (tekst && lenke) {
     notat.appendChild(document.createTextNode(" "));
     const a = el("a", "action-note-lenke", lenke);
     a.href = lenke;
-    // Egen side, sa den som star i menyen ikke mister den hen holdt pa med.
+    // Egen side, sa den som leser ikke mister det hen holdt pa med.
     a.target = "_blank";
     a.rel = "noopener";
     notat.appendChild(a);
@@ -2042,6 +2072,66 @@ visKonto();
 
 /* ---------- detaljvisning ---------- */
 
+// To knapper, og det er med vilje to. De sender IKKE samme adresse, og
+// forskjellen er noe leseren merker — ikke en detalj vi kan velge bort for
+// dem:
+//
+// - **«Del saken»** sender sportsbibelen.no-adressen. Den er den eneste
+//   som kan bli et kort med bilde og overskrift der den limes inn, fordi
+//   en hash aldri naar en tjener. Leseren havner pa nettsiden.
+// - **«Del i appen»** sender app-adressen. Den apner saken her, med
+//   feeden rundt — men star naken overalt den limes inn: bare ordet
+//   «Sportsbibelen», intet bilde.
+//
+// Regelen om at to knapper til én ting er én for mye gjelder to knapper
+// som gjor det SAMME. Disse svarer pa hvert sitt sporsmal, som de to
+// publistene i kampkortet: «send den til noen» og «send dem hit».
+// Derfor staar folgen i knappen, ikke bare i navnet.
+//
+// Mangler post.link, staar «Del saken» ikke der: en knapp som ikke kan
+// gjore det den heter er verre enn ingen.
+function delRad(post, link) {
+  const boks = el("div", "del-boks");
+  const rad = el("div", "del-rad");
+  const appUrl = location.origin + "/" + sakHash(post);
+  const tittel = getTitle(post);
+
+  // Kvitteringen staar HER, ikke i menyens #actionNote. Den ligger inne i
+  // menypanelet, som er lukket naar en artikkel er apen — en beskjed
+  // leseren aldri ville sett. Samme regel som feilmeldinga om posisjon:
+  // den hoerer hjemme der handlingen skjedde.
+  const notat = el("p", "del-notat");
+  notat.setAttribute("role", "status");
+  notat.setAttribute("aria-live", "polite");
+  notat.hidden = true;
+
+  if (link) rad.appendChild(delKnapp("Del saken", "går til sportsbibelen.no",
+    { title: tittel, text: tittel, url: link }, "Sak delt", notat));
+
+  rad.appendChild(delKnapp("Del i appen", "åpner i Sportsbibelen",
+    { title: tittel, text: tittel, url: appUrl }, "Sak delt i appen", notat));
+
+  boks.appendChild(rad);
+  boks.appendChild(notat);
+  return boks;
+}
+
+function delKnapp(navn, folge, data, hendelse, notat) {
+  const b = el("button", "del-knapp");
+  b.type = "button";
+  b.appendChild(el("span", "del-navn", navn));
+  b.appendChild(el("span", "del-folge", folge));
+  b.addEventListener("click", async () => {
+    const utfall = await delTekst(data, hendelse);
+    // Delingsmenyen svarer selv, sa vi sier bare noe naar den ikke fantes.
+    // Og lenka er en ekte <a>, av samme grunn som i menyen: teksten er det
+    // eneste leseren har naar utklippstavla sviktet.
+    settNotat(notat, utfall === "kopiert" ? "Lenken er kopiert:"
+      : utfall === "feil" ? "Kopier lenken selv:" : "", data.url);
+  });
+  return b;
+}
+
 function openDetail(post, trigger) {
   lastFocused = trigger || document.activeElement;
 
@@ -2085,6 +2175,8 @@ function openDetail(post, trigger) {
     });
     body.appendChild(anchor);
   }
+
+  body.appendChild(delRad(post, link));
 
   // Relaterte saker holder leseren i appen i stedet for a sende dem
   // tilbake til feeden for a finne noe nytt.

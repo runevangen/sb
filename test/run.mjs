@@ -784,7 +784,38 @@ const SAK_4 = kjor("ruting", FELLES + `
       ok("paginering beholder rulleposisjonen", feed.scrollTop > 100, feed.scrollTop);
 
       // --- ruting: apne en sak ---
-      document.querySelector(".hero").click();
+      // Saker som ekte lenker (#146). Ruten fantes fra for; det som manglet
+      // var en <a> som bar den.
+      var helt = document.querySelector(".hero");
+      var rad1 = document.querySelector(".row");
+      ok("toppsaken er en lenke, ikke en knapp",
+         helt.tagName === "A" && helt.getAttribute("href").indexOf("#/sak/") === 0,
+         helt.tagName + " " + helt.getAttribute("href"));
+      ok("og radene er det ogsa",
+         rad1.tagName === "A" && rad1.getAttribute("href").indexOf("#/sak/") === 0,
+         rad1.tagName + " " + rad1.getAttribute("href"));
+
+      // Det som gjor lenka verdt noe: Ctrl/Cmd/Shift/midtklikk skal ga til
+      // nettleseren. Fanger vi dem, har vi gitt lenka med den ene handa og
+      // tatt «apne i ny fane» med den andre.
+      var ctrl = new MouseEvent("click",
+        { bubbles: true, cancelable: true, button: 0, ctrlKey: true });
+      rad1.dispatchEvent(ctrl);
+      ok("ctrl-klikk overlates til nettleseren", !ctrl.defaultPrevented);
+      var midt = new MouseEvent("click",
+        { bubbles: true, cancelable: true, button: 1 });
+      rad1.dispatchEvent(midt);
+      ok("og midtklikk likesa", !midt.defaultPrevented);
+      // Og artikkelen skal IKKE ha apnet seg av de to.
+      ok("ingen av dem apnet artikkelen i appen",
+         document.getElementById("detailWrap").className.indexOf("open") === -1,
+         document.getElementById("detailWrap").className);
+
+      var vanlig = new MouseEvent("click",
+        { bubbles: true, cancelable: true, button: 0 });
+      helt.dispatchEvent(vanlig);
+      ok("men et vanlig venstreklikk fanges av appen", vanlig.defaultPrevented);
+
       setTimeout(function () {
         ok("artikkel gir egen adresse", location.hash.indexOf("#/sak/") === 0, location.hash);
 
@@ -796,6 +827,71 @@ const SAK_4 = kjor("ruting", FELLES + `
            intern ? intern.dataset.slug : "mangler");
         ok("ekstern lenke apnes fortsatt utenfor",
            !!ekstern && ekstern.href.indexOf("vg.no") > -1);
+
+        // Naar en artikkel staar apen: er menyknappen i det hele tatt
+        // naabar? Issue #148 ba om at «Del appen» skulle bli
+        // kontekstsensitiv naar en sak er apen — men .detail-wrap er
+        // fixed og dekker hele skjermen, saa knappen kan vaere skjult
+        // bak den. MAALT, ikke resonnert: en kode ingen kan naa er en
+        // kode som raatner.
+        var mKnapp = document.getElementById("menuBtn");
+        var r = mKnapp.getBoundingClientRect();
+        var paToppen = document.elementFromPoint(
+          Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2));
+        var naabar = mKnapp === paToppen || mKnapp.contains(paToppen);
+        ok("menyknappen er dekket mens en artikkel staar apen",
+           !naabar, paToppen ? (paToppen.id || paToppen.className || paToppen.tagName) : "ingenting");
+
+        // Delingsknappene i den apne saken (#146). To, og de sender ikke
+        // samme adresse — det er hele grunnen til at de er to.
+        var delKnapper = document.querySelectorAll(".del-knapp");
+        ok("saken har to delingsknapper", delKnapper.length === 2, delKnapper.length);
+        // Null-sikkert hele veien. Mangler en knapp, skal disse FEILE —
+        // ikke kaste. En test som kaster velter scenen, og da forsvinner
+        // alle paastandene etter den ogsa; sabotasjen jeg brukte for aa
+        // proeve dem gjorde nettopp det, og sa ut som «ingenting falt».
+        var navn = Array.prototype.map.call(delKnapper, function (b) {
+          var n = b.querySelector(".del-navn");
+          return n ? n.textContent : ""; });
+        ok("og de heter ikke det samme",
+           navn.length === 2 && navn[0] !== navn[1] &&
+           navn.indexOf("Del saken") > -1 && navn.indexOf("Del i appen") > -1,
+           navn.join(" / ") || "ingen knapper");
+        // Folgen staar i knappen. To knapper som bare het «Del» ville
+        // vaert det ene tilfellet regelen forbyr.
+        var folger = Array.prototype.map.call(delKnapper, function (b) {
+          var f = b.querySelector(".del-folge");
+          return f ? f.textContent : ""; });
+        ok("og hver av dem sier hvor lenka forer",
+           folger.length === 2 && folger[0].length > 0 && folger[1].length > 0 &&
+           folger[0] !== folger[1],
+           folger.join(" / ") || "ingen knapper");
+
+        // Kvitteringen skal staa I artikkelen. #actionNote ligger inne i
+        // menypanelet, som er lukket her — en beskjed leseren aldri ville
+        // sett. Maalt ved aa stenge begge delingsveiene og trykke.
+        navigator.share = undefined;
+        Object.defineProperty(navigator, "clipboard", {
+          configurable: true,
+          value: { writeText: function () { return Promise.reject(new Error("nei")); } }
+        });
+        if (delKnapper[0]) delKnapper[0].click();
+
+        setTimeout(function () { try {
+          var notat = document.querySelector(".del-notat");
+          ok("kvitteringen staar i artikkelen, ikke i menyen",
+             !!notat && !notat.hidden && notat.textContent.indexOf("Kopier lenken selv") === 0,
+             notat ? (notat.hidden ? "skjult" : notat.textContent.slice(0, 40)) : "fant den ikke");
+          var lenka = notat && notat.querySelector("a");
+          ok("og lenka der er en ekte <a>, som i menyen",
+             !!lenka && lenka.tagName === "A" && lenka.getAttribute("href").length > 0,
+             lenka ? lenka.getAttribute("href") : "ingen lenke");
+          // «Del saken» skal sende nettstedets adresse — den ene som kan
+          // bli et kort med bilde der den limes inn.
+          ok("«Del saken» sender adressen pa nettstedet",
+             !!lenka && lenka.getAttribute("href").indexOf("sportsbibelen.no") > -1,
+             lenka ? lenka.getAttribute("href") : "");
+        } catch (e) { ok("ingen unntak i delingsraden", false, e.message); } }, 200);
 
         // --- tilbakeknappen ---
         // Uten vakten navigerer history.back() bort fra testsiden hvis
