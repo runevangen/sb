@@ -816,6 +816,13 @@ spørsmål kode ikke kan svare på alene.
   ikke en mangel.
   **Nøkkelen maskeres i adressene som skrives ut.** v1 legger den i stien,
   og en nøkkel i en terminal er en nøkkel i et skjermbilde.
+  **`--lag=` og `--spiller=` hoppes over uten en id.** Prøvd med et
+  oppdiktet tall ville «404 på id 0» sett ut som et nei til endepunktet, og
+  det er en annen sak enn at vi ikke spurte. For spillerstatistikken måles
+  det ene som avgjør om den er til nytte: bærer raden **mål**, og står
+  **sesongen** på den? Uten begge kan den ikke bli en toppscorerliste,
+  uansett hvor mange kall vi bruker. Letinga går på innhold, ikke på et
+  feltnavn vi har gjettet.
 - **`lag-pdf.mjs`** — lager PDF av et dokument i `docs/` med Chromium og
   ingenting annet, så et sammendrag kan sendes som vedlegg. Oversetter
   bare det Markdown-en i `docs/` faktisk bruker; en pakke for resten
