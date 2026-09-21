@@ -528,6 +528,28 @@
     <p class="melding" id="brukerMelding" role="status" aria-live="polite"></p>
   </section>
 
+  <!-- Sonden mot TheSportsDB.
+       Diagnostikk, ikke drift: den svarer på hva kilden FAKTISK gir oss,
+       framfor hva dokumentasjonen sier. Den finnes her og ikke bare i
+       verktoy/ fordi den som eier prosjektet sitter med en telefon, og en
+       oppgave som krever en terminal er ingen oppgave.
+       Nøkkelen blir på serveren: v1 legger den i stien, og en spørring
+       gjort fra en nettleser ville lagt den i historikken. -->
+  <section>
+    <h2>Hva gir TheSportsDB oss?</h2>
+    <p class="hint">Spør kilden direkte og viser hva som faktisk kom — om
+      hele sesongen finnes, og om spillerstatistikken bærer både mål og
+      sesong. Uten begge kan det ikke bli en toppscorerliste.
+      <strong>Seks kall per trykk</strong>, så trykk når du lurer, ikke
+      for å se på.</p>
+    <div class="rad">
+      <select id="sondeLiga" aria-label="Liga"></select>
+      <button id="sondeKjor" type="button">Spør kilden</button>
+    </div>
+    <pre class="forslag-kode" id="sondeSvar" hidden></pre>
+    <p class="melding" id="sondeMelding" role="status" aria-live="polite"></p>
+  </section>
+
   </div>
 
   <p class="hint">

@@ -169,6 +169,12 @@ tall fra API-Football, med sesongen tydelig merket over tabellen.
 - **Leses av:** `netlify/functions/fotball.mjs`
 - **Sendes som:** to måter, fordi vi ikke vet hvilken utgave nøkkelen er for. Først v2 (`/api/v2/json/`, nøkkelen i headeren `X-API-KEY`), så v1 (nøkkelen i selve adressen). Patreon gir begge.
 - **Uten den:** testnøkkelen `3` brukes. Den virker, men **kapper svarene** — fem tabellrader, én kamp i listene. Et avkortet svar vises aldri som årets: `TSDB_MINST` i `fotball-data.js` (`{tabell: 10, resultater: 2, neste: 2}`) er grensen for hva som regnes som helt, og under den faller vi tilbake til API-Football.
+- **Sonden i portalen** (*Hva gir TheSportsDB oss?*) spør kilden med denne
+  nøkkelen og viser hva som faktisk kom. **Nøkkelen blir på serveren:** v1
+  legger den i *stien*, så den samme spørringa gjort fra en nettleser ville
+  lagt den i historikken, i en logg og i hvert skjermbilde noen tar.
+  Svaret sier bare *om* den er satt, og en funksjonstest vokter at den
+  aldri går ut til den som spurte.
 - **Lages på:** thesportsdb.com → Patreon-abonnement
 - **Utløper:** når abonnementet gjør det. Symptomet er ikke en feilmelding, men at tabellen stille går tilbake til fjoråret — se symptomtabellen nedenfor.
 

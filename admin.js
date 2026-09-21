@@ -196,7 +196,88 @@ async function loggInn() {
   hentBrukere();
   hentForslag();
   hentSteder();
+  fyllSondeLigaer();
 }
+
+/* ---------- sonden mot TheSportsDB ---------- */
+
+// Diagnostikk, ikke drift. Den svarer pa hva kilden FAKTISK gir oss,
+// framfor hva dokumentasjonen sier — og den ligger her, ikke bare i
+// verktoy/, fordi en oppgave som krever en terminal er ingen oppgave for
+// den som sitter med en telefon.
+//
+// Passordet gar med, som ellers herfra. Nokkelen mot TheSportsDB blir pa
+// serveren: v1 legger den i STIEN, og en sporring gjort fra nettleseren
+// ville lagt den i historikken og i hvert skjermbilde noen tar.
+function fyllSondeLigaer() {
+  const v = felt("sondeLiga");
+  if (v.options.length) return;
+  Object.keys(LIGAER).forEach((nokkel) => {
+    const o = document.createElement("option");
+    o.value = nokkel;
+    o.textContent = LIGAER[nokkel].navn;
+    v.appendChild(o);
+  });
+}
+
+// Svaret skrives som TEKST, ikke som rå JSON.
+//
+// Den som trykker skal lese et svar, ikke tolke et datasett — og
+// avgjorelsen («duger den til en toppscorerliste?») star med ord, sa den
+// ikke ma utledes av to lister med feltnavn.
+function sondeTekst(data) {
+  const ut = [];
+  ut.push(data.liga + " — sesong " + data.sesong
+    + " (vi står i " + data.staarI + ")");
+  ut.push("Nøkkel: " + data.nokkel);
+  ut.push("");
+  (data.prover || []).forEach((p) => {
+    ut.push((p.gjetning ? "? " : "  ") + p.navn + ": " + p.utfall);
+    if (p.hvorfor) ut.push("      " + p.hvorfor);
+    if (p.runder !== undefined) {
+      ut.push("      runder: " + (p.runder
+        ? p.runder + " ulike"
+        : "INGEN rundetall — kan ikke grupperes"));
+    }
+    if (p.felt) ut.push("      felt: " + p.felt.join(", "));
+    if (p.plukket) ut.push("      → " + p.plukket);
+    if (p.duger) {
+      ut.push("      mål-felt:    " + (p.maalfelt.join(", ") || "INGEN"));
+      ut.push("      sesong-felt: " + (p.sesongfelt.join(", ") || "INGEN"));
+      ut.push("      DUGER: " + p.duger);
+      ut.push("      første rad:  " + p.forsteRad);
+    }
+  });
+  return ut.join("\n");
+}
+
+felt("sondeKjor").addEventListener("click", async () => {
+  const m = felt("sondeMelding");
+  felt("sondeKjor").disabled = true;
+  m.textContent = "Spør kilden …";
+  m.className = "melding";
+  try {
+    const respons = await fetch("/api/tsdb-sonde", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passord, liga: felt("sondeLiga").value }),
+    });
+    const data = JSON.parse(await respons.text());
+    if (!respons.ok || data.feil) {
+      throw new Error(data.feil || ("Tjenesten svarte " + respons.status));
+    }
+    felt("sondeSvar").textContent = sondeTekst(data);
+    felt("sondeSvar").hidden = false;
+    m.textContent = "Svaret står under. Seks kall brukt.";
+    m.className = "melding ok";
+  } catch (err) {
+    // En sonde som feiler stille er verdilos: hele poenget er a vite hva
+    // som skjedde.
+    m.textContent = err.message;
+    m.className = "melding feil";
+  }
+  felt("sondeKjor").disabled = false;
+});
 
 function visAdgang(tekst, art) {
   const m = felt("adgangMelding");

@@ -18,6 +18,7 @@ import pubListe, { SOK_FRIST } from "../netlify/functions/pub-liste.mjs";
 import konto from "../netlify/functions/konto.mjs";
 import brukere from "../netlify/functions/brukere.mjs";
 import svarfunksjon from "../netlify/functions/svar.mjs";
+import tsdbsonde from "../netlify/functions/tsdbsonde.mjs";
 
 // SUITEN SETTER SITT EGET MILJO, framfor a arve maskinens.
 //
@@ -2308,6 +2309,111 @@ ok("fristen holder seg innenfor det Netlify gir, med margin",
 delete process.env.ADMIN_PASSORD;
 delete process.env.SUPABASE_URL;
 delete process.env.SUPABASE_ANON_KEY;
+
+/* ---------------- /api/tsdb-sonde: hva kilden faktisk gir ------------ */
+
+// Sonden finnes fordi den som eier prosjektet sitter med en telefon, og
+// en oppgave som krever en terminal er ingen oppgave. Det som testes her
+// er ikke hva TheSportsDB svarer — det vet vi ikke, og det er hele
+// grunnen til at sonden finnes — men at VAKTA holder, at nokkelen ikke
+// lekker, og at kjeden plukker id-ene.
+function sondeBe(kropp) {
+  return new Request("https://mvp-sb.netlify.app/api/tsdb-sonde", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(kropp),
+  });
+}
+
+delete process.env.ADMIN_PASSORD;
+delete process.env.THESPORTSDB_KEY;
+
+let sondeSvar = await tsdbsonde(sondeBe({ passord: "hva som helst" }));
+ok("uten ADMIN_PASSORD svarer sonden 503", sondeSvar.status === 503, sondeSvar.status);
+
+process.env.ADMIN_PASSORD = "riktig-passord";
+sondeSvar = await tsdbsonde(sondeBe({ passord: "feil" }));
+ok("feil passord slipper ikke inn", sondeSvar.status === 401, sondeSvar.status);
+
+// Og et feil passord skal aldri ha rort tjenesten. Sjekken kommer forst.
+let sondeKall = [];
+globalThis.fetch = async (u) => {
+  sondeKall.push(String(u));
+  return new Response(JSON.stringify({ events: [] }), { status: 200 });
+};
+sondeSvar = await tsdbsonde(sondeBe({ passord: "ogsa feil" }));
+ok("og naar aldri TheSportsDB", sondeKall.length === 0, sondeKall.join(" "));
+
+sondeSvar = await tsdbsonde(sondeBe({ passord: "riktig-passord" }));
+ok("GET finnes ikke, bare POST",
+   (await tsdbsonde(new Request("https://mvp-sb.netlify.app/api/tsdb-sonde"))).status === 405);
+
+// Kjeden, med et stubbet svar som MODELLERER TheSportsDB — feltnavnene er
+// de dokumenterte, tallene er oppdiktede. En stubb som var enig med koden
+// min ville bevist ingenting (docs/testing.md).
+process.env.THESPORTSDB_KEY = "hemmelig-sonde-nokkel";
+sondeKall = [];
+globalThis.fetch = async (u) => {
+  const url = String(u);
+  sondeKall.push(url);
+  if (url.indexOf("eventspastleague") > -1) {
+    return new Response(JSON.stringify({ events: [
+      { idEvent: "1", intRound: "23", idHomeTeam: "133604" }] }), { status: 200 });
+  }
+  if (url.indexOf("lookup_all_players") > -1) {
+    return new Response(JSON.stringify({ player: [
+      { idPlayer: "34145937", strPlayer: "Ola" }] }), { status: 200 });
+  }
+  if (url.indexOf("lookupplayerstats") > -1) {
+    return new Response(JSON.stringify({ playerstats: [
+      { idPlayer: "34145937", strSeason: "2026", intGoals: "12" }] }), { status: 200 });
+  }
+  return new Response("{}", { status: 404, statusText: "Not Found" });
+};
+sondeSvar = await tsdbsonde(sondeBe({ passord: "riktig-passord", liga: "eliteserien" }));
+const sondeKropp = JSON.parse(await sondeSvar.text());
+ok("riktig passord gir et svar", sondeSvar.status === 200, sondeSvar.status);
+
+// Kjernen: id-ene PLUKKES, sa ingen maa finne dem for hand.
+ok("lag-id plukkes ut av kamplista og brukes videre",
+   sondeKall.some((u) => u.indexOf("lookup_all_players.php?id=133604") > -1),
+   sondeKall.join("\n"));
+ok("og spiller-id ut av spillerlista",
+   sondeKall.some((u) => u.indexOf("lookupplayerstats.php?id=34145937") > -1),
+   sondeKall.join("\n"));
+
+// Avgjorelsen star med ORD, sa den ikke ma utledes av to lister feltnavn.
+const stats = sondeKropp.prover.find((p) => p.duger);
+ok("og svaret sier om statistikken duger",
+   !!stats && stats.duger.indexOf("JA") === 0, stats ? stats.duger : "ingen");
+ok("med malfeltet navngitt",
+   !!stats && stats.maalfelt.join(",") === "intGoals");
+
+// NOKKELEN LEKKER ALDRI. v1 legger den i stien, og det er nettopp derfor
+// sporringa ikke kan gjores fra en nettleser — svaret vaart ma ikke
+// gjenta den feilen.
+ok("nokkelen gar til TheSportsDB",
+   sondeKall.some((u) => u.indexOf("hemmelig-sonde-nokkel") > -1));
+ok("men aldri ut til den som spurte",
+   JSON.stringify(sondeKropp).indexOf("hemmelig-sonde-nokkel") === -1,
+   JSON.stringify(sondeKropp).slice(0, 200));
+ok("og svaret sier bare OM den er satt",
+   sondeKropp.nokkel === "satt", sondeKropp.nokkel);
+
+// En 404 pa en gjetning er et nei til NAVNET, ikke til dataene — og det
+// skal staa i svaret, ikke bare i hodet mitt.
+const gjett = sondeKropp.prover.find((p) => p.gjetning);
+ok("gjetninga er merket som en gjetning", !!gjett && gjett.gjetning === true);
+ok("og sier at en 404 er et nei til navnet",
+   !!gjett && (gjett.hvorfor || "").indexOf("gjetning") > -1, gjett ? gjett.hvorfor : "");
+
+// Feilsvar caches aldri.
+ok("sonden caches aldri",
+   sondeSvar.headers.get("Cache-Control") === "no-store",
+   sondeSvar.headers.get("Cache-Control"));
+
+delete process.env.ADMIN_PASSORD;
+delete process.env.THESPORTSDB_KEY;
 
 /* ---------------- rapport ---------------- */
 
