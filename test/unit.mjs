@@ -1206,11 +1206,19 @@ function kaster(fn) {
 ok("tabell spor om standings",
    apiSti("tabell", LIGAER.premier, 2026) === "/standings?league=39&season=2026",
    apiSti("tabell", LIGAER.premier, 2026));
-// last og next gir et vindu rundt naet. Uten dem ville hele sesongen blitt
-// hentet for a vise ti kamper.
-ok("resultater spor om de siste spilte",
-   apiSti("resultater", LIGAER.premier, 2026).indexOf("status=FT&last=10") > -1,
+// Resultater spor om HELE sesongen. `&last=10` sto her, og ti kamper er
+// godt over én runde i Eliteserien — da sa fanen «kun siste runde», meldt
+// 21. september 2026. Det koster ingen ekstra kall: samme endepunkt,
+// samme ene foresporsel.
+ok("resultater spor om alle spilte kamper i sesongen",
+   apiSti("resultater", LIGAER.premier, 2026) ===
+     "/fixtures?league=39&season=2026&status=FT",
    apiSti("resultater", LIGAER.premier, 2026));
+ok("og kapper dem ikke til et vindu",
+   apiSti("resultater", LIGAER.premier, 2026).indexOf("last=") === -1,
+   apiSti("resultater", LIGAER.premier, 2026));
+// `next` paa neste staar: dét er et vindu FRAMOVER, og en sesong som ikke
+// er spilt enda er ingen liste noen blar i.
 ok("neste spor om de kommende",
    apiSti("neste", LIGAER.premier, 2026).indexOf("status=NS&next=") > -1,
    apiSti("neste", LIGAER.premier, 2026));

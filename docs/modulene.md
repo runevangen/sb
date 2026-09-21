@@ -797,6 +797,25 @@ spørsmål kode ikke kan svare på alene.
   rad: `lag`, `kilde` og `sikkerhet` står tomme med vilje. Overpass vet at
   stedet er en pub; den vet ikke om de viser fotball, og det er den
   vurderingen som gjør `puber.js` til kode framfor en tabell.
+- **`kamper()` deler resultater i to bolker.** Siste runde framme, resten i
+  en egen `ul` bak «Vis tidligere runder (N)» — hele sesongen kommer nå fra
+  API-et, og hundre og åtti rader er ingen liste. Skillet går på **runden**,
+  ikke på et tak, så en runde aldri deles i to. Knappen teller runder.
+  **En rad uten rundetall blir stående framme:** bak knappen ville den vært
+  skjult av en opplysning vi ikke har, uten overskrift og uten å telle med.
+  Samme regel som `naerNok()`.
+- **`tsdbsjekk.mjs`** — spør TheSportsDB hva den faktisk gir oss, med den
+  nøkkelen som er satt. Fire adresser per liga: hele sesongen (v2 og v1),
+  toppscorere, og det vi bruker i dag. Utskrifta sier hvor mange rader som
+  kom, **hvilke felt første rad hadde**, og hvor mange ulike runder som er
+  representert — det siste avgjør om «alle runder» er mulig i det hele
+  tatt. En sesong uten rundetall kan ikke grupperes.
+  Det kan ingen test svare på: en stubb vet bare det vi alt trodde, og
+  nettopp den fella står i [`testing.md`](testing.md). Uten nøkkel brukes
+  testnøkkelen «3», og da sier utskrifta at et lite tall er en *kapping*,
+  ikke en mangel.
+  **Nøkkelen maskeres i adressene som skrives ut.** v1 legger den i stien,
+  og en nøkkel i en terminal er en nøkkel i et skjermbilde.
 - **`lag-pdf.mjs`** — lager PDF av et dokument i `docs/` med Chromium og
   ingenting annet, så et sammendrag kan sendes som vedlegg. Oversetter
   bare det Markdown-en i `docs/` faktisk bruker; en pakke for resten

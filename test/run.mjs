@@ -6896,6 +6896,156 @@ const SAK_22B = kjor("pub-forslag-utlogget", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
 `);
 
+
+/* ---------------- 24. resultater: hele sesongen ---------------- */
+
+// Meldt 21. september 2026: «Hva koster det aa gaa tilbake alle runder
+// der? Naa ser vel kun siste runde.»
+//
+// Fanen sporte om `&last=10`, og ti kamper er godt over én runde i
+// Eliteserien. Na kommer hele sesongen i det samme ene kallet. Ved runde
+// 23 er det over halvannet hundre rader, saa siste runde staar framme og
+// resten ligger bak en knapp.
+const SAK_24 = kjor("resultater-alle-runder", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+
+  // Fire runder, nyeste forst — slik /api/fotball/resultater gir dem.
+  // To kamper i hver, saa «en runde deles ikke i to» kan males.
+  var ALLE = [];
+  for (var r = 23; r >= 20; r--) {
+    // En kamp uten rundetall, midt i lista. Ikke forst: da ville
+    // sisteRunde blitt tom og hele grupperinga slatt av, og det er en
+    // annen sak enn den denne raden maaler.
+    if (r === 22) {
+      ALLE.push({ id: 999, dato: "2026-09-16T17:00:00+00:00", runde: "",
+        hjemme: "Viking", borte: "Bryne", malHjemme: 1, malBorte: 1, spilt: true });
+    }
+    for (var i = 0; i < 2; i++) {
+      ALLE.push({ id: r * 10 + i,
+        dato: "2026-09-" + (String(r - 5 + i).padStart(2, "0")) + "T17:00:00+00:00",
+        runde: "Runde " + r,
+        hjemme: i ? "Molde" : "Brann", borte: i ? "Rosenborg" : "Viking",
+        malHjemme: 2, malBorte: i, spilt: true });
+    }
+  }
+
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { svar: [], visninger: [] })); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: del === "resultater" ? ALLE : KOMMENDE,
+                    runde: "Runde 23" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 ||
+        u.indexOf("/api/pub-liste") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+
+  location.hash = "#/fotball/eliteserien/resultater";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var liste = document.querySelector(".kamper");
+    ok("resultatfanen staar", !!liste);
+    if (!liste) { ferdig(); return; }
+
+    // Kjernen i det som ble meldt: alle fire rundene ER hentet. Sto
+    // «&last=10» igjen, kom det bare én.
+    ok("hele sesongen er hentet, ikke bare siste runde",
+       document.querySelectorAll(".kamp").length === 9,
+       document.querySelectorAll(".kamp").length);
+
+    // Men ikke alle staar framme. Siste runde gjor.
+    var tidligere = document.querySelector(".kamp-tidligere");
+    ok("de tidligere rundene ligger for seg", !!tidligere);
+    if (!tidligere) { ferdig(); return; }
+    ok("og er skjult til du trykker", tidligere.hidden === true);
+
+    var framme = Array.prototype.filter.call(
+      document.querySelectorAll(".kamp"),
+      function (k) { return !k.closest(".kamp-tidligere"); });
+    ok("bare siste runde staar framme, pluss den uten rundetall",
+       framme.length === 3, framme.length);
+    // En runde skal ikke deles i to av et tak: skillet gaar paa RUNDEN,
+    // ikke paa et antall rader.
+    ok("og det er hele runden, ikke et avkappet antall",
+       framme.filter(function (k) { return k.dataset.runde === "Runde 23"; })
+         .length === 2,
+       framme.map(function (k) { return k.dataset.runde; }).join(","));
+
+    // Overskrifta staar over runden — den sto bare paa «neste» for.
+    var overskrift = liste.querySelector(".kamp-runde");
+    ok("runden har en overskrift ogsaa i resultater",
+       !!overskrift && overskrift.textContent === "Runde 23",
+       overskrift ? overskrift.textContent : "ingen");
+
+    // Knappen teller RUNDER, ikke kamper: det er runder du blar i.
+    var knapp = document.querySelector(".kamp-tidligere-apne");
+    ok("knappen sier hvor mange runder som ligger bak",
+       !!knapp && knapp.textContent === "Vis tidligere runder (3)",
+       knapp ? knapp.textContent : "ingen knapp");
+    if (!knapp) { ferdig(); return; }
+    ok("og sier at den er lukket",
+       knapp.getAttribute("aria-expanded") === "false");
+
+    knapp.click();
+    ok("ett trykk viser dem", tidligere.hidden === false);
+    ok("og knappen snur", knapp.textContent === "Skjul tidligere runder",
+       knapp.textContent);
+    ok("og sier at den er apen",
+       knapp.getAttribute("aria-expanded") === "true");
+    ok("alle tre tidligere runder har hver sin overskrift",
+       tidligere.querySelectorAll(".kamp-runde").length === 3,
+       tidligere.querySelectorAll(".kamp-runde").length);
+    // Nyeste forst, ogsaa bak knappen: en sesong leses bakover herfra.
+    ok("i rekkefolge, nyeste forst",
+       Array.prototype.map.call(tidligere.querySelectorAll(".kamp-runde"),
+         function (h) { return h.textContent; }).join(",") ===
+         "Runde 22,Runde 21,Runde 20",
+       Array.prototype.map.call(tidligere.querySelectorAll(".kamp-runde"),
+         function (h) { return h.textContent; }).join(","));
+
+    // En rad UTEN rundetall blir staaende framme.
+    //
+    // Fanget av en sabotasje 21. september 2026: uten runde-sjekken i
+    // plasseringa havnet den bak knappen — uten overskrift, og uten aa
+    // telle med i tallet paa knappen. Skjult av en opplysning vi ikke
+    // har. Samme regel som naerNok(): en liste som gjemmer noe fordi den
+    // mangler opplysninger, gjemmer det uten grunn.
+    var utenRunde = Array.prototype.filter.call(
+      document.querySelectorAll(".kamp"),
+      function (k) { return k.dataset.runde === ""; });
+    ok("kampen uten rundetall staar framme, ikke bak knappen",
+       utenRunde.length === 1 && !utenRunde[0].closest(".kamp-tidligere"),
+       utenRunde.length + " uten runde, "
+         + (utenRunde[0] ? (utenRunde[0].closest(".kamp-tidligere") ? "bak" : "framme") : "-"));
+
+    // Resultatrader er ikke delbare — det er de aldri blitt, og en
+    // sesong tilbake i tid er ingenting aa avtale rundt.
+    ok("en spilt kamp er ikke delbar",
+       !document.querySelector(".kamp.delbar") &&
+       !document.querySelector(".kamp-del"));
+    // Og stillingen staar der resultatet skal staa.
+    ok("stillingen staar mellom lagene",
+       framme[0].querySelector(".kamp-tall").textContent === "2 – 0",
+       framme[0].querySelector(".kamp-tall").textContent);
+    ferdig();
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
+`);
+
 /* ---------------- 22. tabellen pa en ekte iPhone ---------------- */
 
 // «Ma scrolle skjermen til siden for a se poeng» — meldt fra prod
@@ -6992,7 +7142,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

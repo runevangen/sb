@@ -546,6 +546,21 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   runde. Taket på tjue id-er mot `/api/svar` holdes av buntingen i
   `hentSvarFor()`, ikke av at lista kappes i forkant.
   [ADR 0017](docs/adr/0017-kampene-framover.md)
+- **«Resultater» henter hele sesongen, og viser siste runde framme.**
+  `apiSti` spurte om `&status=FT&last=10`, og ti kamper er godt over én
+  runde i Eliteserien — da sa fanen «kun siste runde». Å droppe `last`
+  koster **ingen ekstra kall**: samme endepunkt, samme ene forespørsel,
+  bare et større svar som `tolkKamper()` skreller ned før noe caches.
+  `next=20` på «neste» står: dét er et vindu *framover*, og en sesong som
+  ikke er spilt ennå er ingen liste noen blar i.
+  **Siste runde står framme, resten bak «Vis tidligere runder (N)».**
+  Hundre og åtti rader er ingen liste noen leser. Knappen teller **runder**,
+  ikke kamper — det er runder du blar i. Skillet går på runden, ikke på et
+  tak: en runde deles aldri i to.
+  **Og en rad uten rundetall blir stående framme.** Havnet den bak knappen,
+  var den skjult av en opplysning vi ikke har, uten overskrift og uten å
+  telle med i tallet. Samme regel som `naerNok()`. Fanget av en sabotasje,
+  ikke av at noen tenkte på det.
 - **`tolkSvar` må tåle å kjøres to ganger.** Den deles mellom tjenesten og
   appen, og begge kjører den.
 - **En skriving som svarer 200 er ikke bevis på at raden ligger der.**

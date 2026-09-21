@@ -1792,6 +1792,39 @@ a.ad-cta:focus-visible {
    full avstand mellom seg leses som to seksjoner, ikke som én. */
 .kamp-runde + .kamp-dag { margin-top: 6px; }
 
+/* Tidligere runder i Resultater.
+
+   Fanen henter hele sesongen na, ikke de ti siste kampene. Ved runde 23
+   er det over halvannet hundre rader, og det er ingen liste noen leser:
+   siste runde staar framme, resten ligger bak knappen. Samme form som
+   «Trykk her for puber i andre byer» i kortet — en vei videre, ikke en
+   liste i seg selv.
+
+   Begge er `li`, for de ligger i en `ul`: et `div` der ville gitt en
+   liste med et barn som ikke er et listepunkt. */
+.kamp-tidligere-rad, .kamp-tidligere-holder { list-style: none; }
+
+.kamp-tidligere-apne {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--border-faint);
+  background: none;
+  text-align: left;
+  font-size: calc(13px * var(--fs));
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Lista arver `.kamper`, saa den har alt sine marger. Regelen her sier
+   bare hva [hidden] betyr — uten den ville en `display` lenger oppe
+   slatt nettleserens eget stilark, og lista statt framme mens koden tror
+   den er skjult. */
+.kamp-tidligere[hidden] { display: none; }
+
 /* Raden er beholderen: rammen rundt den valgte kampen tegnes her, sa
    den omslutter vaeret, puben og panelet — alt som horer til kampen.
    .kamp-linje er selve kamplinja, og det er bare den trykkflata dekker;

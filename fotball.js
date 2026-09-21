@@ -579,30 +579,73 @@ function kampliste(kamper, del, data) {
   let forrigeDag = null;
   let forrigeRunde = null;
 
+  // Resultater rekker na HELE sesongen, ikke de ti siste kampene.
+  // Ved runde 23 er det over halvannet hundre rader, og det er ingen
+  // liste noen leser. Den siste runden staar framme; resten ligger bak
+  // «Vis tidligere runder», som pubene i andre byer i kortet.
+  //
+  // Siste runde er den forste i lista, for kampene er sortert nyeste
+  // forst. Mangler rundetallet — en kilde som ikke sender det — faller
+  // alt framme, som for: en knapp som skjuler noe vi ikke kan gruppere,
+  // skjuler det vilkaarlig.
+  const sisteRunde = del === "resultater" && kamper.length
+    ? String(kamper[0].runde || "") : "";
+  const tidligere = sisteRunde ? el("ul", "kamper kamp-tidligere") : null;
+  if (tidligere) tidligere.hidden = true;
+
   kamper.forEach((kamp) => {
     // Runden over dagene: lista rekker na flere helger, og uten den er
     // «lordag 27. sep» det eneste som skiller neste runde fra den etter.
     // Kilder som ikke sender rundetall gir ingen overskrift — en tom
     // «Runde » ville vaert verre enn ingen.
-    const runde = del === "neste" ? String(kamp.runde || "") : "";
+    const runde = String(kamp.runde || "");
+    // Hvor raden hoerer: framme, eller bak knappen. Avgjores av runden,
+    // ikke av et tall — en runde skal ikke deles i to av et tak.
+    //
+    // **En rad uten rundetall blir staaende framme.** Uten `runde &&` her
+    // havnet den bak knappen, uten overskrift, og uten aa telle med i
+    // tallet paa knappen — skjult av en opplysning vi ikke har. Det er
+    // samme regel som `naerNok()`: en liste som gjemmer noe fordi den
+    // mangler opplysninger, gjemmer det uten grunn.
+    const hvor = tidligere && runde && runde !== sisteRunde ? tidligere : liste;
     if (runde && runde !== forrigeRunde) {
       forrigeRunde = runde;
       forrigeDag = null;
-      liste.appendChild(el("li", "kamp-runde", runde));
+      hvor.appendChild(el("li", "kamp-runde", runde));
     }
     const dag = dagtekst(kamp.dato);
     if (dag !== forrigeDag) {
       forrigeDag = dag;
       const skille = el("li", "kamp-dag", dag);
-      liste.appendChild(skille);
+      hvor.appendChild(skille);
     }
     const rad = kamprad(kamp, del, delbar);
     // Dagen og runden huskes pa raden: blir lista delt i to bolker senere,
     // ma skillene kunne tegnes pa nytt uten a regnes ut igjen.
     rad.dataset.dag = dag;
     rad.dataset.runde = runde;
-    liste.appendChild(rad);
+    hvor.appendChild(rad);
   });
+
+  // Knappen sier hvor mange runder som ligger bak, ikke hvor mange
+  // kamper: det er runder du blar i. Finnes ingen — sesongen er én runde
+  // gammel — staar den ikke der i det hele tatt.
+  if (tidligere && tidligere.querySelector(".kamp-runde")) {
+    const antall = tidligere.querySelectorAll(".kamp-runde").length;
+    const knapp = el("button", "kamp-tidligere-apne",
+      "Vis tidligere runder (" + antall + ")");
+    knapp.type = "button";
+    knapp.setAttribute("aria-expanded", "false");
+    knapp.addEventListener("click", () => {
+      tidligere.hidden = !tidligere.hidden;
+      knapp.setAttribute("aria-expanded", tidligere.hidden ? "false" : "true");
+      knapp.textContent = tidligere.hidden
+        ? "Vis tidligere runder (" + antall + ")"
+        : "Skjul tidligere runder";
+    });
+    liste.appendChild(el("li", "kamp-tidligere-rad")).appendChild(knapp);
+    liste.appendChild(el("li", "kamp-tidligere-holder")).appendChild(tidligere);
+  }
 
   if (del === "neste" && !delbar) {
     liste.appendChild(el("li", "kamp-notis",
