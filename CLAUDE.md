@@ -45,6 +45,8 @@ modul for modul.
     pub-forslag-data.js / netlify/functions/pub-forslag.mjs
     netlify/functions/pub-liste.mjs   rettelsene admin gjør i portalen
     kanaler.js      hvilken kanal som sender ligaen — tom til noen har sjekket
+    versjoner.js    hva som endret seg og hvilken sak det svarte på
+                    — vises bare i portalen
     konto-data.js / pin-data.js / netlify/functions/konto.mjs
     svar-data.js / netlify/functions/svar.mjs
     visning-data.js / netlify/functions/visninger.mjs
@@ -730,6 +732,24 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   siste rettelsen bort i portalen, er det tomme svaret det riktige, og
   appen skal falle tilbake til fila framfor å bli stående med en rad ingen
   har lenger. `klar` skiller «ingen rettelser» fra «tjenesten svarte ikke».
+- **Versjonen er to halvdeler, og de svarer på hvert sitt spørsmål.**
+  `versjoner.js` sier **hva** som endret seg og hvilken sak det svarte på;
+  `COMMIT_REF` fra Netlifys byggemiljø sier **om du ser på det nyeste**.
+  Sto bare lista der, kunne den si 21. september over en app bygget den
+  12. — og et versjonsnummer som kan ta feil er verre enn ingen. Commit-en
+  er det eneste som kan svare på «ble endringen min faktisk rullet ut?»,
+  spørsmålet som sto ubesvart i en time 21. september.
+  **Nummeret er datoen**, `ÅÅÅÅ.MM.DD`, med én oppføring per dag og flere
+  linjer under: et semantisk nummer krever skjønn hver gang, og
+  `2026.09.21-2` ville latt nummeret telle utrullinger framfor å si når.
+  **Mangler variabelen, sier linja det** framfor å stå tom og se ut som om
+  alt er som det skal. Og `CONTEXT` først når den ikke er `production`:
+  «dette er en forhåndsvisning» er svaret på «hvorfor ser jeg noe annet
+  enn de andre».
+  **Bak begge låsene, men ikke hemmelig.** Portalen krever passord og økt,
+  som resten av `/api/brukere`. Men fila serveres som all annen JS og
+  repoet er offentlig — låsen gjør den vanskelig å snuble over, ikke
+  umulig å finne, og den forskjellen skal ikke pyntes på.
 - **Portalen leser stedene uten en økt, og skriver med den.** `stedKall()`
   krevde et token for *hvert* kall, og «liste» er en ren lesing: appen
   henter den samme lista med en naken GET, og bare `lagre` slår opp uid-en

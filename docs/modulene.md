@@ -404,6 +404,30 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
 
 ---
 
+### `versjoner.js`
+
+Hva som har endret seg, og hvilken sak det svarte på. Leses bare av
+portalen — en leser har ingen nytte av den.
+
+- **Nummeret er datoen**, `ÅÅÅÅ.MM.DD`. Ingen skjønn: et semantisk nummer
+  krever at noen dømmer hvor stor endringen var hver gang, og et tall som
+  dømmes feil er verre enn ett som bare sier når.
+- **Én oppføring per dag, ikke per fletting.** Fem PR-er samme dag er fem
+  linjer under én dato. `2026.09.21-2` ville latt nummeret telle
+  utrullinger framfor å si når — det eneste en dato er god til.
+- **Redaksjonell, ikke en logg.** Git har loggen. Her står det en
+  **leser** ville merket; en opprydding uten synlig side hører hjemme i
+  historikken, ellers drukner det som betyr noe.
+- **Den sier ingenting om hva som faktisk kjører.** Fila vet bare hva som
+  sto i den da den ble bygget. Spørsmålet «ser jeg på det nyeste?»
+  besvares av `COMMIT_REF`, som portalen henter ved siden av lista — sto
+  bare fila der, kunne den si 21. september over en app bygget den 12.
+- **Og den er ikke hemmelig.** Portalen krever passord, men fila serveres
+  som all annen JS, og repoet er offentlig. Låsen gjør den vanskelig å
+  snuble over, ikke umulig å finne.
+
+---
+
 ## Visningen
 
 ### `index.html`

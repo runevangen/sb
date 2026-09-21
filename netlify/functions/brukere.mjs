@@ -81,6 +81,7 @@ export default async (req) => {
   const dor = await slippInn(String(inn.token || ""));
   if (!dor.ok) return svar({ feil: dor.feil, forsok: dor.forsok }, 401);
 
+  if (inn.handling === "versjon") return hvaSomKjorer();
   if (inn.handling === "liste") return hentBrukere();
   if (inn.handling === "pin") return settPin(inn);
   if (inn.handling === "slett") return slettBruker(inn);
@@ -88,6 +89,37 @@ export default async (req) => {
 };
 
 /* ---------- handlingene ---------- */
+
+// Hva som FAKTISK kjorer. `versjoner.js` sier hva som sto i fila da den
+// ble bygget; denne sier hvilken bygging det var.
+//
+// De to svarer pa hvert sitt sporsmal, og det er derfor begge staar i
+// portalen: lista svarer «hva endret seg», commit-en svarer «ser jeg paa
+// det nyeste?». Sto bare lista der, kunne den si 21. september over en app
+// som ble bygget den 12. — og da ville nummeret vaert verre enn ingen.
+//
+// **Mangler variabelen, sier svaret det.** Netlify setter disse ved
+// bygging; kjorer funksjonen et annet sted, finnes de ikke. Et tomt felt
+// vist som en verdi ville vaert en pastand vi ikke har dekning for.
+//
+// Bak begge lasene, som resten av POST-veiene: dette skal bare admin se.
+// **Men det er ikke hemmelig** — repoet er offentlig, og commit-en staar i
+// historikken. Lasa gjor det vanskelig aa snuble over, ikke umulig aa
+// finne, og den forskjellen skal ikke pyntes paa.
+function hvaSomKjorer() {
+  const les = (navn) => {
+    const v = String(process.env[navn] || "").trim();
+    return v || null;
+  };
+  return svar({
+    commit: les("COMMIT_REF"),
+    gren: les("BRANCH"),
+    // production, deploy-preview eller branch-deploy. Svarer paa «er dette
+    // den ekte appen eller en forhaandsvisning».
+    kontekst: les("CONTEXT"),
+    bygget: les("DEPLOY_ID"),
+  }, 200);
+}
 
 // Forste palogging kommer rett fra Supabase: `created_at`, og kontoen
 // lages ved forste innlogging, sa de to er samme oyeblikk. Vi teller ikke
