@@ -4831,14 +4831,16 @@ const SAK_15G = kjor("admin-seksjoner", `
          felt("loggUt").closest(".topp") !== null,
          felt("loggUt").parentElement.className);
 
-      // Kampene er det du kom for, sa de staar framme. Resten er lukket:
-      // sju apne seksjoner er grunnen til at portalen ble meldt.
-      ok("kampene staar apne", apen("kampHode"), "lukket");
+      // Alle ligger lukket, kampene med. De sto framme fordi de var det
+      // du kom for — sant sa lenge kamp for kamp var eneste mate a si hva
+      // et sted viser. Ligaflagget dekker sesongen na, og lista her er
+      // den du apner nar noe avviker fra den.
+      ok("kampene er lukket ogsa", !apen("kampHode"), "apen");
       ok("stedene er lukket", !apen("stedHode"), "apen");
       ok("brukerne er lukket", !apen("brukerHode"), "apen");
       ok("verktoyet er lukket", !apen("verktoyHode"), "apen");
       ok("og panelene folger hodene sine",
-         felt("kampKropp").hidden === false && felt("stedKropp").hidden === true &&
+         felt("kampKropp").hidden === true && felt("stedKropp").hidden === true &&
          felt("brukerKropp").hidden === true && felt("verktoyKropp").hidden === true,
          "panel og hode er uenige");
 
@@ -4848,7 +4850,8 @@ const SAK_15G = kjor("admin-seksjoner", `
       function pila(id) {
         return getComputedStyle(felt(id).querySelector(".seksjon-pil")).transform;
       }
-      ok("pila snur i et apent seksjonshode", pila("kampHode") !== "none", pila("kampHode"));
+      ok("pila snur i et apent seksjonshode", pila("forslagHode") !== "none",
+         pila("forslagHode"));
       ok("og staar uvendt i et lukket", pila("stedHode") === "none", pila("stedHode"));
 
       // Koen apner seg selv fordi den har noe i seg. Tallet er grunnen
@@ -4953,8 +4956,16 @@ const SAK_15G = kjor("admin-seksjoner", `
         // Krysser du av en kamp og lukker seksjonen, gaar bade knappen og
         // kvitteringen ut av syne. Tallet i hodet er det som staar igjen.
         felt("stedAvbryt").click();
-        ok("kamphodet er tomt naar ingenting er endret",
-           felt("kampTall").textContent === "", felt("kampTall").textContent);
+        // Et lukket kamphode maa baere seksjonen, sa det staar hva som ER
+        // satt naar ingenting er ulagret. Et tomt hode over tjue kamper
+        // og to kryss er en seksjon du glemmer.
+        var kampTall = felt("kampTall").textContent;
+        ok("kamphodet sier hva som er satt naar ingenting er endret",
+           kampTall.indexOf(" av ") > -1 && kampTall.slice(-5) === " satt",
+           kampTall);
+        ok("og det staar ikke som noe som venter pa deg",
+           !felt("kampTall").classList.contains("venter"),
+           felt("kampTall").className);
         var boks = document.querySelectorAll(".kamp input")[0];
         ok("det finnes en kamp a krysse av", !!boks, "ingen kamper");
         boks.checked = true;

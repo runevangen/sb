@@ -537,9 +537,19 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   i.** Køen står i én seksjon og stedsskjemaet i en annen; `apneSted()`
   åpner Steder, ellers ruller `scrollIntoView` til et skjult element — et
   trykk som svarer at det lyktes uten at noe skjedde.
+  **Og kampene ligger lukket, som resten.** De sto framme fordi de var det
+  du kom for — sant så lenge kamp for kamp var eneste måte å si hva et sted
+  viser. Ligaflagget dekker sesongen nå, og lista her er den du åpner når
+  noe **avviker** fra den; da er tjue kamper å rulle forbi feil vei rundt.
   **Og ulagret arbeid står i hodet.** Lukker du kampene med en avkryssing
   du ikke har lagret, går både knappen og kvitteringen ut av syne. Tallet
   er det `lagreKnappTekst()` teller: hva trykket kommer til å gjøre.
+  **Er ingenting ulagret, står det hva som ER satt** — «2 av 20 satt», og
+  ikke i aksentfargen: et tall som venter på deg og et tall som bare
+  opplyser, skal ikke se like ut. Et tomt hode over tjue kamper og to
+  kryss er en seksjon du glemmer, og det er nettopp det taket er til for å
+  hindre. Tallet teller **begge** påstandene, ★ og «viser ikke», som
+  knappen gjør.
   **Adgang er ferdig med seg selv.** Seksjonen sto igjen etter innlogging
   som fem rader med ett deaktivert felt. «Logg ut» hører til deg, ikke til
   en oppgave, og ligger oppe ved tittelen.

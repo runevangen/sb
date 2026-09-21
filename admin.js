@@ -1099,10 +1099,18 @@ function oppdaterLagreknapp() {
   // ikke har lagret, gar bade knappen og kvitteringen ut av syne — og en
   // endring du ikke vet om er borte, er borte. Tallet er det samme
   // `lagreKnappTekst` teller: hva trykket kommer til a gjore.
+  //
+  // Og nar ingenting er ulagret, staar det hva som ER satt. Seksjonen
+  // ligger lukket na — ligaflagget dekker sesongen for de fleste stedene,
+  // og denne lista er den du apner nar noe avviker — sa hodet maa baere
+  // den. Et tomt hode over tjue kamper og to kryss er en seksjon du
+  // glemmer. Tallet teller BEGGE pastandene, ★ og «viser ikke», som
+  // knappen: en rad som sier «viser ikke» er like mye satt.
   const endringer = lagt + fjernet;
+  const satt = antall + naNei.size;
   settTall("kampTall", endringer
     ? (endringer === 1 ? "1 ulagret endring" : endringer + " ulagrede endringer")
-    : "", true);
+    : satt + " av " + bokser.length + " satt", !!endringer);
 }
 
 function nar(iso) {

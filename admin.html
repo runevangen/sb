@@ -370,17 +370,27 @@
        etter Foreslatte steder, Steder og Brukere — tre seksjoner som ikke
        har noe med den a gjore — mens den lagret kampene her oppe. «Kryss
        av alle» la samme sted: en knapp som opererer pa en liste du ikke
-       ser mens du trykker den. Meldt fra faktisk bruk 16. september 2026. -->
+       ser mens du trykker den. Meldt fra faktisk bruk 16. september 2026.
+
+       Og seksjonen ligger LUKKET, som de andre. Den sto apen fordi den
+       var det du kom for — og det stemte sa lenge kamp for kamp var
+       eneste mate a si hva et sted viser. Ligaflagget gjor jobben for de
+       fleste stedene na: ett kryss dekker sesongen, og lista her er den
+       du apner nar noe avviker fra den. Da er tjue kamper du maa rulle
+       forbi feil vei rundt.
+
+       Tallet i hodet baerer seksjonen: «2 av 20 satt» nar alt er lagret,
+       og det du ikke har lagret nar du har rort noe. -->
   <section class="seksjon">
     <h2 class="seksjon-tittel">
       <button class="seksjon-hode" id="kampHode" type="button"
-              aria-expanded="true" aria-controls="kampKropp">
+              aria-expanded="false" aria-controls="kampKropp">
         <span class="seksjon-navn" id="kampTittel">Kamper</span>
         <span class="seksjon-tall" id="kampTall"></span>
         <span class="seksjon-pil" aria-hidden="true">▾</span>
       </button>
     </h2>
-    <div class="seksjon-kropp" id="kampKropp">
+    <div class="seksjon-kropp" id="kampKropp" hidden>
       <label for="pub">Pub</label>
       <select id="pub"></select>
       <p class="hint" id="pubHint"></p>
