@@ -828,6 +828,12 @@ spørsmål kode ikke kan svare på alene.
   ikke en mangel.
   **Nøkkelen maskeres i adressene som skrives ut.** v1 legger den i stien,
   og en nøkkel i en terminal er en nøkkel i et skjermbilde.
+  **Stiene ligger i `fotball-data.js`, ikke her.** Skriptet er et skall
+  rundt `tsdbSondeStier()`, `tsdbForsteListe()`, `tsdbSondeFunn()` og
+  `tsdbPlukkId()` — de samme `/api/tsdb-sonde` leser. En vakt i
+  `unit.mjs` slår ut om en av dem skriver en adresse selv: det sto som en
+  påstand i en PR-tekst 21. september 2026 og var usant da den ble
+  skrevet, så vakta finnes fordi påstanden ikke holdt seg selv.
 - **`lag-pdf.mjs`** — lager PDF av et dokument i `docs/` med Chromium og
   ingenting annet, så et sammendrag kan sendes som vedlegg. Oversetter
   bare det Markdown-en i `docs/` faktisk bruker; en pakke for resten

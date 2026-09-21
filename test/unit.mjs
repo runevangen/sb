@@ -3182,6 +3182,32 @@ ok("hver fil i appen er omtalt i docs/modulene.md",
 ok("testen fant faktisk filer a kreve dokumentasjon for",
    SKAL_DOKUMENTERES.length >= 25, SKAL_DOKUMENTERES.length);
 
+/* ---- sonden spor fra to steder, men med ETT sett stier ---- */
+
+// `verktoy/tsdbsjekk.mjs` spor fra en maskin, `/api/tsdb-sonde` fra
+// portalen. Stiene ligger i fotball-data.js, og det er hele poenget:
+// sto de hver for seg, ville de to svart ulikt pa det samme sporsmalet —
+// og en sonde som er uenig med seg selv er verre enn ingen sonde.
+//
+// Dette sto som en paastand i en PR-tekst 21. september 2026, og var
+// USANT da den ble skrevet: verktoyet hadde fortsatt sin egen liste, og
+// to kopier la i main i en time. Vakta finnes fordi paastanden ikke holdt
+// seg selv.
+const SONDE_VERKTOY = readFileSync(new URL("../verktoy/tsdbsjekk.mjs", import.meta.url), "utf8");
+const SONDE_FUNKSJON = readFileSync(new URL("../netlify/functions/tsdbsonde.mjs", import.meta.url), "utf8");
+ok("verktoyet henter stiene fra fotball-data.js",
+   SONDE_VERKTOY.indexOf("tsdbSondeStier") > -1);
+ok("og funksjonen gjor det samme",
+   SONDE_FUNKSJON.indexOf("tsdbSondeStier") > -1);
+// Det er kopien som er faren, ikke importen. En adresse skrevet i en av
+// dem er en adresse som kan gli fra den andre.
+ok("og ingen av dem skriver en egen adresse",
+   SONDE_VERKTOY.indexOf("thesportsdb.com/api") === -1 &&
+   SONDE_VERKTOY.indexOf(".php?id=") === -1 &&
+   SONDE_FUNKSJON.indexOf(".php?id=") === -1,
+   "verktoy: " + (SONDE_VERKTOY.indexOf(".php?id=") > -1) +
+   ", funksjon: " + (SONDE_FUNKSJON.indexOf(".php?id=") > -1));
+
 // Den andre veien: dokumentet skal ikke vise til filer som er borte. En
 // regel for en fil som ikke finnes lenger er verre enn ingen regel — den
 // leses som om den fortsatt gjelder.
