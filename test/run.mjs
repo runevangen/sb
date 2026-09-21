@@ -4007,6 +4007,121 @@ const SAK_15C = kjor("admin-koordinat", `
 // Ingenting var borte. Men «Viser 5 kamper fra for» svarte ikke pa
 // sporsmalet admin faktisk hadde — *ble det jeg lagret staende?* — og
 // talte i tillegg pa tvers av ligaer mens boksene viste en liga.
+// Portalveien for «Ikke denne kvelden». Knappen ble bygget, testet fra
+// APPSIDEN — der en ferdig `viser: false`-rad ble stubbet inn — og var
+// uraakelig i portalen: `k.liga` settes i fotball.js, ikke av tjenesten,
+// og admin.js glemte det. Da fikk `ligaflaggGjelder` undefined inn og
+// svarte nei hver gang.
+//
+// Halve rundturen var testet, og PR-en sa at hullet var tettet.
+const SAK_15F = kjor("admin-ikke-denne-kvelden", `
+  try {
+    localStorage.setItem("sb-konto", JSON.stringify({
+      token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
+      utloper: Date.now() + 3600000,
+    }));
+  } catch (e) { /* privat modus */ }
+
+  var IDAG = new Date().toISOString().slice(0, 10);
+  // Ett sted MED ligaflagg, ett uten. Knappen skal skille dem.
+  var MED = { nokkel: "medflagg", navn: "Sportsbaren Bodø", bydel: "Sentrum",
+    adresse: "Gata 1", lat: 67.2828, lon: 14.3756, type: "sportsbar", lag: [],
+    kilde: "Var innom 21.09.2026, storskjerm i baren", sikkerhet: "bekreftet",
+    sjekket: IDAG, merknad: "", fjernet: false,
+    ligaer: { sender: ["eliteserien"],
+              kilde: "Ringte dem og spurte om ligaen", sjekket: IDAG } };
+  var UTEN = { nokkel: "utenflagg", navn: "Uten flagg", bydel: "Sentrum",
+    adresse: "Gata 2", lat: 67.2830, lon: 14.3760, type: "sportsbar", lag: [],
+    kilde: "Var innom 21.09.2026, storskjerm i baren", sikkerhet: "bekreftet",
+    sjekket: IDAG, merknad: "", fjernet: false };
+
+  var KAMPER_ES = [
+    { id: 601, hjemme: "Rosenborg", borte: "Brann", dato: "2026-10-20T17:00:00+00:00",
+      arena: "Lerkendal Stadion", runde: "Runde 21" },
+    { id: 602, hjemme: "Viking", borte: "Molde", dato: "2026-10-21T17:00:00+00:00",
+      arena: "SR-Bank Arena", runde: "Runde 21" }
+  ];
+  window.__sendt = null;
+  function svar(status, kropp) {
+    return Promise.resolve({ ok: status < 400, status: status, text: function () {
+      return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("/api/visninger") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [], visninger: [] });
+      var kropp = JSON.parse(opt.body);
+      if (kropp.handling === "sjekk") {
+        return kropp.passord === "hemmelig" ? svar(200, { ok: true })
+          : svar(401, { feil: "Feil passord" });
+      }
+      window.__sendt = kropp;
+      return svar(200, { ok: true, pub: kropp.pub, visninger: [], merknad: "Lagret." });
+    }
+    if (u.indexOf("/api/fotball") === 0) {
+      return svar(200, { liga: "Eliteserien", kilde: "TheSportsDB", runde: "Runde 21",
+        runder: ["Runde 21"], kamper: KAMPER_ES });
+    }
+    if (u.indexOf("/api/brukere") === 0) return svar(200, { klar: true, mangler: [] });
+    if (u.indexOf("/api/pub-forslag") === 0) return svar(200, { forslag: [] });
+    if (u.indexOf("/api/pub-liste") === 0) return svar(200, { puber: [MED, UTEN], klar: true });
+    return svar(200, {});
+  };
+  function felt(id) { return document.getElementById(id); }
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    felt("passord").value = "hemmelig";
+    felt("loggInn").click();
+    setTimeout(function () { try {
+      felt("pub").value = "Sportsbaren Bodø";
+      felt("pub").dispatchEvent(new Event("change"));
+
+      var knapper = felt("kamper").querySelectorAll(".kamp-nei");
+      ok("et sted med ligaflagg far knappen pa hver kamp",
+         knapper.length === 2, knapper.length + " knapper");
+      ok("og den sier hva trykket gjor",
+         knapper[0].textContent === "Ikke denne kvelden", knapper[0].textContent);
+
+      // Trykket: raden dempes, og lagreknappen ma se at noe er endret.
+      knapper[0].click();
+      ok("trykket snur teksten",
+         knapper[0].textContent === "Viser ikke" &&
+         knapper[0].getAttribute("aria-pressed") === "true", knapper[0].textContent);
+      ok("og lagreknappen vet at noe er endret",
+         felt("lagre").disabled === false, felt("lagre").textContent);
+
+      // Et ja og et nei er motsatte pastander om den samme kampen.
+      var boks = felt("kamper").querySelectorAll(".kamp input")[0];
+      boks.checked = true;
+      felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
+      ok("et ja slar av nei-et pa samme kamp",
+         knapper[0].dataset.nei !== "1", knapper[0].textContent);
+
+      // Og tilbake: nei-et slar av haken.
+      knapper[0].click();
+      ok("og nei-et slar av haken",
+         boks.checked === false, String(boks.checked));
+
+      felt("lagre").click();
+      setTimeout(function () { try {
+        ok("nei-et sendes som sin egen liste",
+           !!window.__sendt && window.__sendt.neiIder.length === 1 &&
+           window.__sendt.kampIder.length === 0,
+           JSON.stringify(window.__sendt && {
+             ja: window.__sendt.kampIder, nei: window.__sendt.neiIder }));
+
+        // DEN VIKTIGSTE: uten et flagg er det ingenting a si imot.
+        felt("pub").value = "Uten flagg";
+        felt("pub").dispatchEvent(new Event("change"));
+        ok("et sted UTEN ligaflagg far ingen knapp",
+           felt("kamper").querySelectorAll(".kamp-nei").length === 0,
+           felt("kamper").querySelectorAll(".kamp-nei").length + " knapper");
+        ferdig();
+      } catch (e) { ok("ingen unntak etter lagring", false, e.message); ferdig(); } }, 400);
+    } catch (e) { ok("ingen unntak i portalen", false, e.message); ferdig(); } }, 400);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300); });
+`, null, adminSide);
+
 const SAK_15D = kjor("admin-lagret-star", `
   try {
     localStorage.setItem("sb-konto", JSON.stringify({
@@ -7233,7 +7348,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15E, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

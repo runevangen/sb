@@ -388,6 +388,16 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   **Knappen i portalen står bare der flagget påstår noe.** Uten et flagg
   som dekker kampen er det ingenting å si imot, og en knapp der ville bedt
   deg motsi tausheten.
+  **Og portalen må merke kampene med ligaen den spurte om.** Tjenesten
+  sender den ikke per kamp — `tolkKamper()` ser ett datasett om gangen og
+  vet ikke hvem som spurte — så den som spør må sette `k.liga`. `fotball.js`
+  gjør det i `hent()`, og `admin.js` glemte det: `ligaflaggGjelder()` fikk
+  `undefined` inn og svarte nei hver gang, så knappen sto **aldri** i
+  kamplista. Bygget, merget, og uråkelig i én time.
+  Testen fanget det ikke fordi den stubbet en ferdig `viser: false`-rad og
+  målte at appen dempet 📺 — halve rundturen. `SAK_15F` går den andre
+  halvdelen: velger et sted med flagg i portalen og krever at knappen står
+  der, og at et sted uten flagg ikke får den.
   **Og det utløper ved sesongslutt**, regnet av `sjekket` gjennom
   `sesongFor()` — Eliteserien ved nyttår, de andre i juli. Sesongen lagres
   **ikke** som eget felt: to felt kunne sagt hver sin sesong om det samme
