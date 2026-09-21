@@ -175,6 +175,48 @@ tall fra API-Football, med sesongen tydelig merket over tabellen.
   lagt den i historikken, i en logg og i hvert skjermbilde noen tar.
   Svaret sier bare *om* den er satt, og en funksjonstest vokter at den
   aldri går ut til den som spurte.
+
+### Hva sonden målte 21. september 2026
+
+Kjørt mot Eliteserien, med nøkkelen satt. Dette er **målt**, ikke antatt —
+og det er hele grunnen til at sonden finnes: ingen test kan svare på det,
+for en stubb vet bare det vi allerede trodde.
+
+| Adresse | Hva som kom |
+|---|---|
+| `eventspastleague` — det vi brukte da | 15 hendelser |
+| `schedule/league/…` (v2) — hele sesongen | **240 rader, 30 runder, 168 spilte med resultat** |
+| `eventsseason.php` (v1) — hele sesongen | det samme |
+| `lookup/league_topscorers/…` (v2), gjettet | `Message` — adressen finnes ikke |
+| `lookup_all_players.php` — spillerne i et lag | virker, gir spiller-id-er |
+| `lookupplayerstats.php` — én spillers statistikk | `playerstats: null` |
+
+Vår egen parser mot sesongsvaret: **240 kamper, 168 spilt, 168 med
+resultat, 240 med runde.** Eksempelrad: «Runde 1: Hamarkameratene 2–1
+Viking (2026-03-14)». Feltnavnene alene ville ikke sagt det —
+`intHomeScore` var ikke blant de tolv første feltene sonden viser.
+
+**Det som kom ut av det:** resultatfanen henter nå hele sesongen. Tallet
+240 er også grunnen til at `TSDB_MINST.resultater` gikk fra 2 til 20 —
+femten av 240 er en kapping, ikke en liten sesong.
+
+### Toppscorer: nei, og hvorfor
+
+Spørsmålet kommer igjen, så svaret står her framfor i en PR-tekst.
+
+1. **Endepunktet finnes ikke.** Adressen ble formet som de andre
+   v2-oppslagene og svarte `Message`. Det er et nei til *dette navnet*,
+   ikke til toppscorere i seg selv — men vi har ikke funnet noe annet.
+2. **Spillerstatistikken var tom.** `lookupplayerstats.php` ga
+   `playerstats: null` for spilleren vi prøvde. Uten mål *og* sesong på
+   raden kan det ikke bli en liste uansett.
+3. **Og prisen ville vært for høy om den virket.** Det er ett kall per
+   spiller — rundt 416 for én liga, mot en døgnkvote på hundre. En liste
+   som tar fire dager å bygge er ingen liste.
+
+Skal spørsmålet opp igjen, er det sonden som svarer: trykk «Spør kilden»
+i portalen framfor å gjette på nytt. Den gjetta adressen står med vilje
+igjen blant de seks — koster ett kall, og sier om noe har endret seg.
 - **Lages på:** thesportsdb.com → Patreon-abonnement
 - **Utløper:** når abonnementet gjør det. Symptomet er ikke en feilmelding, men at tabellen stille går tilbake til fjoråret — se symptomtabellen nedenfor.
 

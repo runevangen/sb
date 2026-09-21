@@ -822,8 +822,13 @@ spørsmål kode ikke kan svare på alene.
   skjult av en opplysning vi ikke har, uten overskrift og uten å telle med.
   Samme regel som `naerNok()`.
 - **`tsdbsjekk.mjs`** — spør TheSportsDB hva den faktisk gir oss, med den
-  nøkkelen som er satt. Fire adresser per liga: hele sesongen (v2 og v1),
-  toppscorere, og det vi bruker i dag. Utskrifta sier hvor mange rader som
+  nøkkelen som er satt. **Seks adresser per liga**, og de svarer på to
+  ulike spørsmål: hele sesongen (v2 og v1) og det vi bruker i dag er
+  *resultatlista*; toppscorere, spillerne i et lag og én spillers
+  statistikk er *toppscorerlista*. Det sto «fire» til 21. september 2026
+  — de to spillerkallene kom til da toppscorer-spørsmålet ble stilt, og
+  tallet ble liggende igjen. Et dokument som beskriver en sonde som ikke
+  finnes lenger, er verre enn ett som tier: det leses som en fasit. Utskrifta sier hvor mange rader som
   kom, **hvilke felt første rad hadde**, og hvor mange ulike runder som er
   representert — det siste avgjør om «alle runder» er mulig i det hele
   tatt. En sesong uten rundetall kan ikke grupperes.
