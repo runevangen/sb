@@ -2120,6 +2120,23 @@ a.ad-cta:focus-visible {
   white-space: nowrap;
 }
 
+/* Veien tilbake fra en antakelse, pa raden der antakelsen star.
+
+   Dempet og liten: den skal finnes for den som vet bedre, ikke rope mot
+   alle andre. En knapp i en knapp finnes ikke — raden er ikke selv en
+   knapp, mens `.kamp-del` er, sa denne er soesken med ordene ved siden. */
+.sted-si-fra {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: calc(11px * var(--fs));
+  color: var(--text-dim);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.sted-si-fra:hover, .sted-si-fra:focus-visible { color: var(--text-body); }
+
 /* Pubene i andre byer. Lukket til du trykker: for en kamp i kveld er de
    ikke et svar, for en kamp om tre dager er de hele svaret. */
 .sted-andre { margin-top: 8px; }
@@ -2513,14 +2530,21 @@ a.ad-cta:focus-visible {
 
 .sted-forslag-skjema[hidden] { display: none; }
 
-.sted-forslag-merke {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: calc(13px * var(--fs));
+/* Avkryssingsboksen «De viser fotball» sto her. Den er ute: feltet
+   `viser_fotball` har én betydning per verdi na, og `false` er tipset.
+
+   Tittelen sier hvilken av de to handlingene skjemaet er. To ulike
+   handlinger i samme felt, og et skjema som ikke sier hvilken, er verre
+   enn to skjemaer. `display: block` sier ogsa hva [hidden] betyr. */
+.sted-forslag-tittel {
+  display: block;
+  margin: 0;
+  font-size: calc(13.5px * var(--fs));
+  font-weight: 600;
+  line-height: 1.4;
   color: var(--text-body);
-  cursor: pointer;
 }
+.sted-forslag-tittel[hidden] { display: none; }
 
 .sted-forslag-note {
   margin: 0;

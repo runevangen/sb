@@ -194,18 +194,34 @@ den påstår ikke «ingen blir med» om noe den ikke vet.
 
 ## 4. Foreslå ny pub
 
-![Kortet med «Mangler stedet? Send det inn.» åpnet: navn, adresse, «De viser fotball», «Send inn»](bilder/pub-forslag.png)
+![Skjemaet for et nytt sted: navn, gateadresse, merknad, «Send inn»](bilder/pub-forslag.png)
 
-**Hva vises.** Nederst i stedslista står lenka «Mangler stedet? Send det
-inn.» Den åpner tre felt: navn (forhåndsfylt med det du alt skrev),
-gateadresse og «De viser fotball». Svaret fra tjenesten («Takk. Vi ser
-på det.») står under, og feltene tømmes så det samme ikke sendes to
-ganger.
+*(Skjermbildet er fra før kortet ble ryddet — knappen het «Mangler stedet?
+Send det inn.» og skjemaet hadde en avkryssingsboks «De viser fotball».
+Feltene og reglene er de samme; veien inn og boksen er beskrevet under.)*
+
+**Hva vises.** Nederst i kortet står «Jeg er på pub, legg inn her». Den
+leser posisjonen din og legger den i **merknaden** — «Jeg står her:
+63.4305, 10.3951 (±12 m)» — og åpner tre felt: navn, gateadresse og
+merknad. Svaret fra tjenesten («Takk. Vi ser på det.») står under, og
+feltene tømmes så det samme ikke sendes to ganger.
+
+Avkryssingsboksen «De viser fotball» er **ute**. `viser_fotball` hadde to
+verdier og tre betydninger, og `false` er nå tipset «de viser ikke fotball»
+([ADR 0023](adr/0023-tipset-som-tar-et-sted-ut.md)). Står du i døra på en
+pub og melder den inn herfra, er svaret på «viser de fotball» at du bruker
+den knappen.
 
 **Reglene.** Uten adresse sendes ingenting — uten den kan ikke stedet
 sorteres etter avstand, og det står hvorfor. Et sted som alt står i
 lista sendes heller ikke; det sies med ord. Sjekken er den samme fila
 tjenesten bruker (`pub-forslag-data.js`), så app og tjeneste er enige.
+
+**Og veien tilbake.** Et **antatt** sted — merket «Antatt — ikke bekreftet»
+— har en egen knapp: «De viser ikke fotball». Den åpner det samme skjemaet
+med stedet fylt inn, og tipset går øverst i køen. Bare antatte steder har
+den: et sted noen har stått i døra på skal ikke kunne rettes bort av et
+trykk fra en som gikk forbi.
 
 **Hvorfor en kø, ikke lista.** `puber.js` er kode fordi den bærer en
 redaksjonell vurdering, og «Kjent for å vise fotball» skal stå også når

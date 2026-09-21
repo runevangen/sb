@@ -330,7 +330,23 @@ kastet. `oktGyldig` og `oktUtloper` brukes av begge veier.
   opp, og en rad med oppdiktede tall ville vært verre enn ingen rad.
 - **`alleredeILista()` folder som lagnavnene.** «Andys Pub» og «Andy's Pub»
   er samme sted. Et forslag på noe som alt står der er ikke feil — men køen
-  skal si fra.
+  skal si fra. **Vakta i appen går motsatt vei for et tips:** det handler om
+  et sted som alt står der.
+- **`erTips()` leser `viserFotball === false`, og bare en uttrykt `false`.**
+  Feltet hadde to verdier og tre betydninger — portalen viste `false` som
+  «uvisst om de viser fotball», et ord dataene aldri sa. Boksen som kunne
+  satt den er ute av appen, og ingen rad i basen har noen gang vært `false`.
+  `forslagRad()` skriver derfor `inn.viserFotball !== false`: sto det
+  `!!inn.viserFotball`, ble en glemt linje hos den som kaller et tips om at
+  stedet er feil. [ADR 0023](adr/0023-tipset-som-tar-et-sted-ut.md)
+- **`forslagVekt()` leser `sikkerhet` av lista, ikke av raden.** Tips om et
+  sted vi gjettet på veier tyngst (0), tips om et bekreftet sted er en
+  vurdering (1), et forslag står bakerst (2). Sto `sikkerhet` som et felt i
+  køen, kunne det vært uenig med `puber`.
+- **`sorterForslagKo()` sorterer eldst først innenfor hvert lag.** Køen er
+  arbeid som ligger, ikke et varsel — et forslag som stadig skyves ned av
+  nyere blir aldri behandlet. Lista den får må være den **sammenslåtte**:
+  et antatt sted i en ny by ligger i basen, ikke i fila.
 
 ---
 
@@ -526,6 +542,16 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   ikke finnes. Nå setter den `antatt: true`, og `stedRad()` gir raden sitt
   eget merke og ordene «Antatt — ikke bekreftet» — før `viserFotball`-grena,
   ellers hadde ⚽ vunnet. [ADR 0022](adr/0022-antatte-steder.md)
+- **`panel.siFra()` er veien tilbake, og `stedRad()` tegner den bare på et
+  antatt sted.** Et sted noen har stått i døra på skal ikke kunne rettes bort
+  av et trykk fra en som gikk forbi. Utlogget tier knappen, som
+  `tilbyForslag()` — databasen setter `foreslatt_av` fra økta.
+- **`sendInnSted()` har to modus, og `settModus()` setter ordene og det som
+  sendes fra samme tilstand.** `apneMed()` er et forslag, `tipsOm()` et tips;
+  sto ordene for seg, kunne skjemaet sagt «send inn et sted» om en melding
+  som tar et sted ut. Avkryssingsboksen «De viser fotball» er borte — se
+  `erTips()` i `pub-forslag-data.js`.
+  [ADR 0023](adr/0023-tipset-som-tar-et-sted-ut.md)
 - **`merkKuraterte()` fyller koordinatet når raden mangler det.** Den
   merket bare `viserFotball` og `lag` før, og en rad fra «dine puber» —
   som bærer bare et navn — kom derfor inn uten lat og lon. Bare det som
@@ -627,8 +653,11 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   tallene skal se at feltet er til dem.
 - **Rettelsene skrives som hele rader.** `slaSammenPuber()` slår sammen
   fila og basen; et sted som har lagt ned tas ut med `fjernet`.
-- **En lagring merker forslaget den svarer på.** `merkForslagLagtInn()`
-  slår opp køen på navnet foldet. Før var lagring og merking to handlinger
+- **En lagring merker raden den svarer på.** `merkForslagBehandlet()`
+  slår opp køen på navnet foldet, **og på sorten**: tas stedet ut, er det
+  tipset som er besvart; blir det stående, er det forslaget. Merket vi
+  begge, ville en redigering stilt tipset som om noen hadde vurdert det.
+  [ADR 0023](adr/0023-tipset-som-tar-et-sted-ut.md) Før var lagring og merking to handlinger
   for én avgjørelse, og den naturlige er den første — så forslaget ble
   stående i køen etter at stedet var lagt inn. Merkingen henger på
   lagringen og aldri motsatt: [ADR 0019](adr/0019-pubforslag.md) krever at
@@ -637,7 +666,15 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   igjen for radene som limes rett inn i fila. Bare `ny` merkes: et avvist
   forslag skal ikke vekkes av at noen redigerer stedet et halvt år senere.
 - **Byvelgeren styrer søket, ikke raden.** Den følger koordinatet når det
-  endrer seg, og et sted som tas *ut* av lista rører ikke køen.
+  endrer seg.
+- **Køen tegnes om når rettelsene lander.** `tegnForslagIgjen()` kalles fra
+  `hentSteder()`: køen tegnes før det kallet er ferdig, og både vekta og
+  «står allerede i lista» leses av den sammenslåtte lista. Uten dette sto
+  tipset om et antatt sted i en ny by midt i køen som om stedet var
+  bekreftet. Samme lekse som `tegnSvar()` i appen.
+- **«Ta stedet ut» lagrer ikke.** Den åpner stedet med haken satt, og et
+  menneske trykker lagre. Et tips fra en forbipasserende er ikke et unntak
+  fra [ADR 0019](adr/0019-pubforslag.md) — det er grunnen til at den finnes.
 
 ### `personvern.html`
 

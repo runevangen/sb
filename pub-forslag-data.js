@@ -54,7 +54,11 @@ export function forslagRad(inn) {
   return {
     navn: String(inn.navn).trim().slice(0, NAVN_MAKS),
     adresse: String(inn.adresse).trim().slice(0, ADRESSE_MAKS),
-    viser_fotball: !!inn.viserFotball,
+    // `!!inn.viserFotball` sto her, og et felt som mangler ble da `false`
+    // — som etter `erTips` betyr «de viser IKKE fotball». En glemt linje
+    // hos den som kaller, ville blitt et tips om at stedet er feil. Bare
+    // en uttrykt `false` er et tips.
+    viser_fotball: inn.viserFotball !== false,
     merknad: String((inn && inn.merknad) || "").trim().slice(0, MERKNAD_MAKS) || null,
   };
 }
@@ -85,6 +89,56 @@ export function alleredeILista(navn, puber) {
   const leit = normaliserLagnavn(navn);
   if (!leit) return false;
   return (puber || []).some((p) => normaliserLagnavn(p.navn) === leit);
+}
+
+/* ---------- tipset om at stedet ikke viser fotball ---------- */
+
+// **`viser_fotball === false` betyr «de viser IKKE fotball».**
+//
+// Feltet hadde to verdier og tre betydninger: `true` var «de viser
+// fotball», og `false` viste portalen som «uvisst om de viser fotball» —
+// et ord dataene aldri sa. Ingen rad i basen har noen gang vaert `false`,
+// og avkryssingsboksen som var den eneste som kunne satt den, er tatt ut:
+// staar du i doera paa en pub og melder den inn, er svaret paa «viser de
+// fotball» at du bruker denne knappen.
+//
+// Da er `false` ledig, og den betyr det den ser ut som. Ett felt, én
+// betydning per verdi, og ingen ny kolonne aa holde i takt.
+export function erTips(forslag) {
+  return !!forslag && forslag.viserFotball === false;
+}
+
+// Hvor i koen raden hoerer, som et tall — lavere staar foerst.
+//
+// 0 — tips om et sted vi har GJETTET paa. Vi satte det inn uten aa ha
+//     sjekket, og noen har nettopp sjekket. Aa ta det ut koster oss
+//     ingenting vi har staatt inne for.
+// 1 — tips om et sted noen har staatt i doera paa. To kilder er uenige,
+//     og det krever en vurdering framfor et trykk.
+// 2 — et sted noen foreslaar at vi legger inn. Koen taaler aa vente paa
+//     det; en rad som er usann gjoer det ikke.
+//
+// Vekta leses av lista, ikke av raden: `sikkerhet` staar i `puber`, og et
+// felt ved siden av i koen kunne vaert uenig med den.
+export function forslagVekt(forslag, puber) {
+  if (!erTips(forslag)) return 2;
+  const leit = normaliserLagnavn((forslag && forslag.navn) || "");
+  const treff = (puber || []).find((p) => normaliserLagnavn(p.navn) === leit);
+  return treff && treff.sikkerhet === "usikker" ? 0 : 1;
+}
+
+// Koen sortert: tipsene foerst, og det eldste foerst innenfor hvert lag.
+//
+// Eldst foerst er med vilje. Koen er ikke et varsel som skal leses naa —
+// den er arbeid som ligger, og et forslag som stadig skyves ned av nyere
+// blir aldri behandlet.
+export function sorterForslagKo(liste, puber) {
+  return (liste || []).slice().sort((a, b) => {
+    const v = forslagVekt(a, puber) - forslagVekt(b, puber);
+    if (v) return v;
+    return String((a && a.foreslatt) || "").localeCompare(
+      String((b && b.foreslatt) || ""));
+  });
 }
 
 // Raden slik den skal se ut i puber.js, klar til a limes inn.

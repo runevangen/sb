@@ -9,6 +9,68 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 21. september 2026 — `checkout --ours` kastet noe ingen konflikt nevnte
+
+**Fanget av:** en `grep` jeg kjørte på egen mistanke etter flettinga. Ikke
+av en test, ikke av git, ikke av CI.
+
+**Hva som skjedde.** #129 og #130 ble squash-flettet til `main`. Squashen
+skriver om historikken, så da `main` skulle inn i #131 — som alt bar
+#130s arbeid — så git de samme endringene som nye på begge sider. Åtte
+konflikter, alle av formen «vår side er et supersett».
+
+Jeg løste dem med `git checkout --ours -- <fil>`. Det ser ut som «behold
+vår side i konflikten», og det er ikke det den gjør: den henter **hele**
+vår versjon av fila fra før flettinga, og kaster alt fra den andre siden
+— også de hunkene som fletta helt rent.
+
+`docs/modulene.md` hadde én konflikt, i avsnittet om appen. Lenger nede i
+fila lå #129s avsnitt om `byersjekk --rader`, som hadde fletta rent.
+`--ours` tok det med seg ut. **Ingen konflikt sa fra, ingen test dekker
+en dokumentasjonsfil, og CI ville vært grønn.**
+
+**Hva som gjorde at det ikke gikk ut.** Jeg sjekket etterpå at innhold fra
+alle fire PR-ene faktisk lå i treet — én `grep` per PR. Den ene av åtte
+som manglet, sto igjen med null treff.
+
+**Regelen.** Løs konflikter **per hunk**, ikke per fil. Trenger du
+virkelig hele fila fra én side, er det en avgjørelse du tar med åpne øyne
+— og da skal du kontrollere hva den andre siden hadde i den fila først.
+Og uansett: etter en fletting som denne, **sjekk at innholdet fra hver
+gren du tror du har, faktisk er der**. Et supersett er lett å påstå og
+billig å måle.
+
+---
+
+## 21. september 2026 — en test som var rød én time i døgnet
+
+**Fanget av:** en helt annen kjøring. `test/run.mjs` sto med to røde i
+`SAK_15` midt i arbeidet med tipssløyfa, på linjer ingen hadde rørt.
+
+**Hva som faktisk var årsaken.** Scenen satte en økt til
+`Date.now() - 3600000` og krevde at cella leste «I dag». Mellom midnatt og
+01:00 i Oslo er én time siden i **går**. Koden var riktig hele veien —
+`osloDogn()` i `pin-data.js` regner kalenderdøgn, og det er nettopp den
+funksjonen som ble skrevet for å rette «I dag 23:00» klokka 01:00 natt til
+dagen etter, meldt 15. september. Fella var flyttet fra koden til stubben,
+og der sto den.
+
+CI kjører i UTC, så vinduet var 22–23 UTC: rødt én time om dagen, grønt de
+andre tjuetre. Den ville slått til på #129 og #130 uten at noe var galt med
+dem.
+
+**Hvorfor den sto så lenge.** En test som er rød én time i døgnet leses som
+en flakete test, og den som møter den klokka 09:00 finner ingenting. Det er
+nøyaktig samme grunn som den opprinnelige feilen sto: den sa feil bare
+mellom midnatt og samme klokkeslett neste dag.
+
+`iDagIOslo()` går en time tilbake, men aldri forbi ett minutt etter
+Oslo-midnatt. Saboteringen ble gjort i det ene vinduet, klokka 00:09 i
+Oslo: den gamle linja var rød, den nye grønn. **Et døgn er ikke 24 timer
+bakover** står nå i [`testing.md`](testing.md).
+
+---
+
 ## 20. september 2026 — en pub uten koordinat kan ikke plasseres
 
 **Meldt som:** «Puber ikke i by burde markeres. Dette søket er fra

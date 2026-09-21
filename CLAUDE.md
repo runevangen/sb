@@ -144,6 +144,43 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   392 km unna. Å sette «?» foran 📺 i merkekjeden skjuler bare tegnet.
   Avgjort i flettinga 21. september 2026, da ligaflagget og de antatte
   stedene møttes for første gang.
+- **Et antatt sted kan sies imot, og `viser_fotball === false` er tipset.**
+  Uten en vei tilbake er en antakelse gjetning med bedre typografi, og lista
+  blir dårligere for hver by vi fyller. Feltet hadde to verdier og tre
+  betydninger — portalen viste `false` som «uvisst om de viser fotball», et
+  ord dataene aldri sa, og ingen rad i basen har noen gang vært `false`.
+  Avkryssingsboksen som kunne satt den er ute: står du i døra på en pub og
+  melder den inn, er svaret på «viser de fotball» at du bruker den knappen.
+  Da er `false` ledig, og den betyr det den ser ut som. Ett felt, én
+  betydning per verdi, og ingen ny kolonne å holde i takt.
+  **`forslagRad()` skriver bare `false` når feltet uttrykkelig er `false`.**
+  Sto det `!!inn.viserFotball`, ble en glemt linje hos den som kaller et
+  tips om at stedet er feil.
+  **Knappen «De viser ikke fotball» står bare på et antatt sted**, og bare
+  innlogget. Et sted noen har stått i døra på skal ikke kunne rettes bort av
+  et trykk fra en som gikk forbi; et sted vi har gjettet på skal kunne det,
+  for vi har ingenting å forsvare. Utlogget tier den, som `tilbyForslag()` —
+  databasen setter `foreslatt_av` fra økta.
+  **Og vakta mot «står allerede i lista» går motsatt vei her.** Et tips
+  handler om et sted som alt står der; sto vakta som for et forslag, avviste
+  vi den ene meldinga som kan rette lista.
+  [ADR 0023](docs/adr/0023-tipset-som-tar-et-sted-ut.md)
+- **Køen sorteres, og tipsene står først.** `sorterForslagKo()` har tre
+  trinn: tips om et sted vi **gjettet** på, tips om et sted noen har **stått
+  i døra** på, så forslagene — og eldst først innenfor hvert lag, for køen er
+  arbeid som ligger, ikke et varsel. Vekta leses av **lista**, ikke av raden:
+  `sikkerhet` står i `puber`, og et felt ved siden av i køen kunne vært uenig
+  med den. Og av den **sammenslåtte** lista — et antatt sted i en ny by
+  ligger i basen, ikke i fila, og det er nettopp de radene tipsene handler
+  om. Derfor tegnes køen om i `tegnForslagIgjen()` når rettelsene lander.
+- **Lagringen merker den raden den svarer på, og hva den svarer avgjøres av
+  hva den gjør.** Tas stedet ut, er det tipset som er besvart; blir det
+  stående, er det forslaget. Det sto `p.fjernet ? null` — riktig da køen bare
+  kunne si «ta dette inn», og en fjerning svarte ingen. Merket vi begge,
+  ville en redigering stilt tipset som om noen hadde vurdert det.
+  **«Ta stedet ut» lagrer ikke.** Den åpner stedet med haken satt, og et
+  menneske trykker — ADR 0019 og 0020 står, og et tips fra en
+  forbipasserende er ikke et unntak fra dem, det er grunnen til at de finnes.
 - **⚽ settes ett sted, ikke i hver kilde.** `kuraterteNaer()` kopierer
   raden rett fra `KJENTE` og vet ikke at den er kuratert, mens
   `stampuberFor()` går gjennom `merkKuraterte`. Sto merkingen i hver
@@ -397,9 +434,12 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   **Men lagringen merker forslaget den svarer på.** Lagring og merking var
   to handlinger for én avgjørelse, og den naturlige er lagringen — så
   forslaget ble stående i køen etter at stedet var lagt inn.
-  `merkForslagLagtInn()` henger på lagringen og aldri motsatt: mennesket
+  `merkForslagBehandlet()` henger på lagringen og aldri motsatt: mennesket
   gjorde nettopp raden ferdig, med koordinater, kilde og dato. «Lagt
   inn»-knappen står igjen for radene som limes rett inn i fila.
+  **Og den merker bare den sorten rad lagringen svarer på** — se tipset
+  lenger opp: et tips sier at stedet er usant, et forslag at det mangler,
+  og de besvares av motsatte handlinger.
 - **`puber.js` er grunnfjellet; `puber` i Supabase er rettelsene
   oppå.** Admin retter i portalen, appen slår sammen med `slaSammenPuber()`
   — hele rader, aldri felt for felt. Fila skrives aldri fra nettet, og den
@@ -584,6 +624,19 @@ toppen eller i en liste: `CLAUDE.md`, `docs/hendelser.md` og
 `docs/testing.md`. I `hendelser.md` skal begge oppføringer stå — det er en
 logg, ikke en tilstand. I `testing.md` er svaret å kjøre suitene og skrive
 det de sier.
+
+**`git checkout --ours -- <fil>` tar hele fila, ikke hunken.** Den henter
+vår versjon fra før flettinga og kaster alt fra den andre siden — også det
+som fletta helt rent. Det tok #129 sitt avsnitt ut av `docs/modulene.md`
+21. september 2026, uten at noen konflikt nevnte det og uten at en eneste
+test kunne fange det. **Løs per hunk**, og etter en fletting: sjekk med en
+`grep` per gren at innholdet du tror du har, faktisk er der. Et supersett
+er lett å påstå og billig å måle.
+
+**En squash-fletting skriver om historikken**, så en gren som lå på toppen
+av den flettede vil se de samme endringene som nye på begge sider. Da blir
+hver konflikt av formen «vår side er et supersett» — og det er akkurat der
+forrige avsnitt koster deg noe.
 
 **En fletting kan være ekte uenighet, ikke bare to linjer som møtes.** Det
 skjedde 20. september: den ene grenen innførte en sirkel for «nær nok»
