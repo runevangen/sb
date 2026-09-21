@@ -327,19 +327,18 @@ const SAK_1 = kjor("feed", FELLES + `
     ok("tidsstempel bruker date_gmt", tid.textContent === "2t siden", tid.textContent);
 
     ok("annonse etter hver fjerde sak",
-       sekvens() === "topp sak sak sak spok-hoy sak sak sak sak spok-bred sak sak sak sak mer",
+       sekvens() === "topp sak sak sak ledig-portrett sak sak sak sak ledig-bred sak sak sak sak mer",
        sekvens());
 
-    // Spokene star forst i rotasjonen: de er det folk blar for a se, og en
-    // vits bak fire annonseplasser er en vits ingen leser. Det viktigste
-    // om den forste plassen er derfor at den sier hva den er — Ullevalseter
-    // er et ekte sted som ikke har kjopt noe.
+    // Den forste plassen selger plassen. Sju spoker sto forst i rotasjonen
+    // til 21. september 2026, og da var det forste en leser motte en vits —
+    // pa den ene plassen som skal overbevise noen om a kjope den (#25).
     var forste = document.querySelector(".ad-ledig");
-    ok("den forste annonseplassen er en spok",
-       forste.classList.contains("ad-spok"), forste.className);
-    ok("og den sier det, bade for oyet og for skjermleseren",
-       forste.querySelector(".ad-label").textContent === "Spøk" &&
-       forste.getAttribute("aria-label") === "Spøk, ikke en ekte annonse" &&
+    ok("den forste annonseplassen er ingen spok",
+       !forste.classList.contains("ad-spok"), forste.className);
+    ok("og den sier at plassen er ledig, bade for oyet og for skjermleseren",
+       forste.querySelector(".ad-label").textContent === "Ledig plass" &&
+       forste.getAttribute("aria-label") === "Ledig annonseplass" &&
        forste.textContent.indexOf("Reklame") === -1,
        forste.querySelector(".ad-label").textContent + " / " +
        forste.getAttribute("aria-label"));
@@ -347,10 +346,10 @@ const SAK_1 = kjor("feed", FELLES + `
     // og dytter saken man holder pa a lese nedover.
     var bilde = forste.querySelector(".ad-ledig-bilde");
     ok("bildet tar plassen sin for det er lastet",
-       bilde.getAttribute("width") === "800" && bilde.getAttribute("height") === "1000",
+       bilde.getAttribute("width") === "400" && bilde.getAttribute("height") === "400",
        bilde.getAttribute("width") + "x" + bilde.getAttribute("height"));
     ok("og det beskriver seg selv",
-       (bilde.getAttribute("alt") || "").toLowerCase().indexOf("skilt") > -1,
+       (bilde.getAttribute("alt") || "").trim().length > 0,
        bilde.getAttribute("alt"));
 
     // Intensjonen er at feeden ikke skal avsluttes med reklame. "Vis flere"
@@ -510,8 +509,12 @@ const SAK_1B = kjor("annonse-varianter", FELLES + `
       // «Reklame» ville pastatt at de har kjopt plassen — nøyaktig lognen
       // appen ellers er noye pa a ikke fortelle. Vitsen blir ikke darligere
       // av at det star hva den er.
+      // Sju spoker sto her til 21. september 2026 (#25). Reglene under blir
+      // staende: lokka er tom na, og beskytter vitsen igjen den dagen en
+      // rad far merke "spok". Et krav om at det FINNES en spok ville
+      // vaert et krav om at dataene aldri endres.
       var spok = document.querySelectorAll(".ad-spok");
-      ok("spokene star i feeden", spok.length >= 1, spok.length);
+      ok("ingen spok i feeden", spok.length === 0, spok.length);
       var spokFeil = [];
       Array.prototype.forEach.call(spok, function (a) {
         if (a.querySelector(".ad-label").textContent !== "Spøk") spokFeil.push("merke");
@@ -553,15 +556,15 @@ const SAK_1B = kjor("annonse-varianter", FELLES + `
       ok("hvert bilde beskriver seg selv, ogsa de som ikke er av Prem",
          altFeil.length === 0, altFeil.join(", ") || "ingen");
 
-      // Ullevalseter-vitsen er delt i oppsett og poeng. I én setning er
-      // den en opplysning.
-      var ulle = Array.prototype.find.call(spok, function (a) {
-        return a.textContent.indexOf("Ullevålseter") > -1;
+      // En vits er delt i oppsett og poeng. I én setning er den en
+      // opplysning. Star det ingen spok, er det ingenting a male — og det
+      // er tilstanden na.
+      var utenPoeng = [];
+      Array.prototype.forEach.call(spok, function (a) {
+        if (!a.querySelector(".ad-sub")) utenPoeng.push(a.textContent.slice(0, 40));
       });
-      ok("vitsen star med oppsett og poeng pa hver sin linje",
-         !!ulle && ulle.querySelector(".ad-headline").textContent === "Opplev Ullevålseter." &&
-         ulle.querySelector(".ad-sub").textContent.indexOf("travbanen") > -1,
-         ulle ? ulle.textContent.slice(0, 70) : "fant den ikke");
+      ok("en vits star med oppsett og poeng pa hver sin linje",
+         utenPoeng.length === 0, utenPoeng.join(", ") || "ingen spok a male");
       ferdig();
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } });
   }, 700); });
@@ -2809,6 +2812,97 @@ const SAK_14K = kjor("pub-sender-ligaen", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
 `);
 
+/* ------------- 14L. «ikke denne kvelden» ------------- */
+
+// Hullet ligaflagget lagde. 📺 «Sender Eliteserien» er en staende pastand
+// om sesongen, og stedet er stengt nettopp denne kvelden. Uten en vei til
+// a si det, var eneste utvei a ta HELE flagget bort.
+const SAK_14L = kjor("pub-ikke-denne-kvelden", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "" }); });
+  history.replaceState(null, "", location.pathname + "?posisjon=63.4286,10.3641");
+  var IDAG = new Date().toISOString().slice(0, 10);
+  var RBK = { nokkel: "rbkpobbogsant", navn: "RBK. Pøbb og sånt", bydel: "Ila",
+    adresse: "Gata 2", lat: 63.4286, lon: 10.3641, type: "sportsbar", lag: [],
+    kilde: "Var innom 18.09.2026, storskjerm i baren", sikkerhet: "bekreftet",
+    sjekket: "2026-09-18", merknad: "", fjernet: false,
+    ligaer: { sender: ["eliteserien"],
+              kilde: "Ringte dem og spurte om ligaen", sjekket: IDAG } };
+  // Nei-et gjelder den FORSTE kampen. Den andre skal beholde merket sitt —
+  // ellers har vi bare skrudd av flagget med en omvei.
+  // Nei-et gjelder BARE den forste kampen. Star merket igjen pa den
+  // andre, er nei-et per kamp — og det var hele poenget. Slo det ut alle,
+  // hadde vi bare skrudd av flagget med en omvei.
+  window.__visninger = [
+    { pub: "RBK. Pøbb og sånt", kamp_id: "2026-09-20-brann-bodoglimt",
+      kamp: "Brann – Bodo/Glimt", viser: false },
+  ];
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        json: function () { return Promise.resolve({ elements: [] }); } });
+    }
+    if (u.indexOf("/api/pub-liste") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { klar: true, puber: [RBK] })); } });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { svar: [], visninger: window.__visninger })); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({
+          liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+          kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+          kamper: ARETS, runde: "Runde 5" })); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var rader = document.querySelectorAll(".kamp.delbar");
+    var forste = rader[0];
+    forste.querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    var apne = panel.querySelector(".pub-apne");
+    if (apne) apne.click();
+    setTimeout(function () { try {
+      // Kampen stedet sa nei til: stedet star der fortsatt (det ligger
+      // femti meter unna), men UTEN 📺 — flagget er sagt imot.
+      ok("stedet star der fortsatt",
+         panel.textContent.indexOf("Pøbb") > -1,
+         panel.textContent.slice(0, 200) || "(tomt)");
+      ok("men merket er borte for kampen stedet sa nei til",
+         !panel.querySelector(".pub-liga"),
+         panel.textContent.slice(0, 240));
+
+      // Og den NESTE kampen: samme sted, samme flagg, ingen nei.
+      forste.querySelector(".kamp-del").click();
+      rader[1].querySelector(".kamp-del").click();
+      var panel2 = document.querySelectorAll(".kamp-panel")[0];
+      var apne2 = panel2.querySelector(".pub-apne");
+      if (apne2) apne2.click();
+      setTimeout(function () { try {
+        ok("men merket star pa den neste kampen",
+           !!panel2.querySelector(".pub-liga"),
+           panel2.textContent.slice(0, 240) || "(tomt)");
+        ferdig();
+      } catch (e) { ok("ingen unntak pa kamp to", false, e.message); ferdig(); } }, 700);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
+`);
+
 const SAK_15 = kjor("admin", `
   // Skrivingen gar med admins egen okt na (#79), ikke med en nokkel:
   // RLS slar opp uid-en i visning_skrivere, og ADMIN_PASSORD betyr
@@ -3916,6 +4010,121 @@ const SAK_15C = kjor("admin-koordinat", `
 // Ingenting var borte. Men «Viser 5 kamper fra for» svarte ikke pa
 // sporsmalet admin faktisk hadde — *ble det jeg lagret staende?* — og
 // talte i tillegg pa tvers av ligaer mens boksene viste en liga.
+// Portalveien for «Ikke denne kvelden». Knappen ble bygget, testet fra
+// APPSIDEN — der en ferdig `viser: false`-rad ble stubbet inn — og var
+// uraakelig i portalen: `k.liga` settes i fotball.js, ikke av tjenesten,
+// og admin.js glemte det. Da fikk `ligaflaggGjelder` undefined inn og
+// svarte nei hver gang.
+//
+// Halve rundturen var testet, og PR-en sa at hullet var tettet.
+const SAK_15F = kjor("admin-ikke-denne-kvelden", `
+  try {
+    localStorage.setItem("sb-konto", JSON.stringify({
+      token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
+      utloper: Date.now() + 3600000,
+    }));
+  } catch (e) { /* privat modus */ }
+
+  var IDAG = new Date().toISOString().slice(0, 10);
+  // Ett sted MED ligaflagg, ett uten. Knappen skal skille dem.
+  var MED = { nokkel: "medflagg", navn: "Sportsbaren Bodø", bydel: "Sentrum",
+    adresse: "Gata 1", lat: 67.2828, lon: 14.3756, type: "sportsbar", lag: [],
+    kilde: "Var innom 21.09.2026, storskjerm i baren", sikkerhet: "bekreftet",
+    sjekket: IDAG, merknad: "", fjernet: false,
+    ligaer: { sender: ["eliteserien"],
+              kilde: "Ringte dem og spurte om ligaen", sjekket: IDAG } };
+  var UTEN = { nokkel: "utenflagg", navn: "Uten flagg", bydel: "Sentrum",
+    adresse: "Gata 2", lat: 67.2830, lon: 14.3760, type: "sportsbar", lag: [],
+    kilde: "Var innom 21.09.2026, storskjerm i baren", sikkerhet: "bekreftet",
+    sjekket: IDAG, merknad: "", fjernet: false };
+
+  var KAMPER_ES = [
+    { id: 601, hjemme: "Rosenborg", borte: "Brann", dato: "2026-10-20T17:00:00+00:00",
+      arena: "Lerkendal Stadion", runde: "Runde 21" },
+    { id: 602, hjemme: "Viking", borte: "Molde", dato: "2026-10-21T17:00:00+00:00",
+      arena: "SR-Bank Arena", runde: "Runde 21" }
+  ];
+  window.__sendt = null;
+  function svar(status, kropp) {
+    return Promise.resolve({ ok: status < 400, status: status, text: function () {
+      return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("/api/visninger") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [], visninger: [] });
+      var kropp = JSON.parse(opt.body);
+      if (kropp.handling === "sjekk") {
+        return kropp.passord === "hemmelig" ? svar(200, { ok: true })
+          : svar(401, { feil: "Feil passord" });
+      }
+      window.__sendt = kropp;
+      return svar(200, { ok: true, pub: kropp.pub, visninger: [], merknad: "Lagret." });
+    }
+    if (u.indexOf("/api/fotball") === 0) {
+      return svar(200, { liga: "Eliteserien", kilde: "TheSportsDB", runde: "Runde 21",
+        runder: ["Runde 21"], kamper: KAMPER_ES });
+    }
+    if (u.indexOf("/api/brukere") === 0) return svar(200, { klar: true, mangler: [] });
+    if (u.indexOf("/api/pub-forslag") === 0) return svar(200, { forslag: [] });
+    if (u.indexOf("/api/pub-liste") === 0) return svar(200, { puber: [MED, UTEN], klar: true });
+    return svar(200, {});
+  };
+  function felt(id) { return document.getElementById(id); }
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    felt("passord").value = "hemmelig";
+    felt("loggInn").click();
+    setTimeout(function () { try {
+      felt("pub").value = "Sportsbaren Bodø";
+      felt("pub").dispatchEvent(new Event("change"));
+
+      var knapper = felt("kamper").querySelectorAll(".kamp-nei");
+      ok("et sted med ligaflagg far knappen pa hver kamp",
+         knapper.length === 2, knapper.length + " knapper");
+      ok("og den sier hva trykket gjor",
+         knapper[0].textContent === "Ikke denne kvelden", knapper[0].textContent);
+
+      // Trykket: raden dempes, og lagreknappen ma se at noe er endret.
+      knapper[0].click();
+      ok("trykket snur teksten",
+         knapper[0].textContent === "Viser ikke" &&
+         knapper[0].getAttribute("aria-pressed") === "true", knapper[0].textContent);
+      ok("og lagreknappen vet at noe er endret",
+         felt("lagre").disabled === false, felt("lagre").textContent);
+
+      // Et ja og et nei er motsatte pastander om den samme kampen.
+      var boks = felt("kamper").querySelectorAll(".kamp input")[0];
+      boks.checked = true;
+      felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
+      ok("et ja slar av nei-et pa samme kamp",
+         knapper[0].dataset.nei !== "1", knapper[0].textContent);
+
+      // Og tilbake: nei-et slar av haken.
+      knapper[0].click();
+      ok("og nei-et slar av haken",
+         boks.checked === false, String(boks.checked));
+
+      felt("lagre").click();
+      setTimeout(function () { try {
+        ok("nei-et sendes som sin egen liste",
+           !!window.__sendt && window.__sendt.neiIder.length === 1 &&
+           window.__sendt.kampIder.length === 0,
+           JSON.stringify(window.__sendt && {
+             ja: window.__sendt.kampIder, nei: window.__sendt.neiIder }));
+
+        // DEN VIKTIGSTE: uten et flagg er det ingenting a si imot.
+        felt("pub").value = "Uten flagg";
+        felt("pub").dispatchEvent(new Event("change"));
+        ok("et sted UTEN ligaflagg far ingen knapp",
+           felt("kamper").querySelectorAll(".kamp-nei").length === 0,
+           felt("kamper").querySelectorAll(".kamp-nei").length + " knapper");
+        ferdig();
+      } catch (e) { ok("ingen unntak etter lagring", false, e.message); ferdig(); } }, 400);
+    } catch (e) { ok("ingen unntak i portalen", false, e.message); ferdig(); } }, 400);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300); });
+`, null, adminSide);
+
 const SAK_15D = kjor("admin-lagret-star", `
   try {
     localStorage.setItem("sb-konto", JSON.stringify({
@@ -7142,7 +7351,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15E, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

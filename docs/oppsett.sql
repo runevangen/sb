@@ -149,6 +149,20 @@ create table if not exists visninger (
   -- den aldri selv — som `bruker` i kampsvar — sa det er databasen som
   -- ma sette den, eller sa blir den ikke satt.
   satt_av uuid default auth.uid() references auth.users (id) on delete set null,
+  -- Tre tilstander per (pub, kamp), ikke to:
+  --
+  --   ingen rad     ingen paastand. Ligaflagget (puber.ligaer) gjelder.
+  --   viser = true  ★, et menneske har sett paa NETTOPP denne kampen.
+  --   viser = false «ikke denne kvelden» — stedet sender ligaen, men er
+  --                 stengt, har selskap, eller viser noe annet akkurat da.
+  --
+  -- Uten den siste kunne 📺 ikke sies imot. Aa ta hele ligaflagget bort
+  -- var feil svar: stedet SENDER Eliteserien, bare ikke den ene kvelden.
+  -- Og aa la vaere aa krysse av er ingen paastand i det hele tatt.
+  --
+  -- Derfor ingen ny tabell: `unique (pub, kamp_id)` ga alt én rad per
+  -- par, og feltet gjor de to tilstandene til tre.
+  viser   boolean not null default true,
   unique (pub, kamp_id)
 );
 

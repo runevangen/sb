@@ -88,6 +88,12 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   slås opp på `merke` — ikke på `format`, som er fasongen (`kort`,
   `banner`, `stripe`). **Ingen oppdiktet annonsør i prod:** en rad uten
   `merke` er en ekte annonsør, og det finnes ingen ennå.
+  **Og ingen spøk heller, fra 21. september 2026.** De sju vitsene var
+  ærlige, men de sto først i rotasjonen — og den første annonsen en leser
+  møter er den ene som skal overbevise noen om å kjøpe plassen. Merket
+  lever videre uten data: `run.mjs` holder at feeden ikke har en spøk,
+  `unit.mjs` at apparatet for å lage en fortsatt finnes. Bare den ene av
+  dem, og merket kunne ryket som død kode uten at noe sa fra.
   [ADR 0005](docs/adr/0005-egen-annonseplass.md)
 - **En knapp som ser ut som den gir noe den ikke gir, er verre enn en som
   sier hva den er.** Gjelder «Venner», «Meldt inn til oss», og
@@ -381,6 +387,33 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   **Flagget er ingen ny dør inn i lista.** `ligapuberAv()` siler
   kandidater de geografiske kildene alt har funnet; et Oslo-sted som
   sender Eliteserien er ikke et svar i Trondheim.
+  **Og det kan sies imot for én kveld.** Flagget er en stående påstand om
+  sesongen; et sted kan være stengt, ha selskap eller vise noe annet
+  nettopp den kvelden. Å ta hele flagget bort var eneste utvei før, og det
+  ville vært usant resten av sesongen. `visninger.viser` gir derfor **tre**
+  tilstander der det var to: ingen rad er ingen påstand, `true` er ★, og
+  `false` er «ikke denne kvelden». Ingen ny tabell — `unique (pub,
+  kamp_id)` ga alt én rad per par.
+  `avkreftetFor()` og `utenAvkreftede()` er søsken til `bekreftetFor()` og
+  `merkBekreftet()`: samme folding, motsatt fortegn. Nei-et **fjerner**
+  stedet fra lista for den ene kampen framfor å merke det — en rad som sier
+  «viser ikke» tar plass for å si ingenting.
+  **Og `visningsDiff()` må se fortegnet.** Sto den bare på `kampId`, ble et
+  ja som ble et nei lagret som «ingen endring» og nådde aldri basen — en
+  handling som svarer at den lyktes uten at noe skjedde.
+  **Knappen i portalen står bare der flagget påstår noe.** Uten et flagg
+  som dekker kampen er det ingenting å si imot, og en knapp der ville bedt
+  deg motsi tausheten.
+  **Og portalen må merke kampene med ligaen den spurte om.** Tjenesten
+  sender den ikke per kamp — `tolkKamper()` ser ett datasett om gangen og
+  vet ikke hvem som spurte — så den som spør må sette `k.liga`. `fotball.js`
+  gjør det i `hent()`, og `admin.js` glemte det: `ligaflaggGjelder()` fikk
+  `undefined` inn og svarte nei hver gang, så knappen sto **aldri** i
+  kamplista. Bygget, merget, og uråkelig i én time.
+  Testen fanget det ikke fordi den stubbet en ferdig `viser: false`-rad og
+  målte at appen dempet 📺 — halve rundturen. `SAK_15F` går den andre
+  halvdelen: velger et sted med flagg i portalen og krever at knappen står
+  der, og at et sted uten flagg ikke får den.
   **Og det utløper ved sesongslutt**, regnet av `sjekket` gjennom
   `sesongFor()` — Eliteserien ved nyttår, de andre i juli. Sesongen lagres
   **ikke** som eget felt: to felt kunne sagt hver sin sesong om det samme
