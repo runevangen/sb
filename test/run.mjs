@@ -4178,6 +4178,7 @@ const SAK_15H = kjor("admin-uten-okt", `
   ];
   window.__liste = null;
   window.__lagret = null;
+  window.__brukerPost = null;
   function svar(status, kropp) {
     return Promise.resolve({ ok: status < 400, status: status, text: function () {
       return Promise.resolve(JSON.stringify(kropp)); } });
@@ -4196,7 +4197,10 @@ const SAK_15H = kjor("admin-uten-okt", `
       return svar(200, { liga: "Eliteserien", kilde: "TheSportsDB", runde: "Runde 21",
         runder: ["Runde 21"], kamper: KAMPER });
     }
-    if (u.indexOf("/api/brukere") === 0) return svar(200, { klar: true, mangler: [] });
+    if (u.indexOf("/api/brukere") === 0) {
+      if (opt && opt.method === "POST") window.__brukerPost = JSON.parse(opt.body);
+      return svar(200, { klar: true, mangler: [] });
+    }
     if (u.indexOf("/api/pub-forslag") === 0) return svar(200, { forslag: [] });
     if (u.indexOf("/api/pub-liste") === 0) {
       var kropp = JSON.parse(opt.body);
@@ -4227,6 +4231,16 @@ const SAK_15H = kjor("admin-uten-okt", `
     setTimeout(function () { try {
       ok("stedene hentes uten en økt — kallet leser bare",
          !!window.__liste, JSON.stringify(window.__liste));
+
+      // Og motsatt vei for BRUKERLISTA. De to ser like ut og er ikke det:
+      // stedene er offentlige data tjenesten gir uten en token, mens hver
+      // handling i brukerlista handler paa vegne av andre mennesker. Den
+      // krever okta, og sier det (#140).
+      ok("men brukerlista krever den, og sier det",
+         felt("brukerHint").textContent.indexOf("Logg inn i appen") > -1,
+         felt("brukerHint").textContent);
+      ok("og den sporr ikke tjenesten i det hele tatt",
+         window.__brukerPost === null, JSON.stringify(window.__brukerPost));
       ok("og stedet fra portalen star i pubvelgeren",
          pubValg().indexOf("Sportsbaren Bodø") > -1, pubValg().length + " valg");
 
@@ -4340,6 +4354,75 @@ const SAK_15I = kjor("admin-rettelsen-lander-sist", `
         ferdig();
       } catch (e) { ok("ingen unntak etter rettelsene", false, e.message); ferdig(); } }, 500);
     } catch (e) { ok("ingen unntak i portalen", false, e.message); ferdig(); } }, 200);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300); });
+`, null, adminSide);
+
+// Den andre lasa trenger en LISTE over hvem som slipper inn, og den ligger
+// i ADMIN_UID i Netlify. Mangler den, stenger tjenesten — riktig vei, for
+// en las uten liste apner for alle. Men verdien som skal inn er admins
+// egen konto-id, og den kan tjenesten ikke vite: den vet bare at
+// variabelen er tom. Portalen vet det, for id-en staar i okta.
+//
+// Uten dette er meldinga «sett ADMIN_UID» uten aa si til hva, og svaret
+// ligger et sted admin ikke kommer til fra en telefon.
+const SAK_15J = kjor("admin-uid-mangler", `
+  try {
+    localStorage.setItem("sb-konto", JSON.stringify({
+      token: "okt-token", fornyer: "fornyer",
+      bruker: "99999999-8888-7777-6666-555555555555", navn: "Rune",
+      utloper: Date.now() + 3600000,
+    }));
+  } catch (e) { /* privat modus */ }
+
+  window.__sendt = null;
+  function svar(status, kropp) {
+    return Promise.resolve({ ok: status < 400, status: status, text: function () {
+      return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("/api/visninger") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [], visninger: [] });
+      var v = JSON.parse(opt.body);
+      if (v.handling === "sjekk") {
+        return v.passord === "hemmelig" ? svar(200, { ok: true }) : svar(401, { feil: "Feil passord" });
+      }
+      return svar(200, { ok: true, pub: v.pub, visninger: [], merknad: "Lagret." });
+    }
+    if (u.indexOf("/api/fotball") === 0) {
+      return svar(200, { liga: "Eliteserien", kilde: "TheSportsDB", runde: "Runde 21",
+        runder: ["Runde 21"], kamper: [] });
+    }
+    // Tjenestens egne ord, slik oppsettTekst former dem.
+    if (u.indexOf("/api/brukere") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: false, mangler: ["ADMIN_UID"] });
+      window.__sendt = JSON.parse(opt.body);
+      return svar(503, {
+        feil: "Brukerlista er ikke satt opp: ADMIN_UID mangler i Netlify-miljøet.",
+        mangler: ["ADMIN_UID"],
+      });
+    }
+    if (u.indexOf("/api/pub-forslag") === 0) return svar(200, { forslag: [] });
+    if (u.indexOf("/api/pub-liste") === 0) return svar(200, { puber: [], klar: true });
+    return svar(200, {});
+  };
+  function felt(id) { return document.getElementById(id); }
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    felt("passord").value = "hemmelig";
+    felt("loggInn").click();
+    setTimeout(function () { try {
+      ok("okta sendes med til brukerlista",
+         !!window.__sendt && window.__sendt.token === "okt-token",
+         JSON.stringify(window.__sendt));
+      var hint = felt("brukerHint").textContent;
+      ok("meldinga fra tjenesten staar", hint.indexOf("ADMIN_UID") > -1, hint);
+      ok("og portalen sier hvilken verdi som skal inn",
+         hint.indexOf("99999999-8888-7777-6666-555555555555") > -1, hint);
+      ok("lista staar ikke der som om den var hel",
+         felt("brukere").hidden === true, "synlig");
+      ferdig();
+    } catch (e) { ok("ingen unntak i portalen", false, e.message); ferdig(); } }, 500);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300); });
 `, null, adminSide);
 
@@ -7801,7 +7884,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

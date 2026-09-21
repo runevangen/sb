@@ -616,6 +616,29 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   skriverens **egen økt**; RLS slår opp uid-en i `visning_skrivere`.
   `ADMIN_PASSORD` er døren til skjemaet, ikke til skrivingen.
   [ADR 0018](docs/adr/0018-visninger-i-supabase.md)
+- **Og brukerlista har to låser, ikke én.** `/api/brukere` er den ene
+  funksjonen med `service_role` — liste over alle kontoer, ny PIN på hvem
+  som helst, sletting. `ADMIN_PASSORD` var eneste lås til 22. september
+  2026, mens de fire andre funksjonene som sjekker det samme passordet
+  krever en økt i tillegg: den svakeste døra sto foran det sterkeste
+  rommet. Nå kreves også en **ekte Supabase-økt hvis uid står i
+  `ADMIN_UID`**, og den sjekken skjer før `service_role` røres — et
+  avvist kall når aldri Supabase Auth.
+  **Lista ligger i miljøet, ikke i basen.** `visning_skrivere` er *ment* å
+  vokse — puber som krysser av sine egne kamper er hele poenget med #65 —
+  og da ville en pubeier fått brukerregisteret med på kjøpet. En egen
+  tabell ved siden av blir til «legg dem inn i begge».
+  **Og et tomt oppsett stenger.** Mangler `ADMIN_UID`, svarer funksjonen
+  503: en lås uten liste åpner for alle, og det er den motsatte feilen av
+  den vi rettet.
+  **Portalen sier hvilken verdi som skal inn.** Tjenesten vet bare at
+  variabelen er tom; id-en står i admins egen økt, så portalen viser den.
+  En melding som ber om en verdi uten å si hvilken, peker et sted du ikke
+  kommer til fra en telefon.
+  **Og dette er motsatt av `stedKall`:** der ble kravet *fjernet* fra
+  lesinga, fordi tjenesten ikke stilte det og dataene er offentlige. Her
+  stiller tjenesten det, for alle tre handlingene — de handler på vegne av
+  andre mennesker. De to ser like ut og er det ikke.
 - **Det som kommer over nettet, lander etter at visningen står ferdig.**
   Alt som tegnes av data fra `/api/svar` må tegnes på nytt i `tegnSvar()`
   — kampraden, den åpne kampen og linjene under. Tre feil i dette

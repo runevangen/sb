@@ -395,11 +395,22 @@ function visAdgang(tekst, art) {
 // /api/brukere. Portalen sender passordet og far en liste; den ser aldri
 // noen PIN, for PIN-er ligger hashet hos Supabase. Admin kan sette en
 // ny, ikke lese den gamle.
+//
+// Og okta sendes med, siden #140: brukerlista har to laser na. Merk
+// forskjellen fra `stedKall`, som nettopp fikk kravet FJERNET for lesing
+// — der var okta et krav tjenesten ikke stilte, og fulgte «liste» inn i
+// en ren lesing av offentlige data. Her stiller tjenesten det, for alle
+// tre handlingene: de handler pa vegne av andre mennesker.
 async function brukerKall(kropp) {
+  const okt = lesOkt();
+  if (!okt || !okt.token) {
+    throw new Error("Logg inn i appen først. Brukerlista krever din egen økt"
+      + " i tillegg til passordet.");
+  }
   const respons = await fetch("/api/brukere", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Accept": "application/json" },
-    body: JSON.stringify(Object.assign({ passord }, kropp)),
+    body: JSON.stringify(Object.assign({ passord, token: okt.token }, kropp)),
   });
   let data = null;
   try {
@@ -429,7 +440,16 @@ async function hentBrukere() {
     // ikke har.
     settTall("brukerTall", "");
     felt("brukere").hidden = true;
-    felt("brukerHint").textContent = err.message;
+    // Mangler ADMIN_UID, er verdien som skal inn nettopp din egen — og
+    // tjenesten kan ikke vite hvem som spor. Portalen kan: den staar i
+    // okta. Uten dette er meldinga «sett ADMIN_UID» uten a si til hva,
+    // og svaret ligger et sted admin ikke kommer til fra en telefon.
+    const okt = lesOkt();
+    const min = okt && okt.bruker
+      ? " Din egen konto-id er: " + okt.bruker
+      : "";
+    felt("brukerHint").textContent = err.message
+      + (err.message.indexOf("ADMIN_UID") > -1 ? min : "");
   }
 }
 
