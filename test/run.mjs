@@ -2717,6 +2717,98 @@ const SAK_14J = kjor("pub-i-byen-etterpa", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
 `);
 
+/* ---------------- 14K. stedet som sender ligaen ---------------- */
+
+// «Viser alt»-flagget, meldt 19. september 2026 — men pa LIGANIVA, for
+// kamper kolliderer. Stedet har lag: [] og er ikke krysset av for denne
+// kampen; eneste grunn til at det loftes er flagget.
+const SAK_14K = kjor("pub-sender-ligaen", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "" }); });
+  history.replaceState(null, "", location.pathname + "?posisjon=63.4286,10.3641");
+  var IDAG = new Date().toISOString().slice(0, 10);
+  var RBK = { nokkel: "rbkpobbogsant", navn: "RBK. Pøbb og sånt", bydel: "Ila",
+    adresse: "Gata 2", lat: 63.4286, lon: 10.3641, type: "sportsbar", lag: [],
+    kilde: "Var innom 18.09.2026, storskjerm i baren", sikkerhet: "bekreftet",
+    sjekket: "2026-09-18", merknad: "", fjernet: false,
+    ligaer: { sender: ["eliteserien"],
+              kilde: "Ringte dem og spurte om ligaen", sjekket: IDAG } };
+  // Et OSLO-sted med noyaktig samme flagg. Det ma IKKE stå her: et sted
+  // som sender Eliteserien er ikke et svar for den som star i Trondheim.
+  // Flagget lofter stedene som svarer pa kampen, det apner ingen ny dor.
+  var OSLO = { nokkel: "oslostedet", navn: "Oslo-stedet", bydel: "Sentrum",
+    adresse: "Gata 1", lat: 59.9139, lon: 10.7522, type: "sportsbar", lag: [],
+    kilde: "Var innom 18.09.2026, storskjerm i baren", sikkerhet: "bekreftet",
+    sjekket: "2026-09-18", merknad: "", fjernet: false,
+    ligaer: { sender: ["eliteserien"],
+              kilde: "Ringte dem og spurte om ligaen", sjekket: IDAG } };
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        json: function () { return Promise.resolve({ elements: [] }); } });
+    }
+    if (u.indexOf("/api/pub-liste") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { klar: true, puber: [RBK, OSLO] })); } });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ svar: [], visninger: [] })); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({
+          liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+          kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+          kamper: ARETS, runde: "Runde 5" })); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var rad = document.querySelector(".kamp.delbar");
+    var del = rad && rad.querySelector(".kamp-del");
+    if (del) del.click();
+    var panel = document.querySelector(".kamp-panel");
+    // Etter #127 star de naere stedene FRAMME — «Andre fotballpuber» er
+    // bare der nar det finnes noe a folde ut. Stedet her ligger i dora,
+    // sa knappen trenger ikke finnes.
+    var apne = panel.querySelector(".pub-apne");
+    if (apne) apne.click();
+    setTimeout(function () { try {
+      var forslag = panel;
+      ok("stedet med ligaflagg star der",
+         forslag.textContent.indexOf("Pøbb") > -1,
+         forslag.textContent.slice(0, 200) || "(tomt)");
+      // Merket NAVNGIR ligaen. «Viser vanligvis kamper» ville latt
+      // leseren tro det gjaldt kampen hen ser pa.
+      var merke = forslag.querySelector(".pub-liga");
+      ok("og baerer et merke som navngir ligaen",
+         !!merke && merke.getAttribute("aria-label") === "Sender Eliteserien",
+         merke ? merke.getAttribute("aria-label") : "(intet merke)");
+      // Merket er ikke stjerna: ingen har krysset av denne kampen.
+      ok("men ikke stjerna — ingen har sett pa denne kampen",
+         !forslag.querySelector(".pub-bekreftet"), forslag.textContent.slice(0, 200));
+      // DEN VIKTIGSTE: flagget er ikke en ny dor inn i lista. Oslo-stedet
+      // har nøyaktig samme flagg, og skal likevel ikke sta her — ellers
+      // er vi tilbake til feilen stampubene ble tommet for a unnga.
+      ok("men et sted i en ANNEN by kommer ikke med pa flagget alene",
+         forslag.textContent.indexOf("Oslo-stedet") === -1,
+         forslag.textContent.slice(0, 260));
+      ferdig();
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
+`);
+
 const SAK_15 = kjor("admin", `
   // Skrivingen gar med admins egen okt na (#79), ikke med en nokkel:
   // RLS slar opp uid-en i visning_skrivere, og ADMIN_PASSORD betyr
@@ -3933,6 +4025,30 @@ const SAK_15D = kjor("admin-lagret-star", `
       ok("uten kryss sier den at den fjerner, nar det er noe a fjerne",
          felt("lagre").textContent === "Fjern alle kamper for Andy's Pub" &&
          felt("lagre").disabled === false, felt("lagre").textContent);
+
+      // Knappen per runde, meldt 19. september 2026. «Kryss av alle»
+      // finnes fra for og tar HELE vinduet; denne tar én runde, og
+      // teksten ma si hva trykket gjor — ikke hvor mye som star.
+      var skille1 = felt("kamper").querySelectorAll(".runde-skille")[0];
+      var rundeknapp = skille1.querySelector(".runde-alle");
+      ok("hver runde har sin egen kryss-av-knapp",
+         !!rundeknapp, skille1.textContent);
+      ok("og uten kryss sier den at den tar hele runden",
+         rundeknapp.textContent === "Kryss av alle 2", rundeknapp.textContent);
+      rundeknapp.click();
+      ok("trykket krysser av runden — og BARE den",
+         rundeTekst().indexOf("2 av 2 valgt") > -1 &&
+         rundeTekst().indexOf("0 av 2 valgt") > -1, rundeTekst());
+      // Na er runden full, og da er neste trykk det motsatte. Sto det
+      // fortsatt «Kryss av alle», lovet knappen noe den ikke gjor.
+      ok("og da snur knappen til a fjerne",
+         rundeknapp.textContent === "Fjern alle 2", rundeknapp.textContent);
+      // Teksten ma folge haken ogsa nar du krysser av for hand.
+      felt("kamper").querySelectorAll(".kamp input")[0].checked = false;
+      felt("kamper").dispatchEvent(new Event("change", { bubbles: true }));
+      ok("et handsatt kryss teller med i knappeteksten",
+         rundeknapp.textContent === "Kryss av 1 til", rundeknapp.textContent);
+      rundeknapp.click();
 
       felt("merkAlle").click();
       ok("og «kryss av alle» fyller dem igjen",
@@ -6463,7 +6579,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23])).flat();
 let feilet = 0;
 
 for (const t of alle) {

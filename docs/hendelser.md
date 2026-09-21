@@ -172,6 +172,76 @@ i Oslo og puben i Oslo — den ene kombinasjonen der feilen ikke finnes.
 
 ---
 
+## 19. september 2026 — «viser alt» finnes ikke, fordi kamper kolliderer
+
+**Meldt som:** «viser alt flagg må vi snakke om.»
+
+**Hva det så ut som.** Et flagg på pubraden: «dette stedet viser alle
+kamper». Enkelt å bygge, og feil.
+
+**Hva som knakk det.** Kamper kolliderer. Dine egne data:
+
+    20. september kl. 15:00 — tre Eliteserie-kamper samtidig
+    11. oktober  kl. 15:00 — to samtidig
+
+Et sted med én skjerm viser **én** av de tre. «Viser alt» ville satt
+stedet på alle tre, og to av påstandene ville vært usanne. At Andy's Pub
+faktisk står på begge 11. oktober er greit — de har flere skjermer, og et
+**menneske** bestemte det. Raden bærer `satt` og `satt_av`.
+
+**Og det ville ødelagt ★.** Stjerna betyr «admin krysset av denne
+kampen» — datert, signert, etterprøvbar. Et flagg som produserte ★ på
+kamper ingen hadde sett på, ville stille omdefinert merket til «noen sa
+en gang at de pleier». Samme feil som `satt_av`-hendelsen: *et felt som
+stille blir usant er verre enn ett som ropes ut.*
+
+**Formen som holder.** Påstanden ligger på **liganivå**: «vi sender
+Eliteserien». Det er noe et sted faktisk kan si sant. `kanaler.js` hadde
+alt pekt på hvorfor — *«Rettighetene er en egenskap ved LIGAEN, ikke ved
+kampen.»* Det gjelder stedet som viser dem også.
+
+**Foreldelsen var det farligste.** Hver annen opplysning her dør av seg
+selv: en avkryssing dør når kampen er spilt. Et stående flagg dør aldri —
+stedet mister rettighetene, bygger om, legger ned sportsrommet, og
+flagget lover kamper i månedsvis. Det ville vært den første opplysningen
+i appen som påsto noe om framtida på ubestemt tid.
+
+Og det trengtes ikke en eneste ny dato for å løse det. `sesongFor()`
+kjente allerede forskjellen:
+
+    Eliteserien (kalender)   sjekket 19.09.2026 → utløper ved nyttår
+    Premier League (høst-vår) sjekket 19.09.2026 → overlever nyttår,
+                                                   utløper i juli
+
+Sesongen lagres **ikke** som eget felt. Den leses av `sjekket` gjennom
+den samme funksjonen appen ellers regner sesong med — to felt kunne sagt
+hver sin sesong om det samme flagget.
+
+**Og flagget er ingen ny dør inn i lista.** `ligapuberAv()` siler
+kandidater de geografiske kildene alt har funnet. Et Oslo-sted som sender
+Eliteserien er ikke et svar for den som står i Trondheim — nøyaktig den
+feilen stampubene ble tømt for å unngå.
+
+**Hva som fanget det — og det som nesten ikke ble fanget.** Fire
+sabotasjer slo ut med én gang. Den femte gjorde det **ikke**: byttet jeg
+kandidatene mot hele `KJENTE`, altså fjernet hele den geografiske
+silinga, ble alt stående grønt. Regelen jeg hadde argumentert hardest for
+var den eneste uten en test. Den finnes nå, og med den sabotert svarer
+appen:
+
+    RBK. Pøbb og sånt ⚽📺 50 m   Oslo-stedet ⚽📺
+
+Et Oslo-sted merket «Sender Eliteserien», stående i Trondheim.
+
+**Verdien, korrigert.** Jeg sa først at flagget sparer klikk. Det gjør
+det nesten ikke: «Kryss av alle» tok allerede hele vinduet i ett trykk.
+Den ekte kostnaden er at per-kamp-rader må settes **på nytt for alltid** —
+kampvinduet ruller, og hver uke kommer nye kamper som må krysses av, per
+sted. Et ligaflagg overlever kampkverna. Det er den egenskapen som er
+verdt en ny datatype, ikke de sparte trykkene.
+
+---
+
 ## 19. september 2026 — radiusen er en sirkel, og en by er ikke det
 
 **Meldt som:** «jeg ønsker å få opp puben uavhengig om den har lag RBK

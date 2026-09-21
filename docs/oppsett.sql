@@ -284,6 +284,25 @@ create table if not exists puber (
              check (sikkerhet in ('bekreftet', 'sannsynlig', 'usikker')),
   sjekket    date,
   merknad    text check (char_length(merknad) <= 300),
+  -- Ligaene stedet sender, som ETT flagg:
+  --   {"sender":["eliteserien"],"kilde":"...","sjekket":"2026-09-19"}
+  --
+  -- Paastanden ligger paa LIGANIVAA og ikke paa kampen, fordi kamper
+  -- kolliderer: tre Eliteserie-kamper kl. 15 blir tre paastander der et
+  -- sted med én skjerm bare kan innfri én. «Vi sender Eliteserien» er noe
+  -- et sted faktisk kan si sant — og det er samme innsikt som
+  -- kanaler.js: rettighetene er en egenskap ved ligaen, ikke ved kampen.
+  --
+  -- SESONGEN LAGRES IKKE. Den leses av `sjekket` gjennom sesongFor() i
+  -- fotball-data.js, som alt kjenner forskjellen paa en kalenderliga og
+  -- en host-var-liga (juli er skillet). To felt som kan si hver sin
+  -- sesong om det samme flagget, er to sannheter om én ting — samme grunn
+  -- som at byen ikke lagres paa pubraden.
+  --
+  -- Derfor utloeper flagget ved sesongslutt av seg selv. Det er det
+  -- eneste feltet her som paastaar noe om FRAMTIDA, og uten foreldelsen
+  -- ville det lovet kamper lenge etter at stedet sluttet aa vise dem.
+  ligaer     jsonb,
   -- Et sted som har lagt ned skal kunne forsvinne fra portalen. Raden i
   -- fila står, så det holder ikke å la være å skrive — den må skjules.
   fjernet    boolean not null default false,
