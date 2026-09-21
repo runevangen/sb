@@ -19,7 +19,8 @@ import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          FANER, DELER, DEL_NAVN,
          kamplenke, tolkKamplenke, invitasjonstekst, stedtekst, STED_MAKS,
          kampNokkel, gyldigKampId, kanalFor, sjekkKanalliste,
-         tsdbSondeStier, tsdbForsteListe, tsdbSondeFunn, tsdbPlukkId }
+         tsdbSondeStier, tsdbForsteListe, tsdbSondeFunn, tsdbPlukkId,
+         tsdbSondeParset }
   from "../fotball-data.js";
 
 import { normaliserEpost, gyldigEpost, normaliserKode, gyldigKode, maskerEpost,
@@ -1174,6 +1175,45 @@ ok("spiller-id ut av en spillerliste",
    tsdbPlukkId([{ idPlayer: "34145937" }], "spiller") === "34145937");
 ok("og en liste uten id gir tom streng, ikke et gjettet tall",
    tsdbPlukkId([{ strPlayer: "Ola" }], "spiller") === "");
+
+// Feltnavnene alene svarer ikke.
+//
+// Sonden viser de tolv forste, og `intHomeScore` var ikke blant dem i
+// sesongsvaret 21. september 2026. «Er feltene der» er dessuten feil
+// sporsmal — det riktige er om VAAR EGEN parser gir kamper vi kan VISE.
+const SESONGSVAR = { events: [
+  { idEvent: "1", intRound: "23", strHomeTeam: "Brann", strAwayTeam: "Viking",
+    intHomeScore: "2", intAwayScore: "1", strTimestamp: "2026-09-20T17:00:00",
+    strStatus: "Match Finished" },
+  { idEvent: "2", intRound: "30", strHomeTeam: "Molde", strAwayTeam: "Rosenborg",
+    intHomeScore: null, intAwayScore: null, strTimestamp: "2026-11-20T17:00:00" },
+] };
+const PARSET = tsdbSondeParset(SESONGSVAR, Date.UTC(2026, 8, 25));
+ok("sonden kjorer den ekte parseren", PARSET.kamper === 2, PARSET.kamper);
+// Hele sesongen kommer i ett svar, ogsa kamper som ikke er spilt. Skal
+// den bli en resultatliste, ma de skilles — og tallet sier om de kan det.
+ok("og skiller spilte fra uspilte", PARSET.spilt === 1, PARSET.spilt);
+ok("og teller dem med resultat", PARSET.medResultat === 1, PARSET.medResultat);
+ok("og dem med rundetall", PARSET.medRunde === 2, PARSET.medRunde);
+// Et tall kan vaere riktig av feil grunn; en rad kan leses.
+ok("og viser en ferdig rad",
+   PARSET.prove === "Runde 23: Brann 2–1 Viking  (2026-09-20)", PARSET.prove);
+
+// DET SOM AVSLORER et svar uten resultater: null i stillinga. Uten dette
+// ville et sesongsvar uten `intHomeScore` sett helt i orden ut — 240
+// kamper, 30 runder — og Resultater blitt tom.
+const UTEN_MAL = tsdbSondeParset({ events: [
+  { idEvent: "1", intRound: "23", strHomeTeam: "Brann", strAwayTeam: "Viking",
+    strTimestamp: "2026-09-20T17:00:00" }] }, Date.UTC(2026, 8, 25));
+ok("et svar uten resultater avslores",
+   UTEN_MAL.kamper === 1 && UTEN_MAL.spilt === 0 && UTEN_MAL.medResultat === 0,
+   JSON.stringify(UTEN_MAL));
+ok("og raden viser null der stillinga skulle statt",
+   UTEN_MAL.prove.indexOf("null–null") > -1, UTEN_MAL.prove);
+
+// En parser som kaster skal si det, ikke se ut som null kamper.
+ok("en parser som kaster sier hva den sa",
+   !!tsdbSondeParset({ tullete: 1 }).feil, JSON.stringify(tsdbSondeParset({ tullete: 1 })));
 
 /* ---------------- fotball: lagnavn ---------------- */
 
@@ -3181,6 +3221,32 @@ ok("hver fil i appen er omtalt i docs/modulene.md",
    udokumentert.length === 0, "mangler: " + udokumentert.join(", "));
 ok("testen fant faktisk filer a kreve dokumentasjon for",
    SKAL_DOKUMENTERES.length >= 25, SKAL_DOKUMENTERES.length);
+
+/* ---- sonden spor fra to steder, men med ETT sett stier ---- */
+
+// `verktoy/tsdbsjekk.mjs` spor fra en maskin, `/api/tsdb-sonde` fra
+// portalen. Stiene ligger i fotball-data.js, og det er hele poenget:
+// sto de hver for seg, ville de to svart ulikt pa det samme sporsmalet —
+// og en sonde som er uenig med seg selv er verre enn ingen sonde.
+//
+// Dette sto som en paastand i en PR-tekst 21. september 2026, og var
+// USANT da den ble skrevet: verktoyet hadde fortsatt sin egen liste, og
+// to kopier la i main i en time. Vakta finnes fordi paastanden ikke holdt
+// seg selv.
+const SONDE_VERKTOY = readFileSync(new URL("../verktoy/tsdbsjekk.mjs", import.meta.url), "utf8");
+const SONDE_FUNKSJON = readFileSync(new URL("../netlify/functions/tsdbsonde.mjs", import.meta.url), "utf8");
+ok("verktoyet henter stiene fra fotball-data.js",
+   SONDE_VERKTOY.indexOf("tsdbSondeStier") > -1);
+ok("og funksjonen gjor det samme",
+   SONDE_FUNKSJON.indexOf("tsdbSondeStier") > -1);
+// Det er kopien som er faren, ikke importen. En adresse skrevet i en av
+// dem er en adresse som kan gli fra den andre.
+ok("og ingen av dem skriver en egen adresse",
+   SONDE_VERKTOY.indexOf("thesportsdb.com/api") === -1 &&
+   SONDE_VERKTOY.indexOf(".php?id=") === -1 &&
+   SONDE_FUNKSJON.indexOf(".php?id=") === -1,
+   "verktoy: " + (SONDE_VERKTOY.indexOf(".php?id=") > -1) +
+   ", funksjon: " + (SONDE_FUNKSJON.indexOf(".php?id=") > -1));
 
 // Den andre veien: dokumentet skal ikke vise til filer som er borte. En
 // regel for en fil som ikke finnes lenger er verre enn ingen regel — den

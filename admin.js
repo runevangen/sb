@@ -240,6 +240,14 @@ function sondeTekst(data) {
         : "INGEN rundetall — kan ikke grupperes"));
     }
     if (p.felt) ut.push("      felt: " + p.felt.join(", "));
+    // Vaar egen parser, mot det ekte svaret. Ingen gjetning igjen.
+    if (p.parset) {
+      const q = p.parset;
+      ut.push("      VÅR PARSER: " + (q.feil ? "kastet — " + q.feil
+        : q.kamper + " kamper, " + q.spilt + " spilt, "
+          + q.medResultat + " med resultat, " + q.medRunde + " med runde"));
+      if (q.prove) ut.push("      eksempel: " + q.prove);
+    }
     if (p.plukket) ut.push("      → " + p.plukket);
     if (p.duger) {
       ut.push("      mål-felt:    " + (p.maalfelt.join(", ") || "INGEN"));

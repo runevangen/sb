@@ -16,7 +16,8 @@
 // kommer til a trykke pa tusen ganger.
 
 import { ligaFor, sesongFor, tsdbSesong, tsdbHeadere,
-         tsdbSondeStier, tsdbForsteListe, tsdbSondeFunn, tsdbPlukkId }
+         tsdbSondeStier, tsdbForsteListe, tsdbSondeFunn, tsdbPlukkId,
+         tsdbSondeParset }
   from "../../fotball-data.js";
 
 const ROT = "https://www.thesportsdb.com";
@@ -103,6 +104,9 @@ async function hent(p, nokkel) {
     }
     const funn = tsdbSondeFunn(treff.liste);
     ut.utfall = funn.rader + " rader i «" + treff.felt + "»";
+    // Kjor VAAR EGEN parser mot svaret. Feltnavnene alene svarer ikke paa
+    // om fanen faktisk kan tegnes — det gjor dette.
+    if (p.felt === "events" || p.felt === "schedule") ut.parset = tsdbSondeParset(json);
     ut.felt = funn.felt.slice(0, 12);
     if (p.gir === "lag" || p.felt === "events") ut.runder = funn.runder;
     if (p.maaler === "mal") {

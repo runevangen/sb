@@ -9,6 +9,37 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 21. september 2026 — en påstand i en PR-tekst som ikke var sann
+
+**Fanget av:** meg selv, etter flettinga — ved å sjekke min egen påstand
+framfor å stole på den.
+
+**Hva jeg skrev.** PR #136 la sonden mot TheSportsDB inn i portalen, og
+teksten sa:
+
+> Samme spørsmål som `verktoy/tsdbsjekk.mjs`, og **samme stier**: begge
+> leser `tsdbSondeStier()` i `fotball-data.js`.
+
+**Det var usant da det ble skrevet.** Jeg la de delte funksjonene i
+`fotball-data.js` og koblet *funksjonen* til dem — men rørte aldri
+verktøyet. Det beholdt sin egen liste over adresser. I én time lå det to
+kopier i `main`, av nøyaktig den grunnen jeg selv hadde skrevet regelen
+mot: *sto de hver for seg, ville de to svart ulikt på det samme*.
+
+**Hvorfor ingen test tok det.** Det fantes ingen. Begge filene virket hver
+for seg, og «virker» var aldri spørsmålet — spørsmålet var om de ville
+fortsette å si det samme.
+
+**Hva som gjorde at det ble funnet.** Jeg leste min egen PR-tekst som en
+påstand som måtte etterprøves, ikke som en beskrivelse av noe jeg husket
+å ha gjort. Én `grep` per fil.
+
+Verktøyet er nå et skall rundt de samme fire funksjonene, og en vakt i
+`unit.mjs` slår ut om en av dem skriver en adresse selv. **Vakta finnes
+fordi påstanden ikke holdt seg selv.**
+
+---
+
 ## 21. september 2026 — en rad skjult av en opplysning vi ikke har
 
 **Fanget av:** en sabotasje, ikke av at noen tenkte på det.
