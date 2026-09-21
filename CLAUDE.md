@@ -78,6 +78,12 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   slås opp på `merke` — ikke på `format`, som er fasongen (`kort`,
   `banner`, `stripe`). **Ingen oppdiktet annonsør i prod:** en rad uten
   `merke` er en ekte annonsør, og det finnes ingen ennå.
+  **Og ingen spøk heller, fra 21. september 2026.** De sju vitsene var
+  ærlige, men de sto først i rotasjonen — og den første annonsen en leser
+  møter er den ene som skal overbevise noen om å kjøpe plassen. Merket
+  lever videre uten data: `run.mjs` holder at feeden ikke har en spøk,
+  `unit.mjs` at apparatet for å lage en fortsatt finnes. Bare den ene av
+  dem, og merket kunne ryket som død kode uten at noe sa fra.
   [ADR 0005](docs/adr/0005-egen-annonseplass.md)
 - **En knapp som ser ut som den gir noe den ikke gir, er verre enn en som
   sier hva den er.** Gjelder «Venner», «Meldt inn til oss», og

@@ -327,19 +327,18 @@ const SAK_1 = kjor("feed", FELLES + `
     ok("tidsstempel bruker date_gmt", tid.textContent === "2t siden", tid.textContent);
 
     ok("annonse etter hver fjerde sak",
-       sekvens() === "topp sak sak sak spok-hoy sak sak sak sak spok-bred sak sak sak sak mer",
+       sekvens() === "topp sak sak sak ledig-portrett sak sak sak sak ledig-bred sak sak sak sak mer",
        sekvens());
 
-    // Spokene star forst i rotasjonen: de er det folk blar for a se, og en
-    // vits bak fire annonseplasser er en vits ingen leser. Det viktigste
-    // om den forste plassen er derfor at den sier hva den er — Ullevalseter
-    // er et ekte sted som ikke har kjopt noe.
+    // Den forste plassen selger plassen. Sju spoker sto forst i rotasjonen
+    // til 21. september 2026, og da var det forste en leser motte en vits —
+    // pa den ene plassen som skal overbevise noen om a kjope den (#25).
     var forste = document.querySelector(".ad-ledig");
-    ok("den forste annonseplassen er en spok",
-       forste.classList.contains("ad-spok"), forste.className);
-    ok("og den sier det, bade for oyet og for skjermleseren",
-       forste.querySelector(".ad-label").textContent === "Spøk" &&
-       forste.getAttribute("aria-label") === "Spøk, ikke en ekte annonse" &&
+    ok("den forste annonseplassen er ingen spok",
+       !forste.classList.contains("ad-spok"), forste.className);
+    ok("og den sier at plassen er ledig, bade for oyet og for skjermleseren",
+       forste.querySelector(".ad-label").textContent === "Ledig plass" &&
+       forste.getAttribute("aria-label") === "Ledig annonseplass" &&
        forste.textContent.indexOf("Reklame") === -1,
        forste.querySelector(".ad-label").textContent + " / " +
        forste.getAttribute("aria-label"));
@@ -347,10 +346,10 @@ const SAK_1 = kjor("feed", FELLES + `
     // og dytter saken man holder pa a lese nedover.
     var bilde = forste.querySelector(".ad-ledig-bilde");
     ok("bildet tar plassen sin for det er lastet",
-       bilde.getAttribute("width") === "800" && bilde.getAttribute("height") === "1000",
+       bilde.getAttribute("width") === "400" && bilde.getAttribute("height") === "400",
        bilde.getAttribute("width") + "x" + bilde.getAttribute("height"));
     ok("og det beskriver seg selv",
-       (bilde.getAttribute("alt") || "").toLowerCase().indexOf("skilt") > -1,
+       (bilde.getAttribute("alt") || "").trim().length > 0,
        bilde.getAttribute("alt"));
 
     // Intensjonen er at feeden ikke skal avsluttes med reklame. "Vis flere"
@@ -510,8 +509,12 @@ const SAK_1B = kjor("annonse-varianter", FELLES + `
       // «Reklame» ville pastatt at de har kjopt plassen — nøyaktig lognen
       // appen ellers er noye pa a ikke fortelle. Vitsen blir ikke darligere
       // av at det star hva den er.
+      // Sju spoker sto her til 21. september 2026 (#25). Reglene under blir
+      // staende: lokka er tom na, og beskytter vitsen igjen den dagen en
+      // rad far merke "spok". Et krav om at det FINNES en spok ville
+      // vaert et krav om at dataene aldri endres.
       var spok = document.querySelectorAll(".ad-spok");
-      ok("spokene star i feeden", spok.length >= 1, spok.length);
+      ok("ingen spok i feeden", spok.length === 0, spok.length);
       var spokFeil = [];
       Array.prototype.forEach.call(spok, function (a) {
         if (a.querySelector(".ad-label").textContent !== "Spøk") spokFeil.push("merke");
@@ -553,15 +556,15 @@ const SAK_1B = kjor("annonse-varianter", FELLES + `
       ok("hvert bilde beskriver seg selv, ogsa de som ikke er av Prem",
          altFeil.length === 0, altFeil.join(", ") || "ingen");
 
-      // Ullevalseter-vitsen er delt i oppsett og poeng. I én setning er
-      // den en opplysning.
-      var ulle = Array.prototype.find.call(spok, function (a) {
-        return a.textContent.indexOf("Ullevålseter") > -1;
+      // En vits er delt i oppsett og poeng. I én setning er den en
+      // opplysning. Star det ingen spok, er det ingenting a male — og det
+      // er tilstanden na.
+      var utenPoeng = [];
+      Array.prototype.forEach.call(spok, function (a) {
+        if (!a.querySelector(".ad-sub")) utenPoeng.push(a.textContent.slice(0, 40));
       });
-      ok("vitsen star med oppsett og poeng pa hver sin linje",
-         !!ulle && ulle.querySelector(".ad-headline").textContent === "Opplev Ullevålseter." &&
-         ulle.querySelector(".ad-sub").textContent.indexOf("travbanen") > -1,
-         ulle ? ulle.textContent.slice(0, 70) : "fant den ikke");
+      ok("en vits star med oppsett og poeng pa hver sin linje",
+         utenPoeng.length === 0, utenPoeng.join(", ") || "ingen spok a male");
       ferdig();
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } });
   }, 700); });
