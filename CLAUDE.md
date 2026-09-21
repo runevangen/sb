@@ -19,6 +19,16 @@ modul for modul.
   alternativer, ikke åpne spørsmål i brødteksten.
 - **Avslutt hvert svar med en statusblokk**: hva som er siste nytt, hvor
   jeg finner det (prod-URL, branch, PR), og om du venter på meg.
+- **Statusblokken sier hvordan jeg tester det — i appen, ikke i en
+  terminal.** «787 tester grønne» er ditt bevis, ikke mitt: det sier at
+  koden gjør det du trodde, ikke at skjermen ble bedre. Linja skal være en
+  URL jeg kan trykke på og en handling jeg kan gjøre etterpå — «åpne
+  Resultater, se at det står en knapp med tidligere runder under» — så jeg
+  kan si deg imot. Jeg sitter på en iPhone i en chat: `node test/…`,
+  `curl`, `git` og «slå opp X på et nettsted» er ikke ting jeg kan gjøre,
+  og en oppgave jeg ikke kan utføre er verre enn ingen. Har endringen
+  ingen synlig side — en regel, en vakt, en opprydding — står det, og hva
+  som ville vært å se hvis den var feil.
 
 ## Filene
 
