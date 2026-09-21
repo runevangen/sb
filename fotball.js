@@ -23,7 +23,8 @@ import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
 import { KURATERTE } from "./puber.js";
 import { sjekkForslag, alleredeILista, NAVN_MAKS, ADRESSE_MAKS, MERKNAD_MAKS }
   from "./pub-forslag-data.js";
-import { bekreftetFor, merkBekreftet, tolkVisninger } from "./visning-data.js";
+import { bekreftetFor, merkBekreftet, tolkVisninger,
+         avkreftetFor, utenAvkreftede } from "./visning-data.js";
 import { arenaFor } from "./vaer-data.js";
 import { KANALER } from "./kanaler.js";
 
@@ -1656,9 +1657,16 @@ function ligapuberIBoks(boks, bekreftede) {
     if (p && p.navn && !sett.has(p.navn)) sett.set(p.navn, p);
   });
   const tekst = ligamerkeTekst(boks.kamp.liga);
+  // «Ikke denne kvelden» slar flagget for NETTOPP denne kampen.
+  // Ligaflagget er en staende pastand om sesongen; et nei er en pastand om
+  // én kveld, og den er ferskere og mer bestemt. Uten dette sto 📺 «Sender
+  // Eliteserien» pa et sted som var stengt, og eneste utvei var a ta hele
+  // flagget bort — som ville vaert usant resten av sesongen.
   return merkBekreftet(
-    ligapuberAv(Array.from(sett.values()), boks.kamp)
-      .map((p) => Object.assign({}, p, { senderLigaen: tekst })), bekreftede);
+    utenAvkreftede(
+      ligapuberAv(Array.from(sett.values()), boks.kamp)
+        .map((p) => Object.assign({}, p, { senderLigaen: tekst })),
+      avkreftetFor(boks.kamp, sisteVisninger)), bekreftede);
 }
 
 // Ett sted som bestemmer hva som star pa skjermen.

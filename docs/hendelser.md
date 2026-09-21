@@ -9,6 +9,108 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 21. september 2026 — knappen ble bygget, merget, og var uråkelig
+
+**Meldt som:** «hvor er det mulig å sette unntak for en pub?»
+
+**Svaret var: ingen steder.** «Ikke denne kvelden» ble merget en time før,
+med fire sabotasjer og en PR som sa at hullet var tettet. Knappen sto
+aldri i portalen.
+
+**Årsaken.** Vilkåret som tegner den:
+
+    if (pubrad && ligaflaggGjelder(pubrad.ligaer, k.liga)) {
+
+`k.liga` er `undefined` i portalen. Tjenesten sender ikke ligaen per kamp
+— `tolkKamper()` ser ett datasett om gangen og vet ikke hvem som spurte —
+så den som spør må sette feltet. `fotball.js` gjør det i `hent()`, med en
+kommentar som forklarer hvorfor det må skje der. `admin.js` henter kamper
+gjennom sitt eget kall og glemte det.
+
+Så `ligaflaggGjelder()` fikk `undefined` inn og svarte nei hver gang.
+
+**Hvorfor testene sa grønt.** Nettlesertesten stubbet en ferdig
+`viser: false`-rad inn i `/api/svar` og målte at appen dempet 📺. Den
+beviste at nei-et **virker**. Den sa ingenting om at det går an å **sette**.
+
+Halve rundturen, testet grundig. Den andre halvdelen fantes ikke.
+
+Det er fella `testing.md` alt beskriver — en test som stiller seg der
+svaret er opplagt. Sist gjaldt det geografi: en test som sto i døra på
+puben den skulle finne. Denne gangen var det siden: appen testet, portalen
+ikke.
+
+**Hva som ble gjort.** `admin.js` merker kampene med ligaen den spurte om,
+som appen gjør. Og `SAK_15F` går portalveien: velger et sted med flagg og
+krever at knappen står der, at et sted uten flagg ikke får den, at et ja
+slår av et nei og omvendt, og at nei-et sendes som sin egen liste.
+
+**Én ting til kom ut av det.** Håndtereren som rydder motstrid leste
+`e.target`. Et ekte klikk gir haken som mål, men et kryss satt fra kode
+gir lista — og da fant `closest()` ingenting. Testen avslørte det, og
+regelen leser nå hele lista, som `oppdaterLagreknapp`. En regel som bare
+gjelder den ene veien noen rører haken, er en regel som ikke gjelder.
+
+**Hva som fanget det.** Tre sabotasjer. Den første er hele saken: tas
+merkinga ut igjen, svarer testen **«0 knapper»** — nøyaktig det som sto i
+portalen i en time.
+
+---
+
+## 21. september 2026 — flagget kunne ikke sies imot
+
+**Meldt som:** «Fikse hullet» — det som ble notert da ligaflagget ble
+bygget, og som vi visste om før det rullet ut.
+
+**Hva hullet var.** 📺 «Sender Eliteserien» er en **stående** påstand om
+sesongen. Er stedet stengt, har selskap eller viser noe annet nettopp den
+ene kvelden, fantes det ingen måte å si det på:
+
+- Det er ingen ★ å fjerne — det var aldri noen
+- Å ta hele ligaflagget bort er feil — de *sender* Eliteserien, bare ikke
+  den kvelden
+
+Vi designet mot at flagget skulle gå stille usant, og fanget **sesongen**.
+Vi fanget ikke **kvelden**.
+
+**Hva som ble gjort.** `visninger` hadde allerede `unique (pub, kamp_id)`,
+altså én rad per par. Et felt `viser` gjør de to tilstandene til tre:
+
+    ingen rad     ingen påstand. Ligaflagget gjelder.
+    viser = true  ★, et menneske har sett på nettopp denne kampen.
+    viser = false «ikke denne kvelden».
+
+Ingen ny tabell, ingen ny kolonne å holde i takt med en annen.
+
+**Funksjonene er søsken til dem som fantes.** `avkreftetFor()` mot
+`bekreftetFor()`, `utenAvkreftede()` mot `merkBekreftet()` — samme folding,
+samme form, motsatt fortegn. Nei-et **fjerner** stedet fra lista for den
+ene kampen framfor å merke det: en rad som sier «viser ikke» tar plass for
+å si ingenting.
+
+**Det som nesten glapp.** `visningsDiff()` sto på `kampId` alene. Et ja
+som ble et nei var da «uendret» — lagringen ville svart at den lyktes, og
+ingenting nådd basen. Det er samme familie som `satt_av`-hendelsen: et
+felt som stille blir usant, med ingenting som avslører det.
+
+**Og knappen står bare der flagget påstår noe.** Uten et flagg som dekker
+kampen er det ingenting å si imot, og en knapp der ville bedt deg motsi
+tausheten.
+
+**Hva som fanget det.** Fire sabotasjer, fire ulike røde tester:
+
+| ødelagt | falt |
+|---|---|
+| appen ser bort fra nei-et | «merket er borte for kampen stedet sa nei til» |
+| et nei teller som ★ | «et nei er ikke en bekreftelse» |
+| diffen ser ikke fortegnet | «et ja som blir et nei er en ENDRING» |
+| nei-et gjelder stedet, ikke kampen | «et nei på en ANNEN kamp rører ikke denne» |
+
+Nettlesertesten sier nei til **én** kamp og krever at merket står igjen på
+den neste. Slo nei-et ut alle, hadde vi bare skrudd av flagget med en omvei.
+
+---
+
 ## 21. september 2026 — en påstand i en PR-tekst som ikke var sann
 
 **Fanget av:** meg selv, etter flettinga — ved å sjekke min egen påstand
