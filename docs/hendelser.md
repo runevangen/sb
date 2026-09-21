@@ -9,6 +9,38 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 21. september 2026 — et svar som er likt på hver rad, svarer ikke
+
+**Meldt som:** «Fjern vises på herfra. Skaper bare støy i visningen», med
+skjermbilde av Runde 23.
+
+**Hva skjermbildet viste.** Seks kamper. Fem av dem hadde linja «★ Denne
+kampen vises på: Andy's Pub (Oslo)» — samme pub, fem ganger, under fem
+ulike kamper. Den sjette sa Bohemen Sportspub, også Oslo.
+
+**Ingen kodefeil.** Alt virket som det skulle: admin hadde krysset av de
+kampene Andy's Pub viser, og linja rapporterte det trofast, kamp for kamp.
+
+Linja ble laget for å svare uten at du måtte åpne noe: «den som blar
+gjennom runden skal se det uten å åpne noe». Den antakelsen holdt da det
+sto én bekreftet visning i basen. Med flere blir den til gjentakelse — og
+gjentakelse er ikke et svar, den er noe som står i veien for det som
+faktisk skiller radene: hvem som spiller, og når.
+
+**Hva som ble gjort.** `viserlinje()` er borte, med begge kallsteder, CSS-en
+og de testene som bare dekket den. Opplysningen lever i kortet, under
+«Kampen vises hos:», der den kommer med avstand, by og de andre stedene —
+og der den er et svar på et spørsmål du nettopp stilte ved å åpne kortet.
+
+**Og en sabotasje som først ikke slo ut.** Første forsøk satte linja
+tilbake i `kamprad()`, og alt sto grønt. Det var ikke testen som var
+svak: `sisteVisninger` er tom når raden tegnes, så linja ble aldri laget.
+Den ekte veien inn var `tegnSvar()`, der dataene har landet — og derfra
+falt alle fire assertions. En sabotasje som er enig med endringen din,
+beviser ingenting.
+
+---
+
 ## 21. september 2026 — `checkout --ours` kastet noe ingen konflikt nevnte
 
 **Fanget av:** en `grep` jeg kjørte på egen mistanke etter flettinga. Ikke

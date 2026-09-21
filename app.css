@@ -1907,32 +1907,6 @@ a.ad-cta:focus-visible {
 
 .kamp-vaer[hidden] { display: none; }
 
-/* «Denne kampen vises pa: …» star rett under kampen, sa den som blar
-   gjennom runden ser det uten a apne noe. Pubnavnet er en knapp: den
-   apner delingspanelet med puben valgt. */
-.kamp-viser {
-  margin-top: 4px;
-  font-size: calc(12px * var(--fs));
-  line-height: 1.4;
-  color: var(--text-dim);
-}
-
-.kamp-viser-merke { color: var(--bekreftet); font-weight: 700; margin-right: 4px; }
-.kamp-viser-tekst { color: var(--text-dim); }
-
-.kamp-viser-pub {
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: var(--bekreftet);
-  font-weight: 600;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.kamp-viser-pub:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
 /* Kampen som ble delt med deg, loftet ut av runden: en runde er ti like
    rader, og lenka pekte pa en av dem.
    Klassen het .kamp-delt til den kolliderte med vokteren for .kamp-del:
@@ -2179,25 +2153,6 @@ a.ad-cta:focus-visible {
   color: var(--text-faint);
   white-space: nowrap;
 }
-
-/* Bekreftede visninger langt unna, bak en knapp i linja under kampen.
-   Stiplet, som .pub-mer: den er en vei videre, ikke et sted. */
-.kamp-viser-mer {
-  padding: 0 6px;
-  border: 1px dashed var(--border);
-  border-radius: 999px;
-  background: none;
-  color: var(--text-dim);
-  font: inherit;
-  font-size: calc(11px * var(--fs));
-  cursor: pointer;
-}
-
-.kamp-viser-mer:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-/* `[hidden]` maa sies her: regelen over setter ingen display, men neste
-   som legger en her ma vite det. */
-.kamp-viser-fjerne[hidden] { display: none; }
 
 /* Har du valgt et sted, ligger resten bak denne. Stiplet, som .pub-mer, sa
    den ikke ser ut som enda et sted. */

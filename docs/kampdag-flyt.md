@@ -22,7 +22,7 @@ slik**, og **hvor i koden det skjer**. Beslutningene bak står i
 | 5 | Leser | Mangler stedet: **«Mangler stedet? Send det inn.»** Havner i en kø. | `/api/pub-forslag`, tabellen `pub_forslag` |
 | 6 | Admin | Ser køen under **Foreslåtte steder**, legger stedet inn i **Steder**-editoren med koordinat og kilde. | `admin.html`, `/api/pub-liste`, tabellen `puber` |
 | 7 | Admin | Velger en pub under **Kamper**, krysser av kampene den viser, lagrer. | `/api/visninger`, tabellen `visninger` |
-| 8 | Leser | Ser stjerna ★ «Denne kampen vises på …» i kortet. | rir med `/api/svar` |
+| 8 | Leser | Åpner kortet og ser stjerna ★ «(bekreftet visning)» på raden. | rir med `/api/svar` |
 
 Kanalen som sender ligaen (TV 2 Play, Viaplay …) er **ikke** noe admin
 setter per kamp. Den ligger i koden, én rad per liga, i `kanaler.js`.
@@ -131,9 +131,14 @@ Sportsbibelen har ingen chat, og hvor teksten havner er leserens valg.
 
 ![Kortet med stjerne: «Denne kampen vises på Carls», og lista med avstander](bilder/kort-meldt-inn.png)
 
-**Stjerna.** Har admin meldt at Carls viser kampen, står det «★ Denne
-kampen vises på: Carls» både i kamplinja og øverst i lista. Det er den
-ene raden som faktisk svarer på spørsmålet, og den står først.
+**Stjerna.** Har admin meldt at Carls viser kampen, står raden øverst i
+lista, merket ★ og med «(bekreftet visning)» i ord ved siden av. Det er
+den ene raden som faktisk svarer på spørsmålet, og den står først.
+
+*(Skjermbildet er fra før 21. september 2026, da «Denne kampen vises på:
+…» også sto under kampraden i lista. Den er borte: fem rader på rad sa
+samme pubnavn, og et svar som er likt på hver rad svarer ikke. Stjerna og
+raden i kortet er uendret.)*
 
 ### Innlogget: «Jeg skal hit»
 
@@ -317,7 +322,7 @@ rettelsene), bytter ut pubens rader for de valgte kampene i tabellen
 `visninger`, og rydder rader for kamper som er spilt for lenge siden.
 Kvitteringen sier hva som faktisk skjedde. Endringen er ute for leserne
 med det samme: neste gang noen åpner runden, kommer visningene med i
-svaret fra `/api/svar`, og kortet viser ★ «Denne kampen vises på …».
+svaret fra `/api/svar`, og kortet viser raden med ★ «(bekreftet visning)».
 
 **Hvorfor Supabase, ikke repoet.** Fram til 15. september 2026 var hver
 lagring en commit i `visninger.js`. Det ga historikk, men

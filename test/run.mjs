@@ -4392,32 +4392,17 @@ const SAK_16C = kjor("bekreftet-langt-unna", FELLES + FOTBALL + `
   location.hash = "#/fotball/eliteserien/neste";
   window.addEventListener("load", function () { setTimeout(function () { try {
     var rad = document.querySelectorAll(".kamp.delbar")[0];
-    var viser = rad && rad.querySelector(".kamp-viser");
-    ok("linja staar fortsatt: noen viser kampen", !!viser);
-    if (!viser) { ferdig(); return; }
 
-    // Kjernen. Navnet skal IKKE staa der som svaret paa hvor du skal.
-    ok("men den navngir ikke en pub 392 km unna",
-       viser.textContent.indexOf("Denne kampen vises på: Bernie") === -1,
-       viser.textContent);
-    ok("den sier at ingen er i naerheten",
-       viser.textContent.indexOf("ingen i nærheten") > -1, viser.textContent);
+    // Linja «Denne kampen vises paa: …» sto her, og fem rader paa rad sa
+    // det samme navnet. Den er borte (21. september 2026); kampraden
+    // baerer bare det som SKILLER radene.
+    ok("kampraden navngir ingen pub",
+       !rad.querySelector(".kamp-viser") &&
+       rad.textContent.indexOf("vises på") === -1,
+       rad.textContent.slice(0, 160));
 
-    // Skjult, ikke borte: en bekreftet visning er et faktum noen har foert
-    // inn, og det skal ga an a se det.
-    var mer = viser.querySelector(".kamp-viser-mer");
-    ok("og en knapp viser hvor", !!mer && mer.textContent === "Vis hvor",
-       mer ? mer.textContent : "ingen knapp");
-    var fjerne = viser.querySelector(".kamp-viser-fjerne");
-    ok("som er skjult til den trykkes", !!fjerne && fjerne.hidden === true);
-    if (mer) mer.click();
-    ok("ett trykk viser puben", !!fjerne && fjerne.hidden === false);
-    // «Tydelig hvor den er»: byen staar ved navnet.
-    ok("med byen ved navnet",
-       !!fjerne && fjerne.textContent.indexOf("Bernie's (Oslo)") > -1,
-       fjerne ? fjerne.textContent : "");
-
-    // I kortet: raden finnes, men den er ikke svaret oeverst.
+    // Og opplysningen er ikke borte — den staar i kortet, der den kom med
+    // avstand og by. Det er hele grunnen til at linja kunne fjernes.
     rad.querySelector(".kamp-del").click();
     var panel = document.querySelector(".kamp-panel");
     setTimeout(function () { try {
@@ -4605,18 +4590,16 @@ const SAK_16E = kjor("posisjon-ved-kortapning", FELLES + FOTBALL + `
   location.hash = "#/fotball/eliteserien/neste";
   window.addEventListener("load", function () { setTimeout(function () { try {
     var rad = document.querySelectorAll(".kamp.delbar")[0];
-    var viser = rad && rad.querySelector(".kamp-viser");
-    ok("linja under kampraden staar", !!viser);
-    if (!viser) { ferdig(); return; }
+    ok("runden staar tegnet", !!rad);
+    if (!rad) { ferdig(); return; }
 
     // Regelen som ikke skal vike: vi ber ALDRI om posisjon for a tegne en
     // rad. Runden staar ferdig, og telefonen er ikke spurt om noe.
     ok("ingen ber om posisjon for a tegne runden", spurt === 0, "spurt " + spurt);
 
-    // Og da kan linja ikke pastaa naerhet. Byen staar ved navnet: det er
-    // det eneste vi kan staa inne for uten a vite hvor leseren er.
-    ok("men navnet baerer byen naar avstanden er ukjent",
-       viser.textContent.indexOf("Bernie's (Oslo)") > -1, viser.textContent);
+    // Regelen «byen ved navnet naar avstanden er ukjent» sto ogsa i linja
+    // under kampraden. Den er borte; regelen lever i KORTET, og maales
+    // rett under naar det aapnes.
 
     // Trykket som apner kortet ER handlingen telefonen krever.
     rad.querySelector(".kamp-del").click();
@@ -4642,14 +4625,12 @@ const SAK_16E = kjor("posisjon-ved-kortapning", FELLES + FOTBALL + `
     gi({ coords: { latitude: 63.4305, longitude: 10.3951 } });
 
     setTimeout(function () { try {
-      var viser2 = document.querySelectorAll(".kamp.delbar")[0]
-        .querySelector(".kamp-viser");
-      ok("og da slutter linja a navngi puben",
-         !!viser2 && viser2.textContent.indexOf("Denne kampen vises på: Bernie") === -1,
-         viser2 ? viser2.textContent : "ingen linje");
-      ok("den sier at ingen er i naerheten",
-         !!viser2 && viser2.textContent.indexOf("ingen i nærheten") > -1,
-         viser2 ? viser2.textContent : "ingen linje");
+      // Kampraden navngir ingen pub — hverken for eller etter at
+      // posisjonen lander. Den baerer bare det som skiller radene.
+      var rad2 = document.querySelectorAll(".kamp.delbar")[0];
+      ok("kampraden navngir fortsatt ingen pub",
+         rad2.textContent.indexOf("vises på") === -1,
+         rad2.textContent.slice(0, 160));
 
       var panel2 = document.querySelector(".kamp-panel");
       var bernies2 = panel2 && Array.prototype.find.call(
@@ -5155,57 +5136,31 @@ const SAK_16 = kjor("pub-bekreftet", FELLES + FOTBALL + `
   };
   location.hash = "#/fotball/eliteserien/neste";
   window.addEventListener("load", function () { setTimeout(function () { try {
-    // Linja star pa kampen selv, sa den som blar ser det uten a apne noe.
+    // «Denne kampen vises paa: Lincoln Pub» sto under hver kamprad til
+    // 21. september 2026. Meldt med skjermbilde: fem rader paa rad sa
+    // «Andy's Pub (Oslo)». Et svar som er likt paa hver rad svarer ikke —
+    // det staar i veien for det som SKILLER radene.
     var rader = document.querySelectorAll(".kamp.delbar");
-    // Nullsikre med vilje. Visningene kommer over nettet na, sa «linja
-    // mangler» er en realistisk feil — og en assertion som kaster tar
-    // hele testsida med seg, sa de nitten under forsvinner istedenfor a
-    // bli rode. Det har skjedd to ganger i dette prosjektet.
-    var viser = rader[0] && rader[0].querySelector(".kamp-viser");
-    ok("kampen sier selv at den vises et sted", !!viser);
-    ok("og hvor",
-       !!viser && viser.textContent.indexOf("Denne kampen vises på: Lincoln Pub") > -1,
-       viser ? viser.textContent : "ingen linje");
-    // Stjerna er merket for «denne kampen vises her»; ballen sier bare at
-    // stedet pleier a vise fotball.
-    var merke = viser && viser.querySelector(".kamp-viser-merke");
-    ok("linja er merket med stjerne",
-       !!merke && merke.textContent === "\u2605", merke ? merke.textContent : "ingen merke");
-    var andre = rader[1] && rader[1].querySelector(".kamp-viser");
-    ok("neste kamp har sin egen pub pa raden",
-       !!andre && andre.textContent.indexOf("Carls") > -1,
-       andre ? andre.textContent : "ingen linje");
-    // Pubnavnet tar deg videre: panelet apnes med puben valgt.
-    var pubKnapp = viser && viser.querySelector(".kamp-viser-pub");
-    if (pubKnapp) pubKnapp.click();
+    ok("ingen kamprad navngir en pub",
+       !document.querySelector(".kamp-viser") &&
+       rader[0].textContent.indexOf("vises på") === -1,
+       rader[0].textContent.slice(0, 160));
+    ok("heller ikke den neste, som har sin egen",
+       rader[1].textContent.indexOf("Carls") === -1,
+       rader[1].textContent.slice(0, 160));
+
+    // Opplysningen er ikke borte. Den staar i kortet, og det er hele
+    // grunnen til at linja kunne fjernes.
+    document.querySelectorAll(".kamp-del")[0].click();
     var apnet = document.querySelector(".kamp-panel");
-    ok("et trykk pa pubnavnet apner delingspanelet", !!apnet);
+    ok("kortet apnes fra kampraden", !!apnet);
     if (!apnet) { ferdig(); return; }
-    // Stedet blir pekt ut, ikke valgt: et trykk pa et sted er svaret «jeg
-    // skal dit», og det svaret skal leseren gi selv. Chipen markeres og
-    // far fokus, sa det fortsatt koster ett trykk — hens eget.
-    var pekt = apnet.querySelector(".sted-rad-kort.pekt");
-    ok("med puben pekt ut i kortet",
-       pekt && pekt.querySelector(".sted-navn").textContent === "Lincoln Pub",
-       pekt ? pekt.textContent : "ingen pekt rad");
-    // Fokus staar paa knappen i raden, ikke paa raden: raden er ingen
-    // knapp — den har en inni seg.
-    ok("og den star ikke som valgt: svaret er ikke gitt enda",
-       pekt.querySelector(".sted-knapp").getAttribute("aria-pressed") === "false" &&
-       document.activeElement === pekt.querySelector(".sted-knapp"),
-       pekt.getAttribute("aria-pressed"));
     // Én liste, og den spor. «Disse viser kampen» over hele lista ville
     // pastatt at arenaen og en pub ingen har meldt inn viser den — og det
     // er nettopp den merkingen appen ellers holder ren.
     ok("overskrifta spor, den pastar ingenting",
        apnet.querySelector(".kamp-panel-tittel").textContent === "Hvor skal du se den?",
        apnet.querySelector(".kamp-panel-tittel").textContent);
-    // Stjerna baerer forskjellen, rad for rad.
-    ok("og stjerna sier hvem som faktisk har meldt inn kampen",
-       !!pekt.querySelector(".pub-bekreftet") &&
-       pekt.querySelector(".pub-bekreftet").getAttribute("aria-label") ===
-         "viser denne kampen",
-       pekt.textContent);
     document.querySelectorAll(".kamp-del")[0].click();
 
     // Forste kamp: Brann – Bodo/Glimt, som Lincoln Pub viser.

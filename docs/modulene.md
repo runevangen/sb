@@ -518,8 +518,16 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   som **åpner kortet**. Til 20. september 2026 hang `fyllForslag` på
   «Andre fotballpuber», og ble derfor aldri nådd av den som bare lurte på
   hvem som viser kampen.
-  Uten kjent avstand står **byen** ved navnet — i `viserlinje()` og i
-  `stedRad()` — for linja under kampraden tegnes før noe kort er åpnet.
+  Uten kjent avstand står **byen** ved navnet i `stedRad()`: kortet tegnes
+  i det posisjonen spørres om, så de første radene står der før svaret
+  finnes.
+- **`viserlinje()` er borte (21. september 2026).** «Denne kampen vises
+  på: …» sto under hver kamprad og skulle svare uten at du åpnet noe. Meldt
+  med skjermbilde: fem rader på rad sa «Andy's Pub (Oslo)». Et svar som er
+  likt på hver rad svarer ikke. Opplysningen lever i kortet, med avstand og
+  by; kampraden bærer bare det som skiller radene.
+  Med linja gikk også det ene stedet i `tegnSvar()` som ikke handlet om
+  svar — regelen om å tegne om det som lander over nettet står.
 - **Kortet har to lister, og `naerNok()` er skillet.** `tegnSteder()`
   tegner stedene nær deg: `stedKilder()` slått sammen med de nære
   forslagene (`slaSammenRader`), merket med `merkKuraterte` i ett kall, og
