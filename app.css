@@ -499,6 +499,22 @@ body {
   color: var(--text-dim);
 }
 
+/* Lenka i notatet er det eneste leseren har naar utklippstavla svikter,
+   sa den maa vaere baade aa trykke paa og aa kopiere. En helt vanlig <a>
+   gir begge deler paa en telefon: trykk folger den, langtrykk gir
+   «Kopier lenke» i nettleserens egen meny. `user-select: all` ble provd og
+   tatt ut igjen — den gjor at ETT trykk markerer teksten framfor aa folge
+   lenka, sa den kjopte kopieringen ved aa selge trykket.
+   `inline-block` med luft over og under gir en trykkflate som taaler en
+   finger uten aa gjore notatet til en knapp; `break-all` fordi en URL uten
+   mellomrom ellers skyver menyen sidelengs. */
+.action-note-lenke {
+  display: inline-block;
+  padding: 6px 0;
+  color: var(--accent);
+  word-break: break-all;
+}
+
 /* To lenker pa én linje framfor to avsnitt. Bryter de likevel — lang
    tekst, stor skrift — er det to linjer, ikke et kuttet ord: skillet er
    ren dekor og forsvinner ved linjeskift. */
@@ -758,6 +774,37 @@ body {
   }
   .feed { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
   .menu-actions { padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* Pa en bred skjerm sto appen som et 390 px kort med avrundede hjorner,
+   1 px kant og ti piksler luft rundt — og det leses som et BILDE av en
+   telefon, ikke som en app. En demo, ikke et produkt (#148).
+   Kanten, hjornene og luften gar bort. Spalten blir staende.
+
+   **Bredden og hoyden er ikke pynt**, og derfor rores de ikke her.
+   `.phone` har fast hoyde og `flex-direction: column`, og det er DET som
+   gjor at `.feed` og `.fotball-innhold` ruller inni appen framfor at
+   vinduet ruller. Pa den henger ogsa `.tabbar`, som ligger som siste
+   barn framfor a flyte over; `.menu-panel`, som er `position: absolute;
+   inset: 0` og ville dekket hele skjermen uten en boks a dekke;
+   `.tabell-skall`, som ruller sidelengs nettopp fordi `overflow: hidden`
+   klipper; og `folgMedPaRulling()` i app.js, som lytter pa `.feed` og
+   ikke pa vinduet. En bred spalte er en egen sak med egen risiko — dette
+   er bare a ta av rammen.
+
+   `min-width: 900px`: over dette er det sikkert at skjermen ikke er en
+   telefon i portrett eller et nettbrett der spalten fyller mye av bredden
+   uansett. Nettleserens standard er mobil-forst, sa regelen legger seg
+   pa toppen framfor a maatte skrus av igjen lenger nede. */
+@media (min-width: 900px) {
+  body { padding: 0; }
+  .phone {
+    height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
 }
 
 /* Logoen er den ekte fila med bakgrunnen fjernet: de bla flatene er

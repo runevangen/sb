@@ -924,11 +924,42 @@ function showError(problems) {
 
 const PREF_KEY = "sb-visning";
 
+// `tema` er «lys», «svart» eller «system». Feltet het `svart` og var
+// boolsk til 21. september 2026 — to verdier holdt sa lenge det fantes to
+// valg. `temaAv()` leser begge former, sa en leser som har valgt morkt
+// for beholder det. Vi skriver aldri `svart` igjen: to felt om det samme
+// er to sannheter, og den gamle ville blitt staaende og lyve.
+function temaAv(lagret) {
+  const v = lagret || {};
+  if (v.tema === "lys" || v.tema === "svart" || v.tema === "system") return v.tema;
+  // Gammel form. Fraveret av feltet betyr lyst, som for.
+  return v.svart ? "svart" : "lys";
+}
+
+// Hva temaet BETYR akkurat na. «system» er det eneste valget som kan
+// svare ulikt fra minutt til minutt, og det er derfor dette er en
+// funksjon og ikke en verdi vi lagrer: et lagret svar ville vaert riktig
+// da det ble skrevet og usant da telefonen byttet.
+function morktNa(tema) {
+  if (tema === "svart") return true;
+  if (tema !== "system") return false;
+  try {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  } catch (err) {
+    // Ingen matchMedia: «folg systemet» har ingenting a folge, og lyst er
+    // det appen ser ut som uten et valg.
+    return false;
+  }
+}
+
 function readPrefs() {
   try {
-    return JSON.parse(localStorage.getItem(PREF_KEY)) || {};
+    const lagret = JSON.parse(localStorage.getItem(PREF_KEY)) || {};
+    lagret.tema = temaAv(lagret);
+    delete lagret.svart;
+    return lagret;
   } catch (err) {
-    return {};
+    return { tema: "lys" };
   }
 }
 
@@ -941,19 +972,31 @@ function savePrefs(value) {
   }
 }
 
+// `data-theme` er fortsatt bare «svart» eller ingenting. Det er med
+// vilje: CSS-en har ETT sted som vet hvordan morkt ser ut, og «folg
+// systemet» skal ikke bli et andre. JS regner ut HVILKET tema som
+// gjelder; CSS-en far vite resultatet.
+// Alternativet var en `@media (prefers-color-scheme: dark)`-blokk med de
+// samme tretti variablene en gang til — og da ville et nytt token maattet
+// legges inn to steder for aa gjelde begge veier.
 function applyPrefs(value) {
   const root = document.documentElement;
+  const tema = temaAv(value);
 
-  if (value.svart) root.setAttribute("data-theme", "svart");
+  if (morktNa(tema)) root.setAttribute("data-theme", "svart");
   else root.removeAttribute("data-theme");
 
   if (value.stor) root.setAttribute("data-font", "stor");
   else root.removeAttribute("data-font");
 
-  // aria-current, ikke aria-pressed: dette er et valg mellom to
-  // alternativer, ikke to uavhengige av- og pa-brytere.
-  merkSegment("temaLys", !value.svart);
-  merkSegment("temaSvart", !!value.svart);
+  // aria-current, ikke aria-pressed: dette er et valg mellom flere
+  // alternativer, ikke uavhengige av- og pa-brytere. Markeringen folger
+  // VALGET, ikke resultatet: staar du pa «Følg systemet» en mork kveld,
+  // er det den knappen som er valgt — ikke «Mørkt», som du ikke har
+  // trykket pa.
+  merkSegment("temaLys", tema === "lys");
+  merkSegment("temaSvart", tema === "svart");
+  merkSegment("temaSystem", tema === "system");
   merkSegment("skriftNormal", !value.stor);
   merkSegment("skriftStor", !!value.stor);
 }
@@ -1054,11 +1097,28 @@ function settVisning(felt, verdi, hendelse, navn) {
   track(hendelse, navn);
 }
 
-document.getElementById("temaLys").addEventListener("click", () =>
-  settVisning("svart", false, "Tema byttet", { tema: "lyst" }));
+// Tre valg, ett felt. Lista er data framfor tre naer-identiske kall:
+// en fjerde mulighet en dag er en linje her, ikke en kopi til.
+[["temaLys", "lys"], ["temaSvart", "svart"], ["temaSystem", "system"]]
+  .forEach(([id, tema]) => {
+    document.getElementById(id).addEventListener("click", () =>
+      settVisning("tema", tema, "Tema byttet", { tema }));
+  });
 
-document.getElementById("temaSvart").addEventListener("click", () =>
-  settVisning("svart", true, "Tema byttet", { tema: "svart" }));
+// Bytter telefonen mellom lyst og morkt mens appen staar apen, skal
+// «Folg systemet» folge med. Uten dette gjelder valget forst neste gang
+// sida lastes — og et valg som heter «folg systemet» og ikke folger det,
+// er en knapp som lover noe den ikke gir.
+// Lytteren staar alltid paa; `applyPrefs` gjor ingenting naar temaet ikke
+// er «system», sa den koster ingenting for de to andre valgene.
+try {
+  const systemet = window.matchMedia("(prefers-color-scheme: dark)");
+  const folg = () => { if (temaAv(prefs) === "system") applyPrefs(prefs); };
+  if (systemet.addEventListener) systemet.addEventListener("change", folg);
+  else if (systemet.addListener) systemet.addListener(folg);
+} catch (err) {
+  // Ingen matchMedia: «folg systemet» svarer lyst, og gjor det stille.
+}
 
 document.getElementById("skriftNormal").addEventListener("click", () =>
   settVisning("stor", false, "Skriftstørrelse byttet", { størrelse: "normal" }));
@@ -1121,9 +1181,27 @@ function startSok(q, hendelse) {
 const DEL_TEKST = "Sportsbibelen — siste nytt fra sportens verden";
 let installasjonsvarsel = null;
 
-function visNotat(tekst) {
+// `lenke` gjor URL-en til en ekte <a> framfor tekst i et avsnitt.
+// «Kopier lenken selv: https://…» sto som ren tekst, og det er nettopp
+// den beskjeden som kommer NAR utklippstavla sviktet — da er teksten det
+// eneste leseren har, og en URL man ikke kan trykke pa eller kopiere er
+// ingen vei videre. Pa en telefon er alternativet a merke tekst i et
+// 12px-avsnitt med fingeren.
+// Bygget med createElement, aldri innerHTML: URL-en er var egen, men
+// regelen om at fremmed HTML ikke parses star uansett, og et unntak er
+// noe noen kopierer.
+function visNotat(tekst, lenke) {
   const notat = document.getElementById("actionNote");
-  notat.textContent = tekst;
+  notat.textContent = tekst || "";
+  if (tekst && lenke) {
+    notat.appendChild(document.createTextNode(" "));
+    const a = el("a", "action-note-lenke", lenke);
+    a.href = lenke;
+    // Egen side, sa den som star i menyen ikke mister den hen holdt pa med.
+    a.target = "_blank";
+    a.rel = "noopener";
+    notat.appendChild(a);
+  }
   notat.hidden = !tekst;
 }
 
@@ -1161,8 +1239,11 @@ async function delTekst(data, hendelse) {
 document.getElementById("shareBtn").addEventListener("click", async () => {
   const data = { title: "Sportsbibelen", text: DEL_TEKST, url: location.origin + "/" };
   const utfall = await delTekst(data, "App delt");
-  if (utfall === "kopiert") visNotat("Lenken er kopiert: " + data.url);
-  else if (utfall === "feil") visNotat("Kopier lenken selv: " + data.url);
+  // Lenka staar paa begge: nar kopieringen gikk, er den kvitteringen paa
+  // HVA som ligger paa utklippstavla; nar den sviktet, er den det eneste
+  // leseren har.
+  if (utfall === "kopiert") visNotat("Lenken er kopiert:", data.url);
+  else if (utfall === "feil") visNotat("Kopier lenken selv:", data.url);
 });
 
 const installKnapp = document.getElementById("installBtn");

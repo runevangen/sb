@@ -98,6 +98,14 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 - **En knapp som ser ut som den gir noe den ikke gir, er verre enn en som
   sier hva den er.** Gjelder «Venner», «Meldt inn til oss», og
   «Valgt for deling» utlogget.
+- **Lenka i delingsfallbacken er en ekte `<a>`.** «Kopier lenken selv: …»
+  er beskjeden som kommer **når** utklippstavla sviktet — da er teksten
+  det eneste leseren har, og den sto som ren tekst i et 12px-avsnitt til
+  21. september 2026. På en telefon var alternativet å merke tekst med
+  fingeren. En vanlig lenke gir begge deler: trykk følger den, langtrykk
+  gir «Kopier lenke». `user-select: all` ble prøvd og tatt ut igjen — den
+  gjør at ett trykk *markerer* framfor å følge, og kjøper altså
+  kopieringen ved å selge trykket.
 - **Ingen knapp navngir noe appen ikke har.** «Del i chatten» sto til
   19. september 2026, og Sportsbibelen har ingen chat — knappen lovet et
   sted å sende den. Hvor teksten havner er leserens valg i
@@ -506,6 +514,22 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 ### Form
 - Farger er CSS-variabler i `:root`; et tema overstyrer **kun** variabler.
   Tekst oppå bildegradienten bruker `--on-overlay`.
+- **«Følg systemet» er et valg, ikke et tredje tema.** `data-theme` er
+  fortsatt «svart» eller ingenting — JS regner ut *hvilket* tema som
+  gjelder, CSS-en får vite resultatet. Alternativet var en
+  `@media (prefers-color-scheme: dark)`-blokk med de samme tretti
+  variablene en gang til, og da måtte et nytt token legges inn to steder
+  for å gjelde begge veier. **Regningen står to steder likevel** — i
+  `app.js` og i forhåndsskriptet i `index.html`, som må kjøre før første
+  maling — og en vakt i `unit.mjs` holder at de stiller de samme
+  spørsmålene.
+  **Markeringen følger valget, ikke resultatet:** står du på «Auto» en
+  mørk kveld, er det den knappen som er valgt, ikke «Mørkt» — ellers sier
+  skjermen at du har trykket på noe du ikke har.
+  **Feltet heter `tema` og er et ord**, ikke `svart` og et ja/nei: to
+  verdier holdt så lenge det fantes to valg. `readPrefs()` leser den
+  gamle formen og **kaster den** — to felt om det samme er to sannheter,
+  og den gamle ville blitt stående og lyve.
 - `--fs` skalerer tekst. Avstander og rammer skaleres ikke.
 - **En knapp i en knapp finnes ikke.** Trenger en rad to mål, er de
   søsken — eller trykkflata legges utstrakt over innholdet (`.kamp-del`).
@@ -607,6 +631,21 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
 - **Hver regel som setter `display`, må si hva `[hidden]` betyr.**
   `display: flex` slår `[hidden]` fra nettleserens eget stilark, og da står
   et element framme som koden tror den har skjult.
+- **Telefonrammen er to ting, og bare den ene er pynt.** Over 900 px går
+  kanten, hjørnene og luften bort — et 390 px kort med bezel midt på en
+  skjerm leses som et *bilde* av en telefon, ikke som en app.
+  **Bredden og flex-oppsettet blir stående**, og det er ikke forsiktighet:
+  den faste høyden og `flex-direction: column` er det som gjør at `.feed`
+  og `.fotball-innhold` ruller inni appen framfor at vinduet gjør det. På
+  den henger `.tabbar` (siste barn, ikke overlegg), `.menu-panel`
+  (`position: absolute; inset: 0` — uten en boks å dekke, dekker den
+  skjermen), `.tabell-skall` (ruller sidelengs *fordi* `overflow: hidden`
+  klipper) og `folgMedPaRulling()`, som lytter på `.feed` og ikke på
+  vinduet. En bred spalte er en egen sak.
+  **Regelen måles i CSS-en, ikke på skjermen.** `--window-size` binder
+  ikke likt lokalt og på CI, så en test på 1200 px ville målt hvilken
+  Chromium som kjørte. `run.mjs` leser regelen ut av stilarket og krever
+  at den tar bort kanten **og** at den ikke rører bredden.
 
 ### Data
 - **Kamp-id er `kampNokkel()`**, ikke kildens id. Alt som lagres, slås opp

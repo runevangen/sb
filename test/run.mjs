@@ -631,6 +631,54 @@ const SAK_3 = kjor("oppdatering", FELLES + `
     ok("kortet fyller hoyden", Math.abs(kortH - (window.innerHeight - 20)) <= 2,
        kortH + " av " + (window.innerHeight - 20));
 
+    // Telefonrammen pa brede skjermer (#148). Maalt i CSS-en framfor pa
+    // skjermen, og det er ikke latskap: window-size-flagget binder ikke
+    // lokalt og pa CI — se kommentaren i tabell-scenen lenger nede — sa en
+    // test som satte vinduet til 1200 px ville malt hvilken Chromium som
+    // kjorte. Her leses regelen ut av arket: at den finnes, hva den gjor,
+    // og — viktigst — at den IKKE rorer bredden eller flex-oppsettet, som
+    // er det rulling, meny og tabbar henger pa.
+    var bred = null;
+    Array.prototype.forEach.call(document.styleSheets, function (ark) {
+      var regler;
+      try { regler = ark.cssRules; } catch (e) { return; }
+      Array.prototype.forEach.call(regler || [], function (r) {
+        if (r.type === CSSRule.MEDIA_RULE &&
+            String(r.conditionText || r.media.mediaText).indexOf("min-width: 900px") > -1) {
+          bred = r;
+        }
+      });
+    });
+    ok("det finnes en regel for brede skjermer", !!bred);
+
+    var telefonRegel = null;
+    if (bred) {
+      Array.prototype.forEach.call(bred.cssRules, function (r) {
+        if (r.selectorText === ".phone") telefonRegel = r;
+      });
+    }
+    var st = telefonRegel && telefonRegel.style;
+    // CSSOM normaliserer: «0» leses tilbake som «0px». Testen var rod pa
+    // nettopp det for den ble rettet — og da var det pastanden som tok
+    // feil, ikke regelen.
+    function nullVerdi(v) { return v === "0" || v === "0px"; }
+    ok("og den tar bort kanten og hjornene",
+       !!st && nullVerdi(st.getPropertyValue("border")) &&
+       nullVerdi(st.getPropertyValue("border-radius")),
+       st ? st.cssText : "fant ingen .phone-regel");
+    ok("og luften rundt",
+       !!bred && Array.prototype.some.call(bred.cssRules, function (r) {
+         return r.selectorText === "body" && nullVerdi(r.style.getPropertyValue("padding"));
+       }),
+       bred ? Array.prototype.map.call(bred.cssRules, function (r) {
+         return r.selectorText; }).join(", ") : "");
+    // Bredden og flex-oppsettet er arkitektur, ikke pynt: rores de, ruller
+    // ikke feeden lenger, og menyen dekker skjermen framfor appen.
+    ok("men lar bredden og oppsettet staa",
+       !!st && !st.getPropertyValue("width") && !st.getPropertyValue("display") &&
+       !st.getPropertyValue("overflow") && !st.getPropertyValue("flex-direction"),
+       st ? st.cssText : "");
+
     var toppFor = Math.round(topp.getBoundingClientRect().height);
     f.scrollTop = 200;
     f.dispatchEvent(new Event("scroll"));
@@ -905,6 +953,58 @@ const SAK_5 = kjor("visning", FELLES + `
          !document.documentElement.getAttribute("data-theme") && aktiv("temaLys"));
       ok("skriftvalget star igjen nar temaet byttes", aktiv("skriftStor"));
 
+      // «Folg systemet» (#148). Systemet stubbes framfor a emuleres: det
+      // er matchMedia appen faktisk spor, og et stubbet svar kan settes
+      // begge veier i samme kjoring — en emulert skjerm kan ikke det.
+      var ekteMM = window.matchMedia;
+      function settSystem(morkt) {
+        window.matchMedia = function (q) {
+          if (String(q).indexOf("prefers-color-scheme: dark") > -1) {
+            return { matches: morkt, addEventListener: function () {},
+                     addListener: function () {} };
+          }
+          return ekteMM.call(window, q);
+        };
+      }
+
+      settSystem(true);
+      document.getElementById("temaSystem").click();
+      ok("folg systemet blir morkt nar systemet er morkt",
+         document.documentElement.getAttribute("data-theme") === "svart",
+         String(document.documentElement.getAttribute("data-theme")));
+      // Markeringen folger VALGET, ikke resultatet. Sto den pa «Mørkt»,
+      // ville skjermen sagt at du hadde trykket pa noe du ikke har — og
+      // du ville ikke funnet veien tilbake til det du faktisk valgte.
+      ok("og det er «Auto» som er markert, ikke «Mørkt»",
+         aktiv("temaSystem") && !aktiv("temaSvart") && !aktiv("temaLys"));
+
+      // Samme valg, lyst system. Den samme knappen skal gi motsatt svar —
+      // det er hele poenget med den.
+      settSystem(false);
+      document.getElementById("temaLys").click();
+      document.getElementById("temaSystem").click();
+      ok("og lyst nar systemet er lyst",
+         !document.documentElement.getAttribute("data-theme") && aktiv("temaSystem"),
+         String(document.documentElement.getAttribute("data-theme")));
+
+      // At appen folger et systembytte MENS den staar apen, maales ikke
+      // her: lytteren ble hengt paa det ekte matchMedia-objektet da sida
+      // lastet, og stubben over naar den ikke. En test som klikket seg
+      // fram til morkt igjen ville bare gjentatt pastanden over og sett ut
+      // som dekning den ikke ga. En vakt i unit.mjs holder at lytteren
+      // finnes; at den fyrer, er ikke maalt.
+      window.matchMedia = ekteMM;
+      document.getElementById("temaLys").click();
+
+      // Den gamle boolske formen. En leser som valgte morkt for
+      // 21. september 2026 har {svart: true} liggende, og skal fortsatt
+      // fa morkt — ikke lyst fordi feltet byttet navn.
+      var lagretNa = JSON.parse(localStorage.getItem("sb-visning") || "{}");
+      ok("det gamle feltet skrives ikke tilbake",
+         !("svart" in lagretNa), Object.keys(lagretNa).join(","));
+      ok("og temaet lagres som et ord, ikke en bryter",
+         lagretNa.tema === "lys", String(lagretNa.tema));
+
       // Snarveien skal ta deg til fotballfanen — og bare dit. Uten
       // stopPropagation ville trykket ogsa telt som et trykk pa emnet, og
       // feeden hadde filtrert seg i bakgrunnen mens fanen apnet.
@@ -932,7 +1032,41 @@ const SAK_5 = kjor("visning", FELLES + `
         // Emnet skal ikke vaere valgt: du ba om tabellen, ikke om saker.
         ok("feeden filtreres ikke i bakgrunnen",
            window.__sokUrl === sokFor, sokFor + " -> " + window.__sokUrl);
-        ferdig();
+
+        // «Del appen» uten delingsmeny OG uten utklippstavle. Da sier
+        // notatet «Kopier lenken selv: …», og til 21. september 2026 sto
+        // URL-en der som ren tekst i et 12px-avsnitt — i nettopp det
+        // tilfellet der teksten er det ENESTE leseren har. Meldt i #148.
+        //
+        // Begge veiene stenges med vilje: er bare den ene stengt, tar den
+        // andre over og vi maaler en annen gren enn den vi tror.
+        navigator.share = undefined;
+        Object.defineProperty(navigator, "clipboard", {
+          configurable: true,
+          value: { writeText: function () { return Promise.reject(new Error("nei")); } }
+        });
+        document.getElementById("shareBtn").click();
+
+        setTimeout(function () { try {
+          var notat = document.getElementById("actionNote");
+          var a = notat.querySelector("a");
+          ok("lenken i fallbacken er en ekte lenke, ikke tekst",
+             !!a && a.tagName === "A", notat.textContent.slice(0, 60));
+          // href OG tekst: en lenke som viser noe annet enn den peker paa
+          // er verre enn tekst, og teksten er det man merker og kopierer.
+          ok("og den peker paa appen, med adressen som tekst",
+             !!a && a.href.indexOf(location.origin) === 0 &&
+             a.textContent.indexOf(location.origin) === 0,
+             a ? a.getAttribute("href") + " / " + a.textContent : "fant ingen lenke");
+          // Trykkflate: notatet er 12px, og en lenke pa 12px uten luft er
+          // ikke noe man treffer med en finger.
+          var h = a ? a.getBoundingClientRect().height : 0;
+          ok("og den er stor nok til aa treffes med en finger", h >= 24, Math.round(h));
+          ok("setningen foran staar fortsatt",
+             notat.textContent.indexOf("Kopier lenken selv") === 0,
+             notat.textContent.slice(0, 40));
+          ferdig();
+        } catch (e) { ok("ingen unntak i delingsfallbacken", false, e.message); ferdig(); } }, 200);
       } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
     }, 500);
   }, 900); });
