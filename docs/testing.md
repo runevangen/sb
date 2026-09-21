@@ -172,6 +172,20 @@ til angring, og hele fotballmodulen.
   uten `?posisjon=` og stubbe `navigator.geolocation` selv — gjerne slik at
   svaret kan holdes tilbake, så skjermen kan måles både før og etter.
 
+- **En test skal ikke kunne feile av hva klokka er.** Fiksturen for «sist
+  inne» sto som «for én time siden» og testen påsto «I dag» — sant 23 av
+  24 timer. Kjørte suiten mellom 00:00 og 01:00 norsk tid, var «for én
+  time siden» i går, og to tester falt uten at noe var galt. Den felte CI
+  20. september kl. 00:21, og var ekstra vanskelig å se fordi klokka i
+  byggemiljøet er UTC mens teksten formateres i Europe/Oslo — vinduet
+  ligger altså på 22:00–23:00 UTC.
+  **Hører grensa til, skal den testes med et fast tidspunkt.**
+  `sistInneTekst` tar `naa` som parameter, og `unit.mjs` har alt en
+  `MIDNATT`-konstant som treffer døgnskillet eksakt. Nettleserscenen
+  skulle aldri testet døgnbøtta — den svarer på om cella viser økta.
+  (Rettelsen gikk forresten rett i bakoverfnutt-fella over: kommentaren
+  som forklarte dette skrev funksjonsnavnet med fnutter rundt, og fila
+  sluttet å parse. Regelen står allerede — jeg leste den ikke godt nok.)
 - **Skriv aldri bakoverstrek i et testskript.** Skriptene limes inn i en
   template-streng, og `\d` er borte før nettleseren ser det — mønsteret
   blir `dd.dd.dddd` og treffer ingenting. Fella har slått til tre ganger:

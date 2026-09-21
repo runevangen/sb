@@ -2863,10 +2863,30 @@ const SAK_15 = kjor("admin", `
         // «sist» er PIN-datoen, «aktiv» er okta. Kari tastet PIN-en for
         // fem dager siden og har appen i gang na; Ola har ingen levende
         // okt. Nettopp den forskjellen kolonnen finnes for (ADR 0021).
+        //
+        // Feltet aktiv er NAA, ikke «for én time siden». Det sto minus
+        // én time til 21. september 2026, og testene under pastar «I dag»
+        // — som holder 23 av 24 timer. Kjorer suiten mellom 00:00 og 01:00
+        // norsk tid, er «for én time siden» i gar, og to tester faller uten at
+        // noe er galt med koden.
+        //
+        // Den felte CI 20. september kl. 00:21: «I går 23:21». Klokka i
+        // byggemiljoet er UTC, men sistInneTekst formaterer i
+        // Europe/Oslo, sa vinduet er 22:00–23:00 UTC — og det gjorde
+        // feilen vanskeligere a se enn den var.
+        //
+        // «Na» er alltid i dag, og det er dessuten mer sant: kommentaren
+        // over sier at Kari HAR appen i gang.
+        //
+        // Og ingenting gar tapt. Dognbottene — «I dag» mot «I går» over
+        // midnatt — er testet EKSAKT i unit.mjs, der sistInneTekst far
+        // naa inn som parameter og MIDNATT er et fast tidspunkt. Det er
+        // der den grensa hoerer hjemme. Scenen her svarer pa noe annet:
+        // at cella viser OKTA og ikke PIN-datoen.
         return svar(200, { brukere: [
           { id: "11111111-2222-3333-4444-555555555555", navn: "Kari", slug: "kari",
             forst: "2026-09-01T10:00:00Z", sist: "2026-09-12T19:00:00Z",
-            aktiv: new Date(Date.now() - 3600000).toISOString() },
+            aktiv: new Date().toISOString() },
           { id: "66666666-7777-8888-9999-000000000000", navn: "Ola", slug: "ola",
             forst: "2026-08-20T10:00:00Z", sist: "2026-08-20T10:00:00Z", aktiv: "" }
         ] });
