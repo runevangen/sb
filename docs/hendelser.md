@@ -111,6 +111,47 @@ den neste. Slo nei-et ut alle, hadde vi bare skrudd av flagget med en omvei.
 
 ---
 
+## 21. september 2026 — oppgaver som ikke kunne gjøres
+
+**Fanget av:** Rune, to ganger, med fire ord hver gang.
+
+**Første gang.** Jeg trengte TheSportsDB-id-er for å koble på ligaene, og
+skrev at Rune kunne «slå opp et lag på thesportsdb.com og ta id-en fra
+adressefeltet». Svaret var: *«Kjør sonde. Forklar bedre når du gir
+oppgaver.»*
+
+Jeg leste det som en bestilling på en bedre forklaring, og det var feil
+lesning. Den riktige rettelsen var ikke å forklare oppgaven bedre — det
+var å **fjerne den**. Sonden plukker nå id-ene ut av sine egne svar.
+
+**Andre gang, samme dag.** Jeg skrev at han kunne kjøre
+`node verktoy/tsdbsjekk.mjs` for å se hva kilden faktisk ga. Svaret var:
+*«Terminal på iPhone. Hvordan?»*
+
+Samme feil i ny form. Rune sitter på en telefon, i en chat. Det finnes
+ingen terminal, ingen `git`, ingen `curl`, og ingen fil å åpne. Hver
+oppgave jeg gir som forutsetter noe av det, er en oppgave som ikke kan
+gjøres — og da står den der som noe han skylder meg, uten at han kan
+innfri.
+
+**Hva som kom ut av det.** Sonden flyttet inn i portalen, bak ett trykk:
+`/api/tsdb-sonde` spør kilden fra tjeneren og viser svaret på skjermen.
+Verktøyet i `verktoy/` står igjen for den som *har* en terminal, som et
+skall rundt de samme funksjonene.
+
+**Og en regel om hvordan jeg svarer.** Statusblokken skal si hvordan
+endringen testes **i appen** — en URL å trykke på og en handling å gjøre.
+«787 tester grønne» er mitt bevis, ikke hans: det sier at koden gjør det
+jeg trodde, ikke at skjermen ble bedre. Uten den linja er det ingen vei
+for ham til å si meg imot, og da er alt jeg lander bare noe jeg har
+påstått.
+
+**Det som gjør denne verdt å skrive ned:** ingen av de to gangene så ut
+som en feil i koden. Begge så ut som at jeg var utydelig. Det var ikke
+utydelighet — det var at jeg hadde glemt hvor den andre satt.
+
+---
+
 ## 21. september 2026 — en påstand i en PR-tekst som ikke var sann
 
 **Fanget av:** meg selv, etter flettinga — ved å sjekke min egen påstand
