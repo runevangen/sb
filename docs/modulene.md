@@ -782,6 +782,13 @@ spørsmål kode ikke kan svare på alene.
   svikter **sies**, ikke utelates stille.
 - **`byersjekk.mjs`** — spør Overpass hva som finnes i en by, så en
   falsk posisjon kan sammenliknes med virkeligheten.
+  **`--rader` skriver utkast til rader i `puber.js`.** Lista alene er en
+  måling — finnes det puber her i det hele tatt — men uten koordinatet
+  måtte hvert sted slås opp for hånd etterpå, og det er nettopp jobben
+  som skal gjøres når en by skal fylles. Utkastet er **ikke** en ferdig
+  rad: `lag`, `kilde` og `sikkerhet` står tomme med vilje. Overpass vet at
+  stedet er en pub; den vet ikke om de viser fotball, og det er den
+  vurderingen som gjør `puber.js` til kode framfor en tabell.
 - **`lag-pdf.mjs`** — lager PDF av et dokument i `docs/` med Chromium og
   ingenting annet, så et sammendrag kan sendes som vedlegg. Oversetter
   bare det Markdown-en i `docs/` faktisk bruker; en pakke for resten

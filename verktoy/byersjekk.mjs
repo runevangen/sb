@@ -4,6 +4,7 @@
 //   node verktoy/byersjekk.mjs                 # alle byene i BYER
 //   node verktoy/byersjekk.mjs bodo trondheim  # bare noen
 //   node verktoy/byersjekk.mjs 67.28,14.40     # et koordinat
+//   node verktoy/byersjekk.mjs trondheim --rader   # utkast til puber.js
 //
 // Hvorfor dette finnes, og hvorfor det ikke er en test:
 //
@@ -52,13 +53,42 @@ async function spor(p) {
   }
 }
 
-const bedt = process.argv.slice(2);
+// `--rader` skriver utkast til rader i `puber.js` framfor ei liste.
+//
+// Lista alene er en maaling: finnes det puber her i det hele tatt. Skal
+// byen faktisk fylles, trengs koordinatet — og det sto ikke i utskrifta,
+// saa hvert sted maatte slaas opp for haand etterpaa.
+//
+// Utkastet er IKKE en ferdig rad. `lag`, `kilde` og `sikkerhet` staar
+// tomme med vilje: det er den redaksjonelle vurderingen, og den er hele
+// grunnen til at `puber.js` er kode og ikke en tabell. Overpass vet at
+// stedet er en pub. Den vet ikke om de viser fotball.
+const flagg = process.argv.slice(2).filter((a) => a.startsWith("--"));
+const somRader = flagg.indexOf("--rader") > -1;
+const bedt = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const steder = bedt.length
   ? bedt.map((a) => falskPosisjon("?posisjon=" + encodeURIComponent(a))
       || { navn: a, lat: NaN, lon: NaN })
   : Object.values(BYER);
 
-console.log("Puber innen " + RADIUS + " m, fra OpenStreetMap.\n");
+// Ett utkast til rad, i samme form som `puber.js`. Koordinatet kommer fra
+// Overpass; resten er ditt.
+//
+// `sjekket` settes til i dag, for det er i dag du ser paa dette — og en
+// dato er en paastand om NAAR noen saa etter, ikke pynt. Blir raden
+// liggende til neste uke, skal datoen rettes, ikke staa.
+function rad(pub) {
+  const iDag = new Date().toISOString().slice(0, 10);
+  return "{ navn: " + JSON.stringify(pub.navn) + ", bydel: \"\", adresse: \"\",\n" +
+    "    lat: " + pub.lat.toFixed(4) + ", lon: " + pub.lon.toFixed(4) +
+    ", type: \"pub\", lag: [],\n" +
+    "    kilde: \"\", sikkerhet: \"sannsynlig\", sjekket: " + JSON.stringify(iDag) + " }," +
+    (pub.tider ? "   // " + pub.tider : "");
+}
+
+console.log(somRader
+  ? "Utkast til rader i puber.js. lag, kilde og sikkerhet er dine.\n"
+  : "Puber innen " + RADIUS + " m, fra OpenStreetMap.\n");
 
 for (const sted of steder) {
   if (!Number.isFinite(sted.lat)) {
@@ -82,10 +112,17 @@ for (const sted of steder) {
   // Navn og avstand er det appen faktisk viser. Har stedet ingen av
   // delene, ville det stått som en tom knapp — og da er tallet over
   // misvisende.
-  liste.slice(0, 12).forEach((pub) => {
-    console.log("   · " + pub.navn +
-      (Number.isFinite(pub.avstand) ? "  " + Math.round(pub.avstand) + " m" : "  uten avstand"));
-  });
-  if (liste.length > 12) console.log("   … og " + (liste.length - 12) + " til");
+  if (somRader) {
+    // Alle treffene, ikke de tolv forste: her er det du som velger bort.
+    liste.forEach((pub) => console.log("  " + rad(pub)));
+  } else {
+    liste.slice(0, 12).forEach((pub) => {
+      console.log("   · " + pub.navn +
+        (Number.isFinite(pub.avstand) ? "  " + Math.round(pub.avstand) + " m" : "  uten avstand") +
+        "   " + pub.lat.toFixed(4) + ", " + pub.lon.toFixed(4) +
+        (pub.tider ? "   " + pub.tider : ""));
+    });
+    if (liste.length > 12) console.log("   … og " + (liste.length - 12) + " til");
+  }
   console.log("");
 }
