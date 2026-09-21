@@ -25,7 +25,7 @@ import {
 } from "../../pub-data.js";
 
 const TABELL = "puber";
-const FELT = "nokkel,navn,bydel,adresse,lat,lon,type,lag,kilde,sikkerhet,sjekket,merknad,fjernet";
+const FELT = "nokkel,navn,bydel,adresse,lat,lon,type,lag,kilde,sikkerhet,sjekket,merknad,ligaer,fjernet";
 // Kort levetid med vilje. En rettelse skal vaere ute mens admin fortsatt
 // sitter med portalen apen; et dogn — som pubene rundt arenaen har — ville
 // gjort «lagret» til en pastand admin ikke kunne etterprove.

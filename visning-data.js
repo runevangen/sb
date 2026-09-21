@@ -176,6 +176,30 @@ export function rundeTall(valgt, alle) {
   return valgt + " av " + alle + " valgt";
 }
 
+// Knappen som krysser av en hel runde. Meldt 19. september 2026: et sted
+// som viser alt ma hukes av kamp for kamp, og det skalerer darlig.
+//
+// Den billige halvdelen av svaret: avkryssinga blir ett trykk, mens
+// PASTANDEN star urort. Hver rad er fortsatt per kamp, satt av et
+// menneske, med `satt` og `satt_av`. Et «viser alt»-flagg ville i stedet
+// produsert ★ pa kamper ingen har sett pa — og kamper kolliderer: tre
+// Eliteserie-kamper kl. 15 blir tre pastander der en pub med én skjerm
+// bare kan innfri én.
+//
+// Teksten folger `lagreKnappTekst`: den sier hva trykket GJOR, ikke hvor
+// mye som er valgt. Star tre av atte, legger trykket til fem — og da er
+// «Kryss av alle 8» usant om handlingen.
+export function rundeKnappTekst(valgt, alle) {
+  if (!alle) return "";
+  if (valgt >= alle) {
+    return alle === 1 ? "Fjern kampen" : "Fjern alle " + alle;
+  }
+  if (!valgt) {
+    return alle === 1 ? "Kryss av kampen" : "Kryss av alle " + alle;
+  }
+  return "Kryss av " + (alle - valgt) + " til";
+}
+
 /* ---------- hva en lagring faktisk endrer ---------- */
 
 // Meldt 18. september 2026: «Jeg kommer inn, fem kamper er markert, jeg

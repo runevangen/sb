@@ -133,6 +133,17 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   **Portalens pubvelger filtrerer fortsatt bort `usikker`:** å krysse av at
   et sted viser en bestemt kamp er en påstand admin gjør, og den kan ikke
   hvile på en antakelse. [ADR 0022](docs/adr/0022-antatte-steder.md)
+  **Og et antatt sted sender ingen liga.** `ligapuberAv()` slipper ikke et
+  `usikker`-sted gjennom, uansett hvor godt datert flagget er. «Sender
+  Eliteserien» er den sterkeste påstanden et sted kan bære uten at et
+  menneske har sett på nettopp denne kampen, og `usikker` betyr at vi ikke
+  har sjekket at stedet viser fotball i det hele tatt.
+  **Vakta ligger i kilden, ikke i merket.** `ligapuber` står rett etter
+  `bekreftede` i `FORSLAG_KILDER`, så en rad som slapp gjennom ville blitt
+  *løftet* over alt geografisk — samme form som den bekreftede visningen
+  392 km unna. Å sette «?» foran 📺 i merkekjeden skjuler bare tegnet.
+  Avgjort i flettinga 21. september 2026, da ligaflagget og de antatte
+  stedene møttes for første gang.
 - **⚽ settes ett sted, ikke i hver kilde.** `kuraterteNaer()` kopierer
   raden rett fra `KJENTE` og vet ikke at den er kuratert, mens
   `stampuberFor()` går gjennom `merkKuraterte`. Sto merkingen i hver
@@ -308,6 +319,25 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   I feil-lista ble «Du sa nei til posisjon» stående etter at du sa ja — sann
   da den ble skrevet, usann da den ble lest. Uten geolocation står det
   ingen knapp: en vei tilbake som ikke fører noe sted er verre enn ingen.
+- **Et sted sender en LIGA, ikke «alle kamper».** Kamper kolliderer: tre
+  Eliteserie-kamper kl. 15 blir tre påstander der et sted med én skjerm
+  bare kan innfri én. `ligaer` på pubraden er derfor `{sender, kilde,
+  sjekket}` på liganivå — samme innsikt som `kanaler.js`: rettighetene er
+  en egenskap ved ligaen, ikke ved kampen.
+  **Merket 📺 «Sender Eliteserien» er svakere enn ★** og vises bare når
+  stjerna ikke gjør det. ★ betyr at et menneske krysset av nettopp den
+  kampen; lot vi flagget produsere ★, ble merket stille omdefinert til
+  «noen sa en gang at de pleier». Merket **navngir ligaen** — «viser
+  vanligvis kamper» ville latt leseren tro det gjaldt kampen hen ser på.
+  **Flagget er ingen ny dør inn i lista.** `ligapuberAv()` siler
+  kandidater de geografiske kildene alt har funnet; et Oslo-sted som
+  sender Eliteserien er ikke et svar i Trondheim.
+  **Og det utløper ved sesongslutt**, regnet av `sjekket` gjennom
+  `sesongFor()` — Eliteserien ved nyttår, de andre i juli. Sesongen lagres
+  **ikke** som eget felt: to felt kunne sagt hver sin sesong om det samme
+  flagget. Foreldelsen er ikke pynt — hver annen opplysning her dør av seg
+  selv når kampen er spilt, mens et stående flagg ellers ville lovet
+  kamper lenge etter at stedet sluttet å vise dem.
 - **En stille tom liste er ikke til å skille fra «ingen svarte».** Feiler
   et kall der lista *er* hele visningen, si det. Er lista et tillegg til
   noe annet, ti — men da får den som handlet beskjed.
@@ -452,9 +482,10 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   `/api/pub-liste`: `KJENTE` er ingen `const`, og et kort som alt står
   åpent tegnes om i `tegnKjenteIgjen()` — som regner om **alle** kildene
   som leser `KJENTE`: `bekreftede`, `kjenteVedArena`, `kjenteNaer`,
-  `kjenteIByen` og `stampuber`. Fem, ikke fire — `kjenteIByen` kom til
-  19. september 2026, og lista her vokser med hver ny kilde. En som
-  glemmes blir stående med gamle rader til kortet lukkes.
+  `kjenteIByen`, `stampuber` og `ligapuber`. Seks, ikke fire — lista her
+  vokser med hver ny kilde. En som glemmes blir stående med gamle rader
+  til kortet lukkes. **`ligapuber` regnes sist**, for den siler de
+  geografiske som nettopp ble regnet om.
   Derfor husker boksen kampen sin.
 - **Rettelsene hentes på nytt når appen kommer fram igjen.** De ble hentet
   **én gang, ved sidelasting**, og runden admin → app er nettopp den
@@ -487,7 +518,10 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   ropes ut: ingenting avslører det.
 - **Knappen sier hva trykket gjør, ikke hvor mye som er valgt.** «Lagre 6
   kamper» når du la til én er sant om det som sendes og usant om det du
-  gjør. `lagreKnappTekst()` teller endringen.
+  gjør. `lagreKnappTekst()` teller endringen. Det samme gjelder knappen per
+  runde: `rundeKnappTekst()` sier «Kryss av 5 til» når tre av åtte står,
+  ikke «Kryss av alle 8» — trykket legger til fem. Står alt, snur den til
+  «Fjern alle 8», og teksten følger hvert håndsatt kryss.
 - **Feilsvar caches aldri** (`no-store`). Ellers låser et blaff seg fast.
 - Hemmeligheter står samlet i [`docs/nokler-og-tokens.md`](docs/nokler-og-tokens.md).
   Funksjonene leser miljøet **ved utrulling** — en ny variabel krever en

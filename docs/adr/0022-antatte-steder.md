@@ -57,6 +57,18 @@ et forslag fra en leser blir fortsatt aldri en rad av seg selv
 ([ADR 0019](0019-pubforslag.md)). Et antatt sted føres inn av et menneske,
 som alle andre — det mennesket er bare ærlig om at det gjetter.
 
+### Hva et antatt sted ikke kan gjøre
+**Det kan ikke sende en liga.** Ligaflagget ([#121](https://github.com/runevangen/sb/pull/121))
+og de antatte stedene møttes i flettinga 21. september 2026, og de to
+grenene satte hver sin gren inn på samme sted i merkekjeden.
+
+`ligapuberAv()` slipper ikke et `usikker`-sted gjennom. Ikke fordi merket
+ville sett rart ut, men fordi `ligapuber` står rett etter `bekreftede` i
+`FORSLAG_KILDER`: en gjetning ville blitt **løftet** over alt geografisk,
+og stått der det sterkeste svaret skulle vært. Samme form som den
+bekreftede visningen 392 km unna. Å sette «?» foran 📺 i merkekjeden
+skjuler bare tegnet.
+
 Portalens **pubvelger** filtrerer fortsatt bort `usikker`: å krysse av at
 et sted viser en bestemt kamp, er en påstand admin gjør, og den kan ikke
 hvile på en antakelse. Vises kampen der, er stedet ikke antatt lenger.
