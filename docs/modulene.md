@@ -636,6 +636,42 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
 [ADR 0018](adr/0018-visninger-i-supabase.md),
 [ADR 0020](adr/0020-stedene-i-portalen.md).
 
+- **Seksjonene er sammenleggbare, og mekanikken er appens.**
+  `settApen()` skriver `aria-expanded` på knappen og `[hidden]` på panelet
+  den peker på med `aria-controls` — samme mønster som `fotball.js`, ikke
+  `<details>`. `kroppen()`, `erApen()`, `settApen()`, `apneHvisUrort()` og
+  `settTall()` dekker **både** seksjonene og de to trinnene i
+  stedsskjemaet: ett sett, fordi to ville glidd fra hverandre.
+  Tilstanden bor på knappen, så tegnerne kan røre innholdet i panelet uten
+  å rive det opp.
+- **`apneHvisUrort()` er køens egen dør.** Den åpner en seksjon som admin
+  ikke har trykket på. `rort` settes av klikket, og fra da av er det admin
+  som styrer — `tegnForslag` kjøres på nytt hver gang rettelsene lander,
+  og en seksjon som åpner seg selv igjen midt i noe du leser er den samme
+  feilen `tegnSteder` i appen har kostet oss.
+- **`settTall()` skriver tallet i hodet.** `venter` er det som ligger og
+  venter på deg — nye rader i køen, en avkryssing du ikke har lagret — og
+  står i aksentfargen. Tallet må si det samme som innholdet: `tegnSteder`
+  skriver «1 av 27» når bystedfilteret er på, fordi «26» over en liste med
+  én rad leses som at de andre er borte. Et feilet kall tømmer tallet:
+  et tall som blir stående påstår en liste vi ikke har.
+- **`apneSted()` åpner seksjonen skjemaet ligger i.** Køen står i en annen
+  seksjon og sender deg hit med «Ta stedet ut» og «Åpne i editoren». Er
+  Steder lukket, åpnes stedet et sted ingen ser det, og `scrollIntoView`
+  ruller til et skjult element.
+- **Skjemaet har to trinn, og `oppdaterTrinn()` teller hva som mangler i
+  hvert.** Tellinga leser `[aria-required]` — satt av `merkPakrevde()` ut
+  av `PUBLISTE_FELT` — så tallet og stjernene ikke kan si hver sin ting.
+  Et nytt sted åpner trinn 1 alene; et sted som finnes åpner begge.
+  `stedSkjema.dataset.provd` skiller «ikke fylt ut ennå» fra «prøvde å
+  lagre og manglet»: rødt hører til det siste. En feilet `lagreSted()`
+  åpner **begge** trinn — å regne ut hvilket den første feilen hører til
+  ville vært enda en liste som kan gli fra `PUBLISTE_FELT`.
+- **`oppdaterLagreknapp()` skriver også kamphodet.** Samme tall som
+  knappen: hva trykket kommer til å gjøre. Lukker du seksjonen med en
+  ulagret avkryssing, er hodet det eneste som står igjen.
+- **Adgang skjules etter innlogging.** `loggInn()` setter
+  `adgang.hidden`; «Logg ut» ligger i `.topp` ved siden av `<h1>`.
 - **To låser, og den som holder er databasens.** `ADMIN_PASSORD` er døren
   til skjemaet. Selve skrivingen går med din egen økt fra appen, og RLS
   slår opp uid-en i `visning_skrivere`. Passordet vårt betyr ingenting for

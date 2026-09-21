@@ -22,8 +22,95 @@
   }
   main { max-width: 620px; margin: 0 auto; }
   h1 { font-size: 22px; margin: 0 0 4px; }
+  /* «Logg ut» star her, ikke i en egen Adgang-boks. Etter innlogging var
+     den seksjonen fem rader som bare sa «Logg ut» — en boks pa linje med
+     Kamper og Steder, om noe som ikke er en oppgave. */
+  .topp { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .topp[hidden] { display: none; }
   .undertittel { margin: 0 0 20px; color: var(--tekst-dim); font-size: 14px; }
   section { background: var(--kort); border: 1px solid var(--ramme); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+
+  /* ---------- sammenleggbare seksjoner ----------
+
+     Portalen var sju seksjoner, alle apne samtidig. Stedsskjemaet alene
+     var 201 av 288 linjer markup i den — sju skjermhoyder for du hadde
+     gjort noe, og kampene, som er det du kom for, la oeverst i noe du
+     matte rulle forbi resten av.
+
+     Mekanikken er appens egen: en <button aria-expanded> og et panel med
+     [hidden], som `fotball.js`. Ikke <details> — det brukes ett sted i
+     appen («Tekniske detaljer»), og to folde-mekanikker er én for mye.
+
+     Apen/lukket huskes pa knappen, og `tegnForslag`/`tegnSteder` rorer
+     bare innholdet i panelet. En seksjon som lukker seg selv fordi et
+     svar landet, er den samme feilen `tegnSteder` i appen alt har kostet
+     oss. */
+  .seksjon { padding: 0; }
+  /* display: flex slar [hidden] fra nettleserens eget stilark. Hodet
+     skjules ikke i dag, men regelen ma si hva den betyr. */
+  .seksjon-hode {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 15px 16px;
+    background: none; border: 0; border-radius: 10px;
+    color: var(--tekst-dim); font: inherit; font-size: 13px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    text-align: left; cursor: pointer;
+  }
+  .seksjon-hode[hidden] { display: none; }
+  .seksjon-hode:hover .seksjon-navn { text-decoration: underline; }
+  /* Tittelen er bare en ramme om knappen: utseendet ligger pa knappen,
+     sa h2-reglene over ikke drar i den samtidig. */
+  .seksjon-tittel { margin: 0; font-size: inherit; letter-spacing: normal; text-transform: none; }
+  .seksjon-navn { flex: 1 1 auto; min-width: 0; }
+  /* Tallet er ikke en del av navnet: det teller, og skal leses som en
+     opplysning ved siden av. Samme grep som `.runde-tall`. */
+  .seksjon-tall {
+    flex: 0 0 auto; font-weight: 400; font-size: 12px;
+    letter-spacing: 0.02em; text-transform: none; color: var(--tekst-svak);
+  }
+  .seksjon-tall:empty { display: none; }
+  /* Tallet er grunnen til at en lukket seksjon er trygg: uten det er en
+     lukket seksjon en du glemmer. Har koen noe i seg, sier den det i
+     portalens aksentfarge. */
+  .seksjon-tall.venter { color: var(--aksent); font-weight: 600; }
+  .seksjon-pil { flex: 0 0 auto; font-size: 11px; color: var(--aksent); }
+  /* Begge hodene, ikke bare seksjonene. Regelen sto pa `.seksjon-hode`
+     alene, og da pekte pila i trinnhodene «lukket» over et apent trinn —
+     et tegn som sier noe annet enn tilstanden det beskriver. */
+  .seksjon-hode[aria-expanded="true"] .seksjon-pil,
+  .trinn-hode[aria-expanded="true"] .seksjon-pil { transform: rotate(180deg); }
+  /* Sidepolstringa la pa <section> for. Na ligger den her, sa hodet kan
+     fylle hele bredden — og `.handling` regner fortsatt med 16 px. */
+  .seksjon-kropp { padding: 0 16px 16px; }
+  .seksjon-kropp[hidden] { display: none; }
+
+  /* ---------- stedsskjemaet i to trinn ----------
+     Tolv felt i én kolonne var den ekte lengden i portalen. «Hvem og
+     hvor» er stedet; «Hva vi vet» er vurderingen av det. Trinn to teller
+     feltene som mangler i hodet sitt: et lukket trinn far ikke skjule at
+     noe kreves. */
+  .trinn { border-top: 1px solid var(--ramme); margin-top: 4px; }
+  .trinn-hode {
+    display: flex; align-items: baseline; gap: 10px; width: 100%;
+    padding: 12px 2px; background: none; border: 0;
+    color: var(--tekst); font: inherit; font-size: 14px; font-weight: 600;
+    text-align: left; cursor: pointer;
+  }
+  .trinn-hode[hidden] { display: none; }
+  .trinn-hode:hover .trinn-navn { text-decoration: underline; }
+  .trinn-tittel { margin: 0; font-size: inherit; }
+  .trinn-navn { flex: 1 1 auto; min-width: 0; }
+  .trinn-tall { flex: 0 0 auto; font-size: 12px; font-weight: 400; color: var(--tekst-svak); }
+  .trinn-tall:empty { display: none; }
+  /* Tas stedet ut, kreves bare navnet — da teller `oppdaterTrinn` null, og
+     tallet er tomt. Ingen dempet variant her: et tall som ikke gjelder,
+     skal ikke sta.
+     `.mangler` settes forst naar du har provd a lagre: et nytt sted er
+     tomt, og en rod advarsel om noe du ikke har gjort ennaa leses som en
+     feil du har gjort. */
+  .trinn-tall.mangler { color: var(--feil); font-weight: 600; }
+  .trinn-kropp { padding: 0 0 8px; }
+  .trinn-kropp[hidden] { display: none; }
   /* Handlingsraden til kamplista. Klebrig mot bunnen av seksjonen, sa
      knappen folger med mens du krysser av tjue kamper — for matte du
      scrolle tilbake for a lagre. Bakgrunnen ma vaere ugjennomsiktig:
@@ -237,27 +324,34 @@
 </head>
 <body>
 <main>
-  <h1>Admin</h1>
+  <div class="topp">
+    <h1>Admin</h1>
+    <!-- «Logg ut» hoerer til deg, ikke til en oppgave. Den sto i en
+         Adgang-seksjon som etter innlogging var fem rader med ett
+         deaktivert felt og denne knappen — en boks pa linje med Kamper og
+         Steder, om noe som ikke er noe a gjore. -->
+    <button class="lenke" id="loggUt" type="button" hidden>Logg ut</button>
+  </div>
   <!-- To pastander sto her og var ikke lenger sanne: at PIN-ene ligger
        her (admin kan sette en ny, aldri lese den gamle — de ligger hashet
        hos Supabase), og at endringen venter pa en utrulling (visningene
        gikk til Supabase 15. september 2026, og lagremeldingen sier
        nettopp at det ikke er noe a vente pa). En undertittel som motsier
-       kvitteringen to seksjoner ned er verre enn ingen. -->
+       kvitteringen to seksjoner ned er verre enn ingen.
+       Resten — brukerne, PIN-ene — sto her ogsa til 21. september 2026.
+       Seksjonene bærer navnene sine i hodet na, og en undertittel som
+       ramser opp det som star rett under, er en liste til. -->
   <p class="undertittel">
     Logg inn, velg en pub, velg liga, kryss av kampene de viser, lagre.
-    Endringen er ute for leserne med det samme. Her ligger også brukerne:
-    hvem som har logget inn og når — og du kan gi noen en ny PIN, men
-    ingen kan lese den gamle.
+    Endringen er ute for leserne med det samme.
   </p>
 
-  <section>
+  <section id="adgang">
     <h2>Adgang</h2>
     <label for="passord">Adminpassord</label>
     <div class="rad">
       <input type="password" id="passord" autocomplete="current-password">
       <button id="loggInn" type="button">Logg inn</button>
-      <button class="lenke" id="loggUt" type="button" hidden>Logg ut</button>
     </div>
     <p class="melding" id="adgangMelding" role="status" aria-live="polite"></p>
     <p class="hint" id="adgangHint">
@@ -267,52 +361,82 @@
   </section>
 
   <div id="portal" hidden>
-  <section>
-    <h2>Pub</h2>
-    <label for="pub" class="visuelt-skjult">Velg pub</label>
-    <select id="pub"></select>
-    <p class="hint" id="pubHint"></p>
-  </section>
+  <!-- Pub og kamper er ÉN oppgave, og sto i to bokser. Pubvelgeren svarer
+       ikke pa noe uten lista under seg, og lista svarer pa feil sted uten
+       velgeren over. Hodet sier hvilken pub du star i — `settKamptittel`
+       skriver «Kamper Andy's Pub viser» der.
 
-  <!-- Handlingen star HER, ikke i en egen seksjon nederst. For la «Lagre»
+       Handlingen star HER, ikke i en egen seksjon nederst. For la «Lagre»
        etter Foreslatte steder, Steder og Brukere — tre seksjoner som ikke
        har noe med den a gjore — mens den lagret kampene her oppe. «Kryss
        av alle» la samme sted: en knapp som opererer pa en liste du ikke
        ser mens du trykker den. Meldt fra faktisk bruk 16. september 2026. -->
-  <section>
-    <h2 id="kampTittel">Kamper</h2>
-    <label for="liga">Liga</label>
-    <select id="liga"></select>
-    <ul class="kamper" id="kamper"><li><p class="hint">Henter kamper …</p></li></ul>
-    <p class="hint" id="kampHint"></p>
-    <!-- Klebrig: med tjue kamper i lista er knappen ute av syne nar du er
-         ferdig a krysse av, og da matte du scrolle tilbake for a lagre. -->
-    <div class="handling">
-      <div class="rad">
-        <button id="lagre" type="button" disabled>Lagre</button>
-        <button class="lenke" id="merkAlle" type="button">Kryss av alle</button>
-        <button class="lenke" id="merkIngen" type="button">Fjern alle</button>
+  <section class="seksjon">
+    <h2 class="seksjon-tittel">
+      <button class="seksjon-hode" id="kampHode" type="button"
+              aria-expanded="true" aria-controls="kampKropp">
+        <span class="seksjon-navn" id="kampTittel">Kamper</span>
+        <span class="seksjon-tall" id="kampTall"></span>
+        <span class="seksjon-pil" aria-hidden="true">▾</span>
+      </button>
+    </h2>
+    <div class="seksjon-kropp" id="kampKropp">
+      <label for="pub">Pub</label>
+      <select id="pub"></select>
+      <p class="hint" id="pubHint"></p>
+      <label for="liga">Liga</label>
+      <select id="liga"></select>
+      <ul class="kamper" id="kamper"><li><p class="hint">Henter kamper …</p></li></ul>
+      <p class="hint" id="kampHint"></p>
+      <!-- Klebrig: med tjue kamper i lista er knappen ute av syne nar du er
+           ferdig a krysse av, og da matte du scrolle tilbake for a lagre. -->
+      <div class="handling">
+        <div class="rad">
+          <button id="lagre" type="button" disabled>Lagre</button>
+          <button class="lenke" id="merkAlle" type="button">Kryss av alle</button>
+          <button class="lenke" id="merkIngen" type="button">Fjern alle</button>
+        </div>
+        <p class="melding" id="melding" role="status" aria-live="polite"></p>
       </div>
-      <p class="melding" id="melding" role="status" aria-live="polite"></p>
     </div>
   </section>
 
-  <section>
-    <h2>Foreslåtte steder</h2>
-    <p class="hint">Sendt inn av lesere. Ingenting havner i
-      <code>puber.js</code> av seg selv — du får raden her, og limer den
-      inn med koordinater og kilde. Det er derfor lista er verdt å stole på.</p>
-    <p class="hint" id="forslagHint">Henter forslagene …</p>
-    <div id="forslagListe"></div>
-    <p class="melding" id="forslagMelding" role="status" aria-live="polite"></p>
+  <!-- Koen apner seg selv nar den har noe i seg, og bare da — og bare til
+       du har rort den selv. Tallet i hodet er grunnen til at den kan ligge
+       lukket: uten det er en lukket seksjon en du glemmer. -->
+  <section class="seksjon">
+    <h2 class="seksjon-tittel">
+      <button class="seksjon-hode" id="forslagHode" type="button"
+              aria-expanded="false" aria-controls="forslagKropp">
+        <span class="seksjon-navn">Innmeldt fra lesere</span>
+        <span class="seksjon-tall" id="forslagTall"></span>
+        <span class="seksjon-pil" aria-hidden="true">▾</span>
+      </button>
+    </h2>
+    <div class="seksjon-kropp" id="forslagKropp" hidden>
+      <p class="hint">Sendt inn av lesere. Ingenting havner i
+        <code>puber.js</code> av seg selv — du får raden her, og limer den
+        inn med koordinater og kilde. Det er derfor lista er verdt å stole på.</p>
+      <p class="hint" id="forslagHint">Henter forslagene …</p>
+      <div id="forslagListe"></div>
+      <p class="melding" id="forslagMelding" role="status" aria-live="polite"></p>
+    </div>
   </section>
 
   <!-- Stedredigeringen (#80). puber.js er fortsatt grunnfjellet:
        den ligger i koden og virker uten nett. Det som lagres her er
        rettelsene oppa — nye steder, en adresse som flyttet, et sted som
        la ned. Fila rores aldri herfra. ADR 0020. -->
-  <section>
-    <h2>Steder</h2>
+  <section class="seksjon">
+    <h2 class="seksjon-tittel">
+      <button class="seksjon-hode" id="stedHode" type="button"
+              aria-expanded="false" aria-controls="stedKropp">
+        <span class="seksjon-navn">Steder</span>
+        <span class="seksjon-tall" id="stedTall"></span>
+        <span class="seksjon-pil" aria-hidden="true">▾</span>
+      </button>
+    </h2>
+    <div class="seksjon-kropp" id="stedKropp" hidden>
     <p class="hint" id="stedHint">Henter stedene …</p>
     <div class="rad">
       <button id="stedNytt" type="button">Nytt sted</button>
@@ -336,6 +460,21 @@
            gli fra den lista validatoren faktisk bruker, og da lover
            skjemaet noe annet enn det slipper gjennom. -->
       <p class="hint" id="stedPakrevdNote">Felt merket * må fylles ut.</p>
+
+      <!-- Trinn 1: hvem stedet er og hvor det ligger. Alt her svarer paa
+           det samme sporsmalet, og de fem veiene til et koordinat —
+           navnesok, adressesok, tastet, «Jeg star her», limt lenke — er
+           fem forsok paa ett felt. -->
+      <div class="trinn">
+        <h3 class="trinn-tittel">
+          <button class="trinn-hode" id="trinn1Hode" type="button"
+                  aria-expanded="true" aria-controls="trinn1Kropp">
+            <span class="trinn-navn">1. Hvem og hvor</span>
+            <span class="trinn-tall" id="trinn1Tall"></span>
+            <span class="seksjon-pil" aria-hidden="true">▾</span>
+          </button>
+        </h3>
+        <div class="trinn-kropp" id="trinn1Kropp">
 
       <div class="felt-blokk">
         <label for="stedNavn">Navn</label>
@@ -427,6 +566,25 @@
         <p class="hint" id="stedLenkeSvar" hidden></p>
       </div>
 
+        </div>
+      </div>
+
+      <!-- Trinn 2: hva vi vet om stedet. Type, sikkerhet, ligaflagg,
+           kilde og dato er vurderinger — ikke adresseopplysninger — og de
+           er de fem feltene som oftest hoppes over.
+           Tallet i hodet teller dem som mangler, sa et lukket trinn ikke
+           kan skjule at noe kreves. -->
+      <div class="trinn">
+        <h3 class="trinn-tittel">
+          <button class="trinn-hode" id="trinn2Hode" type="button"
+                  aria-expanded="false" aria-controls="trinn2Kropp">
+            <span class="trinn-navn">2. Hva vi vet</span>
+            <span class="trinn-tall" id="trinn2Tall"></span>
+            <span class="seksjon-pil" aria-hidden="true">▾</span>
+          </button>
+        </h3>
+        <div class="trinn-kropp" id="trinn2Kropp" hidden>
+
       <div class="felt-blokk felt-par">
         <div>
           <label for="stedType">Type</label>
@@ -506,15 +664,27 @@
         <textarea id="stedMerknad" maxlength="300"></textarea>
       </div>
 
+        </div>
+      </div>
+
       <div class="rad">
         <button id="stedLagre" type="button">Lagre stedet</button>
       </div>
     </form>
     <p class="melding" id="stedMelding" role="status" aria-live="polite"></p>
+    </div>
   </section>
 
-  <section>
-    <h2>Brukere</h2>
+  <section class="seksjon">
+    <h2 class="seksjon-tittel">
+      <button class="seksjon-hode" id="brukerHode" type="button"
+              aria-expanded="false" aria-controls="brukerKropp">
+        <span class="seksjon-navn">Brukere</span>
+        <span class="seksjon-tall" id="brukerTall"></span>
+        <span class="seksjon-pil" aria-hidden="true">▾</span>
+      </button>
+    </h2>
+    <div class="seksjon-kropp" id="brukerKropp" hidden>
     <!-- «Sist inne» kommer fra oktene, ikke fra last_sign_in_at.
          Det feltet er sist noen TASTET PIN-en, og appen holder telefonen
          innlogget med roterende fornyere (ADR 0009): en fornying er ingen
@@ -539,6 +709,7 @@
       <tbody id="brukerRader"></tbody>
     </table>
     <p class="melding" id="brukerMelding" role="status" aria-live="polite"></p>
+    </div>
   </section>
 
   <!-- Sonden mot TheSportsDB.
@@ -548,19 +719,29 @@
        oppgave som krever en terminal er ingen oppgave.
        Nøkkelen blir på serveren: v1 legger den i stien, og en spørring
        gjort fra en nettleser ville lagt den i historikken. -->
-  <section>
-    <h2>Hva gir TheSportsDB oss?</h2>
-    <p class="hint">Spør kilden direkte og viser hva som faktisk kom — om
-      hele sesongen finnes, og om spillerstatistikken bærer både mål og
-      sesong. Uten begge kan det ikke bli en toppscorerliste.
-      <strong>Seks kall per trykk</strong>, så trykk når du lurer, ikke
-      for å se på.</p>
-    <div class="rad">
-      <select id="sondeLiga" aria-label="Liga"></select>
-      <button id="sondeKjor" type="button">Spør kilden</button>
+  <section class="seksjon">
+    <h2 class="seksjon-tittel">
+      <button class="seksjon-hode" id="verktoyHode" type="button"
+              aria-expanded="false" aria-controls="verktoyKropp">
+        <span class="seksjon-navn">Verktøy</span>
+        <span class="seksjon-tall" id="verktoyTall"></span>
+        <span class="seksjon-pil" aria-hidden="true">▾</span>
+      </button>
+    </h2>
+    <div class="seksjon-kropp" id="verktoyKropp" hidden>
+      <h3 style="margin: 0 0 6px; font-size: 14px;">Hva gir TheSportsDB oss?</h3>
+      <p class="hint">Spør kilden direkte og viser hva som faktisk kom — om
+        hele sesongen finnes, og om spillerstatistikken bærer både mål og
+        sesong. Uten begge kan det ikke bli en toppscorerliste.
+        <strong>Seks kall per trykk</strong>, så trykk når du lurer, ikke
+        for å se på.</p>
+      <div class="rad">
+        <select id="sondeLiga" aria-label="Liga"></select>
+        <button id="sondeKjor" type="button">Spør kilden</button>
+      </div>
+      <pre class="forslag-kode" id="sondeSvar" hidden></pre>
+      <p class="melding" id="sondeMelding" role="status" aria-live="polite"></p>
     </div>
-    <pre class="forslag-kode" id="sondeSvar" hidden></pre>
-    <p class="melding" id="sondeMelding" role="status" aria-live="polite"></p>
   </section>
 
   </div>
