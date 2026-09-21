@@ -9,6 +9,113 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 21. september 2026 — «ser ingen forskjell på admin?»
+
+**Meldt som:** «ser ingen forskjell på admin?» — etter at «Ikke denne
+kvelden» nettopp var landet, og etter at flagget var satt på tre steder.
+
+**Det så ut som knappen.** Den var bygget dagen før, og hadde allerede
+vært usynlig én gang: portalen glemte å merke kampene med ligaen den
+spurte om, så `ligaflaggGjelder(pubrad.ligaer, k.liga)` fikk `undefined`
+inn. Det var rettet, testet fra portalsiden, og merget.
+
+**Alt i kjeden sjekket ut.** Flagget lå i basen på tre steder, og alle
+tre ga `true` mot `ligaflaggGjelder`. `pub-liste.mjs` valgte `ligaer` ut
+av Supabase, `tolkPubRader` bar det gjennom, `utenBasefelt` beholdt det,
+`slaSammenPuber` slapp det videre, og utrullingen på Netlify sto på
+riktig commit. Knappen var riktig bygget hele veien.
+
+**Årsaken lå ett hakk før.** En sonde av portalen i headless Chromium —
+logg inn, velg puben, tell knappene — ga null knapper og *26 steder i
+pubvelgeren*. Det tallet er `puber.js` alene. Hinten under lista sa det
+rett ut: «Viser bare puber.js: Logg inn i appen først.»
+
+`stedKall()` krevde et økt-token for **hvert** kall, også for
+`handling: "liste"` — en ren lesing. Tjenesten krever det bare for
+`lagre`; appen henter den samme lista med en naken GET. Portalen fornyer
+ikke økta selv, så den utløper mens admin-passordet står — og da falt
+hele rettelseslaget bort: ingen steder fra portalen i velgeren, og dermed
+ikke ett ligaflagg, for flagget bor bare i basen.
+
+Feilmeldinga sa det den var skrevet for å si: «Lagringen går med din egen
+økt.» Om et kall som ikke lagrer noe.
+
+**Det som ble gjort.** Kravet flyttet fra `stedKall` til de kallene som
+faktisk skriver. Og `hentSteder()` tegner nå kamplista om
+(`tegnKamperIgjen()`) når rettelsene lander — men aldri over en
+avkryssing som ikke er lagret.
+
+**Hvorfor testene var grønne.** `SAK_15F` gikk portalrunden riktig, men
+la en gyldig `sb-konto` i localStorage først — som alle de andre
+adminscenene. Ingen scene hadde noen gang kjørt portalen *uten* en økt,
+og det er den tilstanden en admin oftest er i. `SAK_15H` gjør det nå, og
+`SAK_15I` lar rettelsene lande etter kamplista.
+
+**Lærdommen:** et krav som gjelder alt, rammer også det som ikke stiller
+det. Og en test som logger inn overalt, tester aldri det å ikke være
+logget inn.
+
+---
+
+## 21. september 2026 — portalen var sju seksjoner, alle åpne
+
+**Meldt som:** «Admin menyen er blitt veldig lang og uoversiktelig.»
+
+**Målingen først.** Portalen er sju seksjoner. Fordelingen av markup:
+
+| Seksjon | Linjer |
+|---|---|
+| Steder | **201** |
+| Brukere | 27 |
+| Kamper | 17 |
+| Adgang | 14 |
+| Sonden | 14 |
+| Foreslåtte steder | 9 |
+| Pub | 6 |
+
+Lengden lå ikke i antallet seksjoner. Stedsskjemaet var 70 % av portalen
+alene — så en ren seksjonsdeling ville gjort siden kort helt til du
+trykket «Nytt sted», og da vært tilbake der den startet.
+
+**Det som ble gjort.** Seksjonene ble sammenleggbare, med appens eget
+mønster (`<button aria-expanded>` + `[hidden]`-panel, som `fotball.js`) —
+ikke `<details>`, som bare brukes ett sted i appen. Pub og Kamper var én
+oppgave i to bokser og ble én. Adgang forsvinner etter innlogging; den sto
+igjen som fem rader med ett deaktivert felt. Og stedsskjemaet ble to
+trinn: «Hvem og hvor», «Hva vi vet».
+
+**Det som var lett å gjøre galt.**
+
+*Et lukket hode uten tall er en seksjon du glemmer.* Derfor teller hvert
+hode sitt eget innhold — og tallet må si det samme som innholdet under:
+med bystedfilteret på sier «26» at lista har 26 rader mens skjermen viser
+én, så hodet skriver «1 av 27». Samme regel som hinten under den alt
+fulgte.
+
+*En knapp i køen sender deg til et skjema i en annen seksjon.* Er den
+lukket, åpnes stedet et sted ingen ser det, og `scrollIntoView` ruller til
+et skjult element — et trykk som svarer at det lyktes uten at noe skjedde.
+`apneSted()` åpner Steder.
+
+*«4 felt mangler» i rødt på et tomt skjema.* Første utgave merket trinnet
+rødt i det du åpnet et nytt sted. Et nytt sted er tomt — det er ikke en
+feil du har gjort. Rødt hører til etter at skjemaet ble bedt om noe det
+ikke kunne gjøre. Sett i skjermbildet, ikke av en test.
+
+**To ting i testrammen kom ut av dette.**
+
+`SAK_15E` sto **to ganger** i scenelista nederst i `run.mjs`. Et
+`Promise.all` på den samme promisen gir det samme resultatet to ganger
+uten å klage, så de tretten testene ble talt dobbelt — og tallet i
+`testing.md` finnes nettopp for å avsløre at noe ikke kjørte.
+
+Og begge vaktene i `SAK_15` som måler hele portalen — 16 px på feltene,
+320 px på bredden — målte plutselig en side der det meste var skjult. Et
+skjult panel har ingen bredde. `apneAlt()` åpner alt først: vakta skal
+måle portalen, ikke dagens tilstand.
+
+---
+
 ## 21. september 2026 — knappen ble bygget, merget, og var uråkelig
 
 **Meldt som:** «hvor er det mulig å sette unntak for en pub?»

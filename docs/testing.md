@@ -6,7 +6,7 @@ dager. Legger du til tester, er det denne fila som skal rettes.
 
     node test/unit.mjs      811 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  386 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       788 tester, 3–20 s, headless Chromium
+    node test/run.mjs       816 tester, 3–20 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
@@ -90,6 +90,20 @@ Bare den ene fjernet — den som gjaldt *nettopp det som var meldt* — felte
 ingen av dem. Vakta for den ekte rundturen fantes ikke, og ble skrevet
 etterpå. En fiks med to inngangspunkter trenger en sabotasje per
 inngangspunkt.
+
+**Scenelista nederst kan liste den samme scenen to ganger.** `SAK_15E`
+sto to steder i `Promise.all([…])` fram til 21. september 2026, og da ble
+de tretten testene i den talt dobbelt. Tallet i denne fila var altså for
+høyt — og tallet finnes nettopp for å avsløre at noe ikke kjørte. Et
+`Promise.all` på den samme promisen gir det samme resultatet to ganger
+uten å klage. Legger du til en scene: sjekk at navnet ikke alt står der,
+og at antallet flyttet seg så mye som scenen faktisk inneholder.
+
+**En vakt som måler hele sida, må åpne den først.** Portalen ble
+sammenleggbar 21. september 2026, og da sto de fleste seksjonene lukket.
+Både 16 px-vakta og 320 px-vakta i `SAK_15` måler *alt* — og et skjult
+panel har ingen bredde. Uten `apneAlt()` ville de sagt «alt er bra» om
+felt som står én knapp unna. Vakta måler portalen, ikke dagens tilstand.
 
 **En bakoverfnutt i en kommentar sprenger hele fila.** Scenene i
 `run.mjs` er maler (`` ` ``), sa ``// `sist` er PIN-datoen`` avslutter
