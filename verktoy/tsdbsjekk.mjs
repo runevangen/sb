@@ -19,7 +19,8 @@
 // kall per liga, og TheSportsDB ber om fair use.
 
 import { LIGAER, ligaFor, sesongFor, tsdbSesong, tsdbHeadere,
-         tsdbSondeStier, tsdbForsteListe, tsdbSondeFunn, tsdbPlukkId }
+         tsdbSondeStier, tsdbForsteListe, tsdbSondeFunn, tsdbPlukkId,
+         tsdbSondeParset }
   from "../fotball-data.js";
 
 const ROT = "https://www.thesportsdb.com";
@@ -101,6 +102,16 @@ for (const liga of ligaer) {
         : "INGEN rundetall — kan ikke grupperes"));
     }
     console.log("      felt: " + funn.felt.slice(0, 12).join(", "));
+
+    // VAAR EGEN parser, mot det ekte svaret. Feltnavnene alene svarer
+    // ikke paa om fanen kan tegnes — det gjor dette.
+    if (p.felt === "events" || p.felt === "schedule") {
+      const q = tsdbSondeParset(json);
+      console.log("      VÅR PARSER: " + (q.feil ? "kastet — " + q.feil
+        : q.kamper + " kamper, " + q.spilt + " spilt, "
+          + q.medResultat + " med resultat, " + q.medRunde + " med runde"));
+      if (q.prove) console.log("      eksempel: " + q.prove);
+    }
 
     // DET SOM AVGJØR for spillerstatistikken: bærer raden mål, og står
     // sesongen på den? Uten begge kan den ikke bli en toppscorerliste,

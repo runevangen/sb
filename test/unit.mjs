@@ -19,7 +19,8 @@ import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          FANER, DELER, DEL_NAVN,
          kamplenke, tolkKamplenke, invitasjonstekst, stedtekst, STED_MAKS,
          kampNokkel, gyldigKampId, kanalFor, sjekkKanalliste,
-         tsdbSondeStier, tsdbForsteListe, tsdbSondeFunn, tsdbPlukkId }
+         tsdbSondeStier, tsdbForsteListe, tsdbSondeFunn, tsdbPlukkId,
+         tsdbSondeParset }
   from "../fotball-data.js";
 
 import { normaliserEpost, gyldigEpost, normaliserKode, gyldigKode, maskerEpost,
@@ -1174,6 +1175,45 @@ ok("spiller-id ut av en spillerliste",
    tsdbPlukkId([{ idPlayer: "34145937" }], "spiller") === "34145937");
 ok("og en liste uten id gir tom streng, ikke et gjettet tall",
    tsdbPlukkId([{ strPlayer: "Ola" }], "spiller") === "");
+
+// Feltnavnene alene svarer ikke.
+//
+// Sonden viser de tolv forste, og `intHomeScore` var ikke blant dem i
+// sesongsvaret 21. september 2026. «Er feltene der» er dessuten feil
+// sporsmal — det riktige er om VAAR EGEN parser gir kamper vi kan VISE.
+const SESONGSVAR = { events: [
+  { idEvent: "1", intRound: "23", strHomeTeam: "Brann", strAwayTeam: "Viking",
+    intHomeScore: "2", intAwayScore: "1", strTimestamp: "2026-09-20T17:00:00",
+    strStatus: "Match Finished" },
+  { idEvent: "2", intRound: "30", strHomeTeam: "Molde", strAwayTeam: "Rosenborg",
+    intHomeScore: null, intAwayScore: null, strTimestamp: "2026-11-20T17:00:00" },
+] };
+const PARSET = tsdbSondeParset(SESONGSVAR, Date.UTC(2026, 8, 25));
+ok("sonden kjorer den ekte parseren", PARSET.kamper === 2, PARSET.kamper);
+// Hele sesongen kommer i ett svar, ogsa kamper som ikke er spilt. Skal
+// den bli en resultatliste, ma de skilles — og tallet sier om de kan det.
+ok("og skiller spilte fra uspilte", PARSET.spilt === 1, PARSET.spilt);
+ok("og teller dem med resultat", PARSET.medResultat === 1, PARSET.medResultat);
+ok("og dem med rundetall", PARSET.medRunde === 2, PARSET.medRunde);
+// Et tall kan vaere riktig av feil grunn; en rad kan leses.
+ok("og viser en ferdig rad",
+   PARSET.prove === "Runde 23: Brann 2–1 Viking  (2026-09-20)", PARSET.prove);
+
+// DET SOM AVSLORER et svar uten resultater: null i stillinga. Uten dette
+// ville et sesongsvar uten `intHomeScore` sett helt i orden ut — 240
+// kamper, 30 runder — og Resultater blitt tom.
+const UTEN_MAL = tsdbSondeParset({ events: [
+  { idEvent: "1", intRound: "23", strHomeTeam: "Brann", strAwayTeam: "Viking",
+    strTimestamp: "2026-09-20T17:00:00" }] }, Date.UTC(2026, 8, 25));
+ok("et svar uten resultater avslores",
+   UTEN_MAL.kamper === 1 && UTEN_MAL.spilt === 0 && UTEN_MAL.medResultat === 0,
+   JSON.stringify(UTEN_MAL));
+ok("og raden viser null der stillinga skulle statt",
+   UTEN_MAL.prove.indexOf("null–null") > -1, UTEN_MAL.prove);
+
+// En parser som kaster skal si det, ikke se ut som null kamper.
+ok("en parser som kaster sier hva den sa",
+   !!tsdbSondeParset({ tullete: 1 }).feil, JSON.stringify(tsdbSondeParset({ tullete: 1 })));
 
 /* ---------------- fotball: lagnavn ---------------- */
 

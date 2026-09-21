@@ -864,6 +864,37 @@ export function tsdbSondeFunn(liste) {
   return ut;
 }
 
+// Hva VAAR EGEN PARSER faar ut av svaret.
+//
+// Feltnavnene alene svarer ikke: sonden viser de tolv forste, og
+// `intHomeScore` var ikke blant dem i sesongsvaret 21. september 2026.
+// «Er feltene der» er dessuten feil sporsmal — det riktige er om
+// `tolkKamperTsdb` produserer kamper vi kan VISE.
+//
+// Derfor kjores den ekte parseren her, mot det ekte svaret. Da er det
+// ingen gjetning igjen: tallene under er det leseren ville faatt.
+export function tsdbSondeParset(json, naa) {
+  const ut = { kamper: 0, spilt: 0, medRunde: 0, medResultat: 0, prove: null };
+  let kamper;
+  try { kamper = tolkKamperTsdb(json, naa); }
+  catch (err) { ut.feil = err.message; return ut; }
+  ut.kamper = kamper.length;
+  kamper.forEach((k) => {
+    if (k.spilt) ut.spilt += 1;
+    if (k.runde) ut.medRunde += 1;
+    if (k.malHjemme !== null && k.malBorte !== null) ut.medResultat += 1;
+  });
+  // En spilt kamp, slik den ville sett ut i fanen. Et tall kan vaere
+  // riktig av feil grunn; en rad kan leses.
+  const en = kamper.find((k) => k.spilt) || kamper[0];
+  if (en) {
+    ut.prove = en.runde + ": " + en.hjemme + " " + en.malHjemme
+      + "–" + en.malBorte + " " + en.borte
+      + (en.dato ? "  (" + String(en.dato).slice(0, 10) + ")" : "  UTEN DATO");
+  }
+  return ut;
+}
+
 // Lag- og spiller-id plukket ut av en liste vi alt har hentet.
 export function tsdbPlukkId(liste, slag) {
   const nokler = slag === "spiller"

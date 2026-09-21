@@ -828,6 +828,13 @@ spørsmål kode ikke kan svare på alene.
   ikke en mangel.
   **Nøkkelen maskeres i adressene som skrives ut.** v1 legger den i stien,
   og en nøkkel i en terminal er en nøkkel i et skjermbilde.
+  **Den kjører vår egen parser mot svaret.** Feltnavnene alene svarer ikke:
+  sonden viser de tolv første, og `intHomeScore` var ikke blant dem i
+  sesongsvaret 21. september 2026. «Er feltene der» er dessuten feil
+  spørsmål — det riktige er om `tolkKamperTsdb()` gir kamper vi kan
+  **vise**. `tsdbSondeParset()` teller kamper, spilte, med resultat og med
+  runde, og skriver ut én ferdig rad: et tall kan være riktig av feil
+  grunn, en rad kan leses.
   **Stiene ligger i `fotball-data.js`, ikke her.** Skriptet er et skall
   rundt `tsdbSondeStier()`, `tsdbForsteListe()`, `tsdbSondeFunn()` og
   `tsdbPlukkId()` — de samme `/api/tsdb-sonde` leser. En vakt i
