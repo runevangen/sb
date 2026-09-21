@@ -9,6 +9,54 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 21. september 2026 — «ser ingen forskjell på admin?»
+
+**Meldt som:** «ser ingen forskjell på admin?» — etter at «Ikke denne
+kvelden» nettopp var landet, og etter at flagget var satt på tre steder.
+
+**Det så ut som knappen.** Den var bygget dagen før, og hadde allerede
+vært usynlig én gang: portalen glemte å merke kampene med ligaen den
+spurte om, så `ligaflaggGjelder(pubrad.ligaer, k.liga)` fikk `undefined`
+inn. Det var rettet, testet fra portalsiden, og merget.
+
+**Alt i kjeden sjekket ut.** Flagget lå i basen på tre steder, og alle
+tre ga `true` mot `ligaflaggGjelder`. `pub-liste.mjs` valgte `ligaer` ut
+av Supabase, `tolkPubRader` bar det gjennom, `utenBasefelt` beholdt det,
+`slaSammenPuber` slapp det videre, og utrullingen på Netlify sto på
+riktig commit. Knappen var riktig bygget hele veien.
+
+**Årsaken lå ett hakk før.** En sonde av portalen i headless Chromium —
+logg inn, velg puben, tell knappene — ga null knapper og *26 steder i
+pubvelgeren*. Det tallet er `puber.js` alene. Hinten under lista sa det
+rett ut: «Viser bare puber.js: Logg inn i appen først.»
+
+`stedKall()` krevde et økt-token for **hvert** kall, også for
+`handling: "liste"` — en ren lesing. Tjenesten krever det bare for
+`lagre`; appen henter den samme lista med en naken GET. Portalen fornyer
+ikke økta selv, så den utløper mens admin-passordet står — og da falt
+hele rettelseslaget bort: ingen steder fra portalen i velgeren, og dermed
+ikke ett ligaflagg, for flagget bor bare i basen.
+
+Feilmeldinga sa det den var skrevet for å si: «Lagringen går med din egen
+økt.» Om et kall som ikke lagrer noe.
+
+**Det som ble gjort.** Kravet flyttet fra `stedKall` til de kallene som
+faktisk skriver. Og `hentSteder()` tegner nå kamplista om
+(`tegnKamperIgjen()`) når rettelsene lander — men aldri over en
+avkryssing som ikke er lagret.
+
+**Hvorfor testene var grønne.** `SAK_15F` gikk portalrunden riktig, men
+la en gyldig `sb-konto` i localStorage først — som alle de andre
+adminscenene. Ingen scene hadde noen gang kjørt portalen *uten* en økt,
+og det er den tilstanden en admin oftest er i. `SAK_15H` gjør det nå, og
+`SAK_15I` lar rettelsene lande etter kamplista.
+
+**Lærdommen:** et krav som gjelder alt, rammer også det som ikke stiller
+det. Og en test som logger inn overalt, tester aldri det å ikke være
+logget inn.
+
+---
+
 ## 21. september 2026 — portalen var sju seksjoner, alle åpne
 
 **Meldt som:** «Admin menyen er blitt veldig lang og uoversiktelig.»

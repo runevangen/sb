@@ -991,6 +991,22 @@ function tegnKamper() {
   oppdaterLagreknapp();
 }
 
+// Kamplista pa nytt nar rettelsene lander. Det som kommer over nettet,
+// lander etter at visningen star ferdig — samme leksa som `tegnSvar()` i
+// appen og `tegnKjenteIgjen()` i kortet, og her betyr den ligaflagget:
+// `puber.js` har ingen `ligaer`, sa en kamplista tegnet for
+// `/api/pub-liste` svarte leser en pubrad uten pastand, og «Ikke denne
+// kvelden» uteblir til noe annet tegner lista om.
+//
+// Men aldri over en avkryssing du ikke har lagret: `tegnKamper` bygger
+// lista pa nytt fra `visninger`, og hakene dine ville ryket. Star det noe
+// ulagret, blir lista staende — knappen kommer neste gang den tegnes.
+function tegnKamperIgjen() {
+  if (!kamper.length) return;
+  if (lagretSignatur !== null && valgtSignatur() !== lagretSignatur) return;
+  tegnKamper();
+}
+
 // «Lagre» alene sier ikke hva den lagrer. Antallet og pubnavnet gjor at du
 // ser hva du er i ferd med a gjore for du gjor det — og fanger den ene
 // feilen som ellers er usynlig: feil pub valgt.
@@ -1537,15 +1553,30 @@ function stedMelding(tekst, art) {
   m.className = "melding" + (art ? " " + art : "");
 }
 
+// Kallene som bare LESER. Tjenesten krever ingen token for dem: «liste»
+// og de to sokene gar som var egen nokkel, og appen henter den samme
+// lista med en naken GET. Bare `lagre` slar opp uid-en i basen, og det er
+// den ene som ma ga med skriverens egen okt.
+const STED_LESER = ["liste", "sok", "sok-adresse"];
+
 async function stedKall(kropp) {
   const okt = lesOkt();
-  if (!okt || !okt.token) {
+  const token = (okt && okt.token) || "";
+  // Kravet sto pa HELE stedKall, og gjaldt dermed lesinga ogsa. En admin
+  // med gyldig passord, men uten en levende okt i nettleseren, fikk da
+  // «Viser bare puber.js» — og pubvelgeren sto igjen med de 26 stedene i
+  // fila. Ikke ett sted fra portalen, og dermed ikke ett ligaflagg: de
+  // bor bare i basen. «Ikke denne kvelden» kunne ikke sta noe sted,
+  // uansett hvor riktig knappen var bygget.
+  //
+  // Meldt 21. september 2026: «ser ingen forskjell pa admin?»
+  if (!token && STED_LESER.indexOf(String((kropp && kropp.handling) || "")) === -1) {
     throw new Error("Logg inn i appen først. Lagringen går med din egen økt.");
   }
   const respons = await fetch("/api/pub-liste", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(Object.assign({ passord, token: okt.token }, kropp)),
+    body: JSON.stringify(Object.assign({ passord, token }, kropp)),
   });
   const data = JSON.parse(await respons.text());
   if (!respons.ok || !data || data.feil) {
@@ -1569,6 +1600,9 @@ async function hentSteder() {
     pubRettelser = data.puber || [];
     tegnSteder();
     tegnPubvelger();
+    // Og kamplista: ligaflagget bor bare i basen, sa pubraden `tegnKamper`
+    // leste for dette svaret bar ingen pastand a si imot.
+    tegnKamperIgjen();
     // Og koen paa nytt. Det som kommer over nettet, lander etter at
     // visningen staar ferdig — den samme leksa som `tegnSvar()` i appen og
     // `tegnKjenteIgjen()` i kortet.

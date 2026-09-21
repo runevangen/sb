@@ -631,6 +631,25 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   siste rettelsen bort i portalen, er det tomme svaret det riktige, og
   appen skal falle tilbake til fila framfor å bli stående med en rad ingen
   har lenger. `klar` skiller «ingen rettelser» fra «tjenesten svarte ikke».
+- **Portalen leser stedene uten en økt, og skriver med den.** `stedKall()`
+  krevde et token for *hvert* kall, og «liste» er en ren lesing: appen
+  henter den samme lista med en naken GET, og bare `lagre` slår opp uid-en
+  i basen. Følgen var at en admin med gyldig passord, men med en utløpt
+  økt fra appen, fikk «Viser bare puber.js» — pubvelgeren sto igjen med de
+  26 stedene i fila, og da bar ingen pubrad ligaflagget, for det bor bare
+  i basen. «Ikke denne kvelden» kunne ikke stå noe sted, uansett hvor
+  riktig knappen var bygget. Portalen fornyer ikke økta selv, så den
+  utløper mens passordet står — og et krav som gjelder alt, rammer det som
+  ikke stiller det. Meldt 21. september 2026: «ser ingen forskjell på
+  admin?».
+- **Og kamplista tegnes om når rettelsene lander.** Fjerde gang den samme
+  runden: `tegnSvar()` i appen, `tegnKjenteIgjen()` i kortet,
+  `tegnForslagIgjen()` i køen — og nå `tegnKamperIgjen()`. Ligaflagget bor
+  bare i basen, så pubraden `tegnKamper` leste før `/api/pub-liste` svarte
+  bærer ingen påstand å si imot. **Men aldri over en avkryssing du ikke
+  har lagret:** `tegnKamper` bygger lista på nytt fra `visninger`, og
+  hakene dine ville ryket. Står det noe ulagret, blir lista stående, og
+  knappen kommer neste gang lista tegnes.
 - **«Kommende» viser hele vinduet**, ikke én runde, med en overskrift per
   runde. Taket på tjue id-er mot `/api/svar` holdes av buntingen i
   `hentSvarFor()`, ikke av at lista kappes i forkant.

@@ -724,6 +724,19 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
 - **«Ta stedet ut» lagrer ikke.** Den åpner stedet med haken satt, og et
   menneske trykker lagre. Et tips fra en forbipasserende er ikke et unntak
   fra [ADR 0019](adr/0019-pubforslag.md) — det er grunnen til at den finnes.
+- **Og kamplista tegnes om sammen med den.** `tegnKamperIgjen()` kalles
+  fra samme sted. Ligaflagget bor bare i basen — `puber.js` har ingen
+  `ligaer` — så pubraden `tegnKamper` leste før svaret bærer ingen påstand
+  å si imot, og «Ikke denne kvelden» uteblir. Men den står over en
+  avkryssing som ikke er lagret: `tegnKamper` bygger lista på nytt fra
+  `visninger`, og hakene ville ryket.
+- **`stedKall()` krever økta bare av de kallene som skriver.**
+  `STED_LESER` er de tre som ikke gjør det — `liste`, `sok`,
+  `sok-adresse` — og tjenesten krever ingen token for dem. Sto kravet på
+  hele funksjonen, mistet en admin med utløpt økt hele rettelseslaget:
+  pubvelgeren sto igjen med de 26 stedene i fila, og ingen av dem bærer et
+  ligaflagg. Portalen fornyer ikke økta selv, så den tilstanden er den
+  vanlige, ikke den sjeldne.
 
 ### `personvern.html`
 
