@@ -4,9 +4,9 @@
 kommandoene, men ikke tallene: de sto i tre filer og glei fire ganger på to
 dager. Legger du til tester, er det denne fila som skal rettes.
 
-    node test/unit.mjs      805 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      811 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  405 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       809 tester, 3–20 s, headless Chromium
+    node test/run.mjs       822 tester, 3–20 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
@@ -259,5 +259,14 @@ til angring, og hele fotballmodulen.
 - **Template-literal-feller:** bakstreker spises (bruk enkeltfnutter inne
   i selektorer), og en bakstrek-apostrof i en kommentar avslutter
   literalen.
+  **Og den kommer som vane, ikke som slurv:** den vanligste formen er et
+  kodeord i fnutter i en kommentar — «regelen `merke: "spok"`», «flagget
+  `--window-size`». Det er Markdown-refleksen, og den satt i fingrene to
+  ganger på én dag 21. september 2026. Symptomet peker ikke på linja:
+  du får `SyntaxError` et sted **etter** scenen, der neste `kjor(`
+  begynner, og med en melding om noe helt annet — «missing ) after
+  argument list» eller «Invalid left-hand side expression in postfix
+  operation», det siste fordi `--noe` da leses som en dekrement.
+  Skriv kodeord uten fnutter inne i en scene.
 - **En `pull_request`-kjøring tester grenen flettet med `main`.** En test
   som er ny på main kjører der før den finnes lokalt.

@@ -2441,6 +2441,39 @@ ok("hver modul appen importerer ligger i service workerens skall",
 ok("testen fant faktisk noen importer a sjekke",
    importert.size >= 10, importert.size);
 
+/* ---------------- folg systemet (#148) ---------------- */
+
+// Temaet regnes ut TO steder: i app.js, og i forhandsskriptet i
+// index.html som ma kjore for forste maling. Duplikatet er med vilje —
+// app.js er en modul og kommer for sent til a hindre et glimt av feil
+// tema — men to kopier av en regel glir fra hverandre, og her ville
+// folgen vaert nettopp det glimtet skriptet finnes for a unnga.
+//
+// run.mjs maaler at appen svarer riktig. Denne holder at det andre stedet
+// stiller de samme sporsmalene.
+const INDEKS = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const APPKODE = readFileSync(new URL("../app.js", import.meta.url), "utf8");
+const FORHAND = INDEKS.slice(0, INDEKS.indexOf("</script>"));
+
+ok("forhandsskriptet leser det nye temafeltet", /lagret\.tema/.test(FORHAND));
+ok("og den gamle boolske formen, sa et valg fra for ikke ryker",
+   /lagret\.svart/.test(FORHAND));
+ok("og det sporr systemet nar valget er «system»",
+   /prefers-color-scheme: dark/.test(FORHAND) && /"system"/.test(FORHAND));
+ok("begge stedene spor om det samme",
+   /prefers-color-scheme: dark/.test(APPKODE));
+
+// Lytteren som gjor at «folg systemet» folger et bytte mens appen staar
+// apen. run.mjs naar den ikke — lytteren henger pa det ekte
+// matchMedia-objektet fra sidelastingen — sa dette er det eneste som
+// sier fra om den forsvinner.
+ok("appen lytter etter at systemet bytter",
+   /addEventListener\("change"/.test(APPKODE) || /addListener/.test(APPKODE));
+
+// Og den gamle formen skrives aldri tilbake: to felt om det samme er to
+// sannheter, og den gamle ville blitt staende og lyve.
+ok("readPrefs kaster det gamle feltet", /delete\s+lagret\.svart/.test(APPKODE));
+
 /* ---------------- spoken som ikke lenger star i lista (#25) ---------------- */
 
 // Sju spoker sto i ADS til 21. september 2026. De gikk ut fordi de to

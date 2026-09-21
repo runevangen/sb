@@ -27,7 +27,18 @@
   // oyeblikk for valget leses inn.
   try {
     var lagret = JSON.parse(localStorage.getItem("sb-visning")) || {};
-    if (lagret.svart) document.documentElement.setAttribute("data-theme", "svart");
+    // Samme regning som temaAv() og morktNa() i app.js, med vilje
+    // duplisert: app.js er en modul og kjorer forst etter forste maling,
+    // og en import her ville gitt nettopp det glimtet dette skriptet
+    // finnes for a unnga. Endres reglene der, ma denne folge — en vakt i
+    // test/run.mjs slar ut om de to er uenige.
+    // `tema` er «lys», «svart» eller «system»; `svart` er den gamle
+    // boolske formen, og den leses fortsatt.
+    var tema = lagret.tema || (lagret.svart ? "svart" : "lys");
+    var morkt = tema === "svart" ||
+      (tema === "system" && window.matchMedia &&
+       window.matchMedia("(prefers-color-scheme: dark)").matches);
+    if (morkt) document.documentElement.setAttribute("data-theme", "svart");
     if (lagret.stor)  document.documentElement.setAttribute("data-font", "stor");
   } catch (e) { /* privat modus: standardvisning */ }
 </script>
@@ -61,6 +72,8 @@
           <div class="segment" role="group" aria-label="Fargetema">
             <button class="segment-del" id="temaLys" type="button">Lyst</button>
             <button class="segment-del" id="temaSvart" type="button">Mørkt</button>
+            <button class="segment-del" id="temaSystem" type="button"
+                    aria-label="Følg systemet">Auto</button>
           </div>
           <div class="segment" role="group" aria-label="Skriftstørrelse">
             <button class="segment-del" id="skriftNormal" type="button" aria-label="Normal skrift">A</button>
