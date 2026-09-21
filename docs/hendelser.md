@@ -9,6 +9,54 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 21. september 2026 — knappen ble bygget, merget, og var uråkelig
+
+**Meldt som:** «hvor er det mulig å sette unntak for en pub?»
+
+**Svaret var: ingen steder.** «Ikke denne kvelden» ble merget en time før,
+med fire sabotasjer og en PR som sa at hullet var tettet. Knappen sto
+aldri i portalen.
+
+**Årsaken.** Vilkåret som tegner den:
+
+    if (pubrad && ligaflaggGjelder(pubrad.ligaer, k.liga)) {
+
+`k.liga` er `undefined` i portalen. Tjenesten sender ikke ligaen per kamp
+— `tolkKamper()` ser ett datasett om gangen og vet ikke hvem som spurte —
+så den som spør må sette feltet. `fotball.js` gjør det i `hent()`, med en
+kommentar som forklarer hvorfor det må skje der. `admin.js` henter kamper
+gjennom sitt eget kall og glemte det.
+
+Så `ligaflaggGjelder()` fikk `undefined` inn og svarte nei hver gang.
+
+**Hvorfor testene sa grønt.** Nettlesertesten stubbet en ferdig
+`viser: false`-rad inn i `/api/svar` og målte at appen dempet 📺. Den
+beviste at nei-et **virker**. Den sa ingenting om at det går an å **sette**.
+
+Halve rundturen, testet grundig. Den andre halvdelen fantes ikke.
+
+Det er fella `testing.md` alt beskriver — en test som stiller seg der
+svaret er opplagt. Sist gjaldt det geografi: en test som sto i døra på
+puben den skulle finne. Denne gangen var det siden: appen testet, portalen
+ikke.
+
+**Hva som ble gjort.** `admin.js` merker kampene med ligaen den spurte om,
+som appen gjør. Og `SAK_15F` går portalveien: velger et sted med flagg og
+krever at knappen står der, at et sted uten flagg ikke får den, at et ja
+slår av et nei og omvendt, og at nei-et sendes som sin egen liste.
+
+**Én ting til kom ut av det.** Håndtereren som rydder motstrid leste
+`e.target`. Et ekte klikk gir haken som mål, men et kryss satt fra kode
+gir lista — og da fant `closest()` ingenting. Testen avslørte det, og
+regelen leser nå hele lista, som `oppdaterLagreknapp`. En regel som bare
+gjelder den ene veien noen rører haken, er en regel som ikke gjelder.
+
+**Hva som fanget det.** Tre sabotasjer. Den første er hele saken: tas
+merkinga ut igjen, svarer testen **«0 knapper»** — nøyaktig det som sto i
+portalen i en time.
+
+---
+
 ## 21. september 2026 — flagget kunne ikke sies imot
 
 **Meldt som:** «Fikse hullet» — det som ble notert da ligaflagget ble

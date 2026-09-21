@@ -763,6 +763,17 @@ async function hentKamper() {
     const data = JSON.parse(await respons.text());
     if (data.feil) throw new Error(data.feil);
     kamper = data.kamper || [];
+    // Kampen ma vite hvilken liga den kom fra. Tjenesten sender det ikke
+    // per kamp — `tolkKamper` ser ett datasett om gangen og vet ikke hvem
+    // som spurte — sa den som spurte ma merke dem. Appen gjor nettopp
+    // dette i `fotball.js` (hent()), og portalen glemte det.
+    //
+    // Folgen var at «Ikke denne kvelden» ALDRI sto i kamplista:
+    // `ligaflaggGjelder(pubrad.ligaer, k.liga)` fikk `undefined` inn og
+    // svarte nei hver gang. Knappen ble bygget, testet fra appsiden, og
+    // var uraakelig i portalen — den ene halvdelen av rundturen ingen
+    // test gikk.
+    kamper.forEach((k) => { k.liga = liga; });
     // Funksjonen gir hele vinduet av kommende kamper, ikke bare neste
     // runde: en pub som vet hva den viser om to uker, skal kunne fore det
     // inn na. Leseren ser fortsatt en runde om gangen.
@@ -1023,13 +1034,21 @@ felt("merkIngen").addEventListener("click", () => {
 // Krysser du av en kamp som sto som «viser ikke», er det ja-et som
 // gjelder: de to er motsatte pastander om den samme kampen, og den du
 // nettopp gjorde er den ferskeste.
-felt("kamper").addEventListener("change", (e) => {
-  const boks = e.target && e.target.closest ? e.target.closest(".kamp input") : null;
-  if (boks && boks.checked) {
-    const rad = boks.closest("li");
-    const nei = rad && rad.querySelector(".kamp-nei");
-    if (nei && nei.dataset.nei === "1") { nei.dataset.nei = ""; tegnNei(nei); }
-  }
+//
+// Leser HELE lista framfor `e.target`, som `oppdaterLagreknapp` gjor.
+// Et ekte klikk gir haken som mal, men et kryss satt fra kode gir lista —
+// og da fant `closest()` ingenting. En regel som bare gjelder den ene
+// veien noen rorer haken, er en regel som ikke gjelder.
+function ryddMotstrid() {
+  Array.from(document.querySelectorAll(".kamp-nei")).forEach((nei) => {
+    if (nei.dataset.nei !== "1") return;
+    const rad = nei.closest("li");
+    const boks = rad && rad.querySelector(".kamp input");
+    if (boks && boks.checked) { nei.dataset.nei = ""; tegnNei(nei); }
+  });
+}
+felt("kamper").addEventListener("change", () => {
+  ryddMotstrid();
   oppdaterLagreknapp();
 });
 
