@@ -168,7 +168,7 @@ tall fra API-Football, med sesongen tydelig merket over tabellen.
 
 - **Leses av:** `netlify/functions/fotball.mjs`
 - **Sendes som:** to måter, fordi vi ikke vet hvilken utgave nøkkelen er for. Først v2 (`/api/v2/json/`, nøkkelen i headeren `X-API-KEY`), så v1 (nøkkelen i selve adressen). Patreon gir begge.
-- **Uten den:** testnøkkelen `3` brukes. Den virker, men **kapper svarene** — fem tabellrader, én kamp i listene. Et avkortet svar vises aldri som årets: `TSDB_MINST` i `fotball-data.js` (`{tabell: 10, resultater: 2, neste: 2}`) er grensen for hva som regnes som helt, og under den faller vi tilbake til API-Football.
+- **Uten den:** testnøkkelen `3` brukes. Den virker, men **kapper svarene** — fem tabellrader, én kamp i listene. Et avkortet svar vises aldri som årets: `TSDB_MINST` i `fotball-data.js` (`{tabell: 10, resultater: 20, neste: 2}`) er grensen for hva som regnes som helt, og under den faller vi tilbake til API-Football. `resultater` gikk fra 2 til 20 den 21. september 2026, da spørringa ble «hele sesongen» — et sesongsvar er 240 rader, så femten er en kapping, ikke en liten sesong.
 - **Sonden i portalen** (*Hva gir TheSportsDB oss?*) spør kilden med denne
   nøkkelen og viser hva som faktisk kom. **Nøkkelen blir på serveren:** v1
   legger den i *stien*, så den samme spørringa gjort fra en nettleser ville

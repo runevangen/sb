@@ -15,7 +15,7 @@ import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          ligaForKategori,
          apiSti, tolkKamper, kampeneFramover, tolkFotballHash, fotballHash,
          tilgjengeligSesong, SESONGVINDU, redaksjonsnavn, normaliserLagnavn,
-         tsdbSti, tsdbHeadere, tolkKamperTsdb, tolkTabellTsdb, tsdbSesong, delingstekst, tidstekst, HVOR,
+         tsdbSti, tsdbHeadere, tolkKamperTsdb, tolkTabellTsdb, tsdbSesong, TSDB_MINST, delingstekst, tidstekst, HVOR,
          FANER, DELER, DEL_NAVN,
          kamplenke, tolkKamplenke, invitasjonstekst, stedtekst, STED_MAKS,
          kampNokkel, gyldigKampId, kanalFor, sjekkKanalliste,
@@ -321,12 +321,24 @@ ok("ingen lag gir tom tekst", listeTekst([]) === "" && listeTekst(null) === "");
 ok("adressen bruker testnokkelen 3 som standard",
    tsdbSti("neste", LIGAER.eliteserien) === "/api/v1/json/3/eventsnextleague.php?id=4358",
    tsdbSti("neste", LIGAER.eliteserien));
+const HOST_TID = new Date(Date.UTC(2026, 8, 10));
 // Med nokkel: v2, og nokkelen star ikke i adressen — den gar i en header.
 ok("v2 for neste",
    tsdbSti("neste", LIGAER.premier, "hemmelig", undefined, "v2") === "/api/v2/json/schedule/next/league/4328",
    tsdbSti("neste", LIGAER.premier, "hemmelig", undefined, "v2"));
-ok("v2 for resultater",
-   tsdbSti("resultater", LIGAER.eliteserien, "hemmelig", undefined, "v2") === "/api/v2/json/schedule/previous/league/4358");
+// Resultater spor om HELE sesongen, ikke de forrige kampene.
+//
+// `schedule/previous/league` ga femten hendelser, og da sa fanen «kun
+// siste runde». Malt med sonden 21. september 2026: sesongsvaret er 240
+// rader, 30 ulike runder, 168 spilte med resultat. De uspilte siles i
+// funksjonen, ikke i adressen.
+ok("v2 for resultater spor om hele sesongen",
+   tsdbSti("resultater", LIGAER.eliteserien, "hemmelig", HOST_TID, "v2")
+     === "/api/v2/json/schedule/league/4358/2026",
+   tsdbSti("resultater", LIGAER.eliteserien, "hemmelig", HOST_TID, "v2"));
+ok("og ikke om de forrige kampene",
+   tsdbSti("resultater", LIGAER.eliteserien, "hemmelig", HOST_TID, "v2")
+     .indexOf("previous") === -1);
 ok("v2 for tabellen, med sesongen i stien",
    tsdbSti("tabell", LIGAER.eliteserien, "hemmelig", new Date(Date.UTC(2026, 8, 10)), "v2") === "/api/v2/json/lookup/table/4358/2026",
    tsdbSti("tabell", LIGAER.eliteserien, "hemmelig", new Date(Date.UTC(2026, 8, 10)), "v2"));
@@ -342,9 +354,15 @@ ok("nokkelen gar i X-API-KEY bare for v2",
 ok("uten nokkel sendes ingen X-API-KEY", !("X-API-KEY" in tsdbHeadere("", "v2")) && !("X-API-KEY" in tsdbHeadere()));
 ok("liga uten TheSportsDB-id gir null", tsdbSti("neste", { id: 1 }) === null);
 ok("ukjent datasett gir null", tsdbSti("toppscorere", LIGAER.eliteserien) === null);
-ok("resultater har egen adresse",
-   tsdbSti("resultater", LIGAER.eliteserien) === "/api/v1/json/3/eventspastleague.php?id=4358",
-   tsdbSti("resultater", LIGAER.eliteserien));
+ok("v1 for resultater spor ogsa om sesongen",
+   tsdbSti("resultater", LIGAER.eliteserien, "", HOST_TID)
+     === "/api/v1/json/3/eventsseason.php?id=4358&s=2026",
+   tsdbSti("resultater", LIGAER.eliteserien, "", HOST_TID));
+// Et sesongsvar er 240 rader for Eliteserien. Et svar pa 15 er derfor
+// ikke en liten sesong — det er en kappet en, og et avkortet svar ma
+// ikke vises som om det var helt.
+ok("og grensa for et helt svar folger med opp",
+   TSDB_MINST.resultater >= 20, TSDB_MINST.resultater);
 const HOST = new Date(Date.UTC(2026, 8, 10));
 ok("tabellen sporr om arets sesong",
    tsdbSti("tabell", LIGAER.eliteserien, "", HOST) === "/api/v1/json/3/lookuptable.php?l=4358&s=2026",

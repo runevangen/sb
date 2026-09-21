@@ -385,31 +385,73 @@ r = await fotball(be("/api/fotball/tabell?liga=eliteserien"));
 ok("uten tabell hos TheSportsDB kommer fjorarets fra API-Football",
    r.status === 200 && (await r.json()).kilde === "API-Football", r.status);
 
-const ARETS_RESULTATER = { events: [
-  Object.assign(tsdbHendelse(21, "2026-09-06T15:00:00", 19, "Brann", "Viking"),
-    { strStatus: "Match Finished", intHomeScore: "1", intAwayScore: "0" }),
-  Object.assign(tsdbHendelse(22, "2026-09-08T17:00:00", 20, "Molde", "Rosenborg"),
-    { strStatus: "Match Finished", intHomeScore: "2", intAwayScore: "2" }),
-  tsdbHendelse(23, "2026-09-13T15:00:00", 21, "Viking", "Molde"),   // ikke spilt
-] };
+// STUBBEN MODELLERER SVARET, ikke koden som leser det.
+//
+// Sporringa er `eventsseason` na, og da er svaret HELE sesongen — ogsa
+// kampene som ikke er spilt. Malt med sonden 21. september 2026: 240
+// rader, 30 runder, 168 spilte. En stubb med tre kamper ville modellert
+// den gamle sporringa, og da beviser den ingenting om den nye.
+//
+// Tretti runder a to kamper: de tjue forste rundene spilt, de ti siste
+// ikke. De uspilte har SENERE datoer, sa de ville lagt seg oeverst om
+// ingen silte dem — og en resultatliste som apner pa «null–null» er
+// nettopp feilen denne stubben finnes for.
+function aretsSesong() {
+  const events = [];
+  for (let runde = 1; runde <= 30; runde += 1) {
+    const dag = String(runde).padStart(2, "0");
+    for (let i = 0; i < 2; i += 1) {
+      const e = tsdbHendelse(runde * 10 + i,
+        "2026-" + (runde <= 20 ? "03" : "11") + "-" + dag + "T15:00:00",
+        runde, i ? "Molde" : "Brann", i ? "Rosenborg" : "Viking");
+      if (runde <= 20) {
+        Object.assign(e, { strStatus: "Match Finished",
+          intHomeScore: String(runde % 4), intAwayScore: String(i) });
+      }
+      events.push(e);
+    }
+  }
+  return { events };
+}
+const ARETS_RESULTATER = aretsSesong();
 kall = stub(SVAR, 200, { svar: ARETS_RESULTATER });
 r = await fotball(be("/api/fotball/resultater?liga=eliteserien"));
 const aretsRes = await r.json();
 ok("arets resultater kommer fra TheSportsDB",
    r.status === 200 && aretsRes.kilde === "TheSportsDB", JSON.stringify([r.status, aretsRes.kilde]));
-ok("resultater sporr eventspastleague",
-   tsdbKall(kall)[0].url.indexOf("eventspastleague.php?id=4358") > -1, tsdbKall(kall)[0].url);
-ok("bare spilte kamper, nyeste forst",
-   aretsRes.kamper.length === 2 && aretsRes.kamper[0].hjemme === "Molde" &&
-   aretsRes.kamper[0].malHjemme === 2 && aretsRes.kamper[0].spilt === true,
-   JSON.stringify(aretsRes.kamper));
+ok("resultater sporr om hele sesongen",
+   tsdbKall(kall)[0].url.indexOf("eventsseason.php?id=4358&s=2026") > -1,
+   tsdbKall(kall)[0].url);
+ok("og ikke om de forrige kampene",
+   tsdbKall(kall)[0].url.indexOf("eventspastleague") === -1, tsdbKall(kall)[0].url);
 
-// Ett resultat er et avkortet svar, ikke arets resultater.
+// KJERNEN: 60 kamper inn, 40 spilte ut. De uspilte har senere datoer og
+// ville statt oeverst — en resultatliste som apner pa en kamp som ikke er
+// spilt, er verre enn ingen liste.
+ok("bare de spilte kommer med",
+   aretsRes.kamper.length === 40, aretsRes.kamper.length);
+ok("og ingen av dem mangler stilling",
+   aretsRes.kamper.every((k) => k.malHjemme !== null && k.malBorte !== null),
+   JSON.stringify(aretsRes.kamper.filter((k) => k.malHjemme === null).slice(0, 2)));
+ok("nyeste forst",
+   aretsRes.kamper[0].runde === "Runde 20" &&
+   aretsRes.kamper[aretsRes.kamper.length - 1].runde === "Runde 1",
+   aretsRes.kamper[0].runde + " … " + aretsRes.kamper[aretsRes.kamper.length - 1].runde);
+// Rundetallet er det visningen grupperer paa. Uten det er «alle runder»
+// ikke mulig, uansett hvor mange kamper som kom.
+ok("og hver kamp baerer runden sin",
+   aretsRes.kamper.every((k) => k.runde), JSON.stringify(aretsRes.kamper[0]));
+
+// Et svar pa femten er ikke en liten sesong — det er en kappet en.
+//
+// Grensa sto pa 2 da sporringa var «de siste kampene», og da slapp
+// femten gjennom som et helt svar. Na spor vi om 240, og et avkortet
+// svar ma ikke vises som om det var helt.
 kall = stub({ errors: [], response: [
   kamp(1, "2024-11-30T17:00:00+00:00", "Runde 30", "Brann", "Viking", 1, 0, "FT"),
-] }, 200, { svar: { events: [ARETS_RESULTATER.events[0]] } });
+] }, 200, { svar: { events: ARETS_RESULTATER.events.slice(0, 15) } });
 r = await fotball(be("/api/fotball/resultater?liga=eliteserien"));
-ok("ett resultat fra TheSportsDB gir fjorarets fra API-Football",
+ok("femten kamper er et kappet sesongsvar, og gir fjorarets",
    (await r.json()).kilde === "API-Football");
 
 /* ---------------- ukjent datasett ---------------- */

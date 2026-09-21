@@ -551,6 +551,17 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   runde i Eliteserien — da sa fanen «kun siste runde». Å droppe `last`
   koster **ingen ekstra kall**: samme endepunkt, samme ene forespørsel,
   bare et større svar som `tolkKamper()` skreller ned før noe caches.
+  **Og TheSportsDB spør om `eventsseason`, ikke `eventspastleague`.**
+  Det siste ga femten hendelser. Målt med sonden 21. september 2026:
+  sesongsvaret er 240 rader, 30 ulike runder, 168 spilte med resultat — og
+  det bærer mål, dato og rundetall. Ikke antatt; spurt.
+  **Svaret er hele sesongen, også det som ikke er spilt.** De uspilte har
+  *senere* datoer, så uten silinga i `hentTsdbVersjon` ville runde 30 stått
+  øverst med «null–null». Det er verre enn ingen liste.
+  **Og `TSDB_MINST.resultater` er tjue, ikke to.** Grensa sto på 2 da
+  spørringa var «de siste kampene». Nå spør vi om 240, og da er femten
+  ikke en liten sesong — det er en kappet en. Et avkortet svar må ikke
+  vises som om det var helt.
   `next=20` på «neste» står: dét er et vindu *framover*, og en sesong som
   ikke er spilt ennå er ingen liste noen blar i.
   **Siste runde står framme, resten bak «Vis tidligere runder (N)».**

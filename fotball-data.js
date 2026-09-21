@@ -329,7 +329,15 @@ function maal(verdi) {
 // og faller ellers tilbake til API-Football. Med en betalt nokkel
 // (THESPORTSDB_KEY) kommer alt: full tabell, hele runder, og dermed
 // deling og vaer.
-export const TSDB_MINST = { tabell: 10, resultater: 2, neste: 2 };
+// `resultater` gikk fra 2 til 20 den 21. september 2026, da spørringa
+// sluttet å være «de siste kampene» og ble «hele sesongen».
+//
+// Et sesongsvar er 240 rader for Eliteserien og 380 for Premier League,
+// og det tallet står fast gjennom hele året: fikstursen finnes før
+// kampene spilles (240 rader, 168 spilte, målt 21. september). Et svar på
+// 15 er derfor ikke en liten sesong — det er en kappet en, og et avkortet
+// svar må ikke vises som om det var helt. Tjue ligger rent imellom.
+export const TSDB_MINST = { tabell: 10, resultater: 20, neste: 2 };
 // To utgaver av API-et. Uten nokkel: v1 med testnokkelen «3» i adressen,
 // som kapper svarene. Med nokkel (Patreon): v2, der nokkelen gar i en
 // header og aldri i adressen — den skal ikke ende i en logg eller en
@@ -345,7 +353,15 @@ export function tsdbSti(del, liga, nokkel, naa, versjon) {
     if (del === "tabell") {
       return rot + "lookup/table/" + liga.tsdb + "/" + encodeURIComponent(tsdbSesong(liga, naa));
     }
-    if (del === "resultater") return rot + "schedule/previous/league/" + liga.tsdb;
+    // HELE sesongen, ikke de forrige kampene.
+    //
+    // `schedule/previous/league` ga de siste femten hendelsene, og da sa
+    // fanen «kun siste runde» — meldt 21. september 2026. Sesongsvaret er
+    // 240 rader med 30 ulike runder, og det baerer maal, dato og rundetall
+    // (malt med sonden, ikke antatt). De uspilte siles i funksjonen.
+    if (del === "resultater") {
+      return rot + "schedule/league/" + liga.tsdb + "/" + encodeURIComponent(tsdbSesong(liga, naa));
+    }
     if (del === "neste") return rot + "schedule/next/league/" + liga.tsdb;
     return null;
   }
@@ -353,7 +369,10 @@ export function tsdbSti(del, liga, nokkel, naa, versjon) {
   if (del === "tabell") {
     return rot + "lookuptable.php?l=" + liga.tsdb + "&s=" + encodeURIComponent(tsdbSesong(liga, naa));
   }
-  if (del === "resultater") return rot + "eventspastleague.php?id=" + liga.tsdb;
+  if (del === "resultater") {
+    return rot + "eventsseason.php?id=" + liga.tsdb
+      + "&s=" + encodeURIComponent(tsdbSesong(liga, naa));
+  }
   if (del === "neste") return rot + "eventsnextleague.php?id=" + liga.tsdb;
   return null;
 }
