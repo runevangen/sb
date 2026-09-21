@@ -439,6 +439,11 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
   også skjermlesere, ikke bare øyet.
 - **«Spøk» er ikke pedanteri.** Ullevålseter er et ekte sted som ikke har
   kjøpt noe. En tulleannonse merket «Reklame» ville påstått det motsatte.
+  **Ingen rad bruker merket nå** — de sju vitsene gikk ut 21. september
+  2026 fordi de sto først, og den første plassen skal selge plassen. Selve
+  merket står: `run.mjs` holder at feeden ikke har en spøk, `unit.mjs` at
+  apparatet for å lage en fortsatt finnes. To vakter, fordi bare den ene
+  ville latt merket ryke som død kode i stillhet.
 - **Bildene i annonsene har bredde og høyde på taggen.** Uten dem vokser
   annonsen og dytter saken man leser nedover. `alt` står på annonsen, ikke
   i koden: en skjermleser som sier «Prem» om et treskilt er verre enn

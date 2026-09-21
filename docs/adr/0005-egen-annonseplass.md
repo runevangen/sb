@@ -2,7 +2,8 @@
 
 ## Kontekst
 `ADS` i `app.js` inneholdt tre slags kort: fire oppdiktede annonsører
-(#25), vår egen ledige plass, og sju spøker.
+(#25), vår egen ledige plass, og sju spøker. I dag står bare den ledige
+plassen igjen, i sju utgaver.
 
 > **Endret 16. september 2026.** De oppdiktede annonsørene er ute. En
 > oppdiktet annonsør i prod er en påstand om et samarbeid som ikke
@@ -10,6 +11,18 @@
 > ikke fortelle. Hver plass er nå enten vår egen eller en spøk. Raden med
 > «Reklame» står igjen i tabellen fordi den er det en **ekte** annonsør
 > får — den er bare ikke i bruk.
+
+> **Endret 21. september 2026.** Spøkene er ute også. De var ærlige —
+> merket «Spøk», og de kalte seg aldri reklame — men de sto **først** i
+> rotasjonen, og da var det første en leser møtte en vits. Sju av fjorten
+> plasser spøkte. En app som vil selge en plass kan ikke bruke
+> førsteinntrykket på noe annet, og halvparten vitser leses som at den
+> ikke mener alvor med plassen den selger.
+>
+> **Merket lever videre.** `EGNE_MERKER.spok`, `.ad-spok` og reglene i
+> `run.mjs` står urørt: en vits kommer tilbake ved å sette `merke: "spok"`
+> på en rad. Det er dataene som er borte, ikke muligheten — og en vakt i
+> `unit.mjs` slår ut om noen rydder apparatet bort som dødt.
 
 ## Beslutning
 Hvert kort sier hva det **er**. `EGNE_MERKER` holder merkene som data,
@@ -47,8 +60,16 @@ En rad **uten** `merke` er en ekte annonsør. Da sier den «Reklame», og
 - Merket som data gjør det umulig å legge til en plass uten å ta
   stilling til hva den sier at den er. Nettlesertester slår ut hvis en
   spøk noen gang kaller seg reklame, for øyet eller for skjermleseren.
-- **Spøkene står først i rotasjonen.** En vits bak fire annonseplasser er
-  en vits ingen leser.
+- **Spøkene sto først i rotasjonen**, fordi en vits bak fire
+  annonseplasser er en vits ingen leser. Det var riktig om vitsen og galt
+  om plassen: argumentet gjelder like fullt for det som skal selge, og der
+  er det sterkere. Den første plassen er derfor en ledig plass, og en
+  vits som legges inn igjen hører lenger ned.
+- **Begge halvdelene av vakta måles.** `run.mjs` holder at ingen plass i
+  feeden er en spøk; `unit.mjs` holder at apparatet for å lage en fortsatt
+  finnes. Sto bare den første, kunne merket forsvinne som død kode uten at
+  noe sa fra — og løftet om at vitsen kan komme tilbake ville blitt usant
+  i stillhet.
 - `alt` står på annonsen, ikke i koden: den var hardkodet «Prem» til et
   treskilt kom inn i lista. En skjermleser som sier «Prem» om et skilt er
   verre enn ingenting.

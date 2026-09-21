@@ -2440,6 +2440,38 @@ ok("hver modul appen importerer ligger i service workerens skall",
 ok("testen fant faktisk noen importer a sjekke",
    importert.size >= 10, importert.size);
 
+/* ---------------- spoken som ikke lenger star i lista (#25) ---------------- */
+
+// Sju spoker sto i ADS til 21. september 2026. De gikk ut fordi de to
+// forste annonseplassene var vitser, og den plassen skal selge seg selv.
+//
+// **Merket ble staende.** Kommentaren over ADS lover at en vits kan legges
+// inn igjen ved a sette `merke: "spok"` pa en rad — og det loftet holder
+// bare sa lenge apparatet finnes. Ingen data bruker det lenger, sa
+// ingenting i appen ville sagt fra om noen ryddet det bort som dodt. Da
+// ville kommentaren blitt usann uten at en eneste test falt.
+//
+// run.mjs holder reglene for hvordan en spok SKAL se ut. Denne holder at
+// det i det hele tatt gar an a lage en.
+const APPJS = readFileSync(new URL("../app.js", import.meta.url), "utf8");
+
+ok("merket «Spok» star fortsatt i EGNE_MERKER",
+   /spok:\s*\{[^}]*merke:\s*"Spøk"[^}]*lest:\s*"Spøk, ikke en ekte annonse"/.test(APPJS),
+   APPJS.indexOf("EGNE_MERKER") > -1 ? "EGNE_MERKER finnes, men uten spok" : "EGNE_MERKER borte");
+ok("og en rad med merke spok far fortsatt klassen .ad-spok",
+   /merke\s*===\s*"spok"[\s\S]{0,80}ad-spok/.test(APPJS));
+
+// Og den andre halvdelen: ingen rad i ADS bruker det na. Star det en spok
+// her mens run.mjs krever at feeden ikke har noen, er de to uenige om det
+// samme — og da faller run.mjs med en melding om DOM framfor om dataene.
+const ADSBLOKK = APPJS.slice(APPJS.indexOf("const ADS = ["),
+                             APPJS.indexOf("\n];", APPJS.indexOf("const ADS = [")));
+ok("ingen annonseplass er merket spok",
+   ADSBLOKK.indexOf('merke: "spok"') === -1);
+ok("og testen leste faktisk annonselista",
+   ADSBLOKK.split('merke: "ledig"').length - 1 >= 5,
+   ADSBLOKK.split('merke: "ledig"').length - 1);
+
 /* ---------------- stedene admin retter (#80) ---------------- */
 
 // Fila er grunnfjellet, basen barer rettelsene oppa. Det som testes her er

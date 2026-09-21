@@ -433,58 +433,43 @@ const ADS_EVERY = 4;
 // knapp som ikke går noe sted er verre enn ingen knapp.
 const MESSENGER = "premern";
 
-// **Ingen av annonsørene her er oppdiktet lenger.** Fram til 16. september
-// 2026 sto NORDBANE, PADELHUSET, SPRINTA og TRIBUNE i feeden, tydelig
-// merket «Reklame» og fullstendig oppfunnet (#25). Ingen ble lurt — men
-// en oppdiktet annonsør i prod er en påstand om et samarbeid som ikke
-// finnes, og det er nøyaktig den slags påstand appen ellers er nøye på å
-// ikke fortelle.
+// **Ingen oppdiktet annonsør, og ingen spøk.** To ting har gått ut herfra,
+// av samme grunn.
 //
-// Nå er hver plass enten vår egen («Ledig plass») eller en spøk («Spøk»).
-// Når en ekte annonse skal inn, får raden en `brand` og ingen `merke` —
-// da sier den «Reklame», og formatet er det samme som står her.
+// Fram til 16. september 2026 sto NORDBANE, PADELHUSET, SPRINTA og TRIBUNE
+// i feeden, tydelig merket «Reklame» og fullstendig oppfunnet (#25). Ingen
+// ble lurt — men en oppdiktet annonsør i prod er en påstand om et
+// samarbeid som ikke finnes, og det er nøyaktig den slags påstand appen
+// ellers er nøye på å ikke fortelle.
 //
-// De fire som ble tomme var `banner` og `stripe`, de to tekstformatene.
-// De ble ikke slettet: de er fasongene en ekte annonsør kan kjøpe, og en
-// fasong ingen bruker er en fasong ingen ser. Nå selger de seg selv.
+// Fram til 21. september sto sju spøker om Ullevålseter, og de to første
+// plassene i rotasjonen var blant dem. De var ærlige — merket «Spøk», og
+// de kalte seg aldri reklame. Men **den første annonsen en leser møtte var
+// en vits**, og en plass som skal selges kan ikke bruke førsteinntrykket
+// på noe annet. Fjorten plasser der halvparten spøker leses som en app
+// som ikke mener alvor med plassen den selger.
+//
+// **Merket lever videre.** `EGNE_MERKER.spok`, `.ad-spok` og reglene i
+// `run.mjs` står urørt, så en vits kan legges inn igjen ved å sette
+// `merke: "spok"` på en rad. Det som er borte er dataene, ikke muligheten.
+//
+// Nå er hver plass vår egen («Ledig plass»). Når en ekte annonse skal inn,
+// får raden en `brand` og ingen `merke` — da sier den «Reklame», og
+// formatet er det samme som står her.
+//
+// Begge tekstformatene er med, `banner` og `stripe`: de er fasongene en
+// ekte annonsør kan kjøpe, og en fasong ingen bruker er en fasong ingen
+// ser. Nå selger de seg selv.
 //
 // Rekkefølgen i lista bestemmer blandingen: plassene kommer etter hver
 // fjerde sak, så to kan stå på samme skjerm. Tre like bokser etter
-// hverandre leses som støy; tre ulike leses som tre plasser.
+// hverandre leses som støy; tre ulike leses som tre plasser. Derfor
+// veksler bildekortene og tekstformatene, og de tre fasongene på kortet
+// — portrett, bred, høy — kommer hver for seg.
 //
 // Ansiktet er poenget. Det er en person man skal sende en melding til,
 // ikke et skjema — og da skal man se hvem.
 const ADS = [
-  // Spøkene står først. De er det folk faktisk blar for å se, og en vits
-  // som ligger bak fire annonseplasser er en vits ingen leser.
-  //
-  // De er merket «Spøk», ikke «Reklame», fordi Ullevålseter er et ekte
-  // sted som ikke har kjøpt noe som helst. Knappen går til Prem, som er
-  // den som må svare for påstanden.
-  {
-    merke: "spok",
-    format: "kort",
-    form: "hoy",
-    bilde: "/bilder/skilt-hoy.jpg",
-    bredde: 800,
-    hoyde: 1000,
-    alt: "Skiltet på Ullevålseter sportsstue",
-    headline: "Opplev Ullevålseter.",
-    sub: "Mye bedre enn øl og vin på travbanen.",
-    cta: "Si imot"
-  },
-  {
-    merke: "spok",
-    format: "kort",
-    form: "bred",
-    bilde: "/bilder/tur-bred.jpg",
-    bredde: 1000,
-    hoyde: 562,
-    alt: "To turgåere utenfor Ullevålseter",
-    headline: "Ingen her har satt penger på noe.",
-    sub: "Det er derfor de smiler.",
-    cta: "Ta det med Prem"
-  },
   {
     merke: "ledig",
     format: "kort",
@@ -495,30 +480,6 @@ const ADS = [
     alt: "Prem",
     headline: "Her kunne det stått noe om deg.",
     cta: "Ta en prat med Prem"
-  },
-  {
-    merke: "spok",
-    format: "kort",
-    form: "hoy",
-    bilde: "/bilder/tur-hoy.jpg",
-    bredde: 800,
-    hoyde: 1000,
-    alt: "To turgåere utenfor Ullevålseter",
-    headline: "Odds: 100 %.",
-    sub: "På at du kommer hjem edru.",
-    cta: "Sett imot"
-  },
-  {
-    merke: "spok",
-    format: "kort",
-    form: "portrett",
-    bilde: "/bilder/tur-portrett.jpg",
-    bredde: 400,
-    hoyde: 400,
-    alt: "To turgåere utenfor Ullevålseter",
-    headline: "Vi byttet pils mot solbærtoddy.",
-    sub: "Spør oss gjerne om det.",
-    cta: "Ikke spør"
   },
   {
     merke: "ledig",
@@ -532,34 +493,10 @@ const ADS = [
     cta: "Snakk med Prem"
   },
   {
-    merke: "spok",
-    format: "kort",
-    form: "bred",
-    bilde: "/bilder/prem-bred.jpg",
-    bredde: 1000,
-    hoyde: 562,
-    alt: "Prem",
-    headline: "Samme rus. Uten bakrus.",
-    sub: "Frisk luft-edition.",
-    cta: "Ta det med Prem"
-  },
-  {
     merke: "ledig",
     format: "banner",
     headline: "Her kunne annonsen din stått.",
     cta: "Ta en prat med Prem"
-  },
-  {
-    merke: "spok",
-    format: "kort",
-    form: "hoy",
-    bilde: "/bilder/prem-hoy.jpg",
-    bredde: 800,
-    hoyde: 1000,
-    alt: "Prem",
-    headline: "Det finnes ikke dårlig vær.",
-    sub: "Det finnes bare Bjerke.",
-    cta: "Ta det med Prem"
   },
   {
     merke: "ledig",
@@ -573,18 +510,6 @@ const ADS = [
     cta: "Send Prem en melding"
   },
   {
-    merke: "spok",
-    format: "kort",
-    form: "portrett",
-    bilde: "/bilder/prem-portrett.jpg",
-    bredde: 400,
-    hoyde: 400,
-    alt: "Prem",
-    headline: "Null skjermer. Null odds.",
-    sub: "Én vaffel.",
-    cta: "Ta det med Prem"
-  },
-  {
     merke: "ledig",
     format: "stripe",
     headline: "Denne linja er til salgs.",
@@ -593,7 +518,7 @@ const ADS = [
   {
     merke: "ledig",
     format: "banner",
-    headline: "Vil du nå folk som leser om norsk fotball?",
+    headline: "Én plass, midt i det folk leser.",
     cta: "Snakk med Prem"
   },
   {
