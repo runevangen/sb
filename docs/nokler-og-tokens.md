@@ -162,6 +162,21 @@ Gratisnivået dekker dessuten bare sesongene i `SESONGVINDU` (nå 2022–2024)
 og svarer «season, try from 2022 to 2024» på alt utenfor. Det er hele
 grunnen til at TheSportsDB finnes i bildet.
 
+### `COMMIT_REF`, `BRANCH`, `CONTEXT`, `DEPLOY_ID`
+
+**Settes ikke av deg.** Netlify setter dem selv ved hver bygging, og de er
+ikke hemmeligheter — de står i git-historikken uansett, og repoet er
+offentlig.
+
+- **Leses av:** `netlify/functions/brukere.mjs`, handlingen `versjon`
+- **Vises i:** portalen, seksjonen *Versjon*, bak passord og økt
+- **Hva de svarer på:** «ser jeg på den nyeste utrullingen?» `versjoner.js`
+  kan bare si hva som sto i fila da den ble bygget; commit-en sier hvilken
+  bygging det var. `CONTEXT` skiller prod fra en deploy-preview.
+- **Mangler de:** linja sier det. Et tomt felt vist som en verdi ville vært
+  en påstand vi ikke har dekning for, og funksjonen svarer derfor `null` —
+  ikke en tom streng. En funksjonstest dekker begge veier.
+
 ### `THESPORTSDB_KEY` — TheSportsDB
 
 Gir årets sesong. Uten den er ikke fotballfanen død — den viser fjorårets

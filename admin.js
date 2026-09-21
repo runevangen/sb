@@ -20,6 +20,7 @@
 // oppfriskning er billigere enn et passord som blir liggende.
 
 import { KURATERTE } from "./puber.js";
+import { VERSJONER } from "./versjoner.js";
 import { oktGyldig, kanFornyes } from "./konto-data.js";
 import { LIGAER, kampNokkel } from "./fotball-data.js";
 import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
@@ -285,6 +286,79 @@ async function loggInn() {
   hentForslag();
   hentSteder();
   fyllSondeLigaer();
+  tegnVersjon();
+}
+
+/* ---------- versjon ---------- */
+
+// To halvdeler, og de svarer paa hvert sitt sporsmal.
+//
+// **Lista** sier hva som endret seg. Den ligger i `versjoner.js`, skrevet
+// for haand, og den vet bare hva som sto i fila da den ble bygget.
+//
+// **Commit-en** sier om du ser paa det nyeste. Den leses av Netlifys
+// byggemiljo gjennom `/api/brukere`, og er det eneste som kan svare paa
+// «ble endringen min faktisk rullet ut?» — sporsmalet som sto ubesvart i
+// en time da portalen var riktig bygget og likevel sa feil.
+//
+// Lista tegnes med en gang; commit-en kommer naar tjenesten svarer, og
+// feiler kallet blir lista staaende. En liste er noe, og ingenting er
+// ingenting.
+function tegnVersjon() {
+  const liste = felt("versjonListe");
+  if (!liste) return;
+  liste.replaceChildren();
+
+  const nyeste = VERSJONER[0];
+  settTall("versjonTall", nyeste ? nyeste.versjon : "");
+
+  VERSJONER.forEach((v) => {
+    const boks = celle("div", "versjon-boks", "");
+    boks.appendChild(celle("p", "versjon-nr", v.versjon));
+    const ul = celle("ul", "versjon-liste", "");
+    (v.endringer || []).forEach((e) => {
+      const li = celle("li", null, e.hva);
+      // Issue-nummeret er en lenke, ikke et tall: staar det «#146» uten
+      // vei videre, ma du lete den opp selv — og da er det pynt.
+      if (e.issue) {
+        li.appendChild(document.createTextNode(" "));
+        const a = celle("a", "versjon-issue", "#" + e.issue);
+        a.href = "https://github.com/runevangen/sb/issues/" + e.issue;
+        a.target = "_blank";
+        a.rel = "noopener";
+        li.appendChild(a);
+      }
+      ul.appendChild(li);
+    });
+    boks.appendChild(ul);
+    liste.appendChild(boks);
+  });
+
+  hentKjorer();
+}
+
+async function hentKjorer() {
+  const linje = felt("versjonKjorer");
+  if (!linje) return;
+  try {
+    const d = await brukerKall({ handling: "versjon" });
+    const biter = [];
+    // **Kontekst forst.** «deploy-preview» er svaret paa «hvorfor ser jeg
+    // noe annet enn de andre», og det er det viktigste av de tre.
+    if (d.kontekst && d.kontekst !== "production") {
+      biter.push("Dette er en forhandsvisning (" + d.kontekst + ")");
+    }
+    if (d.commit) biter.push("Bygget fra " + String(d.commit).slice(0, 7));
+    if (d.gren && d.gren !== "main") biter.push("gren " + d.gren);
+    // Uten svar sier linja det, framfor a staa tom og se ut som om alt er
+    // som det skal. Variablene settes av Netlify ved bygging; kjorer
+    // funksjonen et annet sted, finnes de ikke.
+    linje.textContent = biter.length ? biter.join(" · ")
+      : "Byggemiljoet oppgir ingen commit — lista under sier hva som sto i"
+        + " fila, ikke hvilken utrulling du ser paa.";
+  } catch (err) {
+    linje.textContent = "Fikk ikke vite hvilken utrulling dette er: " + err.message;
+  }
 }
 
 /* ---------- sonden mot TheSportsDB ---------- */

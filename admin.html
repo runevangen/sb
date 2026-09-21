@@ -77,6 +77,23 @@
   /* Begge hodene, ikke bare seksjonene. Regelen sto pa `.seksjon-hode`
      alene, og da pekte pila i trinnhodene «lukket» over et apent trinn —
      et tegn som sier noe annet enn tilstanden det beskriver. */
+  /* Versjonen. Lista er tett med vilje: den leses, den brukes ikke. */
+  .versjon-boks { margin-top: 10px; }
+  .versjon-nr {
+    margin: 0 0 4px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  .versjon-liste {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .versjon-liste li { margin-bottom: 5px; }
+  .versjon-issue { white-space: nowrap; }
+
   .seksjon-hode[aria-expanded="true"] .seksjon-pil,
   .trinn-hode[aria-expanded="true"] .seksjon-pil { transform: rotate(180deg); }
   /* Sidepolstringa la pa <section> for. Na ligger den her, sa hodet kan
@@ -751,6 +768,25 @@
       </div>
       <pre class="forslag-kode" id="sondeSvar" hidden></pre>
       <p class="melding" id="sondeMelding" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- Versjonen. To halvdeler som svarer paa hvert sitt sporsmal:
+       lista sier HVA som endret seg, commit-en sier om du ser paa det
+       nyeste. Sto bare lista her, kunne den si 21. september over en app
+       som ble bygget den 12. -->
+  <section class="seksjon">
+    <h2 class="seksjon-tittel">
+      <button class="seksjon-hode" id="versjonHode" type="button"
+              aria-expanded="false" aria-controls="versjonKropp">
+        <span class="seksjon-navn">Versjon</span>
+        <span class="seksjon-tall" id="versjonTall"></span>
+        <span class="seksjon-pil" aria-hidden="true">▾</span>
+      </button>
+    </h2>
+    <div class="seksjon-kropp" id="versjonKropp" hidden>
+      <p class="hint" id="versjonKjorer">Henter …</p>
+      <div id="versjonListe"></div>
     </div>
   </section>
 

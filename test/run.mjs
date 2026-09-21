@@ -3422,9 +3422,19 @@ const SAK_15 = kjor("admin", `
 
           var rader = document.querySelectorAll("#brukerRader tr");
           ok("brukerne star i portalen etter innlogging", rader.length === 2, rader.length);
+          // Ikke «det ene kallet»: portalen henter ogsa versjonen ved
+          // innlogging (22. september 2026), og en test som teller kall
+          // maalte hvor mange handlinger som fantes framfor det den ville
+          // vite. Det den vil vite er at HVERT kall baerer passordet.
+          var listeKall = brukerKall.filter(function (k) {
+            return k.handling === "liste"; });
           ok("og passordet ble sendt med",
-             brukerKall.length === 1 && brukerKall[0].passord === "hemmelig" &&
-             brukerKall[0].handling === "liste", JSON.stringify(brukerKall));
+             listeKall.length === 1 && listeKall[0].passord === "hemmelig",
+             JSON.stringify(brukerKall));
+          ok("og ingen av kallene gaar uten passord og okt",
+             brukerKall.length > 0 && brukerKall.every(function (k) {
+               return k.passord === "hemmelig" && !!k.token; }),
+             JSON.stringify(brukerKall.map(function (k) { return k.handling; })));
           ok("raden viser navnet",
              rader[0].querySelector(".navn").textContent === "Kari",
              rader[0].querySelector(".navn").textContent);
@@ -3551,9 +3561,15 @@ const SAK_15 = kjor("admin", `
             });
           ok("ingen felt er sa sma at iPhone zoomer inn i dem",
              smaaFelt.length === 0, smaaFelt.join(", "));
+          // Tallet leses av MARKUPEN, ikke skrevet som 5: det sto slik, og
+          // gled i det en seksjon kom til (22. september 2026, versjonen).
+          // Det testen vil vite er at ALLE er apne — «5» var bare hvor
+          // mange som fantes den dagen.
+          var alleKropper = document.querySelectorAll(".seksjon-kropp").length;
+          var apneKropper = document.querySelectorAll(".seksjon-kropp:not([hidden])").length;
           ok("og de ble malt med alt apent, ikke bare det som sto framme",
-             document.querySelectorAll(".seksjon-kropp:not([hidden])").length === 5,
-             document.querySelectorAll(".seksjon-kropp:not([hidden])").length + " apne");
+             alleKropper > 0 && apneKropper === alleKropper,
+             apneKropper + " av " + alleKropper + " apne");
 
           // Sida skal fa plass pa en telefon. Meldt 17. september 2026:
           // «Den er los pa mobil, dvs jeg kan scrolle hele skjermen til
@@ -3595,8 +3611,11 @@ const SAK_15 = kjor("admin", `
           var settKnapp = rader[0].querySelectorAll("button")[0];
           pinFelt.value = "12";
           settKnapp.click();
+          // «Stoppes i portalen» betyr at ingen PIN ble sendt — ikke at
+          // det bare fantes ett kall. Det sto som brukerKall.length === 1,
+          // og gled i det portalen fikk enda en handling.
           ok("en for kort PIN stoppes i portalen",
-             brukerKall.length === 1 &&
+             !brukerKall.some(function (k) { return k.handling === "pin"; }) &&
              document.getElementById("brukerMelding").textContent.indexOf("minst") > -1,
              document.getElementById("brukerMelding").textContent);
 
@@ -5152,6 +5171,37 @@ const SAK_15G = kjor("admin-seksjoner", `
       ok("stedene er lukket", !apen("stedHode"), "apen");
       ok("brukerne er lukket", !apen("brukerHode"), "apen");
       ok("verktoyet er lukket", !apen("verktoyHode"), "apen");
+      ok("versjonen er lukket", !apen("versjonHode"), "apen");
+
+      // Versjonen. To halvdeler som svarer paa hvert sitt sporsmal:
+      // lista sier HVA som endret seg, commit-en om du ser paa det
+      // nyeste. Lista tegnes med en gang — den ligger i en fil — mens
+      // commit-en maa hentes.
+      // Formen sjekkes uten regex: bakstreker spises av scene-literalen,
+      // og /\d/ blir til /d/ — testen var rod paa «2026.09.21» av nettopp
+      // den grunnen for den ble skrevet om. Fella staar i testing.md.
+      function erTall(t) {
+        return t.length > 0 && t.split("").every(function (c) {
+          return c >= "0" && c <= "9"; });
+      }
+      var vBiter = felt("versjonTall").textContent.split(".");
+      ok("nyeste versjon staar i hodet, sa en lukket seksjon sier noe",
+         vBiter.length === 3 && vBiter[0].length === 4 && vBiter[1].length === 2 &&
+         vBiter[2].length === 2 && vBiter.every(erTall),
+         felt("versjonTall").textContent);
+      var vLi = felt("versjonListe").querySelectorAll("li");
+      ok("og lista har endringer i seg", vLi.length >= 1, vLi.length);
+      // Issue-nummeret er en LENKE, ikke et tall: staar det «#146» uten
+      // vei videre, maa du lete det opp selv.
+      var vIssue = felt("versjonListe").querySelector(".versjon-issue");
+      ok("issue-nummeret kan trykkes",
+         !!vIssue && vIssue.tagName === "A" &&
+         vIssue.getAttribute("href").indexOf("/issues/") > -1,
+         vIssue ? vIssue.getAttribute("href") : "fant ingen");
+      ok("og det ser ut som et issue-nummer",
+         !!vIssue && vIssue.textContent.charAt(0) === "#" &&
+         erTall(vIssue.textContent.slice(1)),
+         vIssue ? vIssue.textContent : "");
       ok("og panelene folger hodene sine",
          felt("kampKropp").hidden === true && felt("stedKropp").hidden === true &&
          felt("brukerKropp").hidden === true && felt("verktoyKropp").hidden === true,

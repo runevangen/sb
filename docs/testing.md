@@ -5,8 +5,8 @@ kommandoene, men ikke tallene: de sto i tre filer og glei fire ganger på to
 dager. Legger du til tester, er det denne fila som skal rettes.
 
     node test/unit.mjs      811 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  407 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       835 tester, 3–20 s, headless Chromium
+    node test/funksjon.mjs  416 tester, ~250 ms, ingen nettleser
+    node test/run.mjs       841 tester, 3–20 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
@@ -268,6 +268,13 @@ til angring, og hele fotballmodulen.
   argument list» eller «Invalid left-hand side expression in postfix
   operation», det siste fordi `--noe` da leses som en dekrement.
   Skriv kodeord uten fnutter inne i en scene.
+- **Et hardkodet antall i en test glir når noe legges til.** Tre tester
+  sto på `length === 1` og `=== 5` og ble røde da portalen fikk én seksjon
+  og ett API-kall til — og ingen av dem handlet egentlig om tallet. «Alt
+  er åpent» leses av markupen (`alle === apne`), «ingen PIN ble sendt»
+  av handlingen (`!some(k => k.handling === "pin")`). **Si hva du mener
+  framfor å telle**, ellers måler testen hvor mange ting som fantes den
+  dagen den ble skrevet.
 - **En test som KASTER velter scenen, og da rapporteres ingenting.**
   Symptomet er ikke en rød påstand, men `«<scene>: testsiden rapporterte
   ingenting»` — og i en sabotasje leses det som «ingenting falt», altså
