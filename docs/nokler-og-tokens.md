@@ -68,6 +68,7 @@ funksjonen sier det med de ordene, framfor å la deg lete.
 | `API_FOOTBALL_KEY` | tabell, resultater, terminliste | hele fotballfanen svarer 503 | nei |
 | `THESPORTSDB_KEY` | årets sesong i fotballfanen | faller tilbake til fjorårets tall | med abonnementet |
 | `ADMIN_PASSORD` | innlogging i adminportalen | portalen svarer 503 | nei |
+| `ADMIN_UID` | **den andre låsen på brukerlista** | brukerlista svarer 503 | nei |
 | `GITHUB_TOKEN` | *ingenting lenger* — se under | ingenting | **ja — 90 dager** |
 | `SUPABASE_URL` | innlogging i appen | innloggingen svarer 503 | nei |
 | `SUPABASE_ANON_KEY` | innlogging i appen | innloggingen svarer 503 | ved rotering |
@@ -245,6 +246,36 @@ Ikke en konto, ikke en bruker.
 
 Passordet når aldri GitHub: er det feil, svarer funksjonen 401 før den har
 rørt tokenet.
+
+**Og passordet alene åpner ikke brukerlista.** Se `ADMIN_UID` under.
+
+### `ADMIN_UID` — den andre låsen på brukerlista
+
+Konto-id-ene (uuid fra Supabase Auth) til dem som får administrere
+brukere. Komma mellom hvis dere er flere; mellomrom rundt tåles.
+
+- **Leses av:** `netlify/functions/brukere.mjs`
+- **Hva den gjør:** `/api/brukere` krever både `ADMIN_PASSORD` **og** en
+  ekte Supabase-økt hvis uid står her. Først da rører funksjonen
+  `service_role`-nøkkelen.
+- **Uten den:** `503`, og portalen sier hvilken variabel som mangler —
+  og viser din egen konto-id, klar til å limes inn.
+- **Verdien finner du** i portalen: logg inn, åpne **Brukere**, og
+  meldinga der står med id-en. (Den står også i `pin_kontoer` i Supabase.)
+- **Roteres:** bytt i Netlify, deploy. Ingen andre steder.
+
+Hvorfor den finnes: `ADMIN_PASSORD` var **eneste** lås på `/api/brukere`
+til 22. september 2026, og bak den ligger `service_role` — liste over alle
+kontoer, ny PIN på hvem som helst, sletting. De fire andre funksjonene som
+sjekker det samme passordet har to låser. Den svakeste døra sto foran det
+sterkeste rommet ([#140](https://github.com/runevangen/sb/issues/140)).
+
+Hvorfor en miljøvariabel og ikke en tabell: lista i `visning_skrivere` er
+**ment** å vokse — [#65](https://github.com/runevangen/sb/issues/65)
+handler om at puber skal krysse av sine egne kamper. Den dagen ville en
+pubeier fått brukerregisteret med på kjøpet. En egen tabell ved siden av
+blir til «legg dem inn i begge». Her ligger den sammen med de andre
+hemmelighetene, og vokser ikke av seg selv.
 
 ### `SUPABASE_URL` og `SUPABASE_ANON_KEY` — innlogging i appen
 
