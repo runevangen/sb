@@ -42,7 +42,7 @@ const PUBTABELL = "puber";
 // koordinat. Her trengs bare navnene — men en liste som ikke er hel, er
 // en felle for neste som leser den.
 const PUBFELT = "nokkel,navn,bydel,adresse,lat,lon,type,lag,kilde,sikkerhet,sjekket,merknad,fjernet";
-const FELT = "pub,kamp_id,kamp,dato,satt";
+const FELT = "pub,kamp_id,kamp,dato,satt,viser";
 // Rader for kamper som er spilt for lenge siden har ingen verdi, og lista
 // ville vokst uten ende. Ryddes hver gang admin lagrer, som for.
 const RYDD_DAGER = 2;
@@ -114,13 +114,17 @@ async function lagre(inn) {
   const pub = String(inn.pub || "");
   const kamper = Array.isArray(inn.kamper) ? inn.kamper : [];
   const valgte = Array.isArray(inn.kampIder) ? inn.kampIder : [];
+  // «Ikke denne kvelden»: kamper puben uttrykkelig IKKE viser, enda
+  // ligaflagget dekker dem. Egen liste, ikke «alt som ikke er valgt» —
+  // de aller fleste kampene er hverken ja eller nei.
+  const neiValgte = Array.isArray(inn.neiIder) ? inn.neiIder : [];
   if (!pub || !kamper.length) return svar({ feil: "Mangler pub eller kamper" }, 400);
 
   const puber = await kjentePuber();
   if (!puber.some((p) => p.navn === pub)) return svar({ feil: "Ukjent pub" }, 400);
 
   // Radene for denne puben og disse kampene: de avkryssede, med nokkel.
-  const nye = slaSammen(pub, valgte, kamper);
+  const nye = slaSammen(pub, valgte, kamper, null, neiValgte);
   const problemer = sjekkVisninger(nye, puber.map((p) => p.navn));
   if (problemer.length) return svar({ feil: "Ugyldige visninger", problemer }, 400);
 
@@ -144,7 +148,8 @@ async function lagre(inn) {
   const fra = await hosSupabase("GET", "/rest/v1/" + TABELL + omfang +
     "&select=" + FELT, null, token);
   if (!fra.ok) return feilSvar(fra);
-  const { nye: skalLegges, fjern, uendret } = visningsDiff(tolkVisninger(fra.json), nye);
+  const { nye: skalLegges, endret: skalEndres, fjern, uendret } =
+    visningsDiff(tolkVisninger(fra.json), nye);
 
   if (fjern.length) {
     const borte = fjern.map((v) => encodeURIComponent(String(v.kampId))).join(",");
@@ -154,10 +159,16 @@ async function lagre(inn) {
     if (!slett.ok) return feilSvar(slett);
   }
 
-  if (skalLegges.length) {
+  // Nye og endrede gar i samme skriving. `on_conflict` pa (pub, kamp_id)
+  // gjor en rad som alt ligger der til en oppdatering framfor en kollisjon
+  // — en kamp som gar fra ★ til «ikke denne kvelden» beholder raden sin og
+  // bytter bare fortegn.
+  const skriv = skalLegges.concat(skalEndres);
+  if (skriv.length) {
     const r = await hosSupabase("POST",
-      "/rest/v1/" + TABELL + "?select=" + FELT, skalLegges.map(visningRad), token,
-      { "Prefer": "return=representation" });
+      "/rest/v1/" + TABELL + "?on_conflict=pub,kamp_id&select=" + FELT,
+      skriv.map(visningRad), token,
+      { "Prefer": "return=representation,resolution=merge-duplicates" });
     if (!r.ok) return feilSvar(r);
   }
 
@@ -171,12 +182,17 @@ async function lagre(inn) {
   if (!etter.ok) return feilSvar(etter);
   const skrevet = tolkVisninger(etter.json);
 
-  const staar = new Set(skrevet.map((v) => String(v.kampId)));
-  const mangler = skalLegges.filter((v) => !staar.has(String(v.kampId)));
+  // Beviset ma gjelde fortegnet ogsa: en rad som kom tilbake med `viser`
+  // uendret er ikke et bevis pa at endringen ble lagret.
+  const staar = new Map(skrevet.map((v) => [String(v.kampId), v]));
+  const mangler = skriv.filter((v) => {
+    const f = staar.get(String(v.kampId));
+    return !f || (f.viser !== false) !== (v.viser !== false);
+  });
   if (mangler.length) {
     return svar({
       feil: "Ingenting ble lagret. Skrivingen svarte ok, men " + mangler.length
-        + " av " + skalLegges.length + " rader kom ikke tilbake."
+        + " av " + skriv.length + " rader kom ikke tilbake."
         + " Star du i visning_skrivere?",
       forsok: etter.forsok,
     }, 502);
@@ -192,8 +208,17 @@ async function lagre(inn) {
   // Kvitteringen sier hva som faktisk skjedde, ikke hvor mange kamper som
   // sto avkrysset. «Lagret 6 kamper» nar du la til én er sant om det som
   // ble sendt og usant om det du gjorde.
+  // Og et fortegn som snur er sin egen handling: «la til 0, fjernet 0»
+  // om en kamp nettopp gikk fra ★ til «ikke denne kvelden», ville sagt at
+  // ingenting skjedde.
+  const nei = skriv.filter((v) => v.viser === false).length;
+  const ja = skriv.filter((v) => v.viser !== false).length;
+  // Samme skrivemate som for: «La til» er den eneste med stor forbokstav,
+  // resten foyer seg til. Ikke rort her — det er en tekst testene pinner,
+  // og denne endringen handler om et fortegn, ikke om tegnsetting.
   const deler = [];
-  if (skalLegges.length) deler.push("La til " + antall(skalLegges.length));
+  if (ja) deler.push("La til " + antall(ja));
+  if (nei) deler.push("satte " + antall(nei) + " til «viser ikke»");
   if (fjern.length) deler.push("fjernet " + antall(fjern.length));
   const endret = deler.length
     ? deler.join(", ") + "."
