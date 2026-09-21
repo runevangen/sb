@@ -9,6 +9,39 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 21. september 2026 — `checkout --ours` kastet noe ingen konflikt nevnte
+
+**Fanget av:** en `grep` jeg kjørte på egen mistanke etter flettinga. Ikke
+av en test, ikke av git, ikke av CI.
+
+**Hva som skjedde.** #129 og #130 ble squash-flettet til `main`. Squashen
+skriver om historikken, så da `main` skulle inn i #131 — som alt bar
+#130s arbeid — så git de samme endringene som nye på begge sider. Åtte
+konflikter, alle av formen «vår side er et supersett».
+
+Jeg løste dem med `git checkout --ours -- <fil>`. Det ser ut som «behold
+vår side i konflikten», og det er ikke det den gjør: den henter **hele**
+vår versjon av fila fra før flettinga, og kaster alt fra den andre siden
+— også de hunkene som fletta helt rent.
+
+`docs/modulene.md` hadde én konflikt, i avsnittet om appen. Lenger nede i
+fila lå #129s avsnitt om `byersjekk --rader`, som hadde fletta rent.
+`--ours` tok det med seg ut. **Ingen konflikt sa fra, ingen test dekker
+en dokumentasjonsfil, og CI ville vært grønn.**
+
+**Hva som gjorde at det ikke gikk ut.** Jeg sjekket etterpå at innhold fra
+alle fire PR-ene faktisk lå i treet — én `grep` per PR. Den ene av åtte
+som manglet, sto igjen med null treff.
+
+**Regelen.** Løs konflikter **per hunk**, ikke per fil. Trenger du
+virkelig hele fila fra én side, er det en avgjørelse du tar med åpne øyne
+— og da skal du kontrollere hva den andre siden hadde i den fila først.
+Og uansett: etter en fletting som denne, **sjekk at innholdet fra hver
+gren du tror du har, faktisk er der**. Et supersett er lett å påstå og
+billig å måle.
+
+---
+
 ## 21. september 2026 — en test som var rød én time i døgnet
 
 **Fanget av:** en helt annen kjøring. `test/run.mjs` sto med to røde i

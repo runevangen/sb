@@ -625,6 +625,19 @@ toppen eller i en liste: `CLAUDE.md`, `docs/hendelser.md` og
 logg, ikke en tilstand. I `testing.md` er svaret å kjøre suitene og skrive
 det de sier.
 
+**`git checkout --ours -- <fil>` tar hele fila, ikke hunken.** Den henter
+vår versjon fra før flettinga og kaster alt fra den andre siden — også det
+som fletta helt rent. Det tok #129 sitt avsnitt ut av `docs/modulene.md`
+21. september 2026, uten at noen konflikt nevnte det og uten at en eneste
+test kunne fange det. **Løs per hunk**, og etter en fletting: sjekk med en
+`grep` per gren at innholdet du tror du har, faktisk er der. Et supersett
+er lett å påstå og billig å måle.
+
+**En squash-fletting skriver om historikken**, så en gren som lå på toppen
+av den flettede vil se de samme endringene som nye på begge sider. Da blir
+hver konflikt av formen «vår side er et supersett» — og det er akkurat der
+forrige avsnitt koster deg noe.
+
 **En fletting kan være ekte uenighet, ikke bare to linjer som møtes.** Det
 skjedde 20. september: den ene grenen innførte en sirkel for «nær nok»
 mens den andre nettopp hadde landet «radiusen er en sirkel, og en by er
