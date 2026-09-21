@@ -515,6 +515,62 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   også i et element som aldri settes inn i dokumentet, og også når vi
   kaster alt utenom teksten rett etterpå.
 - Filtrerer noe feeden, står det som en knapp med kryss i toppfeltet.
+- **Portalen er sammenleggbar, og et lukket hode bærer et tall.** Den var
+  sju seksjoner åpne samtidig, og stedsskjemaet alene var 201 av 288
+  linjer markup — kampene, som er det du kom for, lå øverst i noe du måtte
+  rulle forbi resten av. Meldt 21. september 2026.
+  Mekanikken er **appens egen**: `<button aria-expanded>` og et panel med
+  `[hidden]`, som `fotball.js`. Ikke `<details>` — det brukes ett sted i
+  appen, og to folde-mekanikker er én for mye. Ett sett funksjoner
+  (`settApen`, `apneHvisUrort`, `settTall`) dekker både seksjonene og de
+  to trinnene i stedsskjemaet.
+  **Tallet er grunnen til at en lukket seksjon er trygg.** Uten det er en
+  lukket seksjon en du glemmer. Og det må si det samme som innholdet: er
+  bystedfilteret på, sier «26» at lista har 26 rader mens skjermen viser
+  én, så hodet teller begge — «1 av 27». Samme regel som hinten under.
+  **Køen åpner seg selv når den har noe i seg — og slutter med det i det
+  du har rørt den.** `rort` settes av trykket. `tegnForslag` kjøres på
+  nytt når rettelsene lander (`tegnForslagIgjen`), og en seksjon som river
+  seg opp igjen der er den samme feilen `tegnSteder` i appen har kostet
+  oss.
+  **En knapp som sender deg til et skjema, åpner seksjonen skjemaet ligger
+  i.** Køen står i én seksjon og stedsskjemaet i en annen; `apneSted()`
+  åpner Steder, ellers ruller `scrollIntoView` til et skjult element — et
+  trykk som svarer at det lyktes uten at noe skjedde.
+  **Og kampene ligger lukket, som resten.** De sto framme fordi de var det
+  du kom for — sant så lenge kamp for kamp var eneste måte å si hva et sted
+  viser. Ligaflagget dekker sesongen nå, og lista her er den du åpner når
+  noe **avviker** fra den; da er tjue kamper å rulle forbi feil vei rundt.
+  **Og ulagret arbeid står i hodet.** Lukker du kampene med en avkryssing
+  du ikke har lagret, går både knappen og kvitteringen ut av syne. Tallet
+  er det `lagreKnappTekst()` teller: hva trykket kommer til å gjøre.
+  **Er ingenting ulagret, står det hva som ER satt** — «2 av 20 satt», og
+  ikke i aksentfargen: et tall som venter på deg og et tall som bare
+  opplyser, skal ikke se like ut. Et tomt hode over tjue kamper og to
+  kryss er en seksjon du glemmer, og det er nettopp det taket er til for å
+  hindre. Tallet teller **begge** påstandene, ★ og «viser ikke», som
+  knappen gjør.
+  **Adgang er ferdig med seg selv.** Seksjonen sto igjen etter innlogging
+  som fem rader med ett deaktivert felt. «Logg ut» hører til deg, ikke til
+  en oppgave, og ligger oppe ved tittelen.
+- **Stedsskjemaet har to trinn, og trinn to skjuler aldri at noe kreves.**
+  «1. Hvem og hvor» er stedet; «2. Hva vi vet» er vurderingen av det —
+  type, sikkerhet, ligaflagg, kilde, dato, og de er de feltene som oftest
+  hoppes over. Et **nytt** sted starter med trinn to lukket; et sted som
+  alt finnes åpner begge, for verdiene står der og et lukket trinn ville
+  skjult raden slik den er.
+  Tallet i trinnhodet teller feltene som mangler, og leses av
+  **`aria-required`** — som `merkPakrevde()` setter ut av `PUBLISTE_FELT`.
+  Én liste, ikke tre: en egen her kunne glidd fra den validatoren bruker,
+  og da sa hodet «alt fylt ut» om et skjema som ikke slipper gjennom.
+  **Rødt først når du har prøvd å lagre.** Et nytt sted er tomt, og «4
+  felt mangler» i rødt før du har skrevet et tegn leses som en feil du har
+  gjort. Tallet er det samme hele veien; alvoret endrer seg i det skjemaet
+  ble bedt om noe det ikke kunne gjøre.
+  **Og en feilet lagring åpner begge trinn.** Meldinga navngir et felt, og
+  en melding som peker inn i noe du ikke ser er verre enn ingen. Begge,
+  ikke det ene: å regne ut hvilket trinn den *første* feilen hører til
+  ville vært enda en liste som kan gli fra `PUBLISTE_FELT`.
 - **Et felt som må fylles ut, sier det — før du trykker lagre.** Stjernene
   i stedskjemaet settes av `merkPakrevde()` **ut av `PUBLISTE_FELT`**, ikke
   skrevet i markupen: en liste i HTML-en kunne glidd fra den lista
@@ -585,6 +641,25 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   siste rettelsen bort i portalen, er det tomme svaret det riktige, og
   appen skal falle tilbake til fila framfor å bli stående med en rad ingen
   har lenger. `klar` skiller «ingen rettelser» fra «tjenesten svarte ikke».
+- **Portalen leser stedene uten en økt, og skriver med den.** `stedKall()`
+  krevde et token for *hvert* kall, og «liste» er en ren lesing: appen
+  henter den samme lista med en naken GET, og bare `lagre` slår opp uid-en
+  i basen. Følgen var at en admin med gyldig passord, men med en utløpt
+  økt fra appen, fikk «Viser bare puber.js» — pubvelgeren sto igjen med de
+  26 stedene i fila, og da bar ingen pubrad ligaflagget, for det bor bare
+  i basen. «Ikke denne kvelden» kunne ikke stå noe sted, uansett hvor
+  riktig knappen var bygget. Portalen fornyer ikke økta selv, så den
+  utløper mens passordet står — og et krav som gjelder alt, rammer det som
+  ikke stiller det. Meldt 21. september 2026: «ser ingen forskjell på
+  admin?».
+- **Og kamplista tegnes om når rettelsene lander.** Fjerde gang den samme
+  runden: `tegnSvar()` i appen, `tegnKjenteIgjen()` i kortet,
+  `tegnForslagIgjen()` i køen — og nå `tegnKamperIgjen()`. Ligaflagget bor
+  bare i basen, så pubraden `tegnKamper` leste før `/api/pub-liste` svarte
+  bærer ingen påstand å si imot. **Men aldri over en avkryssing du ikke
+  har lagret:** `tegnKamper` bygger lista på nytt fra `visninger`, og
+  hakene dine ville ryket. Står det noe ulagret, blir lista stående, og
+  knappen kommer neste gang lista tegnes.
 - **«Kommende» viser hele vinduet**, ikke én runde, med en overskrift per
   runde. Taket på tjue id-er mot `/api/svar` holdes av buntingen i
   `hentSvarFor()`, ikke av at lista kappes i forkant.

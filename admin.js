@@ -32,6 +32,65 @@ import { visningsHint, rundeTall, lagreKnappTekst,
          rundeKnappTekst } from "./visning-data.js";
 
 const felt = (id) => document.getElementById(id);
+
+/* ---------- sammenleggbare seksjoner ----------
+
+   Portalen var sju seksjoner, alle apne samtidig, og stedsskjemaet alene
+   var 201 av 288 linjer markup i den. Kampene — det du kom for — la
+   oeverst i noe du matte rulle forbi resten av.
+
+   Mekanikken er appens egen: en <button aria-expanded> og et panel med
+   [hidden], som `fotball.js`. ETT sett funksjoner for bade seksjonene og
+   de to trinnene i stedsskjemaet: to folde-mekanikker ville glidd fra
+   hverandre, og den ene ville sluttet a huske hva den andre gjorde.
+
+   Apen/lukket huskes pa knappen, og tegnerne rorer bare INNHOLDET i
+   panelet. En seksjon som lukker seg selv fordi et svar landet, er den
+   samme feilen `tegnSteder` i appen alt har kostet oss. */
+
+function kroppen(hode) {
+  return document.getElementById(hode.getAttribute("aria-controls"));
+}
+
+function erApen(hode) {
+  return hode.getAttribute("aria-expanded") === "true";
+}
+
+function settApen(hode, apen) {
+  hode.setAttribute("aria-expanded", apen ? "true" : "false");
+  const kropp = kroppen(hode);
+  if (kropp) kropp.hidden = !apen;
+}
+
+// Apner en seksjon som admin IKKE har rort selv.
+//
+// Koen skal kunne apne seg fordi den har noe i seg. Men lukker du den, og
+// et svar lander et halvt sekund etter, skal den bli liggende lukket —
+// `rort` settes av trykket, og fra da av er det admin som styrer.
+function apneHvisUrort(hode, vil) {
+  if (!vil || hode.dataset.rort === "1") return;
+  settApen(hode, true);
+}
+
+// Tallet i hodet, og det er grunnen til at en lukket seksjon er trygg:
+// uten det er en lukket seksjon en du glemmer. `venter` er det som ligger
+// og venter pa deg — en ko med nye rader, en endring du ikke har lagret —
+// og det star i aksentfargen framfor a se ut som en opplysning til.
+function settTall(id, tekst, venter) {
+  const t = felt(id);
+  if (!t) return;
+  t.textContent = tekst || "";
+  t.classList.toggle("venter", !!venter && !!tekst);
+}
+
+Array.from(document.querySelectorAll(".seksjon-hode, .trinn-hode"))
+  .forEach((hode) => {
+    hode.addEventListener("click", () => {
+      hode.dataset.rort = "1";
+      settApen(hode, !erApen(hode));
+    });
+  });
+
 let kamper = [];
 let passord = "";
 
@@ -215,6 +274,11 @@ async function loggInn() {
   felt("loggUt").hidden = false;
   felt("adgangHint").textContent = "Passordet ligger bare i denne fanen, til du logger ut eller lukker den.";
   visAdgang("Innlogget.", "ok");
+  // Adgang er ferdig med seg selv. Seksjonen sto igjen som fem rader med
+  // ett deaktivert felt — en boks pa linje med Kamper og Steder, om noe
+  // som ikke er en oppgave. «Logg ut» ligger oppe ved tittelen na, og at
+  // portalen star der er kvitteringa pa at passordet gikk gjennom.
+  felt("adgang").hidden = true;
   felt("portal").hidden = false;
   hentKamper();
   hentBrukere();
@@ -361,6 +425,9 @@ async function hentBrukere() {
     felt("brukerOktfeil").hidden = !data.oktfeil;
     felt("brukerOktfeil").textContent = data.oktfeil || "";
   } catch (err) {
+    // Et tall som blir staaende etter et feilet kall, paastar en liste vi
+    // ikke har.
+    settTall("brukerTall", "");
     felt("brukere").hidden = true;
     felt("brukerHint").textContent = err.message;
   }
@@ -403,6 +470,9 @@ async function hentForslag() {
     const data = await forslagKall({ handling: "liste" });
     tegnForslag(data.forslag || []);
   } catch (err) {
+    // Samme grunn som i brukerlista: et tall som blir staaende etter et
+    // feilet kall, paastar en ko vi ikke har spurt om.
+    settTall("forslagTall", "");
     felt("forslagListe").textContent = "";
     felt("forslagHint").textContent = err.message;
   }
@@ -439,6 +509,16 @@ function tegnForslag(liste) {
   // Tipsene foerst, og det eldste foerst innenfor hvert lag.
   const nye = sorterForslagKo(liste.filter((f) => f.status === "ny"),
                               sammenslatt);
+
+  // Tallet forst, og det teller det KOEN VISER: de nye. «26 behandlet»
+  // over en tom ko ville sendt deg inn i en seksjon det ikke er noe a
+  // gjore i.
+  settTall("forslagTall", nye.length ? String(nye.length) : "", true);
+  // Og den apner seg selv naar den har noe i seg — men bare til du har
+  // rort den. En ko som ligger lukket med et tall pa, er en du kan la
+  // ligge; en som apner seg mens du leser noe annet, er ikke det.
+  apneHvisUrort(felt("forslagHode"), nye.length > 0);
+
   if (!nye.length) {
     felt("forslagHint").hidden = false;
     felt("forslagHint").textContent = liste.length
@@ -606,6 +686,8 @@ async function behandleForslag(f, status) {
 function tegnBrukere(liste) {
   const kropp = felt("brukerRader");
   kropp.textContent = "";
+
+  settTall("brukerTall", liste.length ? String(liste.length) : "");
 
   if (!liste.length) {
     felt("brukere").hidden = true;
@@ -909,6 +991,22 @@ function tegnKamper() {
   oppdaterLagreknapp();
 }
 
+// Kamplista pa nytt nar rettelsene lander. Det som kommer over nettet,
+// lander etter at visningen star ferdig — samme leksa som `tegnSvar()` i
+// appen og `tegnKjenteIgjen()` i kortet, og her betyr den ligaflagget:
+// `puber.js` har ingen `ligaer`, sa en kamplista tegnet for
+// `/api/pub-liste` svarte leser en pubrad uten pastand, og «Ikke denne
+// kvelden» uteblir til noe annet tegner lista om.
+//
+// Men aldri over en avkryssing du ikke har lagret: `tegnKamper` bygger
+// lista pa nytt fra `visninger`, og hakene dine ville ryket. Star det noe
+// ulagret, blir lista staende — knappen kommer neste gang den tegnes.
+function tegnKamperIgjen() {
+  if (!kamper.length) return;
+  if (lagretSignatur !== null && valgtSignatur() !== lagretSignatur) return;
+  tegnKamper();
+}
+
 // «Lagre» alene sier ikke hva den lagrer. Antallet og pubnavnet gjor at du
 // ser hva du er i ferd med a gjore for du gjor det — og fanger den ene
 // feilen som ellers er usynlig: feil pub valgt.
@@ -970,6 +1068,7 @@ function oppdaterLagreknapp() {
   if (!pub || !bokser.length) {
     knapp.textContent = "Lagre";
     knapp.disabled = true;
+    settTall("kampTall", "");
     return;
   }
   // Knappen sier hva trykket kommer til a GJORE, ikke hvor mange kamper
@@ -995,6 +1094,23 @@ function oppdaterLagreknapp() {
   // det sto et nei igjen.
   knapp.textContent = lagreKnappTekst(lagt, fjernet, antall + naNei.size, pub);
   knapp.disabled = !lagt && !fjernet;
+
+  // Og det samme tallet i hodet. Lukker du seksjonen med en avkryssing du
+  // ikke har lagret, gar bade knappen og kvitteringen ut av syne — og en
+  // endring du ikke vet om er borte, er borte. Tallet er det samme
+  // `lagreKnappTekst` teller: hva trykket kommer til a gjore.
+  //
+  // Og nar ingenting er ulagret, staar det hva som ER satt. Seksjonen
+  // ligger lukket na — ligaflagget dekker sesongen for de fleste stedene,
+  // og denne lista er den du apner nar noe avviker — sa hodet maa baere
+  // den. Et tomt hode over tjue kamper og to kryss er en seksjon du
+  // glemmer. Tallet teller BEGGE pastandene, ★ og «viser ikke», som
+  // knappen: en rad som sier «viser ikke» er like mye satt.
+  const endringer = lagt + fjernet;
+  const satt = antall + naNei.size;
+  settTall("kampTall", endringer
+    ? (endringer === 1 ? "1 ulagret endring" : endringer + " ulagrede endringer")
+    : satt + " av " + bokser.length + " satt", !!endringer);
 }
 
 function nar(iso) {
@@ -1306,15 +1422,81 @@ function oppdaterPakrevdTekst() {
 
 merkPakrevde();
 
+/* ---------------- skjemaet i to trinn ----------------
+
+   Tolv felt i én kolonne var den ekte lengden i portalen. Trinn 1 er
+   stedet — hvem det er og hvor det ligger; trinn 2 er vurderingen av det:
+   type, sikkerhet, ligaflagg, kilde, dato.
+
+   Et lukket trinn far ikke skjule at noe kreves. Tallet i hodet teller
+   feltene som mangler, og det leses ut av `aria-required` — som
+   `merkPakrevde` setter ut av PUBLISTE_FELT. Én liste, ikke tre: en egen
+   liste her kunne glidd fra den validatoren bruker, og da ville hodet
+   sagt «alt fylt ut» om et skjema som ikke slipper gjennom. */
+
+const TRINN = ["trinn1", "trinn2"];
+
+// Feltene i ett trinn som ma fylles ut og ikke er det.
+//
+// `aria-required` er kilden, ikke en liste her: den settes av
+// `merkPakrevde` ut av PUBLISTE_FELT, og stjerna admin ser er den samme
+// opplysningen. Tallet og stjernene kan da ikke si hver sin ting.
+function manglerI(kropp) {
+  return Array.from(kropp.querySelectorAll("[aria-required='true']"))
+    .filter((f) => String(f.value == null ? "" : f.value).trim() === "").length;
+}
+
+function oppdaterTrinn() {
+  // Tas stedet UT av lista, holder navnet — `sjekkPubRad` slipper en
+  // fjernet rad gjennom pa det alene. Da er «2 felt mangler» usant, og
+  // tallet skal tie. Samme regel som stjernene, samme sted avgjort.
+  const ut = felt("stedFjernet").checked;
+  // Rodt forst NAR du har provd a lagre. Et nytt sted starter tomt, sa
+  // «4 felt mangler» i rodt sto der for du hadde skrevet et tegn — og en
+  // advarsel om noe du ikke har gjort ennaa, leses som en feil du har
+  // gjort. Tallet er det samme hele veien; det er alvoret som endrer seg
+  // i det skjemaet ble bedt om noe det ikke kunne gjore.
+  const provd = felt("stedSkjema").dataset.provd === "1";
+  TRINN.forEach((t) => {
+    const antall = ut ? 0 : manglerI(felt(t + "Kropp"));
+    const merke = felt(t + "Tall");
+    merke.textContent = antall ? antall + " felt mangler" : "";
+    merke.classList.toggle("mangler", antall > 0 && provd);
+  });
+}
+
+// Skjemaet er ett skjema: hvert tastetrykk kan endre begge tallene, og en
+// teller som bare oppdateres i sitt eget trinn ville ligget bak.
+felt("stedSkjema").addEventListener("input", oppdaterTrinn);
+felt("stedSkjema").addEventListener("change", oppdaterTrinn);
+
 function apneSted(p, nokkel) {
   stedRedigeres = nokkel || "";
   fyllSted(p);
   settBy(p);
+  // Skjemaet ligger i Steder-seksjonen, og koen apner det herfra — «Ta
+  // stedet ut» og «Apne i editoren» star begge i en ANNEN seksjon. Er
+  // Steder lukket, ville skjemaet blitt apnet et sted ingen ser det, og
+  // `scrollIntoView` rullet til et skjult element: et trykk som svarer at
+  // det lyktes uten at noe skjedde.
+  settApen(felt("stedHode"), true);
+  // Trinnene starter pa nytt for hvert sted, sa `rort` fra forrige rad
+  // ikke styrer denne.
+  TRINN.forEach((t) => { delete felt(t + "Hode").dataset.rort; });
+  // Et nytt sted har ikke provd noe ennaa.
+  delete felt("stedSkjema").dataset.provd;
+  settApen(felt("trinn1Hode"), true);
+  // Et NYTT sted starter pa trinn 1: trinn 2 er tomt, og et tomt trinn er
+  // ingenting a se paa. Et sted som alt finnes apner begge — verdiene
+  // STAR der, og et lukket trinn ville skjult raden slik den er.
+  settApen(felt("trinn2Hode"), !!nokkel);
   // fyllSted setter haken uten a utlose `change`. Apner du et sted som alt
   // er tatt ut, ville forklaringa ellers sagt «ma fylles ut» om felt som
   // ikke kreves — og et skjema som lyver om sine egne krav er verre enn et
-  // som ikke sier noe.
+  // som ikke sier noe. Tallene i trinnhodene er den samme pastanden, og
+  // leses av det samme haket.
   oppdaterPakrevdTekst();
+  oppdaterTrinn();
   felt("stedSkjema").hidden = false;
   felt("stedAvbryt").hidden = false;
   stedMelding("", "");
@@ -1379,15 +1561,30 @@ function stedMelding(tekst, art) {
   m.className = "melding" + (art ? " " + art : "");
 }
 
+// Kallene som bare LESER. Tjenesten krever ingen token for dem: «liste»
+// og de to sokene gar som var egen nokkel, og appen henter den samme
+// lista med en naken GET. Bare `lagre` slar opp uid-en i basen, og det er
+// den ene som ma ga med skriverens egen okt.
+const STED_LESER = ["liste", "sok", "sok-adresse"];
+
 async function stedKall(kropp) {
   const okt = lesOkt();
-  if (!okt || !okt.token) {
+  const token = (okt && okt.token) || "";
+  // Kravet sto pa HELE stedKall, og gjaldt dermed lesinga ogsa. En admin
+  // med gyldig passord, men uten en levende okt i nettleseren, fikk da
+  // «Viser bare puber.js» — og pubvelgeren sto igjen med de 26 stedene i
+  // fila. Ikke ett sted fra portalen, og dermed ikke ett ligaflagg: de
+  // bor bare i basen. «Ikke denne kvelden» kunne ikke sta noe sted,
+  // uansett hvor riktig knappen var bygget.
+  //
+  // Meldt 21. september 2026: «ser ingen forskjell pa admin?»
+  if (!token && STED_LESER.indexOf(String((kropp && kropp.handling) || "")) === -1) {
     throw new Error("Logg inn i appen først. Lagringen går med din egen økt.");
   }
   const respons = await fetch("/api/pub-liste", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(Object.assign({ passord, token: okt.token }, kropp)),
+    body: JSON.stringify(Object.assign({ passord, token }, kropp)),
   });
   const data = JSON.parse(await respons.text());
   if (!respons.ok || !data || data.feil) {
@@ -1411,6 +1608,9 @@ async function hentSteder() {
     pubRettelser = data.puber || [];
     tegnSteder();
     tegnPubvelger();
+    // Og kamplista: ligaflagget bor bare i basen, sa pubraden `tegnKamper`
+    // leste for dette svaret bar ingen pastand a si imot.
+    tegnKamperIgjen();
     // Og koen paa nytt. Det som kommer over nettet, lander etter at
     // visningen staar ferdig — den samme leksa som `tegnSvar()` i appen og
     // `tegnKjenteIgjen()` i kortet.
@@ -1528,6 +1728,12 @@ function tegnSteder() {
     ? "Viser " + vist.length + " " + byNavn + ", av " + alle.length
       + " rader. " + kilde
     : sammen.length + " steder i lista. " + kilde;
+  // Tallet i hodet ma si det samme som hinten rett under. Er filteret pa,
+  // sier «26» at lista har 26 rader mens skjermen viser én — og det leses
+  // som at de andre er borte. Da teller hodet begge: «1 av 27».
+  settTall("stedTall", stedFilter
+    ? vist.length + " av " + alle.length
+    : String(sammen.length));
 }
 
 function stedRad(p, nokkel, rettelse) {
@@ -1607,6 +1813,16 @@ async function lagreSted() {
   const p = stedFelt();
   const problemer = sjekkPubRad(p);
   if (problemer.length) {
+    // Meldinga navngir et felt. Ligger det i et lukket trinn, peker den et
+    // sted admin ikke ser — og da er den verre enn ingen melding: du leter
+    // etter «kilde» i et skjema som ikke viser det.
+    //
+    // Begge apnes, ikke bare det ene: `sjekkPubRad` gir feilene i sin egen
+    // rekkefolge, og a regne ut hvilket trinn den FORSTE hoerer til ville
+    // vaert en liste til som kan gli fra PUBLISTE_FELT.
+    TRINN.forEach((t) => settApen(felt(t + "Hode"), true));
+    felt("stedSkjema").dataset.provd = "1";
+    oppdaterTrinn();
     stedMelding(problemer[0], "feil");
     return;
   }

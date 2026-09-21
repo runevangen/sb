@@ -3289,6 +3289,27 @@ const SAK_15 = kjor("admin", `
           // Derfor maler denne skriftstoerrelse framfor bredde: bredden var
           // aldri problemet, og en vakt som maler feil ting er en vakt som
           // sier «alt er bra» mens telefonen gjor noe annet.
+          //
+          // Seksjonene er sammenleggbare fra 21. september 2026, og de
+          // fleste star lukket. Begge vaktene her maler HELE portalen, sa
+          // alt apnes foerst: en vakt som bare maler det som tilfeldigvis
+          // er framme, maler ikke portalen — den maler dagens tilstand,
+          // og sier «alt er bra» om et felt som star en knapp unna.
+          function apneAlt(rot) {
+            Array.prototype.forEach.call(
+              rot.querySelectorAll(".seksjon-hode, .trinn-hode"), function (h) {
+                h.setAttribute("aria-expanded", "true");
+                var kropp = rot.querySelector("#" + h.getAttribute("aria-controls"))
+                  || (rot.getElementById && rot.getElementById(h.getAttribute("aria-controls")));
+                if (kropp) kropp.hidden = false;
+              });
+            // Stedsskjemaet ligger bak «Nytt sted» og er det lengste i
+            // portalen. Det er nettopp det som ma males.
+            var skjema = rot.querySelector("#stedSkjema");
+            if (skjema) skjema.hidden = false;
+          }
+          apneAlt(document);
+
           var smaaFelt = [];
           Array.prototype.forEach.call(
             document.querySelectorAll("input, select, textarea"), function (e) {
@@ -3300,6 +3321,9 @@ const SAK_15 = kjor("admin", `
             });
           ok("ingen felt er sa sma at iPhone zoomer inn i dem",
              smaaFelt.length === 0, smaaFelt.join(", "));
+          ok("og de ble malt med alt apent, ikke bare det som sto framme",
+             document.querySelectorAll(".seksjon-kropp:not([hidden])").length === 5,
+             document.querySelectorAll(".seksjon-kropp:not([hidden])").length + " apne");
 
           // Sida skal fa plass pa en telefon. Meldt 17. september 2026:
           // «Den er los pa mobil, dvs jeg kan scrolle hele skjermen til
@@ -3315,6 +3339,10 @@ const SAK_15 = kjor("admin", `
             "visibility:hidden;overflow:visible;";
           var kopi = document.querySelector("main").cloneNode(true);
           kopi.style.maxWidth = "320px";
+          // Kopien ogsa: et skjult panel har ingen bredde, og da ville
+          // vakta sagt at portalen far plass fordi mesteparten av den ikke
+          // ble tegnet.
+          apneAlt(kopi);
           maleboks.appendChild(kopi);
           document.body.appendChild(maleboks);
           var trengs = kopi.scrollWidth;
@@ -4125,6 +4153,196 @@ const SAK_15F = kjor("admin-ikke-denne-kvelden", `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300); });
 `, null, adminSide);
 
+// Portalen har passordet, men INGEN okt i nettleseren. Det er runden
+// admin gar oftest: passordet ligger i fana, mens okta fra appen er
+// utlopt — portalen fornyer den ikke selv. Kravet sto pa HELE stedKall,
+// og da falt stedene fra portalen ut av bade lista og pubvelgeren. Ingen
+// pubrad bar ligaflagget, for det bor bare i basen, og «Ikke denne
+// kvelden» kunne ikke sta noe sted uansett hvor riktig knappen var
+// bygget. Meldt 21. september 2026: «ser ingen forskjell pa admin?»
+const SAK_15H = kjor("admin-uten-okt", `
+  try { localStorage.removeItem("sb-konto"); } catch (e) { /* privat modus */ }
+
+  var IDAG = new Date().toISOString().slice(0, 10);
+  var MED = { nokkel: "sportsbaren-bodo", navn: "Sportsbaren Bodø", bydel: "Sentrum",
+    adresse: "Gata 1", lat: 67.2828, lon: 14.3756, type: "sportsbar", lag: [],
+    kilde: "Var innom 21.09.2026, storskjerm i baren", sikkerhet: "bekreftet",
+    sjekket: IDAG, merknad: "", fjernet: false,
+    ligaer: { sender: ["eliteserien"],
+              kilde: "Ringte dem og spurte om ligaen", sjekket: IDAG } };
+  var KAMPER = [
+    { id: 701, hjemme: "Bodø/Glimt", borte: "Brann", dato: "2026-10-20T17:00:00+00:00",
+      arena: "Aspmyra Stadion", runde: "Runde 21" },
+    { id: 702, hjemme: "Viking", borte: "Molde", dato: "2026-10-21T17:00:00+00:00",
+      arena: "SR-Bank Arena", runde: "Runde 21" }
+  ];
+  window.__liste = null;
+  window.__lagret = null;
+  function svar(status, kropp) {
+    return Promise.resolve({ ok: status < 400, status: status, text: function () {
+      return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("/api/visninger") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [], visninger: [] });
+      var v = JSON.parse(opt.body);
+      if (v.handling === "sjekk") {
+        return v.passord === "hemmelig" ? svar(200, { ok: true }) : svar(401, { feil: "Feil passord" });
+      }
+      return svar(200, { ok: true, pub: v.pub, visninger: [], merknad: "Lagret." });
+    }
+    if (u.indexOf("/api/fotball") === 0) {
+      return svar(200, { liga: "Eliteserien", kilde: "TheSportsDB", runde: "Runde 21",
+        runder: ["Runde 21"], kamper: KAMPER });
+    }
+    if (u.indexOf("/api/brukere") === 0) return svar(200, { klar: true, mangler: [] });
+    if (u.indexOf("/api/pub-forslag") === 0) return svar(200, { forslag: [] });
+    if (u.indexOf("/api/pub-liste") === 0) {
+      var kropp = JSON.parse(opt.body);
+      // Stubben modellerer TJENESTEN, ikke klienten: «liste» svarer uten
+      // en token — appen henter den samme lista med en naken GET — og
+      // bare lagringen slar opp uid-en. Sto kravet i stubben ogsa, malte
+      // testen var egen feil og ville vaert gronn uansett.
+      if (kropp.handling === "liste") {
+        window.__liste = kropp;
+        return svar(200, { puber: [MED], klar: true });
+      }
+      if (!kropp.token) {
+        return svar(401, { feil: "Logg inn i appen først. Lagringen går med din egen økt." });
+      }
+      window.__lagret = kropp;
+      return svar(200, { ok: true, merknad: "Lagret." });
+    }
+    return svar(200, {});
+  };
+  function felt(id) { return document.getElementById(id); }
+  function pubValg() {
+    return Array.prototype.map.call(felt("pub").options, function (o) { return o.value; });
+  }
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    felt("passord").value = "hemmelig";
+    felt("loggInn").click();
+    setTimeout(function () { try {
+      ok("stedene hentes uten en økt — kallet leser bare",
+         !!window.__liste, JSON.stringify(window.__liste));
+      ok("og stedet fra portalen star i pubvelgeren",
+         pubValg().indexOf("Sportsbaren Bodø") > -1, pubValg().length + " valg");
+
+      felt("pub").value = "Sportsbaren Bodø";
+      felt("pub").dispatchEvent(new Event("change"));
+      ok("sa ligaflagget nar fram, og knappen star pa hver kamp",
+         felt("kamper").querySelectorAll(".kamp-nei").length === 2,
+         felt("kamper").querySelectorAll(".kamp-nei").length + " knapper");
+
+      // Men LAGRINGEN krever fortsatt okta, og sier det for den sender.
+      felt("stedNytt").click();
+      felt("stedNavn").value = "Ny Bar";
+      felt("stedBydel").value = "Sentrum";
+      felt("stedLat").value = "63.4305";
+      felt("stedLon").value = "10.3951";
+      felt("stedType").value = "pub";
+      felt("stedSikkerhet").value = "bekreftet";
+      felt("stedKilde").value = "Var innom 21.09.2026, storskjerm i baren";
+      felt("stedLagre").click();
+      setTimeout(function () { try {
+        ok("men lagringen krever okta, og sier det",
+           felt("stedMelding").textContent.indexOf("Logg inn i appen") > -1,
+           felt("stedMelding").textContent);
+        ok("og da ble ingenting sendt",
+           window.__lagret === null, JSON.stringify(window.__lagret));
+        ferdig();
+      } catch (e) { ok("ingen unntak etter lagring", false, e.message); ferdig(); } }, 400);
+    } catch (e) { ok("ingen unntak i portalen", false, e.message); ferdig(); } }, 600);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300); });
+`, null, adminSide);
+
+// Rettelsene lander ETTER at kamplista star ferdig. Den runden har kostet
+// oss tre feil for — `tegnSvar()` i appen, `tegnKjenteIgjen()` i kortet —
+// og her er det ligaflagget som uteblir: `puber.js` har ingen `ligaer`,
+// sa pubraden `tegnKamper` leste bar ingen pastand a si imot.
+//
+// Stedet er en RETTELSE av den forste puben i fila, sa velgeren star pa
+// den hele veien. Da er det ingen ting som tegner lista om — uten at noen
+// gjor det med vilje.
+const SAK_15I = kjor("admin-rettelsen-lander-sist", `
+  try { localStorage.removeItem("sb-konto"); } catch (e) { /* privat modus */ }
+
+  var IDAG = new Date().toISOString().slice(0, 10);
+  var RETTET = { nokkel: "andyspub", navn: "Andy's Pub", bydel: "Sentrum",
+    adresse: "Gata 1", lat: 59.9127, lon: 10.7461, type: "sportsbar", lag: [],
+    kilde: "Var innom 21.09.2026, storskjerm i baren", sikkerhet: "bekreftet",
+    sjekket: IDAG, merknad: "", fjernet: false,
+    ligaer: { sender: ["eliteserien"],
+              kilde: "Ringte dem og spurte om ligaen", sjekket: IDAG } };
+  var KAMPER = [
+    { id: 801, hjemme: "Rosenborg", borte: "Brann", dato: "2026-10-20T17:00:00+00:00",
+      arena: "Lerkendal Stadion", runde: "Runde 21" },
+    { id: 802, hjemme: "Viking", borte: "Molde", dato: "2026-10-21T17:00:00+00:00",
+      arena: "SR-Bank Arena", runde: "Runde 21" }
+  ];
+  window.__tidlig = null;
+  function svar(status, kropp) {
+    return Promise.resolve({ ok: status < 400, status: status, text: function () {
+      return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  function sent(status, kropp, ms) {
+    return new Promise(function (r) {
+      setTimeout(function () {
+        r({ ok: status < 400, status: status, text: function () {
+          return Promise.resolve(JSON.stringify(kropp)); } });
+      }, ms);
+    });
+  }
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("/api/visninger") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [], visninger: [] });
+      var v = JSON.parse(opt.body);
+      if (v.handling === "sjekk") {
+        return v.passord === "hemmelig" ? svar(200, { ok: true }) : svar(401, { feil: "Feil passord" });
+      }
+      return svar(200, { ok: true, pub: v.pub, visninger: [], merknad: "Lagret." });
+    }
+    if (u.indexOf("/api/fotball") === 0) {
+      return svar(200, { liga: "Eliteserien", kilde: "TheSportsDB", runde: "Runde 21",
+        runder: ["Runde 21"], kamper: KAMPER });
+    }
+    if (u.indexOf("/api/brukere") === 0) return svar(200, { klar: true, mangler: [] });
+    if (u.indexOf("/api/pub-forslag") === 0) return svar(200, { forslag: [] });
+    // Rettelsene kommer sist. Det er den ene rekkefolgen som avslorer om
+    // kamplista tegnes om nar de lander.
+    if (u.indexOf("/api/pub-liste") === 0) return sent(200, { puber: [RETTET], klar: true }, 300);
+    return svar(200, {});
+  };
+  function felt(id) { return document.getElementById(id); }
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    felt("passord").value = "hemmelig";
+    felt("loggInn").click();
+    // Forst: kampene star tegnet, rettelsene er ikke kommet ennaa.
+    setTimeout(function () { try {
+      window.__tidlig = felt("kamper").querySelectorAll(".kamp-nei").length;
+      ok("for rettelsene har landet star kampene der, uten knapp",
+         felt("kamper").querySelectorAll(".kamp input").length === 2 &&
+         window.__tidlig === 0, "kamper tegnet, " + window.__tidlig + " knapper");
+      ok("og velgeren star pa den puben rettelsen gjelder",
+         felt("pub").value === "Andy's Pub", felt("pub").value);
+
+      // Og sa lander de — uten at noen rorer velgeren.
+      setTimeout(function () { try {
+        ok("nar rettelsene lander, tegnes kamplista om med flagget",
+           felt("kamper").querySelectorAll(".kamp-nei").length === 2,
+           felt("kamper").querySelectorAll(".kamp-nei").length + " knapper");
+        ok("og velgeren star pa den samme puben",
+           felt("pub").value === "Andy's Pub", felt("pub").value);
+        ferdig();
+      } catch (e) { ok("ingen unntak etter rettelsene", false, e.message); ferdig(); } }, 500);
+    } catch (e) { ok("ingen unntak i portalen", false, e.message); ferdig(); } }, 200);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 300); });
+`, null, adminSide);
+
 const SAK_15D = kjor("admin-lagret-star", `
   try {
     localStorage.setItem("sb-konto", JSON.stringify({
@@ -4528,6 +4746,238 @@ const SAK_15E = kjor("admin-tips", `
         } catch (e) { ok("ingen unntak i lagringen", false, e.message); ferdig(); } }, 400);
       } catch (e) { ok("ingen unntak i skjemaet", false, e.message); ferdig(); } }, 200);
     } catch (e) { ok("ingen unntak i koen", false, e.message); ferdig(); } }, 500);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
+`, null, adminSide);
+
+/* ---------------- 15G. portalen sammenlagt ---------------- */
+
+// Portalen var sju seksjoner, alle apne samtidig, og stedsskjemaet alene
+// var 201 av 288 linjer markup i den. Meldt 21. september 2026: «Admin
+// menyen er blitt veldig lang og uoversiktelig.»
+//
+// Egen scene framfor flere lag inni SAK_15: det som testes her er
+// mekanikken som holder resten sammen, og den skal kunne rettes uten a
+// grave seg gjennom sju tilbakekall.
+//
+// Det som maa vaere sant:
+//   - hodet baerer et tall, for uten det er en lukket seksjon en du glemmer
+//   - koen apner seg selv naar den har noe i seg
+//   - koen apner Steder-seksjonen naar den sender deg dit
+//   - trinn 2 skjuler aldri at noe kreves
+const SAK_15G = kjor("admin-seksjoner", `
+  try {
+    localStorage.setItem("sb-konto", JSON.stringify({
+      token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
+      utloper: Date.now() + 3600000,
+    }));
+  } catch (e) { /* privat modus */ }
+
+  var KAMPER = [
+    { id: 501, hjemme: "Rosenborg", borte: "Brann",
+      dato: "2026-09-20T17:00:00+00:00", arena: "Lerkendal Stadion", runde: "Runde 21" }
+  ];
+  // Koen har ett forslag. Den skal apne seg selv av det.
+  var koen = [{ id: 7, navn: "Bar Boca", adresse: "Thorvald Meyers gate 30",
+                merknad: "", foreslatt: "2026-09-18", status: "ny" }];
+  var iBasen = [];
+
+  function svar(status, kropp) {
+    return Promise.resolve({ ok: status < 400, status: status, text: function () {
+      return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("/api/fotball") === 0) {
+      return svar(200, { liga: "Eliteserien", sesong: 2026, kilde: "TheSportsDB",
+                         runde: "Runde 21", runder: ["Runde 21"], kamper: KAMPER });
+    }
+    if (u.indexOf("/api/pub-liste") === 0) {
+      var k = JSON.parse(opt.body);
+      if (k.handling === "liste") return svar(200, { puber: iBasen, klar: true });
+      return svar(200, { ok: true, pub: k.pub, merknad: "Lagret." });
+    }
+    if (u.indexOf("/api/pub-forslag") === 0) return svar(200, { forslag: koen });
+    if (u.indexOf("/api/brukere") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [] });
+      return svar(200, { brukere: [
+        { id: "u-1", navn: "Kari", slug: "kari", forst: "2026-09-01T10:00:00Z",
+          sist: "2026-09-12T19:00:00Z", aktiv: "" },
+        { id: "u-2", navn: "Ola", slug: "ola", forst: "2026-08-20T10:00:00Z",
+          sist: "2026-08-20T10:00:00Z", aktiv: "" }
+      ] });
+    }
+    if (u.indexOf("/api/visninger") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [] });
+      return svar(200, { ok: true, visninger: [] });
+    }
+    return svar(200, {});
+  };
+
+  function felt(id) { return document.getElementById(id); }
+  function apen(id) { return felt(id).getAttribute("aria-expanded") === "true"; }
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    felt("passord").value = "hemmelig";
+    felt("loggInn").click();
+
+    setTimeout(function () { try {
+      // Adgang er ferdig med seg selv. Seksjonen sto igjen som fem rader
+      // med ett deaktivert felt — en boks pa linje med Kamper og Steder,
+      // om noe som ikke er en oppgave.
+      ok("adgangsseksjonen er borte etter innlogging",
+         felt("adgang").hidden === true, "star fortsatt");
+      ok("og «Logg ut» staar oppe ved tittelen",
+         felt("loggUt").hidden === false &&
+         felt("loggUt").closest(".topp") !== null,
+         felt("loggUt").parentElement.className);
+
+      // Alle ligger lukket, kampene med. De sto framme fordi de var det
+      // du kom for — sant sa lenge kamp for kamp var eneste mate a si hva
+      // et sted viser. Ligaflagget dekker sesongen na, og lista her er
+      // den du apner nar noe avviker fra den.
+      ok("kampene er lukket ogsa", !apen("kampHode"), "apen");
+      ok("stedene er lukket", !apen("stedHode"), "apen");
+      ok("brukerne er lukket", !apen("brukerHode"), "apen");
+      ok("verktoyet er lukket", !apen("verktoyHode"), "apen");
+      ok("og panelene folger hodene sine",
+         felt("kampKropp").hidden === true && felt("stedKropp").hidden === true &&
+         felt("brukerKropp").hidden === true && felt("verktoyKropp").hidden === true,
+         "panel og hode er uenige");
+
+      // Pila ogsa. Den sto pa «.seksjon-hode» alene, sa trinnhodene i
+      // stedsskjemaet pekte «lukket» over et apent trinn — et tegn som
+      // sier noe annet enn tilstanden det beskriver.
+      function pila(id) {
+        return getComputedStyle(felt(id).querySelector(".seksjon-pil")).transform;
+      }
+      ok("pila snur i et apent seksjonshode", pila("forslagHode") !== "none",
+         pila("forslagHode"));
+      ok("og staar uvendt i et lukket", pila("stedHode") === "none", pila("stedHode"));
+
+      // Koen apner seg selv fordi den har noe i seg. Tallet er grunnen
+      // til at de ANDRE kan ligge lukket.
+      ok("koen apner seg selv naar den har et forslag", apen("forslagHode"), "lukket");
+      ok("og tallet staar i hodet", felt("forslagTall").textContent === "1",
+         felt("forslagTall").textContent);
+      ok("og er merket som noe som venter",
+         felt("forslagTall").classList.contains("venter"), felt("forslagTall").className);
+      ok("brukerne teller sine egne", felt("brukerTall").textContent === "2",
+         felt("brukerTall").textContent);
+      ok("og stedene sine", Number(felt("stedTall").textContent) > 20,
+         felt("stedTall").textContent);
+
+      // Et trykk styrer, begge veier.
+      felt("forslagHode").click();
+      ok("ett trykk lukker koen", !apen("forslagHode"), "fortsatt apen");
+      felt("stedHode").click();
+      ok("og et annet apner stedene", apen("stedHode"), "fortsatt lukket");
+
+      // Trinn 2 er lukket for et NYTT sted: det er tomt, og et tomt trinn
+      // er ingenting a se paa.
+      felt("stedNytt").click();
+      ok("skjemaet staar framme", felt("stedSkjema").hidden === false, "skjult");
+      ok("trinn 1 er apent for et nytt sted", apen("trinn1Hode"), "lukket");
+      ok("og trinn 2 er lukket", !apen("trinn2Hode"), "apent");
+      // Og trinnhodene har den samme pila som seksjonene.
+      ok("pila snur i et apent trinnhode", pila("trinn1Hode") !== "none", pila("trinn1Hode"));
+      ok("og staar uvendt i et lukket", pila("trinn2Hode") === "none", pila("trinn2Hode"));
+      // Men det skjuler ikke at noe kreves. Type og sikkerhet har
+      // forhandsvalg, og sjekket fylles med dagens dato av fyllSted — da
+      // staar kilde igjen som det ene som mangler.
+      ok("og hodet sier hvor mange felt som mangler i det",
+         felt("trinn2Tall").textContent.indexOf("felt mangler") > -1,
+         felt("trinn2Tall").textContent);
+      // Men ikke i rodt ennaa: et nytt sted er tomt, og en advarsel om noe
+      // du ikke har gjort leses som en feil du har gjort.
+      ok("og staar ikke som en feil for du har provd a lagre",
+         !felt("trinn2Tall").classList.contains("mangler"), felt("trinn2Tall").className);
+
+      // Tallet folger det du skriver, og aria-required er kilden — den
+      // samme opplysningen stjerna staar for.
+      var forKilde = felt("trinn2Tall").textContent;
+      felt("stedKilde").value = "Var innom 20.09.2026, storskjerm i baren";
+      felt("stedKilde").dispatchEvent(new Event("input", { bubbles: true }));
+      ok("tallet folger feltene du fyller",
+         felt("trinn2Tall").textContent !== forKilde,
+         forKilde + " -> " + felt("trinn2Tall").textContent);
+
+      // Trinn 1 mangler bydel, lat og lon. Lagring skal aapne BEGGE
+      // trinn: meldinga navngir et felt, og en melding som peker inn i
+      // noe du ikke ser er verre enn ingen.
+      felt("stedNavn").value = "Bar Boca";
+      felt("stedNavn").dispatchEvent(new Event("input", { bubbles: true }));
+      felt("trinn1Hode").click();
+      ok("trinn 1 kan lukkes", !apen("trinn1Hode"), "fortsatt apent");
+      felt("stedLagre").click();
+
+      setTimeout(function () { try {
+        ok("en feilet lagring apner trinnet feilen ligger i",
+           apen("trinn1Hode") && apen("trinn2Hode"),
+           "trinn1 " + apen("trinn1Hode") + ", trinn2 " + apen("trinn2Hode"));
+        ok("og sier hva som mangler",
+           felt("stedMelding").textContent.indexOf("mangler") > -1,
+           felt("stedMelding").textContent);
+        // NAA er det en mangel: skjemaet ble bedt om noe det ikke kunne
+        // gjore, og da skal tallet si det med farge og ikke bare telle.
+        ok("og tallet i hodet staar som en mangel etterpa",
+           felt("trinn1Tall").classList.contains("mangler"), felt("trinn1Tall").className);
+
+        // Tas stedet UT, holder navnet — og da er «2 felt mangler» usant.
+        felt("stedFjernet").checked = true;
+        felt("stedFjernet").dispatchEvent(new Event("change", { bubbles: true }));
+        ok("et sted som tas ut krever ingen flere felt",
+           felt("trinn1Tall").textContent === "" && felt("trinn2Tall").textContent === "",
+           felt("trinn1Tall").textContent + " / " + felt("trinn2Tall").textContent);
+
+        // Koen sender deg til skjemaet, og skjemaet ligger i en ANNEN
+        // seksjon. Er den lukket, apnes stedet et sted ingen ser det — og
+        // scrollIntoView ruller til et skjult element.
+        felt("stedAvbryt").click();
+        felt("stedHode").click();
+        ok("stedene er lukket igjen", !apen("stedHode"), "apen");
+        felt("forslagHode").click();
+        var iEditor = Array.prototype.filter.call(
+          felt("forslagListe").querySelectorAll("button"),
+          function (b) { return b.textContent === "Åpne i editoren"; })[0];
+        ok("koen har knappen inn i editoren", !!iEditor, "fant den ikke");
+        iEditor.click();
+        ok("og den apner seksjonen skjemaet ligger i", apen("stedHode"), "fortsatt lukket");
+        ok("saa skjemaet faktisk er synlig", felt("stedSkjema").hidden === false, "skjult");
+
+        // Et sted som ALT finnes apner begge trinn: verdiene staar der,
+        // og et lukket trinn ville skjult raden slik den er.
+        felt("stedAvbryt").click();
+        var rediger = felt("stedListe").querySelectorAll("button")[0];
+        rediger.click();
+        ok("et sted som finnes apner begge trinn",
+           apen("trinn1Hode") && apen("trinn2Hode"),
+           "trinn1 " + apen("trinn1Hode") + ", trinn2 " + apen("trinn2Hode"));
+
+        // Krysser du av en kamp og lukker seksjonen, gaar bade knappen og
+        // kvitteringen ut av syne. Tallet i hodet er det som staar igjen.
+        felt("stedAvbryt").click();
+        // Et lukket kamphode maa baere seksjonen, sa det staar hva som ER
+        // satt naar ingenting er ulagret. Et tomt hode over tjue kamper
+        // og to kryss er en seksjon du glemmer.
+        var kampTall = felt("kampTall").textContent;
+        ok("kamphodet sier hva som er satt naar ingenting er endret",
+           kampTall.indexOf(" av ") > -1 && kampTall.slice(-5) === " satt",
+           kampTall);
+        ok("og det staar ikke som noe som venter pa deg",
+           !felt("kampTall").classList.contains("venter"),
+           felt("kampTall").className);
+        var boks = document.querySelectorAll(".kamp input")[0];
+        ok("det finnes en kamp a krysse av", !!boks, "ingen kamper");
+        boks.checked = true;
+        boks.dispatchEvent(new Event("change", { bubbles: true }));
+        ok("en ulagret endring staar i kamphodet",
+           felt("kampTall").textContent === "1 ulagret endring",
+           felt("kampTall").textContent);
+        ok("og den er merket som noe som venter",
+           felt("kampTall").classList.contains("venter"), felt("kampTall").className);
+        ferdig();
+      } catch (e) { ok("ingen unntak i skjemaet", false, e.message); ferdig(); } }, 400);
+    } catch (e) { ok("ingen unntak i portalen", false, e.message); ferdig(); } }, 600);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
 `, null, adminSide);
 
@@ -7351,7 +7801,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15E, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {
