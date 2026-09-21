@@ -5,13 +5,15 @@
 //   THESPORTSDB_KEY=… node verktoy/tsdbsjekk.mjs eliteserien premier
 //   node verktoy/tsdbsjekk.mjs                    # testnøkkelen «3»
 //
-//   …  --lag=133604       spillerne i ett lag (idTeam)
-//   …  --spiller=34145937 én spillers statistikk (idPlayer)
+// Du trenger ingen id-er. Skriptet plukker dem ut av svarene sine egne:
+// kampene bærer lag-id-en, spillerlista bærer spiller-id-en.
 //
-// De to siste krever en id vi ikke har i repoet. Uten dem hoppes prøvene
-// over framfor å bli prøvd med et oppdiktet tall — «404 på id 0» ser ut
-// som et nei til endepunktet, og det er en annen sak enn at vi ikke
-// spurte.
+//   …  --lag=133604        overstyr: prøv dette laget
+//   …  --spiller=34145937  overstyr: prøv denne spilleren
+//
+// Finner den ingen id — fordi et kall over sviktet — hoppes prøven over
+// framfor å bli prøvd med et oppdiktet tall. «404 på id 0» ser ut som et
+// nei til endepunktet, og det er en annen sak enn at vi ikke spurte.
 //
 // Hvorfor dette finnes.
 //
@@ -45,8 +47,18 @@ function flaggverdi(navn) {
   const t = flagg.find((f) => f.indexOf("--" + navn + "=") === 0);
   return t ? t.split("=").slice(1).join("=") : "";
 }
-const LAG_ID = flaggverdi("lag");
-const SPILLER_ID = flaggverdi("spiller");
+// Id-ene PLUKKES ut av svarene underveis, ikke skrives inn for haand.
+//
+// Forste utgave krevde --lag= og --spiller=, og ba deg finne dem paa
+// thesportsdb.com. Det er ikke en oppgave, det er en antydning: hvilket
+// lag, hvor i sida staar id-en, og hvordan vet du at den er riktig?
+//
+// Kampene vi alt henter BAERER lag-id-en (`idHomeTeam`), og spillerlista
+// for et lag baerer spiller-id-en. Kjeden er dermed gratis — ingen ekstra
+// kall, og ingenting aa slaa opp. Flaggene staar igjen som overstyring
+// for den som vil prove et bestemt lag.
+let LAG_ID = flaggverdi("lag");
+let SPILLER_ID = flaggverdi("spiller");
 const ligaer = (bedt.length ? bedt : Object.keys(LIGAER))
   .map((n) => [n, ligaFor(n)])
   .filter(([, l]) => l && l.tsdb);
@@ -58,6 +70,13 @@ const ligaer = (bedt.length ? bedt : Object.keys(LIGAER))
 // «3», som kapper svarene; da er et lite svar ikke et nei, bare et kappet
 // ja. Det står i utskrifta, så ingen leser en kapping som en mangel.
 const PROVER = [
+  // FORST, og det er ikke tilfeldig: dette er kallet vi vet virker i dag.
+  // Svaret baerer lag-id-en resten av kjeden trenger, saa den staar
+  // stodig selv om provene under svikter.
+  { navn: "det vi bruker i dag (v1)", felt: "events",
+    sti: (l) => "/api/v1/json/" + enc(NOKKEL || "3")
+      + "/eventspastleague.php?id=" + l.tsdb,
+    versjon: "v1" },
   { navn: "hele sesongen (v2)", felt: "schedule",
     sti: (l, s) => "/api/v2/json/schedule/league/" + l.tsdb + "/" + encodeURIComponent(s),
     versjon: "v2" },
@@ -86,10 +105,6 @@ const PROVER = [
   { navn: "én spillers statistikk (v1)", felt: "*", spillerId: true,
     sti: (l, s, lag, spiller) => "/api/v1/json/" + enc(NOKKEL || "3")
       + "/lookupplayerstats.php?id=" + enc(spiller),
-    versjon: "v1" },
-  { navn: "det vi bruker i dag (v1)", felt: "events",
-    sti: (l) => "/api/v1/json/" + enc(NOKKEL || "3")
-      + "/eventspastleague.php?id=" + l.tsdb,
     versjon: "v1" },
 ];
 
@@ -142,6 +157,20 @@ async function prov(p, liga, sesong) {
 // Runder er hele poenget med spørsmål 1: en sesong uten rundetall kan
 // ikke grupperes, og da er «alle runder» ikke mulig uansett hvor mange
 // kamper som kommer.
+// Forste verdi i lista som baerer en av disse noklene. Vi leter paa flere
+// navn med vilje: v1 og v2 heter ikke det samme, og en id vi ikke fant er
+// en prove vi hopper over — ikke en prove vi gjor med et gjettet tall.
+function plukkId(liste, nokler) {
+  for (const rad of liste || []) {
+    for (const n of nokler) {
+      if (rad && rad[n] !== undefined && rad[n] !== null && String(rad[n]) !== "") {
+        return String(rad[n]);
+      }
+    }
+  }
+  return "";
+}
+
 function runder(liste) {
   const sett = new Set();
   (liste || []).forEach((r) => {
@@ -166,11 +195,13 @@ for (const [navn, liga] of ligaer) {
     // et oppdiktet tall. «404 paa id 0» ville sett ut som et nei til
     // endepunktet, og det er en annen sak enn at vi ikke spurte.
     if (p.lagId && !LAG_ID) {
-      console.log("   " + p.navn.padEnd(30) + "hoppet over — gi --lag=<idTeam>");
+      console.log("   " + p.navn.padEnd(30)
+        + "hoppet over — fant ingen lag-id i kamplistene over");
       continue;
     }
     if (p.spillerId && !SPILLER_ID) {
-      console.log("   " + p.navn.padEnd(30) + "hoppet over — gi --spiller=<idPlayer>");
+      console.log("   " + p.navn.padEnd(30)
+        + "hoppet over — fant ingen spiller-id i laglista over");
       continue;
     }
     const svar = await prov(p, liga, sesong);
@@ -190,6 +221,17 @@ for (const [navn, liga] of ligaer) {
       // Feltnavnene på første rad. Det er dem en parser må treffe, og de
       // er ikke til å gjette: v1 og v2 heter ikke det samme.
       console.log("      felt: " + Object.keys(svar.liste[0]).slice(0, 12).join(", "));
+
+      // Kjeden: en kampliste baerer et lag, en spillerliste baerer en
+      // spiller. Plukkes bare naar du ikke har gitt en selv.
+      if (!LAG_ID && (p.felt === "events" || p.felt === "schedule")) {
+        LAG_ID = plukkId(svar.liste, ["idHomeTeam", "idTeam", "idAwayTeam"]);
+        if (LAG_ID) console.log("      → lag-id plukket herfra: " + LAG_ID);
+      }
+      if (!SPILLER_ID && p.lagId) {
+        SPILLER_ID = plukkId(svar.liste, ["idPlayer"]);
+        if (SPILLER_ID) console.log("      → spiller-id plukket herfra: " + SPILLER_ID);
+      }
 
       // For spillerstatistikk er det ÉN ting som avgjor om den er til
       // nytte: baerer raden maal, og staar sesongen paa den? Uten begge

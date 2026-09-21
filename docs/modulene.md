@@ -816,9 +816,16 @@ spørsmål kode ikke kan svare på alene.
   ikke en mangel.
   **Nøkkelen maskeres i adressene som skrives ut.** v1 legger den i stien,
   og en nøkkel i en terminal er en nøkkel i et skjermbilde.
-  **`--lag=` og `--spiller=` hoppes over uten en id.** Prøvd med et
-  oppdiktet tall ville «404 på id 0» sett ut som et nei til endepunktet, og
-  det er en annen sak enn at vi ikke spurte. For spillerstatistikken måles
+  **Du trenger ingen id-er — skriptet plukker dem ut av sine egne svar.**
+  Kampene bærer `idHomeTeam`, spillerlista bærer `idPlayer`, så kjeden
+  koster ingen ekstra kall. Første utgave krevde `--lag=` og `--spiller=`
+  og ba deg finne dem på nettsida; det er ikke en oppgave, det er en
+  antydning. Flaggene står igjen som **overstyring**.
+  Kallet vi bruker i dag (`eventspastleague`) står **først** i lista, og
+  det er ikke tilfeldig: det er det vi vet virker, og det bærer lag-id-en
+  resten av kjeden trenger. Svikter et kall så en id mangler, hoppes prøven
+  over — prøvd med et oppdiktet tall ville «404 på id 0» sett ut som et nei
+  til endepunktet, og det er en annen sak enn at vi ikke spurte. For spillerstatistikken måles
   det ene som avgjør om den er til nytte: bærer raden **mål**, og står
   **sesongen** på den? Uten begge kan den ikke bli en toppscorerliste,
   uansett hvor mange kall vi bruker. Letinga går på innhold, ikke på et
