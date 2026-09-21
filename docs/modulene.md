@@ -776,6 +776,18 @@ Se [`nokler-og-tokens.md`](nokler-og-tokens.md).
   er et søk noen kommer til å kjøre tusen ganger. Notatene per speil eies
   av den som kaller: `AbortController` avviser alle kallene med **samme**
   feilobjekt, så et notat skrevet på feilen ville overskrevet de andre.
+- **`tsdbsonde.mjs`** — hva TheSportsDB faktisk gir oss, spurt fra
+  portalen. Samme spørsmål som `verktoy/tsdbsjekk.mjs`, og **samme stier**:
+  begge leser `tsdbSondeStier()` i `fotball-data.js`. Sto de hver for seg,
+  ville de to svart ulikt på det samme, og da er sonden verre enn ingen.
+  **Nøkkelen blir på serveren.** v1 legger den i *stien*, så den samme
+  spørringa gjort fra en nettleser ville lagt nøkkelen i historikken, i en
+  logg og i hvert skjermbilde noen tar. Funksjonen leser den fra miljøet
+  og svaret bærer den aldri.
+  Bak `ADMIN_PASSORD`, som `pub-liste`. Ikke fordi svaret er hemmelig, men
+  fordi hvert trykk koster seks kall mot en tjeneste som ber om fair use.
+  Den finnes i tillegg til verktøyet fordi den som eier prosjektet sitter
+  med en telefon: en oppgave som krever en terminal er ingen oppgave.
 
 ---
 

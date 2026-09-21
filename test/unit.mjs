@@ -18,7 +18,8 @@ import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          tsdbSti, tsdbHeadere, tolkKamperTsdb, tolkTabellTsdb, tsdbSesong, delingstekst, tidstekst, HVOR,
          FANER, DELER, DEL_NAVN,
          kamplenke, tolkKamplenke, invitasjonstekst, stedtekst, STED_MAKS,
-         kampNokkel, gyldigKampId, kanalFor, sjekkKanalliste }
+         kampNokkel, gyldigKampId, kanalFor, sjekkKanalliste,
+         tsdbSondeStier, tsdbForsteListe, tsdbSondeFunn, tsdbPlukkId }
   from "../fotball-data.js";
 
 import { normaliserEpost, gyldigEpost, normaliserKode, gyldigKode, maskerEpost,
@@ -1111,6 +1112,68 @@ ok("koen rorer ikke lista den far",
      return inn[0].navn === "B";
    })());
 ok("tomt inn gir tomt ut", sorterForslagKo(null, LISTA_NA).length === 0);
+
+/* ---------------- sonden mot TheSportsDB ---------------- */
+
+// Stiene og malingen ligger i fotball-data.js og ikke i verktoyet, fordi
+// TO ting spor: verktoy/tsdbsjekk.mjs fra en maskin, og /api/tsdb-sonde
+// fra portalen. Sto de hver for seg, ville de svart ulikt pa det samme.
+const SONDE = tsdbSondeStier(LIGAER.eliteserien, "2026", "hemmelig", {});
+ok("sonden prover seks adresser", SONDE.length === 6, SONDE.length);
+// Kallet vi VET virker staar forst, og det er ikke tilfeldig: svaret
+// baerer lag-id-en resten av kjeden trenger. Sto det sist, rok kjeden
+// hver gang gjetningene over svarte 404 — uten at noe var galt.
+ok("det vi bruker i dag staar forst",
+   SONDE[0].sti.indexOf("eventspastleague") > -1, SONDE[0].sti);
+ok("og den gir lag-id-en videre", SONDE[0].gir === "lag", SONDE[0].gir);
+// En gjetning skal VISE at den er en gjetning. En 404 pa et navn vi fant
+// paa, er ikke et nei til dataene.
+ok("v2-toppscorer er merket som en gjetning",
+   SONDE.filter((p) => p.gjetning).length === 1 &&
+   SONDE.find((p) => p.gjetning).sti.indexOf("topscorers") > -1);
+ok("spillerstatistikken krever en spiller-id",
+   SONDE.find((p) => p.sti.indexOf("lookupplayerstats") > -1).krever === "spiller");
+// Nokkelen gar i stien pa v1, og det er nettopp derfor sporringa ikke
+// kan gjores fra en nettleser.
+ok("nokkelen star i v1-stien, ikke i v2",
+   SONDE[0].sti.indexOf("hemmelig") > -1 &&
+   SONDE.find((p) => p.versjon === "v2").sti.indexOf("hemmelig") === -1);
+ok("en liga uten tsdb-id gir ingen adresser",
+   tsdbSondeStier({ navn: "X" }, "2026", "k", {}).length === 0);
+
+// Feltnavnet varierer mellom utgavene, sa vi leter etter om dataene
+// FINNES framfor etter et navn vi alt hadde gjettet.
+ok("forste liste finnes uansett hva den heter",
+   tsdbForsteListe({ tullete: [1, 2] }, "events").felt === "tullete");
+ok("men det onskede feltet vinner nar det er der",
+   tsdbForsteListe({ events: [1], annet: [2, 3] }, "events").felt === "events");
+ok("ingen liste gir null", tsdbForsteListe({ events: null }, "events") === null);
+
+// DET SOM AVGJOR: baerer raden mal, og staar sesongen pa den? Uten begge
+// kan den ikke bli en toppscorerliste uansett hvor mange kall vi bruker.
+const STATS = tsdbSondeFunn([{ idPlayer: "1", strSeason: "2026", intGoals: "12" }]);
+ok("malfeltet finnes pa innhold, ikke pa et gjettet navn",
+   STATS.maalfelt.join(",") === "intGoals", STATS.maalfelt.join(","));
+ok("og sesongfeltet likesa",
+   STATS.sesongfelt.join(",") === "strSeason", STATS.sesongfelt.join(","));
+ok("en rad uten mal sier det",
+   tsdbSondeFunn([{ idPlayer: "1", strSeason: "2026" }]).maalfelt.length === 0);
+
+// Runder avgjor om «alle runder» er mulig i det hele tatt: en sesong
+// uten rundetall kan ikke grupperes, uansett hvor mange kamper som kom.
+ok("rundene telles, unike",
+   tsdbSondeFunn([{ intRound: "23" }, { intRound: "23" }, { intRound: "22" }]).runder === 2);
+ok("og en sesong uten rundetall gir null",
+   tsdbSondeFunn([{ idEvent: "1" }, { idEvent: "2" }]).runder === 0);
+ok("tomt inn kaster ikke", tsdbSondeFunn(null).rader === 0);
+
+// Kjeden: id-ene plukkes ut av svarene, sa ingen maa finne dem for hand.
+ok("lag-id plukkes ut av en kampliste",
+   tsdbPlukkId([{ idHomeTeam: "133604" }], "lag") === "133604");
+ok("spiller-id ut av en spillerliste",
+   tsdbPlukkId([{ idPlayer: "34145937" }], "spiller") === "34145937");
+ok("og en liste uten id gir tom streng, ikke et gjettet tall",
+   tsdbPlukkId([{ strPlayer: "Ola" }], "spiller") === "");
 
 /* ---------------- fotball: lagnavn ---------------- */
 

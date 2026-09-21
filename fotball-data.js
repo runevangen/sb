@@ -776,3 +776,105 @@ export function sjekkKanalliste(kanaler, ligaer) {
   });
   return feil;
 }
+
+/* ---------- sonden mot TheSportsDB ---------- */
+
+// Hva TheSportsDB faktisk gir oss — spurt for hand, ikke av CI.
+//
+// To sporsmal sto apne 21. september 2026, og begge er sporsmal om DATA:
+// kan vi vise ALLE runder i Resultater for arets sesong, og har vi
+// toppscorere i det hele tatt? Ingen test kan svare: en stubb vet bare
+// det vi alt trodde, og nettopp den fella star i docs/testing.md.
+//
+// Stiene og malingen ligger HER og ikke i verktoyet, fordi to ting spor:
+// `verktoy/tsdbsjekk.mjs` fra en maskin, og `/api/tsdb-sonde` fra
+// portalen — for den som sitter med en telefon. Sto de hver for seg,
+// ville de to svart ulikt pa det samme sporsmalet, og da er sonden verre
+// enn ingen sonde.
+//
+// `ider` er lag og spiller PLUKKET ut av svarene underveis. Kampene
+// baerer idHomeTeam, spillerlista baerer idPlayer, sa kjeden koster ingen
+// ekstra kall og krever ingenting av den som spor.
+export function tsdbSondeStier(liga, sesong, nokkel, ider) {
+  if (!liga || !liga.tsdb) return [];
+  const id = ider || {};
+  const v1 = "/api/v1/json/" + encodeURIComponent(nokkel || "3") + "/";
+  const s = encodeURIComponent(sesong);
+  return [
+    // FORST, og det er ikke tilfeldig: dette er kallet vi bruker i dag.
+    // Svaret baerer lag-id-en resten av kjeden trenger, sa den star
+    // stodig selv om provene under svikter.
+    { navn: "det vi bruker i dag", felt: "events", versjon: "v1",
+      gir: "lag", sti: v1 + "eventspastleague.php?id=" + liga.tsdb },
+    { navn: "hele sesongen (v2)", felt: "schedule", versjon: "v2",
+      gir: "lag", sti: "/api/v2/json/schedule/league/" + liga.tsdb + "/" + s },
+    { navn: "hele sesongen (v1)", felt: "events", versjon: "v1",
+      gir: "lag", sti: v1 + "eventsseason.php?id=" + liga.tsdb + "&s=" + s },
+    // GJETNING. Navnet er formet som de andre v2-oppslagene — det er ikke
+    // fra et svar vi har sett. Svarer den 404, er det ikke et nei til
+    // toppscorere, bare et nei til dette navnet.
+    { navn: "toppscorere, gjettet (v2)", felt: "*", versjon: "v2", gjetning: true,
+      sti: "/api/v2/json/lookup/league_topscorers/" + liga.tsdb + "/" + s },
+    { navn: "spillerne i et lag", felt: "player", versjon: "v1",
+      krever: "lag", gir: "spiller",
+      sti: v1 + "lookup_all_players.php?id=" + encodeURIComponent(id.lag || "") },
+    // Adressen som ble foreslatt. Noklet pa idPlayer — den svarer pa
+    // «hvordan har DENNE spilleren gjort det», ikke «hvem leder ligaen».
+    { navn: "én spillers statistikk", felt: "*", versjon: "v1",
+      krever: "spiller", maaler: "mal",
+      sti: v1 + "lookupplayerstats.php?id=" + encodeURIComponent(id.spiller || "") },
+  ];
+}
+
+// Den forste noekkelen i svaret som baerer en liste.
+//
+// Feltnavnet varierer mellom utgavene, sa vi leter etter om dataene
+// FINNES framfor etter et navn vi alt hadde gjettet. Returnerer navnet
+// ogsa, for det er det en parser ma treffe senere.
+export function tsdbForsteListe(json, onsket) {
+  if (!json || typeof json !== "object") return null;
+  if (onsket && onsket !== "*" && Array.isArray(json[onsket])) {
+    return { felt: onsket, liste: json[onsket] };
+  }
+  const felt = Object.keys(json).find((k) => Array.isArray(json[k]));
+  return felt ? { felt, liste: json[felt] } : null;
+}
+
+// Hva svaret BAR. Ikke hva det het.
+//
+// For spillerstatistikken er det ÉN ting som avgjor om den er til nytte:
+// baerer raden MAAL, og staar SESONGEN pa den? Uten begge kan den ikke
+// bli en toppscorerliste uansett hvor mange kall vi bruker. Vi leter pa
+// innhold, ikke pa feltnavn vi har gjettet.
+export function tsdbSondeFunn(liste) {
+  const rader = Array.isArray(liste) ? liste : [];
+  const ut = { rader: rader.length, felt: [], runder: 0, maalfelt: [], sesongfelt: [] };
+  if (!rader.length) return ut;
+  ut.felt = Object.keys(rader[0] || {});
+  ut.maalfelt = ut.felt.filter((k) => /goal/i.test(k));
+  ut.sesongfelt = ut.felt.filter((k) => /season/i.test(k));
+  // Runder avgjor om «alle runder» er mulig i det hele tatt: en sesong
+  // uten rundetall kan ikke grupperes, uansett hvor mange kamper som kom.
+  const sett = new Set();
+  rader.forEach((r) => {
+    const n = r && (r.intRound !== undefined ? r.intRound : r.strRound);
+    if (n !== undefined && n !== null && String(n) !== "") sett.add(String(n));
+  });
+  ut.runder = sett.size;
+  return ut;
+}
+
+// Lag- og spiller-id plukket ut av en liste vi alt har hentet.
+export function tsdbPlukkId(liste, slag) {
+  const nokler = slag === "spiller"
+    ? ["idPlayer"]
+    : ["idHomeTeam", "idTeam", "idAwayTeam"];
+  for (const rad of Array.isArray(liste) ? liste : []) {
+    for (const n of nokler) {
+      if (rad && rad[n] !== undefined && rad[n] !== null && String(rad[n]) !== "") {
+        return String(rad[n]);
+      }
+    }
+  }
+  return "";
+}
