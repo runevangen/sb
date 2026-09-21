@@ -63,7 +63,8 @@ import { sjekkForslag, forslagRad, tolkForslag, alleredeILista, publisteRad,
   from "../pub-forslag-data.js";
 import { sjekkVisninger, visningerFor, slaSammen, tolkVisninger, visningRad, kampIderFor,
          bekreftetFor, merkBekreftet, visningsHint, rundeTall,
-         visningsDiff, lagreKnappTekst, rundeKnappTekst } from "../visning-data.js";
+         visningsDiff, lagreKnappTekst, rundeKnappTekst,
+         avkreftetFor, utenAvkreftede } from "../visning-data.js";
 
 let feilet = 0;
 let kjort = 0;
@@ -2866,6 +2867,82 @@ ok("alle testbyene har et koordinat i Norge",
 // ikke «viser alt», for kamper KOLLIDERER: tre Eliteserie-kamper kl. 15
 // blir tre pastander der et sted med én skjerm bare kan innfri én.
 // Pastanden ligger derfor pa liganiva.
+/* ------------- «ikke denne kvelden» ------------- */
+
+// Hullet ligaflagget lagde: 📺 «Sender Eliteserien» er en STAENDE pastand
+// om sesongen, og den kunne ikke sies imot for den ene kvelden stedet er
+// stengt. Eneste utvei var a ta hele flagget bort — og det ville vaert
+// usant resten av sesongen.
+const NKAMP = { hjemme: "Rosenborg", borte: "Brann",
+                nokkel: "2026-10-01-rosenborg-brann", liga: "eliteserien" };
+const NVISNINGER = [
+  { pub: "Ja-puben", kampId: "2026-10-01-rosenborg-brann", viser: true },
+  { pub: "Nei-puben", kampId: "2026-10-01-rosenborg-brann", viser: false },
+  { pub: "Annen kamp", kampId: "2026-10-02-viking-molde", viser: false },
+];
+
+ok("et nei er ikke en bekreftelse",
+   bekreftetFor(NKAMP, NVISNINGER, []).map((p) => p.navn).join(",") === "Ja-puben",
+   bekreftetFor(NKAMP, NVISNINGER, []).map((p) => p.navn).join(",") || "(tom)");
+ok("og nei-ene kan slas opp for seg",
+   avkreftetFor(NKAMP, NVISNINGER).map((v) => v.pub).join(",") === "Nei-puben",
+   avkreftetFor(NKAMP, NVISNINGER).map((v) => v.pub).join(",") || "(tom)");
+// Et nei gjelder én kamp, ikke stedet. Sto det pa stedet, var vi tilbake
+// til a ta hele flagget bort.
+ok("et nei pa en ANNEN kamp rorer ikke denne",
+   avkreftetFor(NKAMP, NVISNINGER).length === 1);
+
+// Det nei-et faktisk gjor: tar stedet ut av lista for nettopp den kampen.
+const NLISTE = [{ navn: "Ja-puben" }, { navn: "Nei-puben" }, { navn: "Uten mening" }];
+ok("stedet som sa nei star ikke i lista",
+   utenAvkreftede(NLISTE, avkreftetFor(NKAMP, NVISNINGER))
+     .map((p) => p.navn).join(",") === "Ja-puben,Uten mening",
+   utenAvkreftede(NLISTE, avkreftetFor(NKAMP, NVISNINGER)).map((p) => p.navn).join(","));
+ok("og uten nei rores lista ikke",
+   utenAvkreftede(NLISTE, []).length === 3);
+// Foldingen ma vaere den samme som ellers, ellers slipper «Nei-Puben»
+// gjennom fordi den er skrevet med stor P.
+ok("navnet foldes som ellers",
+   utenAvkreftede([{ navn: "NEI-PUBEN" }],
+     [{ pub: "nei-puben" }]).length === 0);
+
+// tolkVisninger ma baere fortegnet — og en rad fra for kolonnen fantes
+// sa ja. Bare et uttrykkelig `false` er et nei.
+ok("en rad uten feltet betyr ja",
+   tolkVisninger([{ pub: "P", kamp_id: "k" }])[0].viser === true);
+ok("og bare et uttrykkelig false er et nei",
+   tolkVisninger([{ pub: "P", kamp_id: "k", viser: false }])[0].viser === false &&
+   tolkVisninger([{ pub: "P", kamp_id: "k", viser: true }])[0].viser === true);
+
+// slaSammen lager begge slag, og et ja vinner om portalen sender begge.
+const NRADER = slaSammen("Carls", ["2026-09-13-brann-bodoglimt"], VKAMPER, VNAA,
+                         ["2026-09-14-molde-rosenborg"]);
+ok("bade ja og nei blir rader",
+   NRADER.length === 2 && NRADER.some((r) => r.viser === true) &&
+   NRADER.some((r) => r.viser === false),
+   JSON.stringify(NRADER.map((r) => [r.kampId, r.viser])));
+// VKAMPER har to kamper, og begge fikk en mening her. Den tredje
+// paastanden er at et TOMT valg ikke lager rader — ingen mening er ingen
+// rad, og det er hele grunnen til at nei-ene er en egen liste.
+ok("og uten noen mening blir det ingen rader",
+   slaSammen("Carls", [], VKAMPER, VNAA, []).length === 0);
+
+// Diffen ma se et fortegn som snur. Sto den bare pa kampId, ble «ikke
+// denne kvelden» lagret som «ingen endring» og nadde aldri basen.
+const NDFOR = [{ kampId: "a", viser: true }, { kampId: "b", viser: true }];
+const NDTIL = [{ kampId: "a", viser: false }, { kampId: "b", viser: true }];
+const NDIFF = visningsDiff(NDFOR, NDTIL);
+ok("et ja som blir et nei er en ENDRING",
+   NDIFF.endret.length === 1 && NDIFF.endret[0].kampId === "a",
+   JSON.stringify(NDIFF.endret));
+ok("og den som sto likt er uendret",
+   NDIFF.uendret.length === 1 && NDIFF.uendret[0].kampId === "b");
+ok("uendret teller ikke den som snudde",
+   !NDIFF.uendret.some((v) => v.kampId === "a"), JSON.stringify(NDIFF.uendret));
+ok("nye og fjern virker som for",
+   visningsDiff([], NDTIL).nye.length === 2 &&
+   visningsDiff(NDFOR, []).fjern.length === 2);
+
 const LIGADAG = (s) => new Date(s + "T12:00:00Z");
 const FLAGG = {
   sender: ["eliteserien", "premier"],

@@ -9,6 +9,60 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 21. september 2026 — flagget kunne ikke sies imot
+
+**Meldt som:** «Fikse hullet» — det som ble notert da ligaflagget ble
+bygget, og som vi visste om før det rullet ut.
+
+**Hva hullet var.** 📺 «Sender Eliteserien» er en **stående** påstand om
+sesongen. Er stedet stengt, har selskap eller viser noe annet nettopp den
+ene kvelden, fantes det ingen måte å si det på:
+
+- Det er ingen ★ å fjerne — det var aldri noen
+- Å ta hele ligaflagget bort er feil — de *sender* Eliteserien, bare ikke
+  den kvelden
+
+Vi designet mot at flagget skulle gå stille usant, og fanget **sesongen**.
+Vi fanget ikke **kvelden**.
+
+**Hva som ble gjort.** `visninger` hadde allerede `unique (pub, kamp_id)`,
+altså én rad per par. Et felt `viser` gjør de to tilstandene til tre:
+
+    ingen rad     ingen påstand. Ligaflagget gjelder.
+    viser = true  ★, et menneske har sett på nettopp denne kampen.
+    viser = false «ikke denne kvelden».
+
+Ingen ny tabell, ingen ny kolonne å holde i takt med en annen.
+
+**Funksjonene er søsken til dem som fantes.** `avkreftetFor()` mot
+`bekreftetFor()`, `utenAvkreftede()` mot `merkBekreftet()` — samme folding,
+samme form, motsatt fortegn. Nei-et **fjerner** stedet fra lista for den
+ene kampen framfor å merke det: en rad som sier «viser ikke» tar plass for
+å si ingenting.
+
+**Det som nesten glapp.** `visningsDiff()` sto på `kampId` alene. Et ja
+som ble et nei var da «uendret» — lagringen ville svart at den lyktes, og
+ingenting nådd basen. Det er samme familie som `satt_av`-hendelsen: et
+felt som stille blir usant, med ingenting som avslører det.
+
+**Og knappen står bare der flagget påstår noe.** Uten et flagg som dekker
+kampen er det ingenting å si imot, og en knapp der ville bedt deg motsi
+tausheten.
+
+**Hva som fanget det.** Fire sabotasjer, fire ulike røde tester:
+
+| ødelagt | falt |
+|---|---|
+| appen ser bort fra nei-et | «merket er borte for kampen stedet sa nei til» |
+| et nei teller som ★ | «et nei er ikke en bekreftelse» |
+| diffen ser ikke fortegnet | «et ja som blir et nei er en ENDRING» |
+| nei-et gjelder stedet, ikke kampen | «et nei på en ANNEN kamp rører ikke denne» |
+
+Nettlesertesten sier nei til **én** kamp og krever at merket står igjen på
+den neste. Slo nei-et ut alle, hadde vi bare skrudd av flagget med en omvei.
+
+---
+
 ## 21. september 2026 — en påstand i en PR-tekst som ikke var sann
 
 **Fanget av:** meg selv, etter flettinga — ved å sjekke min egen påstand

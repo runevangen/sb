@@ -67,13 +67,44 @@ export function visningerFor(kamp, alle) {
 // pub som er fjernet fra publista skal ikke forsvinne stumt.
 export function bekreftetFor(kamp, alle, kjente) {
   const kjent = new Map((kjente || []).map((p) => [normaliserLagnavn(p.navn), p]));
-  return visningerFor(kamp, alle).map((v) => {
+  // ★ betyr «viser denne kampen». En rad med `viser: false` sier det
+  // MOTSATTE, og ville staat overst i lista som en bekreftelse.
+  return visningerFor(kamp, alle).filter((v) => v.viser !== false).map((v) => {
     const pub = kjent.get(normaliserLagnavn(v.pub));
     return Object.assign({}, pub || {}, {
       navn: (pub && pub.navn) || v.pub,
       bekreftet: true,
     });
   });
+}
+
+// Pubene som har sagt at de IKKE viser denne kampen.
+//
+// Ligaflagget pa pubraden er en staende pastand: «vi sender Eliteserien».
+// Den holder for sesongen, men ikke for den ene kvelden stedet har
+// selskap, stenger tidlig eller viser noe annet. Uten en vei til a si det,
+// var eneste utvei a ta HELE flagget bort — og det ville vaert usant:
+// stedet sender ligaen, bare ikke den kvelden.
+//
+// Nei-et er per kamp, som ★, og lever i den samme raden (`unique (pub,
+// kamp_id)`). Det er derfor det ikke trengs en ny tabell: feltet `viser`
+// gir tre tilstander der det for var to.
+export function avkreftetFor(kamp, alle) {
+  return visningerFor(kamp, alle).filter((v) => v.viser === false);
+}
+
+// Tar bort de stedene som har sagt nei til nettopp denne kampen. Sosken
+// til merkBekreftet: samme folding, samme form, motsatt fortegn.
+//
+// Den MERKER ikke — den fjerner. Et sted som har sagt at det ikke viser
+// kampen, har ingenting a gjore i en liste som svarer pa «hvor skal du se
+// den?», og et merke som sa «viser ikke» ville vaert en rad som tar plass
+// for a si ingenting.
+export function utenAvkreftede(puber, avkreftede) {
+  const nei = new Set((avkreftede || []).map((v) =>
+    normaliserLagnavn(v && (v.pub || v.navn))));
+  if (!nei.size) return puber || [];
+  return (puber || []).filter((p) => !nei.has(normaliserLagnavn(p && p.navn)));
 }
 
 // Merker de av trefftene som har bekreftet kampen, sa en pub naer deg
@@ -89,18 +120,26 @@ export function merkBekreftet(puber, bekreftede) {
 // Avkrysningene kommer som nokler fra portalen. Det som alt star i basen
 // rores ikke her: visninger.mjs sletter og skriver bare forskjellen
 // (visningsDiff), sa en kamp som ikke var pa skjermen star som for.
-export function slaSammen(pub, valgteIder, kamper, naa) {
+export function slaSammen(pub, valgteIder, kamper, naa, neiIder) {
   const tid = new Date(naa || Date.now()).toISOString();
   const valgt = (valgteIder || []).map(String);
+  // Nei-ene er en egen liste fra portalen, ikke «alt som ikke er valgt»:
+  // de aller fleste kampene er hverken ja eller nei, og en rad per kamp
+  // ingen har sagt noe om ville gjort feltet meningslost.
+  const nei = (neiIder || []).map(String);
+  const rad = (k, viser) => ({
+    pub,
+    kampId: nokkelFor(k),
+    kamp: k.hjemme + " – " + k.borte,
+    dato: k.dato,
+    satt: tid,
+    viser,
+  });
   return (kamper || [])
-    .filter((k) => valgt.indexOf(nokkelFor(k)) > -1)
-    .map((k) => ({
-      pub,
-      kampId: nokkelFor(k),
-      kamp: k.hjemme + " – " + k.borte,
-      dato: k.dato,
-      satt: tid,
-    }))
+    .filter((k) => valgt.indexOf(nokkelFor(k)) > -1 || nei.indexOf(nokkelFor(k)) > -1)
+    // Et ja vinner over et nei om portalen skulle sende begge: ★ krever
+    // at et menneske krysset av, og det er den sterkeste handlingen.
+    .map((k) => rad(k, valgt.indexOf(nokkelFor(k)) > -1))
     .sort((a, b) => String(a.dato).localeCompare(String(b.dato)));
 }
 
@@ -122,6 +161,11 @@ export function tolkVisninger(rader) {
     kamp: String((r && r.kamp) || ""),
     dato: (r && r.dato) || "",
     satt: (r && r.satt) || "",
+    // Tre tilstander, ikke to: ingen rad er ingen pastand, `true` er ★,
+    // og `false` er «ikke denne kvelden». Bare et uttrykkelig `false`
+    // teller som et nei — en rad uten feltet er en rad fra for kolonnen
+    // fantes, og den sa ja.
+    viser: (r && r.viser) === false ? false : true,
   })).filter((v) => v.pub && v.kampId);
 }
 
@@ -137,6 +181,7 @@ export function visningRad(v) {
     kamp: String(v.kamp || ""),
     dato: v.dato || null,
     satt: v.satt || new Date().toISOString(),
+    viser: v.viser === false ? false : true,
   };
 }
 
@@ -212,13 +257,27 @@ export function rundeKnappTekst(valgt, alle) {
 // Ingen sa det, for `satt` vises ikke — men et felt som stille blir usant
 // er verre enn et som ropes ut, fordi ingenting avsloerer det.
 export function visningsDiff(fraFor, onsket) {
-  const har = new Set((Array.isArray(fraFor) ? fraFor : []).map((v) => String(v.kampId)));
-  const vil = new Set((Array.isArray(onsket) ? onsket : []).map((v) => String(v.kampId)));
-  return {
-    nye: (Array.isArray(onsket) ? onsket : []).filter((v) => !har.has(String(v.kampId))),
-    fjern: (Array.isArray(fraFor) ? fraFor : []).filter((v) => !vil.has(String(v.kampId))),
-    uendret: (Array.isArray(fraFor) ? fraFor : []).filter((v) => vil.has(String(v.kampId))),
-  };
+  const fra = new Map((Array.isArray(fraFor) ? fraFor : [])
+    .map((v) => [String(v.kampId), v]));
+  const til = new Map((Array.isArray(onsket) ? onsket : [])
+    .map((v) => [String(v.kampId), v]));
+  // Et ja som blir et nei er en ENDRING, ikke en uendret rad. Sto diffen
+  // bare pa kampId, ville «ikke denne kvelden» blitt lagret som «ingen
+  // endring» og aldri natt basen — en handling som svarer at den lyktes
+  // uten at noe skjedde.
+  const likt = (a, b) => (a.viser !== false) === (b.viser !== false);
+  const ut = { nye: [], endret: [], fjern: [], uendret: [] };
+  til.forEach((v, id) => {
+    const f = fra.get(id);
+    if (!f) ut.nye.push(v);
+    else if (!likt(f, v)) ut.endret.push(v);
+  });
+  fra.forEach((v, id) => {
+    const t = til.get(id);
+    if (!t) ut.fjern.push(v);
+    else if (likt(v, t)) ut.uendret.push(v);
+  });
+  return ut;
 }
 
 // Knappen sier hva trykket kommer til a gjore, ikke hvor mange kamper som

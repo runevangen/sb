@@ -2809,6 +2809,97 @@ const SAK_14K = kjor("pub-sender-ligaen", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
 `);
 
+/* ------------- 14L. «ikke denne kvelden» ------------- */
+
+// Hullet ligaflagget lagde. 📺 «Sender Eliteserien» er en staende pastand
+// om sesongen, og stedet er stengt nettopp denne kvelden. Uten en vei til
+// a si det, var eneste utvei a ta HELE flagget bort.
+const SAK_14L = kjor("pub-ikke-denne-kvelden", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "" }); });
+  history.replaceState(null, "", location.pathname + "?posisjon=63.4286,10.3641");
+  var IDAG = new Date().toISOString().slice(0, 10);
+  var RBK = { nokkel: "rbkpobbogsant", navn: "RBK. Pøbb og sånt", bydel: "Ila",
+    adresse: "Gata 2", lat: 63.4286, lon: 10.3641, type: "sportsbar", lag: [],
+    kilde: "Var innom 18.09.2026, storskjerm i baren", sikkerhet: "bekreftet",
+    sjekket: "2026-09-18", merknad: "", fjernet: false,
+    ligaer: { sender: ["eliteserien"],
+              kilde: "Ringte dem og spurte om ligaen", sjekket: IDAG } };
+  // Nei-et gjelder den FORSTE kampen. Den andre skal beholde merket sitt —
+  // ellers har vi bare skrudd av flagget med en omvei.
+  // Nei-et gjelder BARE den forste kampen. Star merket igjen pa den
+  // andre, er nei-et per kamp — og det var hele poenget. Slo det ut alle,
+  // hadde vi bare skrudd av flagget med en omvei.
+  window.__visninger = [
+    { pub: "RBK. Pøbb og sånt", kamp_id: "2026-09-20-brann-bodoglimt",
+      kamp: "Brann – Bodo/Glimt", viser: false },
+  ];
+  window.fetch = function (u) {
+    u = String(u);
+    if (u.indexOf("overpass") > -1) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        json: function () { return Promise.resolve({ elements: [] }); } });
+    }
+    if (u.indexOf("/api/pub-liste") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { klar: true, puber: [RBK] })); } });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve("{}"); } });
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify(
+          { svar: [], visninger: window.__visninger })); } });
+    }
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({
+          liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+          kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+          kamper: ARETS, runde: "Runde 5" })); } });
+    }
+    var svar = u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker;
+    return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+      text: function () { return Promise.resolve(JSON.stringify(svar)); } });
+  };
+  location.hash = "#/fotball/eliteserien/neste";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var rader = document.querySelectorAll(".kamp.delbar");
+    var forste = rader[0];
+    forste.querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    var apne = panel.querySelector(".pub-apne");
+    if (apne) apne.click();
+    setTimeout(function () { try {
+      // Kampen stedet sa nei til: stedet star der fortsatt (det ligger
+      // femti meter unna), men UTEN 📺 — flagget er sagt imot.
+      ok("stedet star der fortsatt",
+         panel.textContent.indexOf("Pøbb") > -1,
+         panel.textContent.slice(0, 200) || "(tomt)");
+      ok("men merket er borte for kampen stedet sa nei til",
+         !panel.querySelector(".pub-liga"),
+         panel.textContent.slice(0, 240));
+
+      // Og den NESTE kampen: samme sted, samme flagg, ingen nei.
+      forste.querySelector(".kamp-del").click();
+      rader[1].querySelector(".kamp-del").click();
+      var panel2 = document.querySelectorAll(".kamp-panel")[0];
+      var apne2 = panel2.querySelector(".pub-apne");
+      if (apne2) apne2.click();
+      setTimeout(function () { try {
+        ok("men merket star pa den neste kampen",
+           !!panel2.querySelector(".pub-liga"),
+           panel2.textContent.slice(0, 240) || "(tomt)");
+        ferdig();
+      } catch (e) { ok("ingen unntak pa kamp to", false, e.message); ferdig(); } }, 700);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
+`);
+
 const SAK_15 = kjor("admin", `
   // Skrivingen gar med admins egen okt na (#79), ikke med en nokkel:
   // RLS slar opp uid-en i visning_skrivere, og ADMIN_PASSORD betyr
@@ -7142,7 +7233,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

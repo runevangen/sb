@@ -26,7 +26,8 @@ import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
 import { publisteRad, alleredeILista, erTips, forslagVekt, sorterForslagKo }
   from "./pub-forslag-data.js";
 import { PUBTYPER, PUBSIKKERHET, pubNokkel, sjekkPubRad, slaSammenPuber,
-  koordinatFraLenke, BYER, byFor, PUBLISTE_FELT } from "./pub-data.js";
+  koordinatFraLenke, BYER, byFor, PUBLISTE_FELT,
+  ligaflaggGjelder } from "./pub-data.js";
 import { visningsHint, rundeTall, lagreKnappTekst,
          rundeKnappTekst } from "./visning-data.js";
 
@@ -45,8 +46,31 @@ let passord = "";
 // tegnes — det som star der da, kom fra basen og ER det lagrede.
 let lagretSignatur = null;
 
+// Tegner én nei-knapp ut fra sin egen tilstand. Ligger pa modulniva fordi
+// BADE knappen selv og haken ved siden av kan endre den — og to tegnere
+// for samme knapp er to steder a gli fra hverandre.
+function tegnNei(knapp) {
+  const pa = knapp.dataset.nei === "1";
+  const rad = knapp.closest("li");
+  if (rad) rad.classList.toggle("kamp-avkreftet", pa);
+  knapp.textContent = pa ? "Viser ikke" : "Ikke denne kvelden";
+  knapp.setAttribute("aria-pressed", pa ? "true" : "false");
+  knapp.title = pa
+    ? "Stedet sender ligaen, men ikke denne kampen. Trykk for å ta det tilbake."
+    : "Stedet sender ligaen, men er stengt eller viser noe annet denne kvelden.";
+}
+
+function alleNei() {
+  return Array.from(document.querySelectorAll(".kamp-nei"))
+    .filter((n) => n.dataset.nei === "1").map((n) => n.dataset.kampId);
+}
+
+// Signaturen ma se BEGGE pastandene. Sto den bare pa hakene, var «ikke
+// denne kvelden» usynlig for lagreknappen: du trykket, ingenting sto som
+// endret, og knappen ble staende av.
 function valgtSignatur() {
-  return alleBokser().filter((b) => b.checked).map((b) => b.value).sort().join("|");
+  const ja = alleBokser().filter((b) => b.checked).map((b) => b.value).sort();
+  return ja.join("|") + "#" + alleNei().slice().sort().join("|");
 }
 
 // Rettelsene som ligger oppa puber.js, slik de sist ble lest (#80).
@@ -772,7 +796,15 @@ function tegnKamper() {
     return;
   }
   const pub = felt("pub").value;
-  const alt = visninger.filter((v) => v.pub === pub).map((v) => String(v.kampId));
+  // Tre tilstander, ikke to. `alt` er begge slag — hinten under teller
+  // rader, og et nei er like mye en rad som et ja.
+  const mine = visninger.filter((v) => v.pub === pub);
+  const alt = mine.map((v) => String(v.kampId));
+  const neiFraFor = mine.filter((v) => v.viser === false).map((v) => String(v.kampId));
+  const jaFraFor = mine.filter((v) => v.viser !== false).map((v) => String(v.kampId));
+  // Raden til den valgte puben, sa vi vet om ligaflagget pastar noe om
+  // kampene under. Star det ingen pastand, er det ingenting a si imot.
+  const pubrad = PUBER.find((p) => p.navn === pub) || null;
   // Hvor mange av dem som faktisk star i lista under. Totalen alene svarte
   // ikke pa sporsmalet admin har — *ble det jeg lagret staende?* — og den
   // talte pa tvers av ligaer mens boksene viste én.
@@ -823,7 +855,7 @@ function tegnKamper() {
     const boks = document.createElement("input");
     boks.type = "checkbox";
     boks.value = kampNokkel(k) || String(k.id);
-    boks.checked = alt.indexOf(boks.value) > -1;
+    boks.checked = jaFraFor.indexOf(boks.value) > -1;
     const tekst = document.createElement("span");
     tekst.className = "kamp-navn";
     tekst.textContent = k.hjemme + " – " + k.borte;
@@ -834,6 +866,31 @@ function tegnKamper() {
     merke.appendChild(boks);
     merke.appendChild(tekst);
     rad.appendChild(merke);
+
+    // «Ikke denne kvelden» — og BARE der ligaflagget pastar noe om
+    // nettopp denne kampen. Uten et flagg finnes det ingenting a si imot:
+    // en kamp ingen har krysset av og ingen liga dekker, er allerede uten
+    // pastand, og en knapp der ville bedt deg motsi tausheten.
+    //
+    // Den star utenfor <label>: en knapp inni en label er en knapp i en
+    // knapp, og trykket ville truffet haken.
+    if (pubrad && ligaflaggGjelder(pubrad.ligaer, k.liga)) {
+      const nei = document.createElement("button");
+      nei.type = "button";
+      nei.className = "kamp-nei";
+      nei.dataset.kampId = boks.value;
+      nei.dataset.nei = neiFraFor.indexOf(boks.value) > -1 ? "1" : "";
+      rad.appendChild(nei);
+      tegnNei(nei);
+      nei.addEventListener("click", () => {
+        nei.dataset.nei = nei.dataset.nei === "1" ? "" : "1";
+        // Et nei og et ja er motsatte pastander om den samme kampen. Sier
+        // du nei, ryker haken — ellers sto begge, og raden matte velge.
+        if (nei.dataset.nei === "1") boks.checked = false;
+        tegnNei(nei);
+        oppdaterLagreknapp();
+      });
+    }
     liste.appendChild(rad);
   });
   // Det som star avkrysset na, kom fra basen. Da er det ogsa det lagrede.
@@ -907,12 +964,25 @@ function oppdaterLagreknapp() {
   // Knappen sier hva trykket kommer til a GJORE, ikke hvor mange kamper
   // som star avkrysset. Meldt 18. september 2026: «Jeg legger til én, og
   // da star det 6 lagret. Egentlig sa lagrer bruker 1 da.»
-  const for_ = new Set((lagretSignatur || "").split("|").filter(Boolean));
+  //
+  // Signaturen baerer to lister med «#» imellom — ja-ene og nei-ene. De
+  // ma leses hver for seg: splittet vi bare pa «|», ble den siste ja-en
+  // «b#» og ingenting stemte med noe.
+  const [jaFor, neiFor] = String(lagretSignatur || "").split("#");
+  const settAv = (t) => new Set(String(t || "").split("|").filter(Boolean));
+  const for_ = settAv(jaFor);
+  const forNei = settAv(neiFor);
   const na = new Set(bokser.filter((b) => b.checked).map((b) => b.value));
-  const lagt = [...na].filter((v) => !for_.has(v)).length;
-  const fjernet = [...for_].filter((v) => !na.has(v)).length;
+  const naNei = new Set(alleNei());
+  const lagt = [...na].filter((v) => !for_.has(v)).length
+    + [...naNei].filter((v) => !forNei.has(v)).length;
+  const fjernet = [...for_].filter((v) => !na.has(v)).length
+    + [...forNei].filter((v) => !naNei.has(v)).length;
 
-  knapp.textContent = lagreKnappTekst(lagt, fjernet, antall, pub);
+  // Antallet er radene som blir staende — bade ★ og «viser ikke». Begge
+  // er pastander puben barer, og «Fjern alle kamper» ville vaert usant om
+  // det sto et nei igjen.
+  knapp.textContent = lagreKnappTekst(lagt, fjernet, antall + naNei.size, pub);
   knapp.disabled = !lagt && !fjernet;
 }
 
@@ -950,7 +1020,18 @@ felt("merkIngen").addEventListener("click", () => {
 // Hvert eneste kryss, ikke bare de to knappene over: teksten skal alltid
 // si det samme som boksene. Lyttes pa lista framfor pa hver boks, sa den
 // ogsa gjelder rader som tegnes senere.
-felt("kamper").addEventListener("change", oppdaterLagreknapp);
+// Krysser du av en kamp som sto som «viser ikke», er det ja-et som
+// gjelder: de to er motsatte pastander om den samme kampen, og den du
+// nettopp gjorde er den ferskeste.
+felt("kamper").addEventListener("change", (e) => {
+  const boks = e.target && e.target.closest ? e.target.closest(".kamp input") : null;
+  if (boks && boks.checked) {
+    const rad = boks.closest("li");
+    const nei = rad && rad.querySelector(".kamp-nei");
+    if (nei && nei.dataset.nei === "1") { nei.dataset.nei = ""; tegnNei(nei); }
+  }
+  oppdaterLagreknapp();
+});
 
 /* ---------- lagring ---------- */
 
@@ -980,6 +1061,7 @@ felt("lagre").addEventListener("click", async () => {
         token: okt.token,
         pub: felt("pub").value,
         kampIder: valgte,
+        neiIder: alleNei(),
         // Kampene sendes med, sa funksjonen slipper a hente dem pa nytt
         // og vi er sikre pa at det er de samme som sto pa skjermen.
         kamper: kamper.map((k) => ({ id: k.id, nokkel: kampNokkel(k),
