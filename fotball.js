@@ -2028,10 +2028,17 @@ function kamprad(kamp, del, delbar) {
     linje.appendChild(delKnapp(kamp, rad));
   }
   rad.appendChild(linje);
-  if (delbar) {
-    const viser = viserlinje(kamp);
-    if (viser) rad.appendChild(viser);
-  }
+  // «Denne kampen vises paa: …» sto her, rett under kampraden.
+  //
+  // Meldt 21. september 2026, med skjermbilde: fem rader paa rad sa
+  // «Andy's Pub (Oslo)». Linja var ment aa svare uten at du maatte aapne
+  // noe — men et svar som er likt paa hver rad, svarer ikke. Det staar
+  // bare i veien for det som SKILLER radene: hvem som spiller og naar.
+  //
+  // Opplysningen er ikke borte. Den staar i kortet, under «Kampen vises
+  // hos:», der den staar sammen med avstand, by og de andre stedene — og
+  // der den er et svar paa et spoersmaal du nettopp stilte ved aa aapne
+  // kortet.
   return rad;
 }
 
@@ -2287,92 +2294,6 @@ function sendInnSted(pubFelt) {
   return boks;
 }
 
-// «Denne kampen vises på: Lincoln Pub» rett under kampen, ikke bare inne
-// i delingspanelet: den som blar gjennom runden skal se det uten a apne
-// noe. Navnet er en knapp som apner panelet med puben ferdig valgt —
-// linja svarer pa sporsmalet og tar deg videre til a dele det.
-function viserlinje(kamp) {
-  const bekreftede = bekreftetFor(kamp, sisteVisninger, KJENTE);
-  if (!bekreftede.length) return null;
-
-  // «Denne kampen vises pa: Bernie's» sto over en leser i Trondheim, om en
-  // pub pa Gronland i Oslo — 392 km unna. Kilden svarer pa KAMPEN og
-  // kjenner ingen geografi, og det var riktig sa lenge lista var Oslo.
-  //
-  // Na navngir linja bare de naere. De andre ligger bak en knapp, og der
-  // star det hvor de er: et sted i en annen by er fortsatt et svar paa
-  // «hvem viser kampen», bare ikke paa «hvor skal jeg».
-  const naere = bekreftede.filter(naerNok);
-  const fjerne = bekreftede.filter((p) => !naerNok(p));
-
-  const linje = el("div", "kamp-viser");
-  const merke = el("span", "kamp-viser-merke", "★");
-  merke.setAttribute("aria-hidden", "true");
-  linje.appendChild(merke);
-
-  // Byen staar ved navnet i to tilfeller, og de er ikke det samme:
-  // naar vi VET at stedet er langt unna, og naar vi ikke vet noe. Det
-  // siste er en leser uten posisjon: da staar puben blant de naere fordi
-  // `naerNok()` svarer ja naar vi ikke vet, og «Bernie's» alene leses som
-  // «i naerheten». «Bernie's (Oslo)» er det vi faktisk kan staa inne for.
-  const pubKnapp = (p, fjern) => {
-    const sted = fjern ? (byenTil(p) || avstandtekst(avstandTil(p) || 0))
-      : (avstandTil(p) === null ? byenTil(p) : "");
-    const knapp = el("button", "kamp-viser-pub", p.navn + (sted ? " (" + sted + ")" : ""));
-    knapp.type = "button";
-    knapp.title = "Meldt inn til oss. Trykk for å dele at du ser kampen her.";
-    knapp.addEventListener("click", (e) => {
-      e.stopPropagation();
-      apnePanelMed(knapp.closest(".kamp"), "pub", p.navn);
-    });
-    return knapp;
-  };
-
-  linje.appendChild(el("span", "kamp-viser-tekst", naere.length
-    ? "Denne kampen vises på: "
-    // Er ingen i naerheten, skal linja ikke pasta at kampen vises et sted
-    // du kan dra. Den sier hva den vet, og knappen viser hvor.
-    : "Vises " + (fjerne.length === 1 ? "ett sted" : fjerne.length + " steder")
-      + ", ingen i nærheten. "));
-
-  naere.forEach((p, i) => {
-    if (i) linje.appendChild(el("span", "kamp-viser-tekst", ", "));
-    linje.appendChild(pubKnapp(p, false));
-  });
-
-  if (fjerne.length) {
-    // Skjult, ikke borte: en bekreftet visning er et faktum noen har fort
-    // inn, og det skal ga an a se det. Men det skal koste et trykk, og da
-    // star stedet ved navnet.
-    const resten = el("span", "kamp-viser-fjerne");
-    resten.hidden = true;
-    fjerne.forEach((p, i) => {
-      if (i) resten.appendChild(el("span", "kamp-viser-tekst", ", "));
-      resten.appendChild(pubKnapp(p, true));
-    });
-
-    const mer = el("button", "kamp-viser-mer");
-    mer.type = "button";
-    const merTekst = () => (resten.hidden
-      ? (naere.length ? "+" + fjerne.length + " andre steder" : "Vis hvor")
-      : "Skjul");
-    mer.textContent = merTekst();
-    mer.setAttribute("aria-expanded", "false");
-    mer.addEventListener("click", (e) => {
-      e.stopPropagation();
-      resten.hidden = !resten.hidden;
-      mer.textContent = merTekst();
-      mer.setAttribute("aria-expanded", resten.hidden ? "false" : "true");
-    });
-
-    if (naere.length) linje.appendChild(el("span", "kamp-viser-tekst", " "));
-    linje.appendChild(mer);
-    linje.appendChild(resten);
-  }
-
-  return linje;
-}
-
 /* ---------- hvem blir med ---------- */
 
 // Svaret delingslenka ba om. Teksten i chatten spurte «Hvor ser du?», og
@@ -2460,26 +2381,11 @@ function tegnSvar(rot) {
     const gammel = rad.querySelector(".kamp-blirmed");
     if (gammel) gammel.remove();
 
-    // «Denne kampen vises pa: …» tegnes ogsa her, og ikke bare i
-    // kamprad(). Visningene la i koden og fulgte med utrullingen til
-    // 15. september 2026; na kommer de over nettet, i det samme svaret,
-    // og det lander **etter** at runden star ferdig. Tegnet vi linja bare
-    // nar raden lages, ville den aldri dukket opp. Samme felle som det
-    // apne kortet under — og den ble fanget av at dette er tredje gang
-    // den slar til.
-    const gammelViser = rad.querySelector(".kamp-viser");
-    if (gammelViser) gammelViser.remove();
-    const kampen = radensKamp(rad);
-    if (kampen && rad.classList.contains("delbar")) {
-      const viser = viserlinje(kampen);
-      if (viser) {
-        const panel = rad.querySelector(".kamp-panel");
-        const blirMed = rad.querySelector(".kamp-blirmed");
-        const for_ = blirMed || panel;
-        if (for_) rad.insertBefore(viser, for_);
-        else rad.appendChild(viser);
-      }
-    }
+    // Linja «Denne kampen vises pa: …» ble tegnet om her ogsa, fordi
+    // visningene lander ETTER at runden staar ferdig. Linja er borte (se
+    // kamprad), og med den det ene stedet i denne funksjonen som ikke
+    // handlet om svar. Regelen staar: alt som tegnes av data herfra maa
+    // tegnes paa nytt her.
 
     const svar = kart.get(String(rad.dataset.kamp || "")) || [];
     const okt = konto.okt();

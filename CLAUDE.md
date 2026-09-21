@@ -210,10 +210,13 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   Grønland i Oslo sto øverst som svaret på «hvor skal du se den?» for en
   leser i Trondheim — 392 km unna. Samme antagelse som `puber.js` bar:
   riktig så lenge alt var Oslo.
-  **Linja under kampraden navngir bare de nære.** Er ingen i nærheten, sier
-  den «Vises ett sted, ingen i nærheten» og legger puben bak «Vis hvor» —
-  skjult, ikke borte, for en bekreftet visning er et faktum noen har ført
-  inn. Der står byen ved navnet: «Bernie's (Oslo)».
+  **Kampraden navngir ingen pub.** «Denne kampen vises på: …» sto der til
+  21. september 2026, og skulle svare uten at du åpnet noe. Meldt med
+  skjermbilde: fem rader på rad sa «Andy's Pub (Oslo)». Et svar som er likt
+  på hver rad svarer ikke — det står i veien for det som **skiller** radene,
+  som er hvem som spiller og når. Opplysningen lever i kortet, der den
+  kommer med avstand, by og de andre stedene, og der den er svar på et
+  spørsmål du nettopp stilte ved å åpne det.
   **I kortet går de fjerne bak «Vis de andre», med avstanden på raden.**
   «Bernie's» og «Bernie's 392 km» er to ulike svar, og bare det andre kan
   leses.
@@ -243,11 +246,10 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   lista flyttet framme i kortet, spurte `hentNaerDeg` uansett, og to veier
   til samme posisjon er én for mye. **Én som spør**, og det er den som
   også trenger svaret.
-  **Men linja under kampraden rekker ikke å vente på den**, for den tegnes
-  før noe kort er åpnet. En bekreftet visning uten kjent avstand bærer
-  derfor byen ved navnet — «Bernie's (Oslo)» — både i linja og på raden i
-  kortet. Det er det eneste vi kan stå inne for uten å vite hvor leseren
-  er, og det koster ingen tillatelsesboks.
+  **Og en rad uten kjent avstand bærer byen ved navnet** — «Bernie's»,
+  «Oslo». Kortet tegnes i det posisjonen spørres om, så de første radene
+  står der før svaret finnes. Byen er det eneste vi kan stå inne for uten å
+  vite hvor leseren er, og den koster ingen tillatelsesboks.
 - **Kortet rangerer etter hvor du står *nå*, og andre byer er veien
   utenom.** For en kamp i kveld er «nå» og «ved avspark» det samme. For en
   kamp om tre dager er det en gjetning, og for den som reiser feil
