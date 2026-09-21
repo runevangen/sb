@@ -9,6 +9,36 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 21. september 2026 — en rad skjult av en opplysning vi ikke har
+
+**Fanget av:** en sabotasje, ikke av at noen tenkte på det.
+
+**Sammenhengen.** Resultatfanen hentet `&status=FT&last=10` og viste derfor
+omtrent én runde. Meldt som «hva koster det å gå tilbake alle runder der?»
+Svaret var: ingenting i kall — samme endepunkt uten `last`. Siste runde
+står framme, resten bak «Vis tidligere runder (N)».
+
+**Feilen.** Plasseringa var `tidligere && runde !== sisteRunde`. En kamp
+uten rundetall får `runde === ""`, og `"" !== "Runde 23"` er sant — så den
+havnet **bak knappen**. Uten overskrift, siden overskrifta krever et
+rundetall. Og uten å telle med i tallet på knappen, av samme grunn. En rad
+skjult av en opplysning vi *ikke har*, under en knapp som ikke visste om
+den.
+
+**Hvordan den kom fram.** Sabotasjen som skulle vise at grupperinga virket,
+slo av rundetallet for resultater. Den felte ingen assertion — den
+**krasjet hele suiten**, fordi en eldre scene gjør `kamper[0].querySelector(…)`
+på en liste som da var tom. Krasjen var ikke poenget; den tvang meg til å
+lese hva koden faktisk gjorde med en tom `runde`, og der lå feilen.
+
+Regelen finnes fra før, for stedene i kortet: **en liste som gjemmer noe
+fordi den mangler opplysninger, gjemmer det uten grunn** (`naerNok()`). Den
+gjelder her også. `runde &&` i plasseringa, og en rad i scenen som bærer
+tomt rundetall — midt i lista, ikke først, for først ville slått av hele
+grupperinga og målt noe annet.
+
+---
+
 ## 21. september 2026 — et svar som er likt på hver rad, svarer ikke
 
 **Meldt som:** «Fjern vises på herfra. Skaper bare støy i visningen», med

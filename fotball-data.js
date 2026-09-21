@@ -50,7 +50,18 @@ export function tolkDatasett(sport, del, json) {
     // Nyeste forst: API-et gir de siste kampene i stigende rekkefolge.
     const kamper = s.tolkKamper(json).slice().sort(
       (a, b) => String(b.dato).localeCompare(String(a.dato)));
-    return { kamper };
+    // Rundene i samme rekkefolge som kampene — nyeste forst. Visningen
+    // trenger dem for aa kunne vise den siste runden framme og resten bak
+    // en knapp; uten dem matte den regne dem ut selv, og da hadde to
+    // steder svart paa «hvilke runder finnes».
+    //
+    // Samme form som `kommendeKamper` gir for «neste», med vilje: én
+    // visning leser begge.
+    const runder = [];
+    kamper.forEach((k) => {
+      if (k.runde && runder.indexOf(k.runde) === -1) runder.push(k.runde);
+    });
+    return { kamper, runde: runder[0] || "", runder };
   }
   return kommendeKamper(s.tolkKamper(json));
 }
@@ -254,8 +265,17 @@ export const DEL_NAVN = {
 export function apiSti(del, liga, sesong) {
   const felles = "league=" + liga.id + "&season=" + sesong;
   if (del === "tabell") return "/standings?" + felles;
-  // last og next gir oss et vindu rundt naet uten a hente hele sesongen.
-  if (del === "resultater") return "/fixtures?" + felles + "&status=FT&last=10";
+  // Resultater: HELE sesongen, ikke de ti siste.
+  //
+  // Det sto `&last=10` her, som er godt over én runde i Eliteserien — og
+  // da sa fanen «kun siste runde», meldt 21. september 2026. Det koster
+  // ingen ekstra kall aa droppe det: samme endepunkt, samme ene
+  // foresporsel, bare et storre svar. `tolkKamper` skreller det ned til
+  // visningsfeltene for noe caches, saa det leseren laster vokser lite.
+  //
+  // `next=20` paa neste staar: dét er et vindu FRAMOVER, og en sesong
+  // som ikke er spilt enda er ikke en liste noen blar i.
+  if (del === "resultater") return "/fixtures?" + felles + "&status=FT";
   if (del === "neste") return "/fixtures?" + felles + "&status=NS&next=20";
   return null;
 }
