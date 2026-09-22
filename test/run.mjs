@@ -5211,6 +5211,46 @@ const SAK_15G = kjor("admin-seksjoner", `
         });
       ok("og hvert issue-nummer ser ut som et issue-nummer",
          !!vIssue && issueFeil.length === 0, issueFeil.join(", ") || "ingen");
+
+      // Byggestempelet. Det er den halvdelen som svarer paa «ser jeg paa
+      // det nyeste?» — og den kom fra en funksjon som svarte null hver
+      // gang, fordi Netlifys lese-variabler finnes i BYGGEMILJOET og ikke
+      // i funksjonenes kjoretid. Meldt 22. september 2026:
+      // «Byggemiljoet oppgir ingen commit».
+      //
+      // Scenen serverer sin egen bygg.js, slik verktoy/lag-bygg.mjs
+      // skriver den ved en utrulling. Fila hentes med en dynamisk import,
+      // saa linja staar paa «Henter …» til den har landet — og DET er
+      // signalet vi venter paa. En fast frist ville malt hvor rask
+      // maskinen er; CI er tregere enn min, og en test som er gronn her og
+      // rod der sier ingenting om koden. Taket paa et halvt sekund ligger
+      // godt innenfor scenens egen ferdig(), saa et stempel som aldri
+      // lander gir roder — ikke pastander som kommer for sent til aa telle.
+      var stempelForsok = 0;
+      (function ventPaaStempel() {
+        var kj = felt("versjonKjorer").textContent;
+        if (kj.indexOf("Henter") > -1 && stempelForsok++ < 20) {
+          setTimeout(ventPaaStempel, 25);
+          return;
+        }
+        try {
+          ok("byggestempelet sier hvilken commit dette er",
+             kj.indexOf("a36dea5") > -1, kj);
+          // Sju tegn, ikke fortti: en full sha er ikke noe et menneske
+          // sammenlikner, og de sju forste holder til aa kjenne den igjen.
+          ok("og det er de sju forste, ikke hele",
+             kj.indexOf("a36dea534225") === -1, kj);
+          // Prod skal IKKE si «forhandsvisning» — det er hele skillet.
+          ok("og sier ikke forhandsvisning naar konteksten er production",
+             kj.toLowerCase().indexOf("forhandsvisning") === -1, kj);
+          ok("og hovedgrenen navngis ikke, for den er det vanlige",
+             kj.indexOf("gren main") === -1, kj);
+          // Tidspunktet leses av et menneske: en ISO-streng svarer ikke paa
+          // «er dette fra i dag».
+          ok("og naar det ble rullet ut, i ord",
+             kj.indexOf("rullet ut") > -1 && kj.indexOf("2026-09-22T") === -1, kj);
+        } catch (e) { ok("ingen unntak i byggestempelet", false, e.message); }
+      })();
       ok("og panelene folger hodene sine",
          felt("kampKropp").hidden === true && felt("stedKropp").hidden === true &&
          felt("brukerKropp").hidden === true && felt("verktoyKropp").hidden === true,
@@ -5351,7 +5391,14 @@ const SAK_15G = kjor("admin-seksjoner", `
       } catch (e) { ok("ingen unntak i skjemaet", false, e.message); ferdig(); } }, 400);
     } catch (e) { ok("ingen unntak i portalen", false, e.message); ferdig(); } }, 600);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
-`, null, adminSide);
+`, null, adminSide, {
+  // Byggestempelet slik `verktoy/lag-bygg.mjs` skriver det ved en
+  // utrulling. Scenens egen fil: den finnes ikke i repoet, for den
+  // er generert og staar i .gitignore.
+  "bygg.js": 'export const BYGG = {"tid":"2026-09-22T01:00:00.000Z",'
+    + '"commit":"a36dea534225cd7801df92dc570dd017080ce7ed",'
+    + '"gren":"main","kontekst":"production","utrulling":"6ab1d31b"};',
+});
 
 /* ---------------- 16. puben bekrefter kampen ---------------- */
 

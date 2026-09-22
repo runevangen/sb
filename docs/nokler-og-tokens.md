@@ -168,14 +168,29 @@ grunnen til at TheSportsDB finnes i bildet.
 ikke hemmeligheter — de står i git-historikken uansett, og repoet er
 offentlig.
 
-- **Leses av:** `netlify/functions/brukere.mjs`, handlingen `versjon`
+**De finnes bare i byggemiljøet.** Det er den ene tingen å vite om dem, og
+den kostet en utrulling: de er der mens byggekommandoen kjører, og borte
+når funksjonene svarer. Alle de andre variablene i dette dokumentet er
+motsatt — de leses av en funksjon, ved kall. Disse fire kan ikke leses
+slik i det hele tatt.
+
+- **Leses av:** `verktoy/lag-bygg.mjs`, som byggekommandoen kjører sist
+- **Skrives til:** `bygg.js` i rota — generert, i `.gitignore`, laget på
+  nytt ved hver utrulling
 - **Vises i:** portalen, seksjonen *Versjon*, bak passord og økt
 - **Hva de svarer på:** «ser jeg på den nyeste utrullingen?» `versjoner.js`
   kan bare si hva som sto i fila da den ble bygget; commit-en sier hvilken
   bygging det var. `CONTEXT` skiller prod fra en deploy-preview.
-- **Mangler de:** linja sier det. Et tomt felt vist som en verdi ville vært
-  en påstand vi ikke har dekning for, og funksjonen svarer derfor `null` —
-  ikke en tom streng. En funksjonstest dekker begge veier.
+- **Mangler fila:** linja sier det — «Ingen byggestempel». Den hentes med
+  en dynamisk import i try/catch, så lokalt, der fila ikke finnes, faller
+  bare denne ene linja bort. Et tomt felt vist som en verdi ville vært en
+  påstand vi ikke har dekning for.
+
+**Første utgave leste dem i `/api/brukere`**, på handlingen `versjon`.
+Den svarte `null` hver eneste gang, og portalen sa ærlig fra:
+«Byggemiljøet oppgir ingen commit». Funksjonstesten var grønn — den
+dekket *begge utfall* av at variabelen manglet, men målte aldri om den
+fantes. Rettet 22. september 2026; handlingen er ute.
 
 ### `THESPORTSDB_KEY` — TheSportsDB
 

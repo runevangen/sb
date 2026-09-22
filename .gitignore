@@ -5,6 +5,11 @@
 .env
 .env.*
 
+# Generert ved utrulling av verktoy/lag-bygg.mjs: hvilken commit og
+# hvilken kontekst denne utrullingen kom fra. Netlifys lese-variabler
+# finnes bare i byggemiljoet, sa de skrives ned mens de er der.
+bygg.js
+
 # Verktoy
 node_modules/
 .netlify/

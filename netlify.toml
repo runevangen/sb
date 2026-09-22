@@ -34,7 +34,10 @@
 #
 # GAR DET GALT: fjern `command`-linja, commit, og deployene gar som for.
 [build]
-  command = "node test/unit.mjs && node test/funksjon.mjs"
+  # Stemplingen star SIST: feiler portene, publiseres ingenting, og da
+  # er det heller ingenting a stemple. `bygg.js` er generert og star i
+  # .gitignore — den lages pa nytt ved hver utrulling.
+  command = "node test/unit.mjs && node test/funksjon.mjs && node verktoy/lag-bygg.mjs"
   # INGEN `publish` her, og det er et funn framfor en forglemmelse.
   #
   # Forste utgave satte `publish = "."` — eksplisitt framfor a hvile pa en

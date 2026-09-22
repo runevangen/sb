@@ -4,9 +4,9 @@
 kommandoene, men ikke tallene: de sto i tre filer og glei fire ganger på to
 dager. Legger du til tester, er det denne fila som skal rettes.
 
-    node test/unit.mjs      826 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  421 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       841 tester, 3–20 s, headless Chromium
+    node test/unit.mjs      834 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  414 tester, ~250 ms, ingen nettleser
+    node test/run.mjs       846 tester, 3–20 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
@@ -82,6 +82,34 @@ feltet testen leser.
 **Og en sabotasje kan avsløre at stubben er feil, ikke bare at koden er
 det.** Det var sabotasjen som fant dette — testen var grønn både før og
 etter fiksen, og sa dermed ingenting.
+
+**En test som dekker begge utfall av en antagelse, har ikke prøvd
+antagelsen.** Dette kostet en utrulling 22. september 2026.
+`/api/brukere` leste `process.env.COMMIT_REF`, og testen dekket begge
+veier: satt variabel ga commit-en ut, slettet variabel ga `null`. Begge
+grønne. Spørsmålet var et tredje — *finnes variabelen der koden kjører?*
+— og svaret var nei: Netlifys lese-variabler finnes i byggemiljøet, ikke
+i funksjonenes kjøretid. En funksjonstest setter `process.env` selv, så
+den kan **aldri** stille det spørsmålet; den er enig med feilen.
+Kjennetegnet er lett å se etterpå: testen setter selv det den måler.
+Står du der, er svaret å kjøre den ekte kilden — `unit.mjs` kjører nå
+`verktoy/lag-bygg.mjs` med `execFileSync` og leser fila som kom ut —
+eller å måle antagelsen i prod og melde den som en hendelse.
+
+**Og to filer som må være enige, trenger en vakt som måler enigheten.**
+Samme sak: skrev `lag-bygg.mjs` feltet `sha` mens `admin.js` leste
+`commit`, ville hver eneste test vært grønn og linja stått tom i prod.
+Vakta leser `stempel.<felt>` ut av `admin.js` og krever at stempelet
+skriver hvert av dem. Variabelen heter `stempel` og ikke `b` nettopp
+derfor: en enkeltbokstav ville truffet hver annen `b.noe` i fila.
+
+**Rydd opp etter en sabotasje med en kopi, ikke med `git checkout --`.**
+Den henter fila fra indeksen og kaster *alt* som ikke er committet — også
+testene du nettopp skrev, som er grunnen til at du saboterte i det hele
+tatt. Skjedde 22. september 2026, midt i sabotasjerunden for
+byggestempelet: åtte nye påstander forsvant på én linje, og det eneste
+sporet var at tallet falt fra 834 til 826. Ta `cp fil fil.bak` før du
+ødelegger noe, og legg kopien utenfor repoet.
 
 **Sabotér hver linje for seg, ikke fiksen under ett.** 17. september 2026
 ble en rettelse satt to steder: når lista tegnes, og etter en vellykket

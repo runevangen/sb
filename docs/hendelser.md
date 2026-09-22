@@ -9,6 +9,48 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 22. september 2026 — stempelet som leste et miljø som ikke var der
+
+**Meldt som:** «Byggemiljoet oppgir ingen commit — lista under sier hva
+som sto i fila, ikke hvilken utrulling du ser paa.» Ordrett den setningen
+jeg selv hadde skrevet inn som det linja skulle si når noe manglet.
+
+**Hva den skulle svare på.** Portalen fikk en versjonsseksjon samme dag:
+`versjoner.js` sier *hva* som endret seg, og commit-en sier *om du ser på
+det nyeste*. Den andre halvdelen er den eneste som kan besvare «le
+endringen min faktisk rullet ut?» — spørsmålet som sto ubesvart i en time
+dagen før.
+
+**Årsaken.** `/api/brukere` leste `process.env.COMMIT_REF` når portalen
+spurte. Netlifys lese-variabler — `COMMIT_REF`, `BRANCH`, `CONTEXT`,
+`DEPLOY_ID` — finnes i **byggemiljøet**, ikke i funksjonenes kjøretid. De
+er der mens byggekommandoen kjører, og borte etterpå. Alle de andre
+variablene i prosjektet er motsatt, og det er derfor antagelsen gikk
+gjennom uten at noen stusset.
+
+**Hvorfor testen var grønn.** Den dekket *begge utfall* av at variabelen
+manglet: satt den, kom commit-en ut; slettet vi den, kom `null`. Begge
+veier målt, og ingen av dem målte det som var spørsmålet — om variabelen
+i det hele tatt finnes der koden kjører. En funksjonstest setter
+`process.env` selv. Da er den enige med feilen.
+
+**Det som ble gjort.** `verktoy/lag-bygg.mjs` skriver `bygg.js` mens
+byggekommandoen kjører og variablene fortsatt er der. Fila er generert,
+står i `.gitignore`, og hentes av portalen med en *dynamisk* import i
+try/catch — lokalt finnes den ikke, og en manglende import på toppnivå
+ville veltet hele portalen framfor denne ene linja. Stemplingen står
+**sist** i kommandoen: feiler portene, publiseres ingenting, og da er det
+heller ingenting å stemple. Handlingen `versjon` i `brukere.mjs` er ute —
+et låst endepunkt som svarer fire `null` er verre enn ingen.
+
+**Lærdommen:** en test som dekker begge utfall av en antagelse, har
+fortsatt ikke prøvd antagelsen. «Koden håndterer at den mangler» og
+«variabelen finnes» er to påstander, og bare den ene kan stubbes. Den
+andre måtte måles i prod — og ble det, av den som
+åpnet portalen og fikk setningen i ansiktet.
+
+---
+
 ## 21. september 2026 — variabelen som stoppet sin egen utrulling
 
 **Meldt som:** ingenting. Prod ble stående på forrige deploy etter at

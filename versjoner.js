@@ -17,9 +17,10 @@
 //
 // **Den sier ingenting om hva som faktisk kjører.** Fila ble med i den
 // utrullingen den ble med i, og det er alt den vet. Spørsmålet «ser jeg på
-// den nyeste versjonen?» besvares av commit-en, som portalen henter fra
-// Netlifys byggemiljø ved siden av denne lista. Sto bare denne der, kunne
-// den si 21. september over en app som ble bygget den 12.
+// den nyeste versjonen?» besvares av commit-en, som `verktoy/lag-bygg.mjs`
+// stempler inn i `bygg.js` ved utrulling og portalen viser ved siden av
+// denne lista. Sto bare denne der, kunne den si 21. september over en app
+// som ble bygget den 12.
 //
 // Nyeste først.
 export const VERSJONER = [
@@ -27,7 +28,7 @@ export const VERSJONER = [
     versjon: "2026.09.22",
     endringer: [
       { hva: "Feilmeldinger viser tjenestens egne ord, ikke maskinkonvolutten bak dem. En innlogging som svikter sier «svarte 522» framfor å lime inn en halv JSON-blokk." },
-      { hva: "Portalen har fått denne lista, og sier hvilken utrulling du faktisk ser på." },
+      { hva: "Portalen har fått denne lista, og sier hvilken utrulling du faktisk ser på — hentet fra et stempel som settes ved utrulling, ikke fra et kall som svarte tomt." },
     ],
   },
   {
