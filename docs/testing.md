@@ -4,8 +4,8 @@
 kommandoene, men ikke tallene: de sto i tre filer og glei fire ganger på to
 dager. Legger du til tester, er det denne fila som skal rettes.
 
-    node test/unit.mjs      811 tester, ~90 ms, ingen nettleser
-    node test/funksjon.mjs  416 tester, ~250 ms, ingen nettleser
+    node test/unit.mjs      826 tester, ~90 ms, ingen nettleser
+    node test/funksjon.mjs  421 tester, ~250 ms, ingen nettleser
     node test/run.mjs       841 tester, 3–20 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
@@ -275,6 +275,11 @@ til angring, og hele fotballmodulen.
   av handlingen (`!some(k => k.handling === "pin")`). **Si hva du mener
   framfor å telle**, ellers måler testen hvor mange ting som fantes den
   dagen den ble skrevet.
+- **En sabotasje må treffe linja testen beskytter, ikke bare fila.** Den
+  som fjernet `forsok.kropp` fra `konto.mjs` 22. september 2026 tok
+  *første* treff — som ligger i `slettKonto`, mens testen vokter
+  innloggingen. Den ble brukt, og det så likevel ut som «ingenting falt».
+  Bekreft hvilken linje som ble rørt når fila har flere like.
 - **En test som KASTER velter scenen, og da rapporteres ingenting.**
   Symptomet er ikke en rød påstand, men `«<scene>: testsiden rapporterte
   ingenting»` — og i en sabotasje leses det som «ingenting falt», altså

@@ -404,6 +404,34 @@ ikke ved kampen — fem ligaer er fem rader som endres omtrent én gang i året.
 
 ---
 
+### `tjeneste-data.js`
+
+Hva en tjeneste faktisk **sa**, når noe gikk galt. Delt mellom alle
+Netlify-funksjonene og testene.
+
+- **Koden sto som seks kopier av `kortMelding`, og de hadde alt glidd.**
+  `brukere` og `konto` leste `error_description` først, de fire andre
+  `message`. På en kropp med begge feltene ville de sagt to ulike ting om
+  det samme svaret. Funnet 22. september 2026, fordi innloggingen svarte
+  522 og meldinga så feil ut.
+- **`tjenestensOrd()` skiller ord fra konvolutt.** Regelen om at en
+  feilmelding skal bære tjenestens egne ord var skrevet om Supabase, som
+  sier «Invalid login credentials». Den gjaldt aldri en maskinkonvolutt:
+  en Cloudflare-522 er en dokumentasjons-URL i JSON, kappet midt i en
+  streng, og «svarte 522» alene sier mer.
+  Parset kroppen som JSON uten et kjent meldingsfelt, er det noe mellom
+  oss og tjenesten som svarte — en proxy, en kant — og den har ingen
+  setning å gi leseren. Begynner teksten med `<`, er det en HTML-side.
+- **Kroppen kastes ikke, den flyttes.** `forsok.kropp` bærer den for
+  diagnose; `forsok.melding` er det `tjenestenSa()` i appen limer inn i
+  det leseren ser. Uten skillet byttet vi støy mot blindhet.
+- **Rekkefølgen på feltene står ett sted, og det er hele poenget.**
+  `error_description` og `message` er de uttrykkelige
+  «beskrivelse»-feltene; `error` sist, fordi den oftest er en kode
+  («invalid_grant») og ikke ord.
+
+---
+
 ### `versjoner.js`
 
 Hva som har endret seg, og hvilken sak det svarte på. Leses bare av

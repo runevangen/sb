@@ -58,6 +58,7 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
 import { PUBER_KONTAKT } from "../puber-kontakt.js";
 import { KANALER } from "../kanaler.js";
 import { KURATERTE } from "../puber.js";
+import { tjenestensOrd, diagnosekropp } from "../tjeneste-data.js";
 import { sjekkForslag, forslagRad, tolkForslag, alleredeILista, publisteRad,
          erTips, forslagVekt, sorterForslagKo }
   from "../pub-forslag-data.js";
@@ -2440,6 +2441,74 @@ ok("hver modul appen importerer ligger i service workerens skall",
    utenfor.length === 0, "mangler i SKALL: " + utenfor.join(", "));
 ok("testen fant faktisk noen importer a sjekke",
    importert.size >= 10, importert.size);
+
+/* ---------------- tjenestens ord, og konvolutten ---------------- */
+
+// Den ekte kroppen fra natt til 22. september 2026. Innloggingen svarte
+// 522, og dette sto i ansiktet pa leseren — kappet midt i en streng, og
+// det leses som at noe knakk hos oss.
+const CF_522 = JSON.stringify({
+  type: "https://developers.cloudflare.com/support/troubleshooting/"
+      + "http-status-codes/cloudflare-5xx-errors/error-522/",
+  title: "Connection timed out",
+  status: 522,
+});
+
+ok("en Cloudflare-konvolutt er ikke ord",
+   tjenestensOrd(JSON.parse(CF_522), CF_522) === "",
+   tjenestensOrd(JSON.parse(CF_522), CF_522));
+
+// Og det er nettopp `title` som gjor den lumsk: den SER ut som en melding.
+// Men «Connection timed out» er kantens ord om seg selv, ikke tjenestens
+// om det vi spurte om — og felt vi ikke kjenner slipper ikke gjennom.
+ok("heller ikke feltene den har som ligner",
+   tjenestensOrd({ title: "Connection timed out", detail: "noe" }, "{}") === "");
+
+// Supabases egne ord skal fortsatt fram. Det er hele grunnen til at
+// `forsok` finnes.
+ok("GoTrue sin setning slipper gjennom",
+   tjenestensOrd({ error: "invalid_grant", error_description: "Invalid login credentials" },
+     "{}") === "Invalid login credentials");
+ok("og PostgREST sin",
+   tjenestensOrd({ message: "relation \"pin_kontoer\" does not exist", code: "42P01" },
+     "{}").indexOf("does not exist") > -1);
+ok("og den eldre msg-formen",
+   tjenestensOrd({ msg: "JWT expired" }, "{}") === "JWT expired");
+
+// En HTML-side er ikke en setning. 5xx fra en kant kommer ofte slik.
+ok("en HTML-side er ikke ord",
+   tjenestensOrd(null, "<html><head><title>522</title>") === "");
+
+// Men naken tekst er ord: PostgREST svarer av og til en ren setning.
+ok("naken tekst er ord",
+   tjenestensOrd(null, "  duplicate key value violates unique constraint  ")
+     === "duplicate key value violates unique constraint");
+ok("og ingenting er ingenting", tjenestensOrd(null, "") === "");
+ok("og null taler det", tjenestensOrd(null, null) === "");
+
+// Ett sted for rekkefolgen. Seks kopier hadde alt glidd: to leste
+// error_description forst, fire message. Pa en kropp med BEGGE sa de to
+// ulike ting om det samme svaret.
+ok("error_description gar foran message",
+   tjenestensOrd({ message: "kode", error_description: "setningen" }, "{}") === "setningen");
+ok("og error kommer sist, for den er oftest en kode",
+   tjenestensOrd({ error: "invalid_grant", msg: "Sier hva som skjedde" }, "{}")
+     === "Sier hva som skjedde");
+
+// Lengden: en melding som sprenger boksen er ikke lesbar.
+ok("meldinga kappes pa 120 tegn",
+   tjenestensOrd({ message: "x".repeat(300) }, "{}").length === 120);
+
+// Kroppen kastes ikke — den flyttes. Uten dette byttet vi stoy mot
+// blindhet: en 522-konvolutt sier HVOR det stoppet.
+ok("kroppen blir med for diagnose",
+   String(diagnosekropp(CF_522)).indexOf("cloudflare") > -1, diagnosekropp(CF_522));
+ok("pa én linje, sa den kan leses i et felt",
+   diagnosekropp("to\n  linjer") === "to linjer", diagnosekropp("to\n  linjer"));
+// undefined, ikke "": et tomt felt leses som «tjenesten sa ingenting», og
+// det er en annen pastand enn at vi ikke spurte.
+ok("og en tom kropp gir ingen felt i det hele tatt",
+   diagnosekropp("") === undefined && diagnosekropp(null) === undefined);
 
 /* ---------------- folg systemet (#148) ---------------- */
 

@@ -45,6 +45,8 @@ modul for modul.
     pub-forslag-data.js / netlify/functions/pub-forslag.mjs
     netlify/functions/pub-liste.mjs   rettelsene admin gjør i portalen
     kanaler.js      hvilken kanal som sender ligaen — tom til noen har sjekket
+    tjeneste-data.js hva en tjeneste SA da noe gikk galt — ord, ikke
+                    konvolutt. Delt av alle funksjonene.
     versjoner.js    hva som endret seg og hvilken sak det svarte på
                     — vises bare i portalen
     konto-data.js / pin-data.js / netlify/functions/konto.mjs
@@ -465,6 +467,22 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   kaller, viser den:** en `forsok` klienten kaster er like god som ingen.
   «Fikk ikke svar fra OpenStreetMap» er like forenlig med at tjeneren er
   nede som med at vi selv la på — og de to krever ulike ting.
+  **Men en maskinkonvolutt er ikke ord.** Regelen var skrevet om Supabase,
+  som sier «Invalid login credentials». Natt til 22. september 2026 svarte
+  innloggingen 522, og leseren fikk *«Innloggingen svarte ikke. Prøv igjen
+  om litt. (svarte 522: {"type":"https://developers.cloudflare.com/…»* —
+  kappet midt i en streng, og det leses som at noe knakk hos oss. Det var
+  Cloudflare som ikke fikk svar fra Supabase bak seg.
+  `tjenestensOrd()` i `tjeneste-data.js` er skillet: parset kroppen som
+  JSON uten et kjent meldingsfelt, er det noe **mellom** oss og tjenesten
+  som svarte, og det har ingen setning å gi leseren. Begynner teksten med
+  `<`, er det en HTML-side. **«Svarte 522» alene sier mer**, og tallet kan
+  meldes videre.
+  **Kroppen kastes ikke, den flyttes** til `forsok.kropp` — den sier *hvor*
+  det stoppet. Uten det skillet byttet vi støy mot blindhet.
+  Funksjonen er delt fordi koden sto som **seks kopier som alt hadde
+  glidd**: to leste `error_description` først, fire `message`. På en kropp
+  med begge feltene sa de to ulike ting om det samme svaret.
 - **Bokstaver er `\p{L}`, ikke en håndskrevet liste.** `osmNavnVask()`
   hadde `A-Za-zæøå` og gjorde «Grünerløkka» til «Gr nerløkka». En liste
   over hvilke tegn som er bokstaver, mangler alltid noen. Vask bort det

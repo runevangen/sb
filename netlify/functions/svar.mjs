@@ -21,6 +21,8 @@ import { tolkSvar, svarRad, gyldigNavn, gyldigKampId, SVAR_MAKS, KAMPER_MAKS }
   from "../../svar-data.js";
 import { tolkVisninger } from "../../visning-data.js";
 
+import { tjenestensOrd, diagnosekropp }
+  from "../../tjeneste-data.js";
 const TABELL = "kampsvar";
 const FELT = "kamp_id,navn,hvor,sted,bruker";
 
@@ -208,8 +210,13 @@ async function hosSupabase(metode, sti, kropp, token, ekstra) {
     } catch (err) {
       json = null;
     }
-    const melding = kortMelding(json) || tekst.slice(0, 120);
+    const melding = tjenestensOrd(json, tekst);
     if (melding) forsok.melding = melding;
+    // Kroppen blir med for diagnose selv naar den ikke er ord: en
+    // 522-konvolutt sier HVOR det stoppet. Den staar i `kropp`, ikke i
+    // `melding`, sa `tjenestenSa()` i appen ikke limer den inn i det
+    // leseren ser — det var nettopp det som skjedde 22. september 2026.
+    else forsok.kropp = diagnosekropp(tekst);
     return { ok: respons.ok, status: respons.status, json, melding, forsok: [forsok] };
   } catch (err) {
     forsok.utfall = String((err && err.message) || err).slice(0, 80);
@@ -238,11 +245,6 @@ function feilSvar(r) {
   return svar({ feil: "Fikk ikke svar fra lageret. Prøv igjen om litt.", forsok: r.forsok }, 502);
 }
 
-function kortMelding(json) {
-  if (!json) return "";
-  const tekst = json.message || json.error_description || json.msg || json.error || "";
-  return String(tekst).slice(0, 120);
-}
 
 function manglerIOppsettet() {
   const mangler = [];

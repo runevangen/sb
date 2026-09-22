@@ -1315,6 +1315,44 @@ ok("en avvist fornyer svarer 401 og sier at du er logget ut",
 ok("og ber deg logge inn framfor a prove igjen",
    avvist.feil.indexOf("Logg inn") > -1, avvist.feil);
 
+/* ---- en 522 fra kanten foran Supabase (22. september 2026) ---- */
+
+// Meldt fra appen: «Innloggingen svarte ikke. Prov igjen om litt. (svarte
+// 522: {"type":"https://developers.cloudflare.com/support/troubleshoot…»
+// — kappet midt i en streng. Det var Cloudflare som ikke fikk svar fra
+// Supabase bak seg; kroppen er en konvolutt, ikke ord, og den leses som
+// at noe knakk hos oss.
+//
+// Hele veien males her, ikke bare den rene funksjonen: det var HER den
+// havnet i ansiktet pa leseren.
+const CF_KROPP = {
+  type: "https://developers.cloudflare.com/support/troubleshooting/"
+      + "http-status-codes/cloudflare-5xx-errors/error-522/",
+  title: "Connection timed out",
+  status: 522,
+};
+kall = stubSupabase(CF_KROPP, 522);
+r = await konto(kontoBe({ handling: "logg-inn", navn: "Ola", pin: "1234" }));
+const cf = await r.json();
+ok("en 522 gir 502 og ber deg prove igjen",
+   r.status === 502 && cf.feil.indexOf("Prøv igjen") > -1,
+   r.status + " " + cf.feil);
+// Det som faktisk var feil: konvolutten fulgte med ut til leseren.
+const cfSist = (cf.forsok || []).filter(Boolean).pop();
+ok("og konvolutten blir IKKE med som melding",
+   !!cfSist && !cfSist.melding, JSON.stringify(cfSist));
+ok("men statusen star der, for det er tallet du kan melde videre",
+   !!cfSist && cfSist.status === 522, JSON.stringify(cfSist));
+// Og den kastes ikke: uten dette byttet vi stoy mot blindhet.
+ok("og kroppen blir med for diagnose, i sitt eget felt",
+   !!cfSist && String(cfSist.kropp).indexOf("cloudflare") > -1,
+   JSON.stringify(cfSist));
+// Ingen av delene ma dra adressen eller nokkelen med seg.
+ok("og verken nokkelen eller adressen vi lager av navnet star der",
+   JSON.stringify(cf).indexOf(SUPA_NOKKEL) === -1 &&
+   JSON.stringify(cf).indexOf("pin.mvp-sb.netlify.app") === -1,
+   JSON.stringify(cf).slice(0, 120));
+
 // Uten fornyer rores ikke tjenesten i det hele tatt.
 kall = stubSupabase(OKT);
 r = await konto(kontoBe({ handling: "forny", navn: "Ola" }));
