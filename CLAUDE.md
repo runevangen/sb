@@ -308,6 +308,27 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   «Oslo». Kortet tegnes i det posisjonen spørres om, så de første radene
   står der før svaret finnes. Byen er det eneste vi kan stå inne for uten å
   vite hvor leseren er, og den koster ingen tillatelsesboks.
+- **Veien dit er en lenke ut, ikke et kart inni.** #144 ba om «kart med
+  pubene og vei til stadion». Et innebygd kart ville vært prosjektets
+  første tredjepartsskript i `index.html` — vi har ikke byggesteg — og
+  verre: en fliseserver ville sett IP-en og kartutsnittet til **hver**
+  leser som åpner et kampkort. Det er sporing i alt annet enn navn, og
+  [ADR 0004](docs/adr/0004-ingen-statistikk.md) sier nei. Telefonen har
+  dessuten et bedre kart: spørsmålet bak raden er «hvordan kommer jeg
+  dit», og det svarer kartappen på med sving for sving.
+  **Bare destinasjonen står i adressen.** Uten `origin` regner kartappen
+  fra telefonens egen posisjon, som leseren alt har gitt den — så vi
+  sender ingenting om hvor hen er. Det er hele forskjellen på en lenke og
+  et innebygd kart, og den skal ikke ryke.
+  **Punktet, ikke navnet:** «Bernie's» kan være et annet sted hos Google
+  enn hos oss. Og `kartLenke()` avviser **`null`, `undefined`, tom streng
+  og `false`** — `Number(null)` er 0, og 0 er et gyldig koordinat, så en
+  rad uten `lat` ville fått en lenke til Guineabukta.
+  **Stadionraden slår opp punktet sitt i `ARENAER` når lenka lages**, og
+  aldri i `stedKilder`. Et koordinat på raden ville gitt arenaen en
+  avstand, og da kunne `naerNok()` filtrert bort hvor kampen spilles — på
+  hver eneste bortekamp. Målt med en sabotasje: den felte tre tester, to av
+  dem eldre enn fiksen.
 - **Kortet rangerer etter hvor du står *nå*, og andre byer er veien
   utenom.** For en kamp i kveld er «nå» og «ved avspark» det samme. For en
   kamp om tre dager er det en gjetning, og for den som reiser feil

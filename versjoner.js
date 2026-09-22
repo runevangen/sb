@@ -27,6 +27,7 @@ export const VERSJONER = [
   {
     versjon: "2026.09.22",
     endringer: [
+      { hva: "Hver pub og hvert stadion har fått «Veien dit» — én trykk inn i kartet på telefonen, med sving for sving.", issue: 144 },
       { hva: "Feilmeldinger viser tjenestens egne ord, ikke maskinkonvolutten bak dem. En innlogging som svikter sier «svarte 522» framfor å lime inn en halv JSON-blokk." },
       { hva: "Portalen har fått denne lista, og sier hvilken utrulling du faktisk ser på — hentet fra et stempel som settes ved utrulling, ikke fra et kall som svarte tomt." },
     ],

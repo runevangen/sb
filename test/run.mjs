@@ -2185,6 +2185,27 @@ const SAK_14 = kjor("pub-feil", FELLES + FOTBALL + `
          forslag.querySelector(".sted-rad-kort") ? forslag.querySelector(".sted-rad-kort").innerHTML.slice(0, 160) : "ingen rad");
       ok("naermest star forst",
          chips[0].textContent.indexOf("O'Learys Oslo Sentralstasjon") > -1, chips[0].textContent);
+
+      // Stadionraden. Leseren staar ved Oslo S, kampen gaar i Bergen —
+      // og raden SKAL staa der likevel: hvor kampen spilles er en
+      // opplysning, ikke et soek.
+      //
+      // Det er ogsaa vakta mot fiksen for «vei til stadion». Foerste
+      // utkast la «lat»/«lon» paa stadionraden i «stedKilder» for aa faa
+      // et punkt aa lenke til — og da ville «naerNok()» filtrert bort
+      // arenaen paa hver eneste bortekamp. Punktet slaas derfor opp i
+      // ARENAER naar lenka lages, og naar aldri raddataene.
+      var stadion = Array.prototype.find.call(chips, function (c) {
+        return c.querySelector(".sted-navn") &&
+               c.querySelector(".sted-navn").textContent === "Brann Stadion"; });
+      ok("stadionraden staar der selv om kampen er i en annen by", !!stadion,
+         Array.prototype.map.call(chips, function (c) { return c.textContent; }).join(" | ").slice(0, 200));
+      // Brann Stadion: 60.365, 5.357 i ARENAER. «Vei til stadion» var
+      // halve bestillingen i #144.
+      var stadionVei = stadion && stadion.querySelector(".sted-kart");
+      ok("og veien dit er slaatt opp i ARENAER",
+         !!stadionVei && stadionVei.getAttribute("href").indexOf("60.365%2C5.357") > -1,
+         stadionVei ? stadionVei.getAttribute("href") : "ingen lenke");
       ok("svikter funksjonen, star det hvorfor",
          forslag.textContent.indexOf("Fikk ikke puber ved Brann Stadion") > -1, forslag.textContent);
       // Hvem som sviktet, sa det kan meldes videre uten a grave i logger.
@@ -5501,6 +5522,31 @@ const SAK_16C = kjor("bekreftet-langt-unna", FELLES + FOTBALL + `
          bernies.querySelector(".sted-avstand").textContent.indexOf("km") > -1,
          bernies && bernies.querySelector(".sted-avstand")
            ? bernies.querySelector(".sted-avstand").textContent : "ingen avstand");
+
+      // #144 ba om kart. Det ble en lenke inn i telefonens eget kart:
+      // et innebygd kart ville vaert foerste tredjepartsskript, og en
+      // fliseserver ville sett IP og utsnitt for hver leser.
+      var vei = bernies && bernies.querySelector(".sted-kart");
+      ok("og veien dit staar paa raden", !!vei,
+         bernies ? bernies.innerHTML.slice(0, 200) : "ingen rad");
+      // Bernie's staar paa Gronland: 59.9095, 10.7690. At det er STEDETS
+      // punkt og ikke et hvilket som helst, er hele forskjellen paa en
+      // lenke som virker og en som sender deg et annet sted.
+      ok("med stedets eget punkt i adressen",
+         !!vei && vei.getAttribute("href").indexOf("59.9095%2C10.769") > -1,
+         vei ? vei.getAttribute("href") : "ingen lenke");
+      // **Og aldri hvor LESEREN staar.** Kartappen regner fra telefonens
+      // egen posisjon, som leseren alt har gitt den. Sto «origin» i
+      // adressen, sendte vi fra oss noe vi ikke trenger aa sende.
+      ok("og ikke hvor leseren staar",
+         !!vei && vei.getAttribute("href").indexOf("origin") === -1,
+         vei ? vei.getAttribute("href") : "ingen lenke");
+      // En ekte <a>, ikke en knapp: langtrykk gir «Kopier lenke», som for
+      // sakene. Og SOESKEN av «Jeg skal hit» — en knapp i en knapp finnes
+      // ikke.
+      ok("den er en lenke, ikke en knapp i en knapp",
+         !!vei && vei.tagName === "A" && !vei.closest("button"),
+         vei ? vei.tagName + " i " + (vei.closest("button") ? "knapp" : "rad") : "ingen");
       ferdig();
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700); });

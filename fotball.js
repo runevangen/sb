@@ -18,7 +18,7 @@ import { overpassSporring, tolkPuber, rundPosisjon, avstandtekst,
          rangerForslag, FORSLAG_MAKS, tolkPubRader, slaSammenPuber,
          posisjonsfeil, kuraterteIByen, ligapuberAv, ligamerkeTekst,
          stampuberFor, falskPosisjon, avstandM, byFor, BYER,
-         sorterForslag, ANDRE_MAKS, NAER_MAKS, merkAntatte }
+         sorterForslag, ANDRE_MAKS, NAER_MAKS, merkAntatte, kartLenke }
   from "./pub-data.js";
 import { KURATERTE } from "./puber.js";
 import { sjekkForslag, alleredeILista, NAVN_MAKS, ADRESSE_MAKS, MERKNAD_MAKS }
@@ -1343,10 +1343,40 @@ function stedRad(kamp, panel, sted, form) {
   // vet, og da maa raden i det minste si Oslo.
   const by = byenTil(sted) || (sted.bydel ? String(sted.bydel) : "");
   const km = Number.isFinite(sted.avstand) ? avstandtekst(sted.avstand) : "";
-  if (by || km || sted.bekreftet || sted.antatt) {
+
+  // Veien dit, for et sted vi kjenner punktet til.
+  //
+  // **Stadionraden slås opp HER, ikke i `stedKilder`.** Å legge `lat`/`lon`
+  // på raden der ville gitt arenaen en avstand — og da kunne `naerNok()`
+  // filtrert bort hvor kampen spilles, for en bortekamp er langt unna per
+  // definisjon. Regelen står: stadionraden blir stående, for hvor kampen
+  // spilles er en opplysning, ikke et søk. Punktet brukes bare til å lage
+  // en adresse, og når derfor aldri raddataene.
+  const punkt = sted.stadion ? (arenaFor(sted.navn) || {}) : sted;
+  const kart = kartLenke(punkt.lat, punkt.lon);
+
+  if (by || km || kart || sted.bekreftet || sted.antatt) {
     const hvor = el("div", "sted-rad-hvor");
     if (by) hvor.appendChild(el("span", "sted-by", by));
     if (km) hvor.appendChild(el("span", "sted-avstand", km));
+    // En ekte `<a>`, ikke en knapp: langtrykk gir «Kopier lenke» og
+    // «Åpne i ny fane», som for sakene. Og den er SØSKEN av
+    // «Jeg skal hit»-knappen, aldri inni den — en knapp i en knapp finnes
+    // ikke.
+    if (kart) {
+      const vei = el("a", "sted-kart", "Veien dit");
+      vei.href = kart;
+      vei.target = "_blank";
+      // `noopener` fordi lenka åpner et fremmed nettsted: uten den får
+      // den sida en peker tilbake til vinduet vårt.
+      vei.rel = "noopener noreferrer";
+      vei.title = "Åpner kartet på telefonen.";
+      vei.setAttribute("aria-label", "Veien til " + sted.navn);
+      // Raden har sitt eget trykk — «Jeg skal hit». Lenka er et annet
+      // spørsmål, og må ikke også melde deg på.
+      vei.addEventListener("click", (e) => e.stopPropagation());
+      hvor.appendChild(vei);
+    }
     // «(bekreftet visning)» ved siden av stjerna. Merket alene er en
     // konvensjon du maa laere; ordene er ikke.
     if (sted.bekreftet) {

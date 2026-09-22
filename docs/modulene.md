@@ -117,6 +117,24 @@ sted. [ADR 0006](adr/0006-sportsdata-via-funksjon.md),
 
 ### `pub-data.js` — stedene rundt kampen
 
+- **`kartLenke(lat, lon)` — veien dit, som en lenke ut.** #144 ba om et
+  kart i appen. Det ble en adresse inn i telefonens eget kart: et innebygd
+  kart er første tredjepartsskript **og** en fliseserver som ser IP og
+  utsnitt for hver leser som åpner et kampkort.
+  **Bare destinasjonen, aldri leserens punkt** — uten `origin` regner
+  kartappen fra telefonens egen posisjon, som leseren alt har gitt den.
+  **Koordinatet, ikke navnet**, for et navn må slås opp hos leverandøren
+  og kan lande et annet sted. Google og ikke Apple, fordi
+  `maps.apple.com` er en blindvei på Android mens denne adressen åpner
+  kartappen begge steder og faller tilbake til en nettside ellers — én
+  lenke, én oppførsel, framfor å lese nettleserens navn og velge.
+  **`null` er ikke null grader:** `Number(null)` er 0, og 0 er et gyldig
+  koordinat, så `koordinattall()` slipper bare et tall eller en streng som
+  *er* et tall gjennom. Uten den vakta fikk en rad uten `lat` en lenke til
+  Guineabukta — funnet første gang funksjonen ble prøvd, ikke av at noen
+  tenkte på det. Et koordinat utenfor kloden avvises av samme grunn som
+  `rammeFor()` finnes: lat og lon byttet om.
+
 Kilden er OpenStreetMap via Overpass. Lisensen (ODbL) krever synlig
 kreditering, og den står der pubene vises.
 
