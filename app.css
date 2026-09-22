@@ -2264,6 +2264,24 @@ a.ad-cta:focus-visible {
 }
 .sted-si-fra:hover, .sted-si-fra:focus-visible { color: var(--text-body); }
 
+/* «Veien dit» — inn i telefonens eget kart.
+   Samme stoerrelse og demping som byen og avstanden ved siden av: den er
+   en opplysning paa raden, ikke et tilbud som skal konkurrere med
+   «Jeg skal hit». Understreket fordi den ER en lenke ut av appen, og det
+   skal staa.
+   `nowrap` av samme grunn som avstanden: «Veien / dit» over to linjer
+   leses som to ting. Trykkflata er hoyden paa raden, ikke bare teksten —
+   ti px hoy tekst er ikke et maal en tommel treffer. */
+.sted-kart {
+  font-size: calc(11px * var(--fs));
+  color: var(--text-dim);
+  text-decoration: underline;
+  white-space: nowrap;
+  padding: 4px 0;
+  margin: -4px 0;
+}
+.sted-kart:hover, .sted-kart:focus-visible { color: var(--text-body); }
+
 /* Pubene i andre byer. Lukket til du trykker: for en kamp i kveld er de
    ikke et svar, for en kamp om tre dager er de hele svaret. */
 .sted-andre { margin-top: 8px; }

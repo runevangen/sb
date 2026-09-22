@@ -54,6 +54,7 @@ import { overpassSporring, rundPosisjon, avstandM, avstandtekst, tolkPuber, entu
          pubNokkel, tolkPubRader, pubRadTilBase, slaSammenPuber, sjekkPubRad,
          osmNavnVask, osmNavnSporring, tolkNavnTreff, PUBTYPER, PUBSIKKERHET,
          delAdresse, osmAdresseSporring, tolkAdresseTreff, koordinatFraLenke,
+         kartLenke,
          SOK_SEKUNDER, SOK_TAK, overpassFeiltekst,
          OSLO_RAMME, rammeFor, byFor, bynavn, BY_RADIUS_KM,
          posisjonsfeil, sokKuraterte } from "../pub-data.js";
@@ -3516,6 +3517,57 @@ ok("og dokumentet viser ikke til filer som er borte",
 // ulest .gitignore slipper alt gjennom, og da maaler ikke vakta noe.
 ok("og unntaket for genererte filer fant faktisk .gitignore",
    GENERERTE.has("bygg.js"), [...GENERERTE].join(", "));
+
+/* ---------------- veien dit ---------------- */
+
+// #144 ba om «kart med pubene og vei til stadion». Det ble en LENKE inn i
+// telefonens eget kart framfor et kart i appen: et innebygd kart ville
+// vært første tredjepartsskript, og en fliseserver ville sett IP og
+// utsnitt for hver leser som åpner et kampkort.
+
+ok("et sted med punkt faar en vei dit",
+   kartLenke(63.4305, 10.3951)
+     .indexOf("destination=63.4305%2C10.3951") > -1, kartLenke(63.4305, 10.3951));
+
+// **Bare destinasjonen, aldri leserens eget punkt.** Uten `origin` regner
+// kartappen fra telefonens egen posisjon, som leseren alt har gitt
+// kartleverandoren. Sto den i adressen, hadde vi sendt fra oss hvor
+// leseren er — og det er hele forskjellen paa en lenke og et kart.
+ok("og adressen baerer ikke hvor leseren staar",
+   kartLenke(63.4305, 10.3951).indexOf("origin") === -1,
+   kartLenke(63.4305, 10.3951));
+
+// Uten punkt: ingen lenke. Samme regel som avstanden, som bare staar paa
+// raden der vi kjenner den.
+ok("uten koordinat blir det ingen lenke",
+   kartLenke(undefined, undefined) === "" && kartLenke(null, null) === "");
+
+// **Og et felt som mangler er ikke null grader.** `Number(null)` er 0, og
+// 0 er et gyldig koordinat — saa en rad uten `lat` ville faatt en lenke til
+// Guineabukta. Fanget da funksjonen ble proevd foerste gang, ikke av at
+// noen tenkte paa det.
+ok("en halv rad sender ingen til Guineabukta",
+   kartLenke(null, 10.39) === "" && kartLenke("", 10.39) === "" &&
+   kartLenke(false, 10.39) === "",
+   [kartLenke(null, 10.39), kartLenke("", 10.39), kartLenke(false, 10.39)].join(" | "));
+
+// Tall som streng er det basen og fila gir oss om hverandre.
+ok("men et tall skrevet som streng er et tall",
+   kartLenke("63.43", "10.39").indexOf("63.43%2C10.39") > -1,
+   kartLenke("63.43", "10.39"));
+
+// Lat og lon byttet om er den vanligste skrivefeilen — samme feil
+// `rammeFor()` finnes for. Her ville den sendt leseren til havs.
+ok("og et koordinat utenfor kloden er en skrivefeil, ikke et sted",
+   kartLenke(91, 10) === "" && kartLenke(63, 181) === "");
+
+// Stadionraden slaar opp punktet sitt i ARENAER. Vakta her er at de
+// tretti arenaene FAKTISK baerer et punkt — uten det er «vei til stadion»
+// en lenke som aldri kan lages, og det var halve bestillingen i #144.
+const utenPunkt = ARENAER.filter((a) => !kartLenke(a.lat, a.lon));
+ok("hver arena vi kjenner kan gi en vei dit",
+   ARENAER.length >= 25 && utenPunkt.length === 0,
+   "uten punkt: " + utenPunkt.map((a) => a.navn).join(", "));
 
 /* ---------------- byggestempelet ---------------- */
 

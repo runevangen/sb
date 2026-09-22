@@ -1239,6 +1239,65 @@ export function tolkAdresseTreff(json, maks) {
     .slice(0, maks || 8);
 }
 
+/* ---------- veien dit ---------- */
+
+// Adressen til telefonens eget kart, for et sted vi kjenner punktet til.
+//
+// **Hvorfor en lenke og ikke et kart.** #144 ba om «kart med pubene og
+// vei til stadion». Et innebygd kart ville vært prosjektets første
+// tredjepartsskript i `index.html` — vi har ikke noe byggesteg — og verre:
+// en fliseserver ville sett IP-en og kartutsnittet til **hver** leser som
+// åpner et kampkort. Det er sporing i alt annet enn navn, og
+// [ADR 0004](docs/adr/0004-ingen-statistikk.md) sier nei.
+//
+// Og telefonen har alt et bedre kart. Spørsmålet bak raden er «hvordan
+// kommer jeg dit», og det svarer kartappen på med sving for sving, buss
+// og gange. Et kart inne i appen gjør ikke det.
+//
+// **Bare destinasjonen står i adressen, aldri leserens punkt.** Uten
+// `origin` regner kartappen ut veien fra telefonens egen posisjon, som
+// leseren alt har gitt Google eller Apple. Vi sender altså ingenting om
+// hvor hen er — og det er hele forskjellen på en lenke og et innebygd
+// kart.
+//
+// **Koordinatet, ikke navnet.** Et navn må slås opp hos kartleverandøren,
+// og «Bernie's» kan være et annet sted hos dem enn hos oss. Punktet er
+// det vi faktisk vet.
+//
+// Google og ikke Apple: `maps.apple.com` er en blindvei på Android, mens
+// denne adressen åpner kartappen på både iPhone og Android og faller
+// tilbake til en nettside som virker overalt ellers. Én lenke, én
+// oppførsel — alternativet var å lese nettleserens navn og velge, og da
+// har vi to veier til det samme.
+//
+// Uten et punkt: tom streng. En «veien dit» som ikke vet hvor, er verre
+// enn ingen — samme regel som avstanden, som bare står på raden der vi
+// kjenner den.
+//
+// **Og et felt som mangler er ikke null grader.** `Number(null)` er 0, og
+// 0 er et gyldig koordinat — så en rad uten `lat` ville fått en lenke til
+// Guineabukta, der null møter null. Det samme gjelder `undefined`, tom
+// streng og `false`. Derfor slipper bare et tall eller en streng som ER
+// et tall gjennom; alt annet er et felt som ikke er fylt ut.
+function koordinattall(v) {
+  if (typeof v === "number") return v;
+  if (typeof v !== "string") return NaN;
+  const t = v.trim();
+  return t ? Number(t) : NaN;
+}
+
+export function kartLenke(lat, lon) {
+  const la = koordinattall(lat);
+  const lo = koordinattall(lon);
+  if (!Number.isFinite(la) || !Number.isFinite(lo)) return "";
+  // Utenfor kloden er det en skrivefeil, ikke et sted. Samme vakt som
+  // rammene i `rammeFor()`, av samme grunn: lat og lon byttet om er den
+  // vanligste feilen, og her ville den sendt leseren til havs.
+  if (la < -90 || la > 90 || lo < -180 || lo > 180) return "";
+  return "https://www.google.com/maps/dir/?api=1&destination=" +
+    encodeURIComponent(la + "," + lo);
+}
+
 /* ---------- koordinat fra en kartlenke ---------- */
 
 // Siste utvei, og den eneste som ikke trenger at OpenStreetMap svarer:
