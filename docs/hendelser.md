@@ -151,6 +151,60 @@ måle portalen, ikke dagens tilstand.
 
 ---
 
+## 22. september 2026 — Cloudflares ord i leserens ansikt
+
+**Meldt av Rune:** *«Innloggingen svarte ikke. Prøv igjen om litt. (svarte
+522: {"type":"https://developers.cloudflare.com/support/troubleshooting/
+http-status-codes/cloudflare-5xx-errors/error-522/",»*
+
+Kappet midt i en streng.
+
+**Hva som egentlig skjedde.** En 522 betyr at Cloudflare ikke fikk svar
+fra tjeneren bak seg. Innloggingen går mot Supabase, og Supabase ligger bak
+Cloudflare — så Supabase svarte ikke. Ingenting av det er vår kode, og
+«prøv igjen om litt» var riktig råd.
+
+**Hva som var vår feil.** Meldinga. `iKontolista` hadde en reservevei som
+limte hele svarkroppen inn i det leseren ser:
+
+```js
+const melding = kortMelding(json) || tekst.slice(0, 120);
+```
+
+Regelen «feilmeldinger bærer tjenestens egne ord» var skrevet om Supabase,
+som sier «Invalid login credentials». Den gjaldt aldri en
+*maskinkonvolutt*. En dokumentasjons-URL i problem+json er ikke ord — og
+kappet på 120 tegn leses den som at noe knakk hos oss. «Svarte 522» alene
+sier mer, og tallet kan meldes videre.
+
+**Og da vi så etter, sto det sju steder.** Alle funksjonene som snakker
+med Supabase gjennom PostgREST hadde den samme linja.
+
+**Det som gjorde dette verdt mer enn en fiks:** `kortMelding` sto som
+**seks kopier, og de hadde alt glidd.** `brukere` og `konto` leste
+`error_description` først; `pub-forslag`, `pub-liste`, `svar` og
+`visninger` leste `message` først. På en kropp med begge feltene ville de
+to sagt ulike ting om det samme svaret. Ingen hadde merket det, fordi
+ingen kropp hadde begge — ennå.
+
+De to veiene inn til Supabase i `konto.mjs` var også ulike: `hosSupabase`
+leste `respons.json()`, `iKontolista` leste `respons.text()`. Bare den ene
+hadde en kropp å legge til side.
+
+**Hva som kom ut av det.** `tjeneste-data.js`, med ett sett regler:
+tjenestens egne ord når vi kjenner feltet; ingenting når kroppen er en
+konvolutt fra noe mellom oss og tjenesten. Kroppen kastes ikke — den
+flyttes til `forsok.kropp`, så en feil fortsatt kan diagnostiseres fra
+nettleseren. Uten det skillet hadde vi byttet støy mot blindhet.
+
+**Og en felle i sabotasjen.** Den fjernet `forsok.kropp` fra *første*
+treff i `konto.mjs` — som ligger i `slettKonto`, ikke i innloggingen. Den
+ble brukt, men på en annen linje enn testen vokter, og det så ut som
+«ingenting falt». **En sabotasje må treffe linja testen beskytter**, ikke
+bare fila.
+
+---
+
 ## 21. september 2026 — knappen ble bygget, merget, og var uråkelig
 
 **Meldt som:** «hvor er det mulig å sette unntak for en pub?»

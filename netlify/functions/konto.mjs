@@ -30,6 +30,8 @@
 import { tolkPinOkt, normaliserPinNavn, gyldigPinNavn, normaliserPin, gyldigPin,
          pinEpost, pinSlug, pinPassord, PIN_MIN, PIN_MAKS } from "../../pin-data.js";
 
+import { tjenestensOrd, diagnosekropp }
+  from "../../tjeneste-data.js";
 // Supabase Auth har med vilje ingen «finnes denne?»-vei utenfra, og vi
 // har ingen service_role-nokkel til admin-veien. Derfor en liten tabell
 // med bare slugen: den sier om et fornavn er tatt, og ingenting mer.
@@ -306,8 +308,13 @@ async function slettMeg(inn) {
     const tekst = await respons.text().catch(() => "");
     let json = null;
     try { json = tekst ? JSON.parse(tekst) : null; } catch (err) { json = null; }
-    const melding = kortMelding(json) || (json && json.message) || tekst.slice(0, 120);
+    const melding = tjenestensOrd(json, tekst);
     if (melding) forsok.melding = melding;
+    // Kroppen blir med for diagnose selv naar den ikke er ord: en
+    // 522-konvolutt sier HVOR det stoppet. Den staar i `kropp`, ikke i
+    // `melding`, sa `tjenestenSa()` i appen ikke limer den inn i det
+    // leseren ser — det var nettopp det som skjedde 22. september 2026.
+    else forsok.kropp = diagnosekropp(tekst);
 
     if (respons.status === 401 || respons.status === 403) {
       return svar({ feil: "Økten gjelder ikke lenger. Logg inn på nytt.", forsok: [forsok] }, 401);
@@ -354,9 +361,16 @@ async function hosSupabase(sti, kropp) {
     });
     forsok.status = respons.status;
 
-    const json = await respons.json().catch(() => null);
-    const melding = kortMelding(json);
+    // Leses som TEKST og parses her, som `iKontolista`. Den sto med
+    // `respons.json()` til 22. september 2026, og da fantes ingen kropp aa
+    // legge i `forsok` naar svaret ikke var ord — de to veiene inn til
+    // Supabase gjorde ulike ting med det samme problemet.
+    const tekst = await respons.text().catch(() => "");
+    let json = null;
+    try { json = tekst ? JSON.parse(tekst) : null; } catch (err) { json = null; }
+    const melding = tjenestensOrd(json, tekst);
     if (melding) forsok.melding = melding;
+    else forsok.kropp = diagnosekropp(tekst);
     return { ok: respons.ok, status: respons.status, json, melding, forsok: [forsok] };
   } catch (err) {
     forsok.utfall = String((err && err.message) || err).slice(0, 80);
@@ -387,8 +401,13 @@ async function iKontolista(metode, hale, kropp, token) {
     const tekst = await respons.text().catch(() => "");
     let json = null;
     try { json = tekst ? JSON.parse(tekst) : null; } catch (err) { json = null; }
-    const melding = kortMelding(json) || tekst.slice(0, 120);
+    const melding = tjenestensOrd(json, tekst);
     if (melding) forsok.melding = melding;
+    // Kroppen blir med for diagnose selv naar den ikke er ord: en
+    // 522-konvolutt sier HVOR det stoppet. Den staar i `kropp`, ikke i
+    // `melding`, sa `tjenestenSa()` i appen ikke limer den inn i det
+    // leseren ser — det var nettopp det som skjedde 22. september 2026.
+    else forsok.kropp = diagnosekropp(tekst);
     return { ok: respons.ok, status: respons.status, json, melding, forsok: [forsok] };
   } catch (err) {
     forsok.utfall = String((err && err.message) || err).slice(0, 80);
@@ -414,11 +433,6 @@ function listeFeil(r) {
 }
 
 // Supabase legger feilen i ulike felt etter hvilket endepunkt det er.
-function kortMelding(json) {
-  if (!json) return "";
-  const tekst = json.error_description || json.msg || json.message || json.error || "";
-  return String(tekst).slice(0, 120);
-}
 
 /* ---------- oppsett ---------- */
 
