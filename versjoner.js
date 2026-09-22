@@ -24,6 +24,13 @@
 // Nyeste først.
 export const VERSJONER = [
   {
+    versjon: "2026.09.22",
+    endringer: [
+      { hva: "Feilmeldinger viser tjenestens egne ord, ikke maskinkonvolutten bak dem. En innlogging som svikter sier «svarte 522» framfor å lime inn en halv JSON-blokk." },
+      { hva: "Portalen har fått denne lista, og sier hvilken utrulling du faktisk ser på." },
+    ],
+  },
+  {
     versjon: "2026.09.21",
     endringer: [
       { hva: "Saker er ekte lenker: langtrykk gir «Kopier lenke», og en sak kan deles med adressen på nettstedet eller med app-adressen.", issue: 146 },

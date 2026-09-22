@@ -5198,10 +5198,19 @@ const SAK_15G = kjor("admin-seksjoner", `
          !!vIssue && vIssue.tagName === "A" &&
          vIssue.getAttribute("href").indexOf("/issues/") > -1,
          vIssue ? vIssue.getAttribute("href") : "fant ingen");
-      ok("og det ser ut som et issue-nummer",
-         !!vIssue && vIssue.textContent.charAt(0) === "#" &&
-         erTall(vIssue.textContent.slice(1)),
-         vIssue ? vIssue.textContent : "");
+      // ALLE, ikke bare den forste. En oppforing uten issue er lov — de to
+      // forste fra 22. september 2026 har ingen, fordi de kom fra en
+      // samtale og ikke fra en sak — men da skal det staa INGEN lenke,
+      // ikke en som sier «#undefined».
+      var issueFeil = [];
+      Array.prototype.forEach.call(
+        felt("versjonListe").querySelectorAll(".versjon-issue"), function (a) {
+          var t = a.textContent;
+          if (t.charAt(0) !== "#" || !erTall(t.slice(1))) issueFeil.push(t);
+          if (a.getAttribute("href").indexOf("/issues/") === -1) issueFeil.push(t + " uten sti");
+        });
+      ok("og hvert issue-nummer ser ut som et issue-nummer",
+         !!vIssue && issueFeil.length === 0, issueFeil.join(", ") || "ingen");
       ok("og panelene folger hodene sine",
          felt("kampKropp").hidden === true && felt("stedKropp").hidden === true &&
          felt("brukerKropp").hidden === true && felt("verktoyKropp").hidden === true,
