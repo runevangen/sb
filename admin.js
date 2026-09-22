@@ -337,28 +337,52 @@ function tegnVersjon() {
   hentKjorer();
 }
 
+// **Stempelet leses fra en fil, ikke fra en funksjon.** Forste utgave lot
+// `/api/brukere` lese `process.env.COMMIT_REF`. Den svarte `null` hver
+// gang, og portalen sa aerlig fra: «Byggemiljoet oppgir ingen commit».
+// Grunnen var at Netlifys lese-variabler finnes i **byggemiljoet**, ikke i
+// funksjonenes kjoretid — en antagelse jeg hadde testet begge utfall av,
+// men aldri selve variabelen.
+//
+// `verktoy/lag-bygg.mjs` skriver dem ned mens byggekommandoen kjorer og de
+// fortsatt finnes. Fila er generert og star i .gitignore.
+//
+// Dynamisk import, ikke `import` pa toppen: lokalt finnes ikke fila, og en
+// manglende import ville veltet hele portalen framfor bare denne linja.
 async function hentKjorer() {
   const linje = felt("versjonKjorer");
   if (!linje) return;
+  let stempel = null;
   try {
-    const d = await brukerKall({ handling: "versjon" });
-    const biter = [];
-    // **Kontekst forst.** «deploy-preview» er svaret paa «hvorfor ser jeg
-    // noe annet enn de andre», og det er det viktigste av de tre.
-    if (d.kontekst && d.kontekst !== "production") {
-      biter.push("Dette er en forhandsvisning (" + d.kontekst + ")");
-    }
-    if (d.commit) biter.push("Bygget fra " + String(d.commit).slice(0, 7));
-    if (d.gren && d.gren !== "main") biter.push("gren " + d.gren);
-    // Uten svar sier linja det, framfor a staa tom og se ut som om alt er
-    // som det skal. Variablene settes av Netlify ved bygging; kjorer
-    // funksjonen et annet sted, finnes de ikke.
-    linje.textContent = biter.length ? biter.join(" · ")
-      : "Byggemiljoet oppgir ingen commit — lista under sier hva som sto i"
-        + " fila, ikke hvilken utrulling du ser paa.";
+    stempel = (await import("/bygg.js")).BYGG;
   } catch (err) {
-    linje.textContent = "Fikk ikke vite hvilken utrulling dette er: " + err.message;
+    linje.textContent = "Ingen byggestempel — dette er ikke en Netlify-utrulling,"
+      + " eller stemplingen feilet. Lista under sier hva som sto i fila.";
+    return;
   }
+  const biter = [];
+  // **Kontekst forst.** «deploy-preview» er svaret paa «hvorfor ser jeg
+  // noe annet enn de andre», og det er det viktigste av de tre.
+  if (stempel.kontekst && stempel.kontekst !== "production") {
+    biter.push("Dette er en forhandsvisning (" + stempel.kontekst + ")");
+  }
+  if (stempel.commit) biter.push("Bygget fra " + String(stempel.commit).slice(0, 7));
+  if (stempel.gren && stempel.gren !== "main") biter.push("gren " + stempel.gren);
+  if (stempel.tid) biter.push(byggTid(stempel.tid));
+  // Et stempel uten commit er et stempel som ikke svarte. Da sier linja
+  // det framfor a staa tom og se ut som om alt er som det skal.
+  linje.textContent = biter.length ? biter.join(" · ")
+    : "Byggestempelet er tomt — lista under sier hva som sto i fila, ikke"
+      + " hvilken utrulling du ser paa.";
+}
+
+// Tidspunktet leses av et menneske, ikke av en maskin: en ISO-streng
+// svarer ikke paa «er dette fra i dag».
+function byggTid(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  return "rullet ut " + d.toLocaleString("nb-NO",
+    { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 /* ---------- sonden mot TheSportsDB ---------- */

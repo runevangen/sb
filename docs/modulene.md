@@ -448,8 +448,9 @@ portalen — en leser har ingen nytte av den.
   historikken, ellers drukner det som betyr noe.
 - **Den sier ingenting om hva som faktisk kjører.** Fila vet bare hva som
   sto i den da den ble bygget. Spørsmålet «ser jeg på det nyeste?»
-  besvares av `COMMIT_REF`, som portalen henter ved siden av lista — sto
-  bare fila der, kunne den si 21. september over en app bygget den 12.
+  besvares av `bygg.js`, som `verktoy/lag-bygg.mjs` stempler inn ved
+  utrulling og portalen viser ved siden av lista — sto bare fila der,
+  kunne den si 21. september over en app bygget den 12.
 - **Og den er ikke hemmelig.** Portalen krever passord, men fila serveres
   som all annen JS, og repoet er offentlig. Låsen gjør den vanskelig å
   snuble over, ikke umulig å finne.
@@ -908,7 +909,29 @@ Se [`nokler-og-tokens.md`](nokler-og-tokens.md).
 ## Verktøyene
 
 `verktoy/` kjøres for hånd, ikke av CI. De trenger nett og svarer på
-spørsmål kode ikke kan svare på alene.
+spørsmål kode ikke kan svare på alene. **Med ett unntak:**
+`lag-bygg.mjs` kjøres av byggekommandoen og trenger ikke nett.
+
+- **`lag-bygg.mjs`** — skriver `bygg.js` ved utrulling: hvilken commit,
+  hvilken gren, hvilken kontekst, og når. Den er ikke diagnostikk, og det
+  er derfor den står først her framfor blant de andre.
+  **Den må kjøre ved bygging, ikke ved kall.** Første utgave lot
+  `/api/brukere` lese `process.env.COMMIT_REF` når portalen spurte.
+  Funksjonen svarte `null` hver gang, og portalen sa ærlig fra:
+  «Byggemiljøet oppgir ingen commit». Netlifys lese-variabler —
+  `COMMIT_REF`, `BRANCH`, `CONTEXT`, `DEPLOY_ID` — finnes i
+  **byggemiljøet**, ikke i funksjonenes kjøretid. Antagelsen var testet
+  begge veier og aldri målt.
+  **`bygg.js` er generert og står i `.gitignore`.** Den finnes ikke
+  lokalt, og `admin.js` henter den med en *dynamisk* import i try/catch:
+  en manglende import på toppnivå ville veltet hele portalen framfor bare
+  denne linja.
+  **Den står sist i byggekommandoen**, etter `unit.mjs` og `funksjon.mjs`:
+  feiler portene, publiseres ingenting, og da er det heller ingenting å
+  stemple.
+  **Ingenting i den er hemmelig.** En commit-sha står i git-historikken,
+  og repoet er offentlig. Fila serveres som all annen JS; portalens
+  passord gjør den vanskelig å snuble over, ikke umulig å finne.
 
 - **`kanalsjekk.mjs`** — henter neste runde og setter på hva `kanaler.js`
   påstår, som en liste et menneske fyller ut fra programoversikten. Er

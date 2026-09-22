@@ -1734,50 +1734,19 @@ r = await brukere(brukerBe({ passord: "riktig-passord", handling: "pin",
 ok("og ny PIN ogsa", r.status === 401, r.status);
 ok("ingen PIN blir satt", kall.length === 0, kall.length);
 
-/* ---- versjonen: hva som faktisk kjorer ---- */
-
-// Portalen viser to ting ved siden av hverandre: lista i versjoner.js, som
-// sier HVA som endret seg, og commit-en, som sier om du ser paa det
-// nyeste. Denne handlingen svarer paa det siste.
-
+// Handlingen «versjon» sto her til 22. september 2026. Den leste
+// process.env.COMMIT_REF og svarte null hver gang: Netlifys lese-variabler
+// finnes i BYGGEMILJOET, ikke i funksjonenes kjoretid. Et last endepunkt
+// som svarer fire null er verre enn ingen, sa den er ute.
+//
+// Stemplingen skjer na ved bygging (verktoy/lag-bygg.mjs), og males i
+// unit.mjs og run.mjs. Det som HER er verdt aa holde, er at en handling
+// ingen kjenner blir avvist framfor aa svare noe.
 oktSvar = OKT_OK;
-process.env.COMMIT_REF = "abc1234def5678";
-process.env.BRANCH = "main";
-process.env.CONTEXT = "production";
 kall = stubSupabase([]);
 r = await brukere(brukerBe({ passord: "riktig-passord", handling: "versjon" }));
-let kjorer = await r.json();
-ok("versjonen svarer 200", r.status === 200, r.status);
-ok("og baerer commit-en byggemiljoet oppgir", kjorer.commit === "abc1234def5678", v.commit);
-ok("og konteksten, sa en forhandsvisning kan skilles fra prod",
-   kjorer.kontekst === "production", kjorer.kontekst);
-// Den rorer ikke Supabase: dette er fire miljovariabler, ikke data.
-ok("og tjenesten rores ikke — det er bare miljoet", kall.length === 0, kall.length);
-
-// Bak BEGGE lasene, som resten av POST-veiene. Den er ikke hemmelig —
-// repoet er offentlig — men admin er den eneste som skal snuble over den.
-kall = stubSupabase([]);
-r = await brukere(brukerBe({ passord: "feil", handling: "versjon" }));
-ok("feil passord gir ingen versjon", r.status === 401, r.status);
-r = await brukere(brukerBe({ passord: "riktig-passord", handling: "versjon", token: null }));
-ok("og passordet alene holder ikke", r.status === 401, r.status);
-
-// Og uten variablene: `null`, ikke en tom streng som ser ut som en verdi.
-// Netlify setter dem ved bygging; kjorer funksjonen et annet sted, finnes
-// de ikke — og da skal svaret si det framfor a paasta noe.
-delete process.env.COMMIT_REF;
-delete process.env.BRANCH;
-delete process.env.CONTEXT;
-delete process.env.DEPLOY_ID;
-kall = stubSupabase([]);
-r = await brukere(brukerBe({ passord: "riktig-passord", handling: "versjon" }));
-kjorer = await r.json();
-ok("uten byggemiljo svarer den fortsatt", r.status === 200, r.status);
-ok("men commit er null, ikke en tom streng", kjorer.commit === null, JSON.stringify(kjorer.commit));
-ok("og konteksten likesa", kjorer.kontekst === null, JSON.stringify(kjorer.kontekst));
-
-process.env.COMMIT_REF = "abc1234def5678";
-process.env.CONTEXT = "production";
+ok("en handling som er tatt ut, avvises", r.status === 400, r.status);
+ok("og tjenesten rores ikke", kall.length === 0, kall.length);
 
 // Oktoppslaget gar med ANON-nokkelen, ikke service_role. Sporsmalet er
 // «hvem er denne okta», og det skal besvares med leserens egen fullmakt:

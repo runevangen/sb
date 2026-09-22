@@ -49,6 +49,8 @@ modul for modul.
                     konvolutt. Delt av alle funksjonene.
     versjoner.js    hva som endret seg og hvilken sak det svarte på
                     — vises bare i portalen
+    bygg.js         hvilken utrulling dette ER — generert av
+                    verktoy/lag-bygg.mjs, i .gitignore, finnes ikke lokalt
     konto-data.js / pin-data.js / netlify/functions/konto.mjs
     svar-data.js / netlify/functions/svar.mjs
     visning-data.js / netlify/functions/visninger.mjs
@@ -56,6 +58,7 @@ modul for modul.
 
     verktoy/        diagnostikk som kjores for hand, ikke av CI
                     kanalsjekk.mjs: neste runde mot det kanaler.js pastar
+                    lag-bygg.mjs: unntaket — kjores av byggekommandoen
 
     personvern.html hva vi lagrer, og hvordan du blir kvitt det
     bilder/         annonsebilder, ett ferdig utsnitt per form
@@ -752,7 +755,7 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   har lenger. `klar` skiller «ingen rettelser» fra «tjenesten svarte ikke».
 - **Versjonen er to halvdeler, og de svarer på hvert sitt spørsmål.**
   `versjoner.js` sier **hva** som endret seg og hvilken sak det svarte på;
-  `COMMIT_REF` fra Netlifys byggemiljø sier **om du ser på det nyeste**.
+  `bygg.js` sier **om du ser på det nyeste**.
   Sto bare lista der, kunne den si 21. september over en app bygget den
   12. — og et versjonsnummer som kan ta feil er verre enn ingen. Commit-en
   er det eneste som kan svare på «ble endringen min faktisk rullet ut?»,
@@ -760,12 +763,24 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   **Nummeret er datoen**, `ÅÅÅÅ.MM.DD`, med én oppføring per dag og flere
   linjer under: et semantisk nummer krever skjønn hver gang, og
   `2026.09.21-2` ville latt nummeret telle utrullinger framfor å si når.
-  **Mangler variabelen, sier linja det** framfor å stå tom og se ut som om
+  **Og stempelet lages ved bygging, ikke ved kall.** Første utgave lot
+  `/api/brukere` lese `process.env.COMMIT_REF` når portalen spurte. Den
+  svarte `null` hver gang: Netlifys lese-variabler — `COMMIT_REF`,
+  `BRANCH`, `CONTEXT`, `DEPLOY_ID` — finnes i **byggemiljøet**, ikke i
+  funksjonenes kjøretid. Funksjonstesten var grønn, for den dekket begge
+  utfall av at variabelen manglet og målte aldri om den fantes.
+  `verktoy/lag-bygg.mjs` skriver dem ned mens byggekommandoen kjører og de
+  fortsatt er der; `bygg.js` er generert, står i `.gitignore`, og hentes
+  med en **dynamisk** import i try/catch — lokalt finnes den ikke, og en
+  manglende import på toppnivå ville veltet hele portalen framfor denne
+  ene linja. Stemplingen står **sist** i byggekommandoen: feiler portene,
+  publiseres ingenting, og da er det heller ingenting å stemple.
+  **Mangler fila, sier linja det** framfor å stå tom og se ut som om
   alt er som det skal. Og `CONTEXT` først når den ikke er `production`:
   «dette er en forhåndsvisning» er svaret på «hvorfor ser jeg noe annet
   enn de andre».
   **Bak begge låsene, men ikke hemmelig.** Portalen krever passord og økt,
-  som resten av `/api/brukere`. Men fila serveres som all annen JS og
+  som resten av seksjonen. Men begge filene serveres som all annen JS og
   repoet er offentlig — låsen gjør den vanskelig å snuble over, ikke
   umulig å finne, og den forskjellen skal ikke pyntes på.
 - **Portalen leser stedene uten en økt, og skriver med den.** `stedKall()`

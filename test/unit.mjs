@@ -7,7 +7,9 @@
 // millisekunder framfor de titalls sekundene nettlesertestene bruker.
 // Alt som trenger DOM ligger i test/run.mjs.
 
-import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
          foldTekst, treffScore, rangerTreff, listeTekst } from "../lib.js";
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
@@ -3491,10 +3493,96 @@ const nevnte = new Set(Array.from(
 // `test/run.mjs`. Et bart navn slas derfor opp i mappene det kan ligge i.
 const MAPPER = ["", "docs/", "netlify/functions/", "verktoy/", "test/"];
 const finnes = (f) => MAPPER.some((m) => existsSync(new URL("../" + m + f, import.meta.url)));
-const borte = [...nevnte].filter((f) => !finnes(f));
+
+// En GENERERT fil finnes ikke lokalt, og det er ikke det samme som at den
+// er borte. `bygg.js` lages av byggekommandoen ved hver utrulling og har
+// aldri ligget i repoet — en regel om den er like gyldig for det.
+//
+// Unntaket leses ut av `.gitignore`, ikke skrevet her: en liste ved siden
+// av ville vaert enda et sted som kan ligge etter, og det er akkurat den
+// feilen resten av denne seksjonen finnes for aa hindre. Bare bare navn,
+// ikke monstre — en `*` er en regel om mange filer, og det er ikke en fil
+// noen kan vise til.
+const GITIGNORE = readFileSync(new URL("../.gitignore", import.meta.url), "utf8");
+const GENERERTE = new Set(GITIGNORE.split("\n")
+  .map((l) => l.trim())
+  .filter((l) => l && l.charAt(0) !== "#" && !/[*?\[\]/]/.test(l)));
+
+const borte = [...nevnte].filter((f) => !finnes(f) && !GENERERTE.has(f));
 
 ok("og dokumentet viser ikke til filer som er borte",
    borte.length === 0, "finnes ikke: " + borte.join(", "));
+// Uten den sjekken ville unntaket over vaert en bakdor: en tom eller
+// ulest .gitignore slipper alt gjennom, og da maaler ikke vakta noe.
+ok("og unntaket for genererte filer fant faktisk .gitignore",
+   GENERERTE.has("bygg.js"), [...GENERERTE].join(", "));
+
+/* ---------------- byggestempelet ---------------- */
+
+// `verktoy/lag-bygg.mjs` kjøres **på ekte** her, med miljøet satt, og det
+// som kom ut leses tilbake. Det er hele poenget: forrige utgave av dette
+// stempelet hadde en grønn test som dekket begge utfall av at
+// `COMMIT_REF` manglet — og aldri målte om variabelen fantes der koden
+// kjørte. En stubb kan ikke stille det spørsmålet; den er enig med feilen.
+//
+// Skriptet trenger verken nett eller nøkler, så det hører hjemme i den
+// raske suiten — som også er porten foran prod.
+const BYGG_UT = tmpdir() + "/sb-bygg-" + process.pid + ".js";
+
+function stempleMed(miljo) {
+  execFileSync(process.execPath,
+    [new URL("../verktoy/lag-bygg.mjs", import.meta.url).pathname, BYGG_UT],
+    { env: Object.assign({}, process.env, miljo), stdio: "pipe" });
+  return readFileSync(BYGG_UT, "utf8");
+}
+
+let stempel = stempleMed({
+  COMMIT_REF: "a36dea534225cd7801df92dc570dd017080ce7ed",
+  BRANCH: "main",
+  CONTEXT: "production",
+  DEPLOY_ID: "6ab1d31b",
+});
+
+ok("stempelet baerer commit-en byggemiljoet oppgir",
+   stempel.indexOf("a36dea534225cd7801df92dc570dd017080ce7ed") > -1, stempel);
+ok("og konteksten, sa en forhandsvisning kan skilles fra prod",
+   stempel.indexOf('"kontekst": "production"') > -1, stempel);
+// Netlifys navn er `COMMIT_REF` og `BRANCH`; appens er `commit` og
+// `gren`. Oversettelsen skjer HER, ett sted, framfor at portalen maa
+// kjenne Netlifys ord.
+ok("og navnene er vare egne, ikke Netlifys",
+   stempel.indexOf('"commit"') > -1 && stempel.indexOf('"gren"') > -1 &&
+   stempel.indexOf("COMMIT_REF") === -1, stempel);
+// Fila serveres til nettleseren. Ingen nokler, ingen adresser — bare de
+// fem feltene som svarer paa «ser jeg paa det nyeste?».
+ok("og ingenting annet fra miljoet blir med",
+   stempel.indexOf("PIN_PEPPER") === -1 &&
+   stempel.indexOf("riktig-passord") === -1, stempel);
+
+// Uten miljoet: `null`, ikke en tom streng som ser ut som en verdi. Og
+// `tid` staar likevel — vi vet alltid naar vi stemplet.
+stempel = stempleMed({ COMMIT_REF: "", BRANCH: "", CONTEXT: "", DEPLOY_ID: "" });
+ok("uten byggemiljo blir commit null, ikke en tom streng",
+   stempel.indexOf('"commit": null') > -1, stempel);
+ok("men tidspunktet staar likevel",
+   /"tid": "\d{4}-\d{2}-\d{2}T/.test(stempel), stempel);
+
+// **Og feltene maa vaere de portalen leser.** Dette er vakta mot at de to
+// glir fra hverandre: skrev skriptet `sha` mens `admin.js` leste `commit`,
+// ville hver eneste test vaert gronn og linja staatt tom i prod — samme
+// klasse feil som den som ble meldt 22. september 2026.
+const ADMIN_KILDE = readFileSync(new URL("../admin.js", import.meta.url), "utf8");
+// Variabelen heter `stempel` og ikke `b` nettopp for denne vaktas skyld:
+// en enkeltbokstav ville truffet hver annen `b.noe` i fila, og en vakt som
+// maaler feil ting er verre enn ingen.
+const LEST = new Set(Array.from(
+  ADMIN_KILDE.matchAll(/\bstempel\.([a-z]+)\b/g), (m) => m[1]));
+const uskrevne = [...LEST].filter((f) => stempel.indexOf('"' + f + '"') === -1);
+ok("portalen leser bare felt stempelet faktisk skriver",
+   LEST.size > 0 && uskrevne.length === 0,
+   "leser: " + [...LEST].join(", ") + " | mangler: " + uskrevne.join(", "));
+
+rmSync(BYGG_UT, { force: true });
 
 /* ---------------- rapport ---------------- */
 
