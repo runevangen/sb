@@ -160,10 +160,16 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   «Kontoen din» over «Mitt lag» var to overskrifter på rad, og den første
   kostet en rad uten å si noe du ikke visste etter å ha trykket på ditt
   eget navn. Panelets `aria-label` er fortsatt «Kontoen din».
-  **Hamburgeren gir alltid menyen**, og der står «Mitt lag →» sist i
-  linja om lagene — ikke som en fjerde knapp, som ga en footer på 308 px
-  mot taket på 300 i SAK_18. Lenka står også uten lag: fanen er der du ser
-  *hvorfor* det er tomt.
+  **Hamburgeren gir alltid menyen — og med et navn i toppfeltet har den
+  ingen konto.** «Rune», Bytt PIN, Logg ut og Slett sto der også til
+  24. september 2026: to veier til samme panel. `.har-navn` på panelet
+  skjuler dem, og settes av `kontoOkt.navn`, ikke av at du er innlogget —
+  en gammel økt fra e-postinnloggingen har ingen knapp i toppfeltet, og da
+  er menyen den eneste veien til Logg ut. Lenka «Mitt lag →» forsvant med
+  panelet: den sto bare der. **Personvern og Admin er bokser**, på én rad
+  som Del og Installer, litt lavere og i dempet tekst — de er sekundære, og
+  i full størrelse brøt «Personvern og sletting» over to linjer og ga en
+  footer på 230 px mot taket på 220 i SAK_1.
 - **Bytt PIN krever den gamle, og logger ut alle andre telefoner.** PIN-en
   er en sperre mellom folk som deler en telefon; kunne den byttes uten den
   gamle, kunne hvem som helst med telefonen ta kontoen. Den gamle prøves

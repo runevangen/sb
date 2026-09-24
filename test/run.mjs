@@ -957,15 +957,24 @@ const SAK_5 = kjor("visning", FELLES + `
       // Lenka til portalen heter det samme som sida den apner. «Hvem viser
       // kampen (admin)» beskrev en seksjon av portalen, ikke portalen.
       var adminLenke = Array.prototype.filter.call(
-        document.querySelectorAll(".admin-lenke"),
+        document.querySelectorAll(".action-lenker a"),
         function (a) { return a.getAttribute("href") === "/admin.html"; })[0];
       ok("lenka til portalen heter Admin",
          !!adminLenke && adminLenke.textContent.trim() === "Admin",
          adminLenke && adminLenke.textContent);
       // Personvern star forst: den gjelder alle som apner menyen.
       ok("og personvern star forst av de to",
-         document.querySelector(".admin-lenke").getAttribute("href") === "/personvern.html",
-         document.querySelector(".admin-lenke").getAttribute("href"));
+         document.querySelector(".action-lenker a").getAttribute("href") === "/personvern.html",
+         document.querySelector(".action-lenker a").getAttribute("href"));
+      // Bokser som de andre valgene, pa én rad — ikke understreket tekst.
+      var lenker = document.querySelectorAll(".action-lenker a");
+      ok("personvern og admin er bokser pa én rad, som resten av valgene",
+         lenker.length === 2 && lenker[0].classList.contains("action-btn") &&
+         lenker[1].classList.contains("action-btn") &&
+         Math.abs(lenker[0].getBoundingClientRect().top - lenker[1].getBoundingClientRect().top) < 2 &&
+         getComputedStyle(lenker[0]).borderTopStyle === "solid" &&
+         getComputedStyle(lenker[0]).textDecorationLine === "none",
+         lenker.length + " " + (lenker[0] && getComputedStyle(lenker[0]).textDecorationLine));
 
       // **Seksten piksler.** Safari pa iPhone zoomer inn av seg selv nar du
       // fokuserer et felt med mindre skrift, og etter den zoomen er sida
@@ -6872,14 +6881,6 @@ const SAK_18C = kjor("favoritter-og-pin", FELLES + FOTBALL + `
        !linje().hidden && linje().textContent.indexOf("Brann og Molde") > -1, linje().textContent);
     ok("og at de folger kontoen", linje().textContent.indexOf("følger kontoen") > -1,
        linje().textContent);
-    // Veien til Mitt lag star i den samme linja, ikke i raden med knappene:
-    // en fjerde knapp der gjorde bunnen av menyen 308 px mot taket pa 300.
-    var til = document.getElementById("kontoMittLag");
-    ok("linja om lagene har veien til Mitt lag",
-       !!til && til.parentNode === linje() && til.textContent === "Mitt lag →",
-       til ? til.textContent : "fant den ikke");
-    ok("og den er en knapp, ikke tekst man ma gjette er trykkbar",
-       !!til && til.tagName === "BUTTON" && til.type === "button", til && til.tagName);
 
     // Navnet apner kontosiden, ikke menyen. Til 24.09.2026 ga navnet og
     // hamburgeren det samme skjermbildet, med kontoen nederst under tjue
@@ -6899,7 +6900,6 @@ const SAK_18C = kjor("favoritter-og-pin", FELLES + FOTBALL + `
     ok("og kontoen star under kortene, med Bytt PIN",
        vises("kontoPanel") && vises("kontoByttPin") && vises("kontoUt") &&
        side.getBoundingClientRect().bottom <= document.getElementById("kontoPanel").getBoundingClientRect().top + 1);
-    ok("lenka til Mitt lag viker, for kortene star rett over den", !vises("kontoMittLag"));
 
     // En stjerne i tabellen gar til kontoen, etter et lite pust.
     var stjerner = document.querySelectorAll(".tabell .lag-stjerne");
@@ -7029,29 +7029,22 @@ const SAK_18C = kjor("favoritter-og-pin", FELLES + FOTBALL + `
            !panel.classList.contains("konto-modus") && side.hidden && vises("menuList") &&
            panel.querySelector(".menu-title").textContent === "Meny" &&
            document.getElementById("menuLukk").textContent === "Lukk menyen");
-        if (document.getElementById("kontoPanel").hidden) document.getElementById("kontoBtn").click();
-        ok("og der star veien til Mitt lag i linja", vises("kontoMittLag"));
-
-        // Trykket pa «Mitt lag →»: menyen lukkes, og du star pa fanen.
-        document.getElementById("kontoMittLag").click();
-        ok("Mitt lag-lenka lukker menyen",
-           !document.getElementById("menuPanel").classList.contains("open"));
-        ok("og apner fotballen",
-           document.getElementById("fotball").hidden === false &&
-           document.getElementById("feed").hidden === true);
-        ok("pa fanen Mitt lag, og adressen sier det",
-           location.hash.slice(-8) === "/mittlag", location.hash);
-        var fane = document.querySelector("#fotballFaner [aria-current='true']");
-        ok("og fanen er merket som den du star i",
-           !!fane && fane.dataset.verdi === "mittlag", fane && fane.dataset.verdi);
+        // Kontoen bor bak navnet. Menyen har den ikke lenger: «Rune» og
+        // Bytt PIN / Logg ut / Slett sto der ogsa, to veier til ett panel.
+        ok("og menyen har ingen konto nar navnet star i toppfeltet",
+           !vises("kontoBtn") && !vises("kontoPanel") && !vises("kontoByttPin"));
+        ok("men personvern og admin star der",
+           document.querySelectorAll(".action-lenker a").length === 2 &&
+           document.querySelector(".action-lenker a").getClientRects().length > 0);
+        document.getElementById("menuLukk").click();
 
         // En lenke i kortene bytter visning bak panelet, og da lukkes det.
         document.getElementById("hvemTag").click();
         steg(function () {
-        location.hash = "#/fotball/eliteserien/tabell";
+        location.hash = "#/fotball/eliteserien/neste";
         steg(function () {
         ok("en lenke i kortene som bytter visning, lukker kontosiden",
-           !panel.classList.contains("open") && location.hash.indexOf("/tabell") > -1,
+           !panel.classList.contains("open") && location.hash.indexOf("/neste") > -1,
            location.hash);
         document.getElementById("hvemTag").click();
         steg(function () {
@@ -7077,8 +7070,9 @@ const SAK_18C = kjor("favoritter-og-pin", FELLES + FOTBALL + `
            prefs().lagPaKonto === undefined && prefs().lagUsendt === undefined, JSON.stringify(prefs()));
         ok("og utlogget star verken linja eller bytt PIN",
            linje().hidden && knapp.hidden && skjema.hidden);
-        ok("og heller ikke veien til Mitt lag, som star i linja",
-           linje().hidden && linje().contains(document.getElementById("kontoMittLag")));
+        ok("og utlogget er Logg inn tilbake i menyen", vises("kontoBtn") &&
+           document.getElementById("kontoBtnTekst").textContent === "Logg inn",
+           document.getElementById("kontoBtnTekst").textContent);
         ferdig();
         });
         });
@@ -7086,6 +7080,36 @@ const SAK_18C = kjor("favoritter-og-pin", FELLES + FOTBALL + `
       });
     });
   }
+`);
+
+// En gammel okt fra e-postinnloggingen har ingen fornavn, og da star det
+// ingen knapp i toppfeltet. Menyen er da den eneste veien til Logg ut, og
+// den skal ikke tas bort fordi navnet har fatt sin egen side.
+const SAK_18D = kjor("konto-uten-navn", FELLES + `
+  var saker = lagSaker(12);
+  localStorage.setItem("sb-konto", JSON.stringify({ token: "okt-1", epost: "ola@eksempel.no",
+    bruker: "u-1", utloper: new Date(Date.now() + 3600000).toISOString() }));
+  ` + mockAlt("saker") + `
+  var grunn = window.fetch;
+  window.fetch = function (u, o) {
+    if (String(u).indexOf("/api/konto") === 0) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve(JSON.stringify({ klar: true, mangler: [] })); } });
+    }
+    return grunn(u, o);
+  };
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    ok("uten fornavn star ingen knapp i toppfeltet", document.getElementById("hvemTag").hidden);
+    document.getElementById("menuBtn").click();
+    var knapp = document.getElementById("kontoBtn");
+    ok("og da har menyen kontoen, sa Logg ut kan nas",
+       knapp.getClientRects().length > 0 &&
+       !document.getElementById("menuPanel").classList.contains("har-navn"),
+       document.getElementById("menuPanel").className);
+    knapp.click();
+    ok("med Logg ut innenfor", document.getElementById("kontoUt").getClientRects().length > 0);
+    ferdig();
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700); });
 `);
 
 /* ---------------- 19. jeg blir med ---------------- */
@@ -8746,7 +8770,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {
