@@ -251,13 +251,17 @@ export const DELER = ["tabell", "resultater", "neste"];
 // er datasettene funksjonen serverer — den validerer `del` mot lista, og
 // et fjerde navn der ville blitt en rute som feiler i apiSti. Vennefanen
 // henter ingenting eget: den slar sammen ligaenes neste runder.
-export const FANER = DELER.concat(["venner"]);
+//
+// «mittlag» likesa: den plukker favorittlagene ut av de tre datasettene,
+// pa tvers av ligaene, og henter ingenting eget (mittlag-data.js).
+export const FANER = DELER.concat(["venner", "mittlag"]);
 
 export const DEL_NAVN = {
   tabell: "Tabell",
   resultater: "Resultater",
   neste: "Kommende",
   venner: "Venner",
+  mittlag: "Mitt lag",
 };
 
 // Adressen hos API-Football for hvert datasett. Bygges her, ikke i

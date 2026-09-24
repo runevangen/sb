@@ -29,6 +29,7 @@ export const VERSJONER = [
     endringer: [
       { hva: "Favorittlagene følger kontoen, slik menyen alltid har sagt. Logger du inn på en ny telefon, er stjernene der — og under navnet ditt står det at de er lagret." },
       { hva: "Du kan bytte PIN selv: trykk på navnet ditt og velg «Bytt PIN». Alle andre telefoner blir logget ut." },
+      { hva: "Ny fane «Mitt lag» i fotballen: plass i tabellen, form, neste kamp og de siste resultatene for lagene du følger — samlet på ett sted." },
     ],
   },
   {

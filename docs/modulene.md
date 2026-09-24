@@ -330,6 +330,31 @@ kastet. `oktGyldig` og `oktUtloper` brukes av begge veier.
   ([ADR 0021](adr/0021-sist-inne-fra-oktene.md)), og PIN-datoen står i
   `title` på samme celle.
 
+### `mittlag-data.js` — favorittlaget, samlet
+
+Fanen «Mitt lag» i fotballen. Plukker favorittlagene ut av tabellen,
+resultatene og de kommende kampene — **de samme svarene de andre fanene
+henter**, cachet på kanten. Ingen nye kall mot API-Football, og døgnkvoten
+er regnet ut for alle tre delene i alle ligaene fra før.
+
+- **`erLaget()` bruker `lagnokkel` fra `pub-data.js`**, ikke
+  `normaliserLagnavn`. Favorittlaget er redaksjonens navn (stjerna i
+  tabellen), kampene bærer kildens — «Vålerenga» mot «Vaalerenga». Det er
+  det samme møtet `stampuberFor()` håndterer, og to foldinger for ett
+  spørsmål kunne svart hver sin vei. `normaliserLagnavn` røres ikke: den går
+  inn i `kampNokkel()` ([ADR 0008](adr/0008-kampnokkel.md)).
+- **Ligaen finnes ved å lete i tabellene** (`ligaForLag`). Favorittlaget er
+  et navn og ingenting annet — lista følger kontoen, og et navn er det
+  eneste som er sant uansett hvilken tabell stjerna ble trykket i.
+- **Bare kamper med mål på begge sider er spilt.** «Resultater» er hele
+  sesongen og bærer de uspilte; en kamp uten resultat er ikke et tap, og
+  ikke 0–0.
+- **Formen leses eldst til venstre; lista nyest først.** Samme kamper, to
+  spørsmål: en rekke man leser, og en liste man leter i.
+- **Poengavstanden regnes av tabellen, ikke av plassen.** To lag på like
+  poeng skilles på målforskjell, og «0 poeng opp» er da sant. Mangler
+  poengene, står ingenting — et tall vi ikke har, blir ikke «0 poeng».
+
 ### `vaer-data.js` — været ved avspark
 
 [ADR 0013](adr/0013-pubforslag-og-vaer.md).
@@ -583,6 +608,13 @@ portalen — en leser har ingen nytte av den.
 
 [ADR 0012](adr/0012-kampkortet.md).
 
+- **«Mitt lag» (`visMittLag`) er vennefanens søsken**: på tvers av ligaer,
+  ingen egen henting. `hentHusket()` deler `husket` med de andre fanene, så
+  et bytte mellom Tabell og Mitt lag koster ikke et kall til. Tabellen i
+  kortet er den samme `tabell()` som i fanen, bare fem rader — stjerna og
+  lagsøket følger med. En sesong som ikke er inneværende står i kortet før
+  tallene, og da lenker ikke neste kamp til avtalekortet: en kamp fra i fjor
+  er ingenting å avtale rundt.
 - **Modulen eier ikke ruting, lagring eller innlogging.** Trykk går tilbake
   til `app.js` gjennom `naviger()`, som setter adressen — da virker
   tilbakeknappen likt her som ellers. Favorittlag, dine puber, svarnavn og

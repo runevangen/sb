@@ -34,6 +34,9 @@ import { normaliserPinNavn, pinSlug, gyldigPinNavn, pinEpost, normaliserPin, gyl
          PIN_MIN, PIN_MAKS, PIN_DOMENE,
          rensLag, flettLag, sammeLag, sjekkPinBytte, LAG_MAKS } from "../pin-data.js";
 
+import { erLaget, ligaForLag, plasseringFor, avstandTekst, spilteFor, formFor,
+         kommendeFor } from "../mittlag-data.js";
+
 import { normaliserNavn, gyldigNavn, svarRad, tolkSvar, perKamp, blirMedTekst,
          egetSvar, loftMedSvar, bareMedSvar, stederFraSvar, perSted,
          stedNokkel, blirMedLinje, mittSted, NAVN_MAKS,
@@ -1826,14 +1829,82 @@ ok("bare kampene med folk, i tidsrekkefolge",
    bareMedSvar(RUNDE, HVEM).map((k) => k.id).join(","));
 ok("uten svar er lista tom", bareMedSvar(RUNDE, new Map()).length === 0);
 
+/* ---- mitt lag (mittlag-data.js) ---- */
+
+// Favorittlaget er redaksjonens navn; kampene barer kildens. Samme
+// folding som stampubene, ikke normaliserLagnavn (som gar inn i
+// kampNokkel og ikke skal endres).
+ok("Vålerenga og Vaalerenga er samme lag", erLaget("Vaalerenga", "Vålerenga"));
+ok("Bodø/Glimt og Bodo/Glimt ogsa", erLaget("Bodo/Glimt", "Bodø/Glimt"));
+ok("men ulike lag er ulike", !erLaget("Brann", "Bryne") && !erLaget("", ""));
+
+const ML_TABELL = [
+  { plass: 1, lag: "Bodø/Glimt", poeng: 57 }, { plass: 2, lag: "Brann", poeng: 53 },
+  { plass: 3, lag: "Viking", poeng: 51 }, { plass: 4, lag: "Rosenborg", poeng: 48 },
+  { plass: 5, lag: "Molde", poeng: 45 }, { plass: 6, lag: "Tromsø", poeng: 45 },
+  { plass: 7, lag: "Bryne", poeng: 40 },
+];
+ok("ligaen finnes i tabellene",
+   ligaForLag("Brann", { premier: [{ lag: "Arsenal" }], eliteserien: ML_TABELL }) === "eliteserien");
+ok("og et lag som ikke star noe sted gir ingen liga",
+   ligaForLag("Lyn", { eliteserien: ML_TABELL }) === null);
+
+let ml = plasseringFor(ML_TABELL, "Brann");
+ok("plassen og antallet lag", ml.rad.plass === 2 && ml.antall === 7);
+ok("utsnittet er fem rader ogsa nar laget star nest overst",
+   ml.utsnitt.map((r) => r.plass).join(",") === "1,2,3,4,5",
+   ml.utsnitt.map((r) => r.plass).join(","));
+ok("og avstanden til laget over og under er i poeng",
+   avstandTekst(ml) === "4 poeng opp til 1. plass · 2 poeng ned til 3.", avstandTekst(ml));
+ml = plasseringFor(ML_TABELL, "Bryne");
+ok("nederst far de fire over seg", ml.utsnitt.map((r) => r.plass).join(",") === "3,4,5,6,7" &&
+   ml.under === null && avstandTekst(ml) === "5 poeng opp til 6. plass", avstandTekst(ml));
+// Like poeng skilles pa malforskjell. Da er «0 poeng opp» den sanne
+// opplysningen, ikke en feil.
+ok("like poeng gir 0 poeng opp",
+   avstandTekst(plasseringFor(ML_TABELL, "Tromsø")).indexOf("0 poeng opp til 5. plass") === 0);
+ok("forsteplassen har ingen over seg",
+   avstandTekst(plasseringFor(ML_TABELL, "Bodø/Glimt")) === "4 poeng ned til 2.");
+ok("mangler poengene, star ingenting",
+   avstandTekst(plasseringFor([{ plass: 1, lag: "A" }, { plass: 2, lag: "B" }], "B")) === "");
+ok("et lag som ikke star i tabellen, har ingen plass", plasseringFor(ML_TABELL, "Lyn") === null);
+
+const ML_KAMPER = [
+  { dato: "2026-08-16T16:00:00Z", hjemme: "Brann", borte: "Viking", malHjemme: 4, malBorte: 2 },
+  { dato: "2026-09-20T16:00:00Z", hjemme: "Brann", borte: "Molde", malHjemme: 2, malBorte: 1 },
+  { dato: "2026-08-23T16:00:00Z", hjemme: "Vaalerenga", borte: "Brann", malHjemme: 2, malBorte: 0 },
+  { dato: "2026-09-13T16:00:00Z", hjemme: "Rosenborg", borte: "Brann", malHjemme: 1, malBorte: 1 },
+  { dato: "2026-09-06T16:00:00Z", hjemme: "Molde", borte: "Viking", malHjemme: 0, malBorte: 0 },
+  // Uspilt, men i resultatlista: hele sesongen kommer med (#134).
+  { dato: "2026-10-04T16:00:00Z", hjemme: "Brann", borte: "KFUM Oslo", malHjemme: null, malBorte: null },
+  { dato: "2026-09-27T16:00:00Z", hjemme: "Bodø/Glimt", borte: "Brann", malHjemme: null, malBorte: null },
+];
+const siste = spilteFor(ML_KAMPER, "Brann");
+ok("siste kamper er lagets, nyeste forst, og bare de spilte",
+   siste.map((f) => f.utfall + ":" + f.mot).join(",") === "V:Molde,U:Rosenborg,T:Vaalerenga,V:Viking",
+   siste.map((f) => f.utfall + ":" + f.mot).join(","));
+ok("utfallet er sett fra laget, ogsa borte",
+   siste[2].hjemme === false && siste[2].utfall === "T");
+ok("formen leses eldst til venstre",
+   formFor(ML_KAMPER, "Brann").map((f) => f.utfall).join("") === "VTUV",
+   formFor(ML_KAMPER, "Brann").map((f) => f.utfall).join(""));
+ok("og har et tak", formFor(ML_KAMPER, "Brann", 2).map((f) => f.utfall).join("") === "UV");
+const kommende = kommendeFor(ML_KAMPER, "Brann");
+ok("kommende er de uten resultat, eldst forst",
+   kommende.map((k) => k.mot).join(",") === "Bodø/Glimt,KFUM Oslo" && kommende[0].hjemme === false,
+   kommende.map((k) => k.mot).join(","));
+ok("tomme og rare lister gir tomme svar",
+   spilteFor(null, "Brann").length === 0 && kommendeFor(undefined, "Brann").length === 0);
+
 // Fanene og datasettene er to lister. «venner» henter ingenting eget, og
 // et fjerde navn i DELER ville blitt en rute funksjonen godtar og sa
 // feiler pa i apiSti.
 ok("vennefanen star i FANER, ikke i DELER",
    FANER.indexOf("venner") > -1 && DELER.indexOf("venner") === -1,
    FANER.join(",") + " / " + DELER.join(","));
-ok("og fanene er datasettene pluss den ene",
-   FANER.length === DELER.length + 1 && DEL_NAVN.venner === "Venner",
+ok("og fanene er datasettene pluss de to som slar dem sammen",
+   FANER.length === DELER.length + 2 && DEL_NAVN.venner === "Venner" &&
+   DEL_NAVN.mittlag === "Mitt lag" && DELER.indexOf("mittlag") === -1,
    FANER.join(","));
 // En delt lenke til vennefanen skal apne den, ikke falle til tabellen.
 ok("ruta kjennes igjen", tolkFotballHash("#/fotball/venner").del === "venner",

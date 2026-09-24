@@ -839,6 +839,16 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   har lagret:** `tegnKamper` bygger lista på nytt fra `visninger`, og
   hakene dine ville ryket. Står det noe ulagret, blir lista stående, og
   knappen kommer neste gang lista tegnes.
+- **«Mitt lag» henter ingenting nytt.** Fanen samler plass, form, neste
+  kamp og siste kamper for favorittlagene — plukket ut av de samme
+  svarene Tabell, Resultater og Kommende henter, cachet på kanten.
+  Døgnkvoten er regnet for alle tre delene i alle ligaene fra før, så en ny
+  fane her koster ingen kall mot API-Football. Ligaen finnes ved å lete i
+  tabellene: favorittlaget er et **navn**, og det skal det forbli.
+  Navnene sammenliknes med `lagnokkel` (samme folding som stampubene), for
+  stjerna bærer redaksjonens «Vålerenga» og kampene kildens «Vaalerenga».
+  **Et lag vi ikke finner, står likevel — med hvorfor**, og en del som
+  svikter sier det i kortet. Virker uten konto, som stjerna.
 - **«Kommende» viser hele vinduet**, ikke én runde, med en overskrift per
   runde. Taket på tjue id-er mot `/api/svar` holdes av buntingen i
   `hentSvarFor()`, ikke av at lista kappes i forkant.

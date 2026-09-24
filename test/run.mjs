@@ -7743,6 +7743,136 @@ const SAK_19C = kjor("fornying-avvist", fornySide(`function () {
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
 `);
 
+/* ---------------- 20c. mitt lag ---------------- */
+
+// Alt appen vet om favorittlaget, samlet — plukket ut av de samme
+// svarene fanene over henter. Mockens fotballsvar er likt for alle ligaer,
+// sa Eliteserien (forst i rekkefolgen) er der Brann finnes.
+const SAK_20C = kjor("mitt-lag", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  localStorage.setItem("sb-visning", JSON.stringify({ lag: ["Brann", "Lyn"] }));
+  ` + mockAlt("saker") + `
+  location.hash = "#/fotball/mittlag";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var faner = document.querySelectorAll("#fotballFaner .segment-del");
+    var fane = faner[faner.length - 1];
+    ok("fanen heter Mitt lag og star sist", fane.dataset.verdi === "mittlag" &&
+       fane.textContent === "Mitt lag", fane.textContent);
+    ok("og en lenke apner den", fane.getAttribute("aria-current") === "true");
+
+    var kort = document.querySelectorAll(".mittlag-kort");
+    ok("ett kort per favorittlag", kort.length === 2, kort.length);
+    var brann = kort[0];
+    ok("kortet navngir laget og ligaen",
+       brann.querySelector(".mittlag-navn").textContent === "Brann" &&
+       brann.querySelector(".mittlag-liga").textContent === "Eliteserien",
+       brann.querySelector(".mittlag-liga").textContent);
+    ok("plassen i tall", brann.querySelector(".mittlag-plass").textContent ===
+       "2. plass av 3 · 60 poeng · 30 kamper", brann.querySelector(".mittlag-plass").textContent);
+    ok("og hva som skiller laget fra de rundt",
+       brann.querySelector(".mittlag-avstand").textContent ===
+       "8 poeng opp til 1. plass · 25 poeng ned til 3.",
+       brann.querySelector(".mittlag-avstand").textContent);
+
+    // Formen: bare Branns kamper. Molde–Rosenborg er ikke deres.
+    var form = brann.querySelectorAll(".mittlag-form .mittlag-utfall");
+    ok("formen er lagets egne kamper", form.length === 1 && form[0].textContent === "V",
+       form.length);
+    ok("og ordet star for skjermleseren, ikke bare fargen",
+       form[0].getAttribute("aria-label") === "Seier mot Viking", form[0].getAttribute("aria-label"));
+
+    ok("neste kamp er lagets",
+       brann.querySelector(".mittlag-kamp").textContent === "Brann – Bodo/Glimt",
+       brann.querySelector(".mittlag-kamp").textContent);
+    // Mockens sesong er ikke inneværende. Da skal kortet si det for
+    // tallene leses, og en kamp fra i fjor er ingenting a avtale rundt.
+    ok("en gammel sesong sier fra",
+       brann.querySelector(".mittlag-merknad").textContent === "Sesong 2024 — ikke inneværende.",
+       brann.querySelector(".mittlag-merknad") && brann.querySelector(".mittlag-merknad").textContent);
+    ok("og gir ingen lenke til a avtale kampen", !brann.querySelector(".mittlag-lenke"));
+
+    var egen = brann.querySelector(".mittlag-egen");
+    ok("tabellen rundt merker laget", egen &&
+       egen.querySelector(".lag-navn").textContent === "Brann",
+       egen && egen.textContent);
+    ok("og stjerna der er tent", egen.querySelector(".lag-stjerne").getAttribute("aria-pressed") === "true");
+
+    ok("siste kamper viser resultatet",
+       brann.querySelector(".mittlag-bolk .mittlag-motstander").textContent === "Brann 1–0 Viking",
+       brann.querySelector(".mittlag-bolk .mittlag-motstander").textContent);
+
+    // Et lag vi ikke finner, forsvinner ikke — det sier hvorfor.
+    ok("et lag vi ikke finner star med forklaring",
+       kort[1].querySelector(".mittlag-navn").textContent === "Lyn" &&
+       kort[1].querySelector(".mittlag-merknad").textContent.indexOf("Fant ikke laget") === 0,
+       kort[1].textContent);
+
+    // Ingen nye kall: bare de tre datasettene fanene alt henter.
+    var deler = window.__fotball.map(function (u) { return u.split("?")[0].split("/").pop(); });
+    ok("siden henter bare det fanene alt henter",
+       deler.every(function (d) { return d === "tabell" || d === "resultater" || d === "neste"; }) &&
+       deler.filter(function (d) { return d === "tabell"; }).length === 5,
+       deler.join(","));
+
+    brann.querySelector(".mittlag-sok").click();
+    ok("«Saker om Brann» soker i nyhetene",
+       document.getElementById("sokFelt").value === "Brann", document.getElementById("sokFelt").value);
+    ferdig();
+  } catch (e) { ok("ingen unntak underveis", false, e.message + " @ " + (e.stack || "").split("\\n")[1]); ferdig(); } }, 1200); });
+`);
+
+// Uten favoritt er siden en forklaring og en vei, ikke en tom flate. Og
+// svikter en del, sier kortet hvilken — «ingen kamper» ville vaert usant.
+const SAK_20D = kjor("mitt-lag-tom", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  ` + mockAlt("saker") + `
+  var grunn = window.fetch;
+  window.fetch = function (u, o) {
+    // Inneværende sesong her, sa kampen kan avtales.
+    if (String(u).indexOf("/api/fotball/neste") === 0) {
+      return grunn(u, o).then(function (r) { return r.text().then(function (t) {
+        var d = JSON.parse(t); d.sisteSesong = true;
+        return { ok: true, status: 200, statusText: "OK",
+          text: function () { return Promise.resolve(JSON.stringify(d)); } };
+      }); });
+    }
+    if (String(u).indexOf("/api/fotball/resultater") === 0) {
+      return Promise.resolve({ ok: false, status: 502, statusText: "Bad Gateway",
+        text: function () { return Promise.resolve(JSON.stringify({ feil: "Fikk ikke svar fra TheSportsDB" })); } });
+    }
+    return grunn(u, o);
+  };
+  location.hash = "#/fotball/mittlag";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var rot = document.getElementById("fotballInnhold");
+    ok("uten favoritt star det hva som skal til",
+       rot.textContent.indexOf("Du følger ingen lag ennå") > -1, rot.textContent);
+    rot.querySelector(".mittlag-til-tabell").click();
+    setTimeout(function () { try {
+      ok("og knappen gar til tabellen", location.hash.indexOf("/tabell") > -1, location.hash);
+      document.querySelectorAll(".tabell .lag-stjerne")[1].click();   // Brann
+      location.hash = "#/fotball/eliteserien/mittlag";
+      setTimeout(function () { try {
+        var kort = document.querySelector(".mittlag-kort");
+        ok("en ny stjerne gir et kort", kort &&
+           kort.querySelector(".mittlag-navn").textContent === "Brann");
+        ok("en del som svikter, sier det med tjenestens ord",
+           kort.textContent.indexOf("Fikk ikke hentet resultatene: Fikk ikke svar fra TheSportsDB") > -1,
+           kort.textContent);
+        ok("og resten av kortet star", !!kort.querySelector(".mittlag-plass") &&
+           !!kort.querySelector(".mittlag-kamp"));
+        // Veien videre er kortet der kampen avtales — en ekte lenke.
+        var lenke = kort.querySelector(".mittlag-lenke");
+        ok("neste kamp lenker til kampen i Kommende",
+           lenke && lenke.tagName === "A" &&
+           lenke.getAttribute("href").indexOf("#/fotball/eliteserien/neste?kamp=") === 0,
+           lenke && lenke.getAttribute("href"));
+        ferdig();
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1000); });
+`);
+
 /* ---------------- 20. vennefanen ---------------- */
 
 // Kampene noen blir med pa, pa tvers av ligaer. Loftingen i Kommende
@@ -7811,7 +7941,8 @@ const SAK_20 = kjor("venner", FELLES + FOTBALL + `
   location.hash = "#/fotball/venner";
   window.addEventListener("load", function () { setTimeout(function () { try {
     var faner = document.querySelectorAll("#fotballFaner .segment-del");
-    ok("vennefanen star i segmentet", faner.length === 4 &&
+    // Fem faner: de tre datasettene, venner og mitt lag.
+    ok("vennefanen star i segmentet", faner.length === 5 &&
        faner[3].dataset.verdi === "venner", faner.length);
     ok("og en delt lenke apner den",
        faner[3].getAttribute("aria-current") === "true",
@@ -8498,7 +8629,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

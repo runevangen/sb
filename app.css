@@ -37,6 +37,12 @@
   /* Bekreftet: en pub har sagt at den viser nettopp denne kampen. */
   --bekreftet: #1F7A4D;
 
+  /* Utfallet i formrekka under «Mitt lag». Bokstaven sier det samme, sa
+     fargen er en forsterkning, ikke eneste bærer. */
+  --seier: #1F7A4D;
+  --tap:   #B3261E;
+  --pa-utfall: #FFFFFF;
+
   --ad-g1: #1B2A87;
   --ad-g2: #2A50D8;
   --ad-g3: #223AA8;
@@ -90,6 +96,10 @@
   /* Aksenten lysnes for a holde kontrasten mot svart. Det samme gjor
      bekreftet-gronn: #1F7A4D er for morkt pa svart. */
   --bekreftet: #4ECB8B;
+  --seier: #4ECB8B;
+  --tap:   #F2786D;
+  /* Lyse flater i mørkt tema: hvit bokstav oppå dem forsvant. */
+  --pa-utfall: #000000;
 
   --accent:        #5C82FF;
   --accent-ink:    #00081F;
@@ -2753,3 +2763,145 @@ a.ad-cta:focus-visible {
 }
 
 .fotball-kilde { color: var(--text-faint); }
+
+/* ---------- mitt lag ----------
+
+   Ett kort per favorittlag. Samme byggeklosser som resten av fotballen —
+   tabellen er den samme tabellen, bare fem rader av den — og ingen nye
+   farger utover utfallet. */
+.mittlag-kort {
+  margin: 0 0 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-app);
+}
+
+.mittlag-hode {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mittlag-navn {
+  margin: 0;
+  font-family: 'Barlow Condensed', 'Inter', sans-serif;
+  font-size: calc(22px * var(--fs));
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-strong);
+}
+
+.mittlag-liga {
+  color: var(--text-dimmer);
+  font-size: var(--t-label);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mittlag-plass {
+  margin: 6px 0 0;
+  color: var(--text);
+  font-size: var(--t-body);
+  font-weight: 600;
+}
+
+.mittlag-avstand, .mittlag-merknad, .mittlag-nar {
+  margin: 2px 0 0;
+  color: var(--text-dim);
+  font-size: var(--t-meta);
+}
+
+.mittlag-merknad { margin-top: 8px; }
+
+.mittlag-form {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 12px 0 0;
+}
+
+.mittlag-etikett, .mittlag-del {
+  margin: 0 6px 0 0;
+  color: var(--text-dimmer);
+  font-size: var(--t-label);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.mittlag-del { margin: 16px 0 6px; }
+
+.mittlag-utfall {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--bg-raised);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.mittlag-utfall[data-utfall="V"] { background: var(--seier); color: var(--pa-utfall); }
+.mittlag-utfall[data-utfall="T"] { background: var(--tap); color: var(--pa-utfall); }
+
+.mittlag-kamp {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--t-row);
+  font-weight: 700;
+}
+
+.mittlag-lenke {
+  display: inline-block;
+  margin: 8px 0 0;
+  color: var(--accent);
+  font-size: var(--t-meta);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.mittlag-lenke:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.mittlag-tabell .tabell-skall { margin: 0; }
+.mittlag-egen td { background: var(--accent-wash); font-weight: 700; }
+
+.mittlag-kamper { list-style: none; margin: 0; padding: 0; }
+
+.mittlag-rad {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-faint);
+  font-size: var(--t-excerpt);
+  color: var(--text-body);
+}
+
+.mittlag-rad:last-child { border-bottom: 0; }
+.mittlag-dato { flex: 0 0 52px; color: var(--text-dimmer); font-size: var(--t-meta); }
+.mittlag-motstander { flex: 1; min-width: 0; }
+
+.mittlag-sok, .mittlag-til-tabell {
+  margin: 14px 0 0;
+  padding: 9px 14px;
+  border: 1px solid var(--border-btn);
+  border-radius: 8px;
+  background: none;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: calc(13px * var(--fs));
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mittlag-sok:focus-visible, .mittlag-til-tabell:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

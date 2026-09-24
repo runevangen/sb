@@ -2527,7 +2527,7 @@ initFotball(
   // finnes allerede, sa dette koster ingen nye kall mot WordPress utover
   // det soket ville kostet uansett.
   (lag) => startSok(lag, "Lagsok"),
-  { er: erFavoritt, veksle: vekslFavoritt },
+  { er: erFavoritt, veksle: vekslFavoritt, liste: favorittlag },
   // «Hvor ser du kampen?» gar inn i gruppechatten leseren allerede har.
   // Ingen konto, ingen lagring: chatten er vennegruppa.
   (tekst, url) => delTekst({ title: "Sportsbibelen", text: tekst, url }, "Kamp delt"),

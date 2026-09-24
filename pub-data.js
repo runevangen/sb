@@ -451,7 +451,12 @@ export function merkAntatte(liste) {
 // lagret, oppslatt og delt star pa (ADR 0008). Endrer vi den, endrer vi
 // nokkelen til hver eneste rad som alt ligger i basen. Et sammenlikning
 // som bare gjelder her, hoerer hjemme her.
-function lagnokkel(navn) {
+//
+// Eksportert for mittlag-data.js, som stiller det samme sporsmalet — er
+// dette laget ditt? — med navn fra redaksjonen (stjerna i tabellen) mot
+// navn fra kilden (kamplistene). To foldinger for det ene sporsmalet
+// ville kunne svart hver sin vei.
+export function lagnokkel(navn) {
   return normaliserLagnavn(navn || "").replace(/aa/g, "a");
 }
 
