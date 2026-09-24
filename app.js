@@ -14,7 +14,7 @@ import { normaliserPinNavn, gyldigPinNavn, normaliserPin, gyldigPin, PIN_MIN,
          rensLag, flettLag, sammeLag, sjekkPinBytte }
   from "./pin-data.js";
 import { normaliserNavn } from "./svar-data.js";
-import { initFotball, visFotball, merkFavoritter } from "./fotball.js";
+import { initFotball, visFotball, merkFavoritter, tegnMittLag } from "./fotball.js";
 
 // Bytt WP_HOST til din egen WordPress-side når som helst.
 const WP_HOST  = "https://sportsbibelen.no";
@@ -1157,6 +1157,7 @@ function mottaKontoLag(lag, vedInnlogging) {
 // sant akkurat na — «folger kontoen» star forst nar kontoen har svart.
 function visKontoLag() {
   const linje = document.getElementById("kontoLag");
+  if (erKontoModus() && isMenuOpen() && favorittlag().join("|") !== kontoSideLag) tegnKontoside();
   if (!kontoOkt || kontoByttar) { linje.hidden = true; return; }
   linje.hidden = false;
   linje.textContent = kontoLagTekst() + " ";
@@ -1570,8 +1571,12 @@ function visFane(visning, liga, del) {
   if (visning === "fotball") visFotball(fotballLiga, fotballDel, tolkKamplenke(location.hash));
 
   // Menyen beskriver den visningen du star i. Star den apen nar du bytter,
-  // skal innholdet folge med.
-  if (document.getElementById("menuPanel").classList.contains("open")) visMeny();
+  // skal innholdet folge med. Kontosiden lukkes i stedet: kortene der har
+  // lenker til kampen og tabellen, og et bytte bak et apent panel ville
+  // vaert et trykk som svarte uten at noe synlig skjedde. Stjerna i
+  // kortene bytter ingen visning, og lar siden sta.
+  if (isMenuOpen() && erKontoModus()) closeMenu();
+  else if (isMenuOpen()) visMeny();
 }
 
 function merkFane(id, aktiv) {
@@ -1720,6 +1725,9 @@ function selectCategory(cat) {
 function openMenu() {
   const panel = document.getElementById("menuPanel");
   const btn = document.getElementById("menuBtn");
+  // Hamburgeren apner alltid menyen. Kontosiden er noe bare navnet gjor,
+  // og den skal ikke henge igjen til neste gang.
+  settKontoModus(false);
   panel.classList.add("open");
   btn.setAttribute("aria-expanded", "true");
   document.getElementById("menuClose").focus();
@@ -1980,6 +1988,9 @@ function visKonto() {
   byttPin.hidden = true;
   pinSkjema.hidden = true;
   document.getElementById("kontoLag").hidden = true;
+  // Logget du ut fra kontosiden, er det ingen konto a sta pa. Menyen tar
+  // over, med innloggingen der den pleier a vaere.
+  if (erKontoModus()) settKontoModus(false);
 
   tekst.textContent = "Logg inn";
   note.hidden = false;
@@ -2187,8 +2198,11 @@ function lukkKontoPanel() {
   document.getElementById("kontoBtn").setAttribute("aria-expanded", "false");
 }
 
-// Fornavnet i toppfeltet er en knapp: den apner menyen med kontopanelet
-// ute, sa «logg ut» og «slett kontoen» er ett trykk unna der du ser navnet.
+// Fornavnet i toppfeltet er en knapp, og den apner kontosiden: lagene
+// dine overst, og Bytt PIN, Logg ut og Slett under dem. Den apnet menyen
+// med kontopanelet ute til 24. september 2026 — og da var navnet og
+// hamburgeren to knapper til det samme skjermbildet. Kontoen sto nederst,
+// under sok og tjue emner, der ingen leter etter den.
 document.getElementById("hvemTag").addEventListener("click", () => {
   lukkPinBytte();
   openMenu();
@@ -2196,8 +2210,44 @@ document.getElementById("hvemTag").addEventListener("click", () => {
   panel.hidden = false;
   document.getElementById("kontoBtn").setAttribute("aria-expanded", "true");
   kontoSvar("");
+  settKontoModus(true);
   visKonto();
 });
+
+// Kontosiden er menypanelet med en klasse pa: CSS-en tar bort sok, emner
+// og deling, og kortene far plassen emnelista hadde. Ett panel, ikke to —
+// kontodelen finnes ett sted, og de to visningene kan ikke bli uenige om
+// den. Tittelen og lukkeknappen sier hvor du er.
+function settKontoModus(pa) {
+  const panel = document.getElementById("menuPanel");
+  panel.classList.toggle("konto-modus", pa);
+  panel.setAttribute("aria-label", pa ? "Kontoen din" : "Hovedmeny");
+  panel.querySelector(".menu-title").textContent = pa ? "Kontoen din" : "Meny";
+  document.getElementById("menuLukk").textContent = pa ? "Lukk" : "Lukk menyen";
+  document.getElementById("kontoSide").hidden = !pa;
+  kontoSideLag = null;
+  if (pa) tegnKontoside();
+}
+
+function erKontoModus() {
+  return document.getElementById("menuPanel").classList.contains("konto-modus");
+}
+
+// Hvilke lag kortene sist ble tegnet for. Lista kan endre seg mens siden
+// star apen — kontoen svarer etter innlogging, og de lagrede lagene
+// flettes inn — og da ma kortene tegnes pa nytt, som tegnSvar i fanene.
+let kontoSideLag = null;
+
+function tegnKontoside() {
+  const side = document.getElementById("kontoSide");
+  const nokkel = favorittlag().join("|");
+  kontoSideLag = nokkel;
+  const kort = document.createElement("div");
+  side.replaceChildren(el("h2", "konto-side-tittel", "Mitt lag"), kort);
+  side.scrollTop = 0;
+  tegnMittLag(kort, () => isMenuOpen() && erKontoModus() && kontoSideLag === nokkel, false);
+}
+
 
 document.getElementById("menuLukk").addEventListener("click", closeMenu);
 

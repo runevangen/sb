@@ -6828,6 +6828,14 @@ const SAK_18C = kjor("favoritter-og-pin", FELLES + FOTBALL + `
   function prefs() { return JSON.parse(localStorage.getItem("sb-visning") || "{}"); }
   function handlinger(h) { return window.__konto.filter(function (k) { return k.handling === h; }); }
   function linje() { return document.getElementById("kontoLag"); }
+  // Hentes nar de brukes: sena kjorer for markupen er lest.
+  var panel, side;
+  window.addEventListener("DOMContentLoaded", function () {
+    panel = document.getElementById("menuPanel");
+    side = document.getElementById("kontoSide");
+  });
+  // Tegnet pa skjermen: et element under en skjult forelder har ingen bokser.
+  function vises(id) { return document.getElementById(id).getClientRects().length > 0; }
   function steg(f, ms) {
     setTimeout(function () {
       try { f(); } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); }
@@ -6873,6 +6881,20 @@ const SAK_18C = kjor("favoritter-og-pin", FELLES + FOTBALL + `
     ok("og den er en knapp, ikke tekst man ma gjette er trykkbar",
        !!til && til.tagName === "BUTTON" && til.type === "button", til && til.tagName);
 
+    // Navnet apner kontosiden, ikke menyen. Til 24.09.2026 ga navnet og
+    // hamburgeren det samme skjermbildet, med kontoen nederst under tjue
+    // emner.
+    ok("navnet apner kontosiden, ikke menyen",
+       panel.classList.contains("open") && panel.classList.contains("konto-modus") &&
+       !side.hidden && panel.querySelector(".menu-title").textContent === "Kontoen din",
+       panel.className + " " + panel.querySelector(".menu-title").textContent);
+    ok("sok, emner og deling viker for den",
+       !vises("menuList") && !vises("sokForm") && !vises("shareBtn") && !vises("kontoBtn"));
+    ok("og kontoen star under kortene, med Bytt PIN",
+       vises("kontoPanel") && vises("kontoByttPin") && vises("kontoUt") &&
+       side.getBoundingClientRect().bottom <= document.getElementById("kontoPanel").getBoundingClientRect().top + 1);
+    ok("lenka til Mitt lag viker, for kortene star rett over den", !vises("kontoMittLag"));
+
     // En stjerne i tabellen gar til kontoen, etter et lite pust.
     var stjerner = document.querySelectorAll(".tabell .lag-stjerne");
     stjerner[0].click();   // Bodo/Glimt
@@ -6883,6 +6905,18 @@ const SAK_18C = kjor("favoritter-og-pin", FELLES + FOTBALL + `
       ok("en ny stjerne sendes til kontoen",
          sist && JSON.stringify(sist.lag) === JSON.stringify(["Brann", "Molde", "Bodo/Glimt"]),
          JSON.stringify(sist));
+      // Kortene er de samme som i fanen, og de folger lista mens siden star
+      // apen: stjerna over ble satt etter at siden var tegnet.
+      var kort = side.querySelectorAll(".mittlag-kort .mittlag-navn");
+      var navn = Array.prototype.map.call(kort, function (k) { return k.textContent; });
+      ok("kontosiden viser lagkortene, ogsa for stjerna som kom etter",
+         JSON.stringify(navn) === JSON.stringify(["Brann", "Molde", "Bodo/Glimt"]), JSON.stringify(navn));
+      ok("med plassen i tabellen, som i fanen",
+         !!side.querySelector(".mittlag-kort .mittlag-plass"));
+      var stempel = side.querySelector(".fotball-stempel");
+      ok("og stempelet peker ikke pa faner som ikke star over",
+         !!stempel && stempel.textContent.indexOf("fanene under Fotball") > -1,
+         stempel && stempel.textContent);
       ok("og linja sier at den folger kontoen igjen",
          linje().textContent.indexOf("følger kontoen") > -1 && !prefs().lagUsendt,
          linje().textContent);
@@ -6982,6 +7016,16 @@ const SAK_18C = kjor("favoritter-og-pin", FELLES + FOTBALL + `
            na.value === "" && ny.value === "" && ny2.value === "" && skjema.hidden &&
            !document.getElementById("kontoPar").hidden && note.hidden);
 
+        // Hamburgeren gir menyen, ogsa rett etter kontosiden.
+        document.getElementById("menuLukk").click();
+        document.getElementById("menuBtn").click();
+        ok("hamburgeren apner menyen, ikke kontosiden",
+           !panel.classList.contains("konto-modus") && side.hidden && vises("menuList") &&
+           panel.querySelector(".menu-title").textContent === "Meny" &&
+           document.getElementById("menuLukk").textContent === "Lukk menyen");
+        if (document.getElementById("kontoPanel").hidden) document.getElementById("kontoBtn").click();
+        ok("og der star veien til Mitt lag i linja", vises("kontoMittLag"));
+
         // Trykket pa «Mitt lag →»: menyen lukkes, og du star pa fanen.
         document.getElementById("kontoMittLag").click();
         ok("Mitt lag-lenka lukker menyen",
@@ -6995,9 +7039,31 @@ const SAK_18C = kjor("favoritter-og-pin", FELLES + FOTBALL + `
         ok("og fanen er merket som den du star i",
            !!fane && fane.dataset.verdi === "mittlag", fane && fane.dataset.verdi);
 
+        // En lenke i kortene bytter visning bak panelet, og da lukkes det.
+        document.getElementById("hvemTag").click();
+        steg(function () {
+        location.hash = "#/fotball/eliteserien/tabell";
+        steg(function () {
+        ok("en lenke i kortene som bytter visning, lukker kontosiden",
+           !panel.classList.contains("open") && location.hash.indexOf("/tabell") > -1,
+           location.hash);
+        document.getElementById("hvemTag").click();
+        steg(function () {
+        var sok = side.querySelector(".mittlag-sok");
+        ok("kortene har knappene sine ogsa her", !!sok && sok.textContent === "Saker om Brann",
+           sok && sok.textContent);
+        sok.click();
+        ok("et trykk i kortene lukker kontosiden", !panel.classList.contains("open"));
+        ok("og gjor det knappen lover", document.getElementById("feed").hidden === false &&
+           document.getElementById("sokFelt").value === "Brann",
+           document.getElementById("sokFelt").value);
+
         // Utlogget blir lagene staende pa telefonen, men glemmer kontoen.
         document.getElementById("hvemTag").click();
         document.getElementById("kontoUt").click();
+        ok("logger du ut fra kontosiden, tar menyen over",
+           panel.classList.contains("open") && !panel.classList.contains("konto-modus") &&
+           side.hidden && vises("menuList") && vises("kontoBtn"));
         ok("utlogget blir favorittlagene staende",
            JSON.stringify(prefs().lag) === JSON.stringify(["Brann", "Molde"]),
            JSON.stringify(prefs()));
@@ -7008,6 +7074,9 @@ const SAK_18C = kjor("favoritter-og-pin", FELLES + FOTBALL + `
         ok("og heller ikke veien til Mitt lag, som star i linja",
            linje().hidden && linje().contains(document.getElementById("kontoMittLag")));
         ferdig();
+        });
+        });
+        });
       });
     });
   }

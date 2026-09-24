@@ -602,7 +602,16 @@ async function hentHusket(liga, del) {
   return data;
 }
 
-async function visMittLag(rot) {
+function visMittLag(rot) {
+  return tegnMittLag(rot, () => aktivDel === "mittlag", true);
+}
+
+// Kortene tegnes to steder: i fanen, og pa kontosiden bak navnet ditt i
+// toppfeltet. Samme kort og samme henting, sa de to ikke kan bli uenige
+// om et lag. `gjelder` svarer pa om rota fortsatt vises nar svarene
+// lander — i fanen er det aktivDel, pa kontosiden at den star apen.
+// `iFanen` bare for stempelet: «fanene over» finnes ikke pa kontosiden.
+export async function tegnMittLag(rot, gjelder, iFanen) {
   const lagene = favoritter.liste();
 
   // Uten et valgt lag er siden ikke tom — den forklarer hva som skal til,
@@ -627,7 +636,7 @@ async function visMittLag(rot) {
   await Promise.all(ligaer.map((liga) => hentHusket(liga, "tabell")
     .then((data) => { tabeller[liga] = data.tabell || []; tabellData[liga] = data; })
     .catch(() => { tabellFeil.push(liga); })));
-  if (aktivDel !== "mittlag") return;
+  if (!gjelder()) return;
 
   // Ligaenes rekkefolge, ikke svarenes: Promise.all fyller i den
   // rekkefolgen kallene svarer, og ligaForLag leser nokler i
@@ -643,13 +652,14 @@ async function visMittLag(rot) {
     hentHusket(liga, "resultater").then((d) => d, (err) => ({ feil: err.message })),
     hentHusket(liga, "neste").then((d) => d, (err) => ({ feil: err.message })),
   ]).then(([resultater, neste]) => { kamper[liga] = { resultater, neste }; })));
-  if (aktivDel !== "mittlag") return;
+  if (!gjelder()) return;
 
   const deler = hvor.map((h) => h.liga
     ? lagkort(h.lag, h.liga, tabellData[h.liga], kamper[h.liga])
     : ukjentLag(h.lag, tabellFeil));
   deler.push(el("p", "fotball-stempel",
-    "Samlet fra tabellen, resultatene og de kommende kampene — de samme som i fanene over."));
+    "Samlet fra tabellen, resultatene og de kommende kampene — de samme som i "
+    + (iFanen ? "fanene over." : "fanene under Fotball.")));
   rot.replaceChildren(...deler);
   rot.scrollTop = 0;
 }

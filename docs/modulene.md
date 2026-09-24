@@ -590,6 +590,17 @@ portalen — en leser har ingen nytte av den.
   fire tilstander og sier «følger kontoen» først når kontoen har svart. Den
   må tegnes både når en stjerne trykkes og når kontoen svarer — den sto med
   den gamle lista i første utkast.
+- **Navnet i toppfeltet åpner kontosiden, ikke menyen.** Kontosiden er
+  menypanelet med `.konto-modus` på: CSS-en tar bort søk, emner, deling og
+  tema, og `#kontoSide` får plassen emnelista hadde, med kortene fra Mitt
+  lag. Ett panel og ett kontopanel — to kopier kunne blitt uenige.
+  `openMenu()` slår modusen av, så hamburgeren alltid gir menyen; navnet
+  slår den på etterpå. **Kortene tegnes på nytt når lista endrer seg**
+  (`kontoSideLag` i `visKontoLag()`): kontoen svarer gjerne etter at siden
+  står åpen. **Et bytte av visning lukker siden** (`visFane`), for lenkene
+  i kortene går til kampen og tabellen bak panelet. Stjerna bytter ingen
+  visning og lar siden stå. Logger du ut der, tar menyen over i
+  `visKonto()`.
 - **Bytt PIN tar plassen til knappene**, ikke en rad under dem.
   `kontoByttar` er den ene tilstanden, og `visKonto()` leser den. Egne
   felt, ikke PIN-feltene fra innloggingen: `autocomplete` må si hvilken som
@@ -608,6 +619,11 @@ portalen — en leser har ingen nytte av den.
 
 [ADR 0012](adr/0012-kampkortet.md).
 
+- **Mitt lag-kortene tegnes to steder**, i fanen og på kontosiden, av den
+  samme `tegnMittLag(rot, gjelder, iFanen)`. `gjelder()` erstatter
+  `aktivDel === "mittlag"` som vakt mot et svar som lander etter at rota er
+  borte; `iFanen` styrer bare stempelet, for «fanene over» finnes ikke på
+  kontosiden.
 - **«Mitt lag» (`visMittLag`) er vennefanens søsken**: på tvers av ligaer,
   ingen egen henting. `hentHusket()` deler `husket` med de andre fanene, så
   et bytte mellom Tabell og Mitt lag koster ikke et kall til. Tabellen i
