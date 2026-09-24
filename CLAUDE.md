@@ -150,6 +150,16 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   stjernene til alle ved første fornying.
   **Og løftet er synlig:** linja i kontopanelet sier «følger kontoen» først
   når kontoen har svart. [ADR 0024](docs/adr/0024-favorittlag-og-pin-pa-kontoen.md)
+  **Navnet i toppfeltet åpner kontosiden, ikke menyen.** Den åpnet menyen
+  med kontopanelet ute til 24. september 2026, og da ga navnet og
+  hamburgeren samme skjermbilde — kontoen sto nederst, under søk og tjue
+  emner. Meldt: «ser ikke forskjell på hamburgermeny og brukernavn».
+  Kontosiden er samme panel med `.konto-modus`: kortene fra Mitt lag
+  øverst, Bytt PIN / Logg ut / Slett under. Ett kontopanel, ikke to.
+  **Hamburgeren gir alltid menyen**, og der står «Mitt lag →» sist i
+  linja om lagene — ikke som en fjerde knapp, som ga en footer på 308 px
+  mot taket på 300 i SAK_18. Lenka står også uten lag: fanen er der du ser
+  *hvorfor* det er tomt.
 - **Bytt PIN krever den gamle, og logger ut alle andre telefoner.** PIN-en
   er en sperre mellom folk som deler en telefon; kunne den byttes uten den
   gamle, kunne hvem som helst med telefonen ta kontoen. Den gamle prøves

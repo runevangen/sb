@@ -669,6 +669,53 @@ body {
 
 .konto-lag[hidden] { display: none; }
 
+/* Veien til Mitt lag, i linja om lagene. Den ser ut som en lenke fordi den
+   er veien et annet sted, ikke en handling pa kontoen — og fordi en knapp
+   med ramme her var 17 px hoyere enn linja den star i. */
+.konto-lag-til {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+.konto-lag-til:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Kontosiden: menypanelet med .konto-modus pa, apnet fra navnet i
+   toppfeltet. Sok, emner, deling og lenkene viker; kortene far plassen
+   emnelista hadde, og kontoen star i bunnen som ellers. Knappen som
+   folder kontoen inn og ut er borte ogsa — her ER du i kontoen.
+   Lenka «Mitt lag →» viker fordi kortene star rett over den. Tema og
+   skrift viker ogsa: de gjelder appen, ikke kontoen, og de delte tittelen
+   pa to linjer. Krysset blir. */
+.menu-panel.konto-modus .menu-tools .segment,
+.menu-panel.konto-modus .sok,
+.menu-panel.konto-modus .menu-list,
+.menu-panel.konto-modus .action-par,
+.menu-panel.konto-modus #kontoBtn,
+.menu-panel.konto-modus .action-lenker,
+.menu-panel.konto-modus .konto-lag-til { display: none; }
+
+.konto-side {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px 20px;
+}
+.konto-side[hidden] { display: none; }
+
+.konto-side-tittel {
+  margin: 0 0 10px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: calc(18px * var(--fs));
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
 .konto-pin {
   display: flex;
   flex-direction: column;

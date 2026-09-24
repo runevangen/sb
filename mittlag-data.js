@@ -19,10 +19,6 @@ import { lagnokkel } from "./pub-data.js";
 export const FORM_ANTALL = 5;
 export const SISTE_ANTALL = 5;
 export const KOMMENDE_ANTALL = 3;
-// To lag over og to under: nok til a se hva som skal til for a klatre og
-// hva som puster deg i nakken, og fem rader er en tabell man leser uten a
-// rulle.
-export const RUNDT = 2;
 
 export const UTFALL_NAVN = { V: "Seier", U: "Uavgjort", T: "Tap" };
 
@@ -50,21 +46,16 @@ export function ligaForLag(lag, tabeller) {
 // Poengavstanden regnes av tabellen, ikke av plassen: to lag pa like
 // poeng star over hverandre pa malforskjell, og «0 poeng opp» er da den
 // sanne opplysningen — ikke en feil.
-export function plasseringFor(rader, lag, rundt = RUNDT) {
+export function plasseringFor(rader, lag) {
   const liste = (Array.isArray(rader) ? rader : []).filter(Boolean);
   const i = liste.findIndex((r) => erLaget(r.lag, lag));
   if (i < 0) return null;
   const rad = liste[i];
-  // Utsnittet holder fem rader ogsa overst og nederst: forste plass far
-  // de fire under seg, ikke bare to.
-  const bredde = rundt * 2 + 1;
-  const fra = Math.max(0, Math.min(i - rundt, liste.length - bredde));
   const over = i > 0 ? liste[i - 1] : null;
   const under = i < liste.length - 1 ? liste[i + 1] : null;
   return {
     rad,
     antall: liste.length,
-    utsnitt: liste.slice(fra, fra + bredde),
     over: over ? { plass: over.plass, poeng: tallEllerNull(over.poeng, rad.poeng) } : null,
     under: under ? { plass: under.plass, poeng: tallEllerNull(rad.poeng, under.poeng) } : null,
   };
