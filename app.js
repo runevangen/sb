@@ -2218,11 +2218,17 @@ document.getElementById("hvemTag").addEventListener("click", () => {
 // og deling, og kortene far plassen emnelista hadde. Ett panel, ikke to —
 // kontodelen finnes ett sted, og de to visningene kan ikke bli uenige om
 // den. Tittelen og lukkeknappen sier hvor du er.
+//
+// Tittelen er «Mitt lag», ikke «Kontoen din» over en egen «Mitt lag»: to
+// overskrifter pa rad kostet en hel rad over kortene, og den forste sa
+// ingenting du ikke visste etter a ha trykket pa ditt eget navn. Meldt med
+// skjermbilde 24. september 2026. Skjermleseren far fortsatt «Kontoen din»
+// som navn pa panelet — der er det navnet pa stedet, ikke en overskrift.
 function settKontoModus(pa) {
   const panel = document.getElementById("menuPanel");
   panel.classList.toggle("konto-modus", pa);
   panel.setAttribute("aria-label", pa ? "Kontoen din" : "Hovedmeny");
-  panel.querySelector(".menu-title").textContent = pa ? "Kontoen din" : "Meny";
+  panel.querySelector(".menu-title").textContent = pa ? "Mitt lag" : "Meny";
   document.getElementById("menuLukk").textContent = pa ? "Lukk" : "Lukk menyen";
   document.getElementById("kontoSide").hidden = !pa;
   kontoSideLag = null;
@@ -2243,7 +2249,7 @@ function tegnKontoside() {
   const nokkel = favorittlag().join("|");
   kontoSideLag = nokkel;
   const kort = document.createElement("div");
-  side.replaceChildren(el("h2", "konto-side-tittel", "Mitt lag"), kort);
+  side.replaceChildren(kort);
   side.scrollTop = 0;
   tegnMittLag(kort, () => isMenuOpen() && erKontoModus() && kontoSideLag === nokkel, false);
 }

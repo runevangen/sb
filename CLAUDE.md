@@ -156,6 +156,10 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   emner. Meldt: «ser ikke forskjell på hamburgermeny og brukernavn».
   Kontosiden er samme panel med `.konto-modus`: kortene fra Mitt lag
   øverst, Bytt PIN / Logg ut / Slett under. Ett kontopanel, ikke to.
+  **Toppraden heter «Mitt lag», og det står ingen overskrift til.**
+  «Kontoen din» over «Mitt lag» var to overskrifter på rad, og den første
+  kostet en rad uten å si noe du ikke visste etter å ha trykket på ditt
+  eget navn. Panelets `aria-label` er fortsatt «Kontoen din».
   **Hamburgeren gir alltid menyen**, og der står «Mitt lag →» sist i
   linja om lagene — ikke som en fjerde knapp, som ga en footer på 308 px
   mot taket på 300 i SAK_18. Lenka står også uten lag: fanen er der du ser

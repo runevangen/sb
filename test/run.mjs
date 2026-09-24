@@ -6886,8 +6886,14 @@ const SAK_18C = kjor("favoritter-og-pin", FELLES + FOTBALL + `
     // emner.
     ok("navnet apner kontosiden, ikke menyen",
        panel.classList.contains("open") && panel.classList.contains("konto-modus") &&
-       !side.hidden && panel.querySelector(".menu-title").textContent === "Kontoen din",
-       panel.className + " " + panel.querySelector(".menu-title").textContent);
+       !side.hidden && panel.getAttribute("aria-label") === "Kontoen din",
+       panel.className + " " + panel.getAttribute("aria-label"));
+    // Én overskrift, ikke to pa rad: «Kontoen din» over «Mitt lag» kostet
+    // en hel rad over kortene.
+    ok("toppraden heter Mitt lag, og det star ingen overskrift til under",
+       panel.querySelector(".menu-title").textContent === "Mitt lag" &&
+       !side.querySelector("h1, h2"),
+       panel.querySelector(".menu-title").textContent);
     ok("sok, emner og deling viker for den",
        !vises("menuList") && !vises("sokForm") && !vises("shareBtn") && !vises("kontoBtn"));
     ok("og kontoen star under kortene, med Bytt PIN",
