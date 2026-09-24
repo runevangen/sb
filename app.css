@@ -499,8 +499,6 @@ body {
   color: var(--accent);
 }
 
-.admin-lenke { color: var(--text-dim); }
-.admin-lenke:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .action-note {
   margin: 2px 0 0;
@@ -525,16 +523,19 @@ body {
   word-break: break-all;
 }
 
-/* To lenker pa én linje framfor to avsnitt. Bryter de likevel — lang
-   tekst, stor skrift — er det to linjer, ikke et kuttet ord: skillet er
-   ren dekor og forsvinner ved linjeskift. */
-.action-lenker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 8px;
+/* Personvern og Admin er bokser som de andre valgene, ikke to sma lenker
+   under dem. De sto som understreket tekst i 12 px til 24. september 2026,
+   og var det eneste i bunnen av menyen som ikke sa det samme som resten:
+   dette kan du trykke pa. <a> fordi de gar til en annen side.
+   Litt lavere og mindre enn Del og Logg inn: de er sekundaere, og i full
+   storrelse brot «Personvern og sletting» over to linjer pa halv bredde.
+   Da ble bunnen av menyen 230 px mot taket pa 220 i SAK_1. */
+.action-lenker .action-btn {
+  padding: 9px 10px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  text-decoration: none;
 }
-
-.lenke-skille { color: var(--text-faint); }
 
 /* Innloggingen: to felt og en knapp, rett under knappen som apner den.
    Ingen dialog — det er ett sporsmal, og menyen er alt apen. */
@@ -669,26 +670,10 @@ body {
 
 .konto-lag[hidden] { display: none; }
 
-/* Veien til Mitt lag, i linja om lagene. Den ser ut som en lenke fordi den
-   er veien et annet sted, ikke en handling pa kontoen — og fordi en knapp
-   med ramme her var 17 px hoyere enn linja den star i. */
-.konto-lag-til {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--accent);
-  font: inherit;
-  text-decoration: underline;
-  cursor: pointer;
-  -webkit-appearance: none;
-}
-.konto-lag-til:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
 /* Kontosiden: menypanelet med .konto-modus pa, apnet fra navnet i
    toppfeltet. Sok, emner, deling og lenkene viker; kortene far plassen
    emnelista hadde, og kontoen star i bunnen som ellers. Knappen som
-   folder kontoen inn og ut er borte ogsa — her ER du i kontoen.
-   Lenka «Mitt lag →» viker fordi kortene star rett over den. Tema og
+   folder kontoen inn og ut er borte ogsa — her ER du i kontoen. Tema og
    skrift viker ogsa: de gjelder appen, ikke kontoen, og de delte tittelen
    pa to linjer. Krysset blir. */
 .menu-panel.konto-modus .menu-tools .segment,
@@ -696,8 +681,12 @@ body {
 .menu-panel.konto-modus .menu-list,
 .menu-panel.konto-modus .action-par,
 .menu-panel.konto-modus #kontoBtn,
-.menu-panel.konto-modus .action-lenker,
-.menu-panel.konto-modus .konto-lag-til { display: none; }
+.menu-panel.konto-modus .action-lenker { display: none; }
+
+/* Og motsatt: med et navn i toppfeltet har menyen ingen konto. Navnet er
+   veien dit, og to veier til samme panel er én for mye. */
+.menu-panel.har-navn:not(.konto-modus) #kontoBtn,
+.menu-panel.har-navn:not(.konto-modus) #kontoPanel { display: none; }
 
 .konto-side {
   flex: 1;

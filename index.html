@@ -177,14 +177,13 @@
           <p class="konto-svar" id="kontoSvar" aria-live="polite"></p>
         </div>
         <p class="action-note" id="actionNote" hidden></p>
-        <!-- To lenker pa én linje. Adminportalen er apen, men uten passord
-             skjer ingenting der. Personvern star forst: den gjelder alle
-             som apner menyen, admin gjelder én. -->
-        <p class="action-note action-lenker">
-          <a class="admin-lenke" href="/personvern.html">Personvern og sletting</a>
-          <span class="lenke-skille" aria-hidden="true">·</span>
-          <a class="admin-lenke" href="/admin.html">Admin</a>
-        </p>
+        <!-- To bokser pa én rad, som Del og Installer. Adminportalen er
+             apen, men uten passord skjer ingenting der. Personvern star
+             forst: den gjelder alle som apner menyen, admin gjelder én. -->
+        <div class="action-par action-lenker">
+          <a class="action-btn" href="/personvern.html">Personvern og sletting</a>
+          <a class="action-btn" href="/admin.html">Admin</a>
+        </div>
         <!-- Krysset i toppen ligger under statuslinja pa iPhone og er vondt
              a treffe med tommelen. Denne star der hanmden er. -->
         <button class="menu-lukk" id="menuLukk" type="button">Lukk menyen</button>

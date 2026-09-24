@@ -595,7 +595,10 @@ portalen — en leser har ingen nytte av den.
   tema, og `#kontoSide` får plassen emnelista hadde, med kortene fra Mitt
   lag. Ett panel og ett kontopanel — to kopier kunne blitt uenige.
   Tittelen i toppraden er «Mitt lag», og `#kontoSide` har ingen egen
-  overskrift; «Kontoen din» er panelets `aria-label`.
+  overskrift; «Kontoen din» er panelets `aria-label`. **`.har-navn`** er
+  det motsatte grepet: satt i `visKonto()` av `kontoOkt.navn`, skjuler den
+  `#kontoBtn` og `#kontoPanel` i den vanlige menyen. Navnet, ikke økta —
+  uten navn finnes ingen knapp i toppfeltet å gå via.
   `openMenu()` slår modusen av, så hamburgeren alltid gir menyen; navnet
   slår den på etterpå. **Kortene tegnes på nytt når lista endrer seg**
   (`kontoSideLag` i `visKontoLag()`): kontoen svarer gjerne etter at siden

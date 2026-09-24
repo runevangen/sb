@@ -1160,8 +1160,7 @@ function visKontoLag() {
   if (erKontoModus() && isMenuOpen() && favorittlag().join("|") !== kontoSideLag) tegnKontoside();
   if (!kontoOkt || kontoByttar) { linje.hidden = true; return; }
   linje.hidden = false;
-  linje.textContent = kontoLagTekst() + " ";
-  linje.appendChild(tilMittLag());
+  linje.textContent = kontoLagTekst();
 }
 
 function kontoLagTekst() {
@@ -1175,30 +1174,6 @@ function kontoLagTekst() {
   else if (prefs.lagUsendt) status = " — ikke lagret på kontoen ennå.";
   else if (prefs.lagPaKonto !== true) status = " — henter fra kontoen …";
   return hva + status;
-}
-
-// «Mitt lag →» pa slutten av linja om lagene dine. Linja er stedet i
-// panelet som alt handler om dem, og det er der du leter etter veien til
-// dem. Knappen star i linja og ikke i raden med Bytt PIN, og den er malt
-// for den kom dit: en fjerde knapp der presset teksten over to linjer og
-// gjorde bunnen av menyen 308 px mot et tak pa 300. Taket er det som
-// holder emnelista lesbar. Her koster den ingenting, og menyen er 291 px
-// som for.
-//
-// Den star ogsa nar du ikke har noe lag. Mitt lag forklarer da hva som
-// skal til, og har en knapp til tabellen. En lenke som forsvant i det du
-// trengte a finne veien, ville vaert verre enn ingen.
-function tilMittLag() {
-  const til = document.createElement("button");
-  til.type = "button";
-  til.className = "konto-lag-til";
-  til.id = "kontoMittLag";
-  til.textContent = "Mitt lag →";
-  til.addEventListener("click", () => {
-    closeMenu();
-    settFane("fotball", null, "mittlag");
-  });
-  return til;
 }
 
 // Okta lagres uten lista. Den bor i visningsvalgene; en kopi i okta ville
@@ -1958,6 +1933,13 @@ function visKonto() {
   const pinSkjema = document.getElementById("kontoPinSkjema");
 
   visHvem();
+  // Med et navn i toppfeltet bor kontoen bak det, og menyen har den ikke.
+  // «Rune» og Bytt PIN / Logg ut / Slett sto i menyen ogsa etter at navnet
+  // fikk sin egen side — to veier til samme panel. Uten navn (en gammel
+  // okt fra e-postinnloggingen) finnes ingen knapp i toppfeltet, og da er
+  // menyen fortsatt veien til Logg ut.
+  document.getElementById("menuPanel").classList.toggle("har-navn",
+    !!(kontoOkt && kontoOkt.navn));
 
   if (kontoOkt) {
     tekst.textContent = kontoOkt.navn || maskerEpost(kontoOkt.epost);
