@@ -7,7 +7,7 @@
 // app.js gjennom naviger(), som setter adressen — da virker tilbakeknappen
 // likt her som i resten av appen.
 
-import { LIGAER, DELER, FANER, DEL_NAVN, HVOR, STED_MAKS, delingstekst,
+import { LIGAER, DELER, FANER, DEL_NAVN, HVOR, STED_MAKS, delingstekst, tidstekst,
          kamplenke, invitasjonstekst, stedtekst, kampeneFramover,
          kampNokkel, kanalFor } from "./fotball-data.js";
 import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
@@ -26,6 +26,8 @@ import { sjekkForslag, alleredeILista, NAVN_MAKS, ADRESSE_MAKS, MERKNAD_MAKS }
 import { bekreftetFor, merkBekreftet, tolkVisninger,
          avkreftetFor, utenAvkreftede } from "./visning-data.js";
 import { arenaFor } from "./vaer-data.js";
+import { ligaForLag, plasseringFor, avstandTekst, formFor, spilteFor, kommendeFor,
+         UTFALL_NAVN } from "./mittlag-data.js";
 import { KANALER } from "./kanaler.js";
 
 // Kuraterte steder vi stoler pa. «usikker» vises ikke: et sted vi ikke
@@ -60,9 +62,9 @@ import { timeAgo, listeTekst } from "./lib.js";
 
 let naviger = () => {};
 let sokEtterLag = () => {};
-// Favorittlag eies av app.js (det er lagring). Modulen far bare to
-// sporsmal: er dette laget valgt, og bytt.
-let favoritter = { er: () => false, veksle: () => false };
+// Favorittlag eies av app.js (det er lagring). Modulen far tre sporsmal:
+// er dette laget valgt, bytt, og hvilke er valgt (til «Mitt lag»).
+let favoritter = { er: () => false, veksle: () => false, liste: () => [] };
 // Deling eies ogsa av app.js: samme delingsmeny og samme utklippstavle-
 // fallback som «Del appen». Svarer med hva som skjedde.
 let deling = async () => "feil";
@@ -258,6 +260,7 @@ export async function visFotball(liga, del, invitasjon) {
   // Vennefanen svarer pa tvers av ligaer, sa den har ingen liga og
   // ingen egen henting — den slar sammen de andre.
   if (del === "venner") return visVenner(rot);
+  if (del === "mittlag") return visMittLag(rot);
 
   const nokkel = liga + "/" + del;
   const lagret = husket.get(nokkel);
@@ -563,6 +566,219 @@ async function visVenner(rot) {
   rot.appendChild(el("p", "fotball-stempel",
     "Alle som er logget inn og har svart. Faste vennegrupper kommer."));
   tegnSvar(rot);
+}
+
+/* ---------- mitt lag ---------- */
+
+// Alt appen vet om favorittlagene dine, samlet: plassen, formen, neste
+// kamp og de siste. Pa tvers av ligaer, som vennefanen — laget ditt spiller
+// der det spiller, og ligavelgeren over svarer ikke pa det.
+//
+// **Ingen nye kall mot API-Football.** Tabellen, resultatene og de
+// kommende kampene er de samme svarene de andre fanene henter, cachet pa
+// kanten, og dognkvoten er regnet ut for alle tre i alle ligaene
+// (kallPerDogn). Tabellene hentes for a finne ligaen: favorittlaget er et
+// navn og ingenting annet, og det er ligaen der det star.
+//
+// Virker uten konto, som stjerna. Innlogget folger lista kontoen; her er
+// den den samme lista uansett.
+async function hentHusket(liga, del) {
+  const nokkel = liga + "/" + del;
+  const lagret = husket.get(nokkel);
+  if (lagret && Date.now() - lagret.hentet < HUSKE_MS) return lagret.data;
+  const data = await hent(liga, del);
+  husket.set(nokkel, { data, hentet: Date.now() });
+  return data;
+}
+
+async function visMittLag(rot) {
+  const lagene = favoritter.liste();
+
+  // Uten et valgt lag er siden ikke tom — den forklarer hva som skal til,
+  // og veien dit er ett trykk.
+  if (!lagene.length) {
+    const boks = tilstand("Du følger ingen lag ennå. Trykk ☆ ved et lag i tabellen,"
+      + " så samles plassering, form og kamper her.");
+    const knapp = el("button", "mittlag-til-tabell", "Gå til tabellen");
+    knapp.type = "button";
+    knapp.addEventListener("click", () => naviger(aktivLiga, "tabell"));
+    boks.appendChild(knapp);
+    rot.replaceChildren(boks);
+    return;
+  }
+
+  rot.replaceChildren(tilstand("Henter " + (lagene.length > 1 ? "lagene dine" : lagene[0]) + " …"));
+
+  const ligaer = Object.keys(LIGAER);
+  const tabeller = {};
+  const tabellData = {};
+  const tabellFeil = [];
+  await Promise.all(ligaer.map((liga) => hentHusket(liga, "tabell")
+    .then((data) => { tabeller[liga] = data.tabell || []; tabellData[liga] = data; })
+    .catch(() => { tabellFeil.push(liga); })));
+  if (aktivDel !== "mittlag") return;
+
+  // Ligaenes rekkefolge, ikke svarenes: Promise.all fyller i den
+  // rekkefolgen kallene svarer, og ligaForLag leser nokler i
+  // innsettingsrekkefolge.
+  const ordnet = {};
+  ligaer.forEach((liga) => { if (tabeller[liga]) ordnet[liga] = tabeller[liga]; });
+
+  const hvor = lagene.map((lag) => ({ lag, liga: ligaForLag(lag, ordnet) }));
+  const trengs = Array.from(new Set(hvor.map((h) => h.liga).filter(Boolean)));
+
+  const kamper = {};
+  await Promise.all(trengs.map((liga) => Promise.all([
+    hentHusket(liga, "resultater").then((d) => d, (err) => ({ feil: err.message })),
+    hentHusket(liga, "neste").then((d) => d, (err) => ({ feil: err.message })),
+  ]).then(([resultater, neste]) => { kamper[liga] = { resultater, neste }; })));
+  if (aktivDel !== "mittlag") return;
+
+  const deler = hvor.map((h) => h.liga
+    ? lagkort(h.lag, h.liga, tabellData[h.liga], kamper[h.liga])
+    : ukjentLag(h.lag, tabellFeil));
+  deler.push(el("p", "fotball-stempel",
+    "Samlet fra tabellen, resultatene og de kommende kampene — de samme som i fanene over."));
+  rot.replaceChildren(...deler);
+  rot.scrollTop = 0;
+}
+
+// Et lag vi ikke fant, star likevel — og sier hvorfor. Forsvant det stille,
+// ville det sett ut som om stjerna ikke virket. Svarte ikke alle tabellene,
+// kan laget sta i en av dem, og da er det den forklaringen som er sann.
+function ukjentLag(lag, tabellFeil) {
+  const kort = el("section", "mittlag-kort");
+  kort.appendChild(el("h2", "mittlag-navn", lag));
+  const navn = Object.keys(LIGAER).map((l) => LIGAER[l].navn);
+  kort.appendChild(el("p", "mittlag-merknad", tabellFeil.length
+    ? "Fant ikke laget, men " + listeTekst(tabellFeil.map((l) => LIGAER[l].navn))
+      + " svarte ikke. Prøv igjen om litt."
+    : "Fant ikke laget i tabellene vi har — " + listeTekst(navn) + "."));
+  return kort;
+}
+
+function lagkort(lag, liga, tabellData, kamper) {
+  const rader = (tabellData && tabellData.tabell) || [];
+  const kort = el("section", "mittlag-kort");
+  const hode = el("div", "mittlag-hode");
+  hode.appendChild(el("h2", "mittlag-navn", lag));
+  hode.appendChild(el("span", "mittlag-liga", LIGAER[liga].navn));
+  kort.appendChild(hode);
+  // Er tabellen fra en annen sesong enn den vi star i, ma det sta for
+  // tallene leses — samme regel som sesongmerket i fanene.
+  if (tabellData && tabellData.sisteSesong === false) {
+    kort.appendChild(el("p", "mittlag-merknad",
+      "Sesong " + tabellData.sesong + " — ikke inneværende."));
+  }
+
+  // Plassen, i tall og i ord.
+  const plass = plasseringFor(rader, lag);
+  if (plass) {
+    const r = plass.rad;
+    kort.appendChild(el("p", "mittlag-plass",
+      r.plass + ". plass av " + plass.antall + " · " + r.poeng + " poeng · "
+      + r.kamper + " kamper"));
+    const avstand = avstandTekst(plass);
+    if (avstand) kort.appendChild(el("p", "mittlag-avstand", avstand));
+  }
+
+  const res = kamper && kamper.resultater;
+  const neste = kamper && kamper.neste;
+
+  // Formen: de siste fem, eldst til venstre. Bokstaven og fargen sier det
+  // samme, og ordet star i aria-label — fargen alene er en konvensjon.
+  if (res && !res.feil) {
+    const form = formFor(res.kamper, lag);
+    if (form.length) {
+      const rad = el("div", "mittlag-form");
+      rad.appendChild(el("span", "mittlag-etikett", "Form"));
+      form.forEach((f) => {
+        const merke = el("span", "mittlag-utfall", f.utfall);
+        merke.dataset.utfall = f.utfall;
+        merke.title = UTFALL_NAVN[f.utfall] + " mot " + f.mot;
+        merke.setAttribute("aria-label", UTFALL_NAVN[f.utfall] + " mot " + f.mot);
+        rad.appendChild(merke);
+      });
+      kort.appendChild(rad);
+    }
+  }
+
+  // Neste kamp, med veien til kortet der den avtales. Kanalen star bare nar
+  // noen har sjekket den (kanaler.js) — ellers ingenting, ikke en gjetning.
+  if (neste && !neste.feil) {
+    const kommende = kommendeFor(neste.kamper, lag);
+    if (kommende.length) {
+      const forste = kommende[0];
+      const boks = el("div", "mittlag-neste");
+      boks.appendChild(el("h3", "mittlag-del", "Neste kamp"));
+      boks.appendChild(el("p", "mittlag-kamp", forste.kamp.hjemme + " – " + forste.kamp.borte));
+      const nar = tidstekst(forste.kamp.dato);
+      const kanal = kanalFor(liga, KANALER);
+      const linje = [nar, forste.hjemme ? "hjemme" : "borte", kanal ? kanal.kanal : ""]
+        .filter(Boolean).join(" · ");
+      boks.appendChild(el("p", "mittlag-nar", linje));
+      if (neste.sisteSesong !== false) {
+        const lenke = el("a", "mittlag-lenke", "Hvor ser du den? →");
+        lenke.href = kamplenke(liga, forste.kamp);
+        boks.appendChild(lenke);
+      }
+      kort.appendChild(boks);
+      if (kommende.length > 1) kort.appendChild(kampbolk("Senere", kommende.slice(1), false));
+    }
+  } else if (neste && neste.feil) {
+    kort.appendChild(el("p", "mittlag-merknad", "Fikk ikke hentet de kommende kampene: " + neste.feil));
+  }
+
+  // Tabellen rundt laget: de samme radene som i fanen, bare fem av dem.
+  if (plass) {
+    const del = el("div", "mittlag-tabell");
+    del.appendChild(el("h3", "mittlag-del", "Tabellen rundt"));
+    const t = tabell(plass.utsnitt);
+    t.querySelectorAll("tbody tr").forEach((tr, i) => {
+      if (plass.utsnitt[i] === plass.rad) tr.classList.add("mittlag-egen");
+    });
+    del.appendChild(t);
+    kort.appendChild(del);
+  }
+
+  if (res && !res.feil) {
+    const siste = spilteFor(res.kamper, lag);
+    if (siste.length) kort.appendChild(kampbolk("Siste kamper", siste, true));
+  } else if (res && res.feil) {
+    kort.appendChild(el("p", "mittlag-merknad", "Fikk ikke hentet resultatene: " + res.feil));
+  }
+
+  const sok = el("button", "mittlag-sok", "Saker om " + lag);
+  sok.type = "button";
+  sok.addEventListener("click", () => sokEtterLag(lag));
+  kort.appendChild(sok);
+  return kort;
+}
+
+function kampbolk(tittel, liste, spilt) {
+  const boks = el("div", "mittlag-bolk");
+  boks.appendChild(el("h3", "mittlag-del", tittel));
+  const ul = el("ul", "mittlag-kamper");
+  liste.forEach((f) => {
+    const li = el("li", "mittlag-rad");
+    const dato = f.kamp.dato ? new Date(f.kamp.dato) : null;
+    li.appendChild(el("span", "mittlag-dato", dato && !Number.isNaN(dato.getTime())
+      ? dato.toLocaleDateString("nb-NO", { day: "numeric", month: "short", timeZone: "Europe/Oslo" })
+      : ""));
+    const k = f.kamp;
+    li.appendChild(el("span", "mittlag-motstander", spilt
+      ? k.hjemme + " " + k.malHjemme + "–" + k.malBorte + " " + k.borte
+      : k.hjemme + " – " + k.borte));
+    if (spilt) {
+      const merke = el("span", "mittlag-utfall", f.utfall);
+      merke.dataset.utfall = f.utfall;
+      merke.setAttribute("aria-label", UTFALL_NAVN[f.utfall]);
+      li.appendChild(merke);
+    }
+    ul.appendChild(li);
+  });
+  boks.appendChild(ul);
+  return boks;
 }
 
 /* ---------- kamper ---------- */

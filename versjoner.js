@@ -25,6 +25,12 @@
 // Nyeste først.
 export const VERSJONER = [
   {
+    versjon: "2026.09.24",
+    endringer: [
+      { hva: "Ny fane «Mitt lag» i fotballen: plass i tabellen, form, neste kamp og de siste resultatene for lagene du følger — samlet på ett sted." },
+    ],
+  },
+  {
     versjon: "2026.09.22",
     endringer: [
       { hva: "Hver pub og hvert stadion har fått «Veien dit» — én trykk inn i kartet på telefonen, med sving for sving.", issue: 144 },
