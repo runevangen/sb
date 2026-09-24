@@ -150,6 +150,10 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   stjernene til alle ved første fornying.
   **Og løftet er synlig:** linja i kontopanelet sier «følger kontoen» først
   når kontoen har svart. [ADR 0024](docs/adr/0024-favorittlag-og-pin-pa-kontoen.md)
+  **«Mitt lag →» står sist i den linja, ikke som en fjerde knapp.** Med
+  en knapp til ved Bytt PIN / Logg ut / Slett ble footeren 308 px ved
+  `--fs: 1.15`, over taket på 300 i SAK_18; i linja er den 291. Lenka står
+  også uten lag — fanen er der du ser *hvorfor* det er tomt.
 - **Bytt PIN krever den gamle, og logger ut alle andre telefoner.** PIN-en
   er en sperre mellom folk som deler en telefon; kunne den byttes uten den
   gamle, kunne hvem som helst med telefonen ta kontoen. Den gamle prøves

@@ -669,6 +669,21 @@ body {
 
 .konto-lag[hidden] { display: none; }
 
+/* Veien til Mitt lag, i linja om lagene. Den ser ut som en lenke fordi den
+   er veien et annet sted, ikke en handling pa kontoen — og fordi en knapp
+   med ramme her var 17 px hoyere enn linja den star i. */
+.konto-lag-til {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+.konto-lag-til:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 .konto-pin {
   display: flex;
   flex-direction: column;

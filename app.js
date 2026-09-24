@@ -1159,17 +1159,45 @@ function visKontoLag() {
   const linje = document.getElementById("kontoLag");
   if (!kontoOkt || kontoByttar) { linje.hidden = true; return; }
   linje.hidden = false;
+  linje.textContent = kontoLagTekst() + " ";
+  linje.appendChild(tilMittLag());
+}
+
+function kontoLagTekst() {
   const lag = favorittlag();
   if (!lag.length && prefs.lagPaKonto === true && !prefs.lagUsendt && !lagSendes) {
-    linje.textContent = "Ingen favorittlag. Velg med ☆ i tabellen.";
-    return;
+    return "Ingen favorittlag. Velg med ☆ i tabellen.";
   }
   const hva = lag.length ? "★ " + listeTekst(lag) : "Ingen favorittlag";
   let status = " — følger kontoen.";
   if (lagSendes || lagKlokke) status = " — lagres på kontoen …";
   else if (prefs.lagUsendt) status = " — ikke lagret på kontoen ennå.";
   else if (prefs.lagPaKonto !== true) status = " — henter fra kontoen …";
-  linje.textContent = hva + status;
+  return hva + status;
+}
+
+// «Mitt lag →» pa slutten av linja om lagene dine. Linja er stedet i
+// panelet som alt handler om dem, og det er der du leter etter veien til
+// dem. Knappen star i linja og ikke i raden med Bytt PIN, og den er malt
+// for den kom dit: en fjerde knapp der presset teksten over to linjer og
+// gjorde bunnen av menyen 308 px mot et tak pa 300. Taket er det som
+// holder emnelista lesbar. Her koster den ingenting, og menyen er 291 px
+// som for.
+//
+// Den star ogsa nar du ikke har noe lag. Mitt lag forklarer da hva som
+// skal til, og har en knapp til tabellen. En lenke som forsvant i det du
+// trengte a finne veien, ville vaert verre enn ingen.
+function tilMittLag() {
+  const til = document.createElement("button");
+  til.type = "button";
+  til.className = "konto-lag-til";
+  til.id = "kontoMittLag";
+  til.textContent = "Mitt lag →";
+  til.addEventListener("click", () => {
+    closeMenu();
+    settFane("fotball", null, "mittlag");
+  });
+  return til;
 }
 
 // Okta lagres uten lista. Den bor i visningsvalgene; en kopi i okta ville

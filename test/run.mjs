@@ -6864,6 +6864,14 @@ const SAK_18C = kjor("favoritter-og-pin", FELLES + FOTBALL + `
        !linje().hidden && linje().textContent.indexOf("Brann og Molde") > -1, linje().textContent);
     ok("og at de folger kontoen", linje().textContent.indexOf("følger kontoen") > -1,
        linje().textContent);
+    // Veien til Mitt lag star i den samme linja, ikke i raden med knappene:
+    // en fjerde knapp der gjorde bunnen av menyen 308 px mot taket pa 300.
+    var til = document.getElementById("kontoMittLag");
+    ok("linja om lagene har veien til Mitt lag",
+       !!til && til.parentNode === linje() && til.textContent === "Mitt lag →",
+       til ? til.textContent : "fant den ikke");
+    ok("og den er en knapp, ikke tekst man ma gjette er trykkbar",
+       !!til && til.tagName === "BUTTON" && til.type === "button", til && til.tagName);
 
     // En stjerne i tabellen gar til kontoen, etter et lite pust.
     var stjerner = document.querySelectorAll(".tabell .lag-stjerne");
@@ -6974,7 +6982,21 @@ const SAK_18C = kjor("favoritter-og-pin", FELLES + FOTBALL + `
            na.value === "" && ny.value === "" && ny2.value === "" && skjema.hidden &&
            !document.getElementById("kontoPar").hidden && note.hidden);
 
+        // Trykket pa «Mitt lag →»: menyen lukkes, og du star pa fanen.
+        document.getElementById("kontoMittLag").click();
+        ok("Mitt lag-lenka lukker menyen",
+           !document.getElementById("menuPanel").classList.contains("open"));
+        ok("og apner fotballen",
+           document.getElementById("fotball").hidden === false &&
+           document.getElementById("feed").hidden === true);
+        ok("pa fanen Mitt lag, og adressen sier det",
+           location.hash.slice(-8) === "/mittlag", location.hash);
+        var fane = document.querySelector("#fotballFaner [aria-current='true']");
+        ok("og fanen er merket som den du star i",
+           !!fane && fane.dataset.verdi === "mittlag", fane && fane.dataset.verdi);
+
         // Utlogget blir lagene staende pa telefonen, men glemmer kontoen.
+        document.getElementById("hvemTag").click();
         document.getElementById("kontoUt").click();
         ok("utlogget blir favorittlagene staende",
            JSON.stringify(prefs().lag) === JSON.stringify(["Brann", "Molde"]),
@@ -6983,6 +7005,8 @@ const SAK_18C = kjor("favoritter-og-pin", FELLES + FOTBALL + `
            prefs().lagPaKonto === undefined && prefs().lagUsendt === undefined, JSON.stringify(prefs()));
         ok("og utlogget star verken linja eller bytt PIN",
            linje().hidden && knapp.hidden && skjema.hidden);
+        ok("og heller ikke veien til Mitt lag, som star i linja",
+           linje().hidden && linje().contains(document.getElementById("kontoMittLag")));
         ferdig();
       });
     });
