@@ -627,8 +627,10 @@ portalen — en leser har ingen nytte av den.
 - **«Mitt lag» (`visMittLag`) er vennefanens søsken**: på tvers av ligaer,
   ingen egen henting. `hentHusket()` deler `husket` med de andre fanene, så
   et bytte mellom Tabell og Mitt lag koster ikke et kall til. Tabellen i
-  kortet er den samme `tabell()` som i fanen, bare fem rader — stjerna og
-  lagsøket følger med. En sesong som ikke er inneværende står i kortet før
+  kortet er den samme `tabell()` som i fanen, **hele**, med laget merket —
+  stjerna og lagsøket følger med. Den var fem rader rundt laget til
+  24. september 2026 («spander plass på hele tabellen»), og `utsnitt` og
+  `RUNDT` ble tatt ut av `mittlag-data.js` med den. En sesong som ikke er inneværende står i kortet før
   tallene, og da lenker ikke neste kamp til avtalekortet: en kamp fra i fjor
   er ingenting å avtale rundt.
 - **Modulen eier ikke ruting, lagring eller innlogging.** Trykk går tilbake

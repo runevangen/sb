@@ -31,6 +31,7 @@ export const VERSJONER = [
       { hva: "Du kan bytte PIN selv: trykk på navnet ditt og velg «Bytt PIN». Alle andre telefoner blir logget ut." },
       { hva: "Ny fane «Mitt lag» i fotballen: plass i tabellen, form, neste kamp og de siste resultatene for lagene du følger — samlet på ett sted." },
       { hva: "Trykk på navnet ditt oppe til høyre, og du får kontosiden: lagene dine med plass, form og kamper øverst, og Bytt PIN og Logg ut under. Hamburgeren gir menyen som før." },
+      { hva: "Kortet i Mitt lag viser hele tabellen med laget ditt merket, ikke bare de fem radene rundt." },
     ],
   },
   {

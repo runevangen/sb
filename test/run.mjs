@@ -7885,7 +7885,7 @@ const SAK_20C = kjor("mitt-lag", FELLES + FOTBALL + `
     ok("og gir ingen lenke til a avtale kampen", !brann.querySelector(".mittlag-lenke"));
 
     var egen = brann.querySelector(".mittlag-egen");
-    ok("tabellen rundt merker laget", egen &&
+    ok("tabellen merker laget", egen &&
        egen.querySelector(".lag-navn").textContent === "Brann",
        egen && egen.textContent);
     ok("og stjerna der er tent", egen.querySelector(".lag-stjerne").getAttribute("aria-pressed") === "true");
@@ -7935,6 +7935,17 @@ const SAK_20D = kjor("mitt-lag-tom", FELLES + FOTBALL + `
     }
     return grunn(u, o);
   };
+  // Sju lag, ikke tre: kortet skal vise hele tabellen, og et utsnitt pa
+  // fem rader er ikke til a skille fra hele nar tabellen er kortere.
+  TABELL.push(
+    { plass: 4, lag: "Viking", kamper: 30, seier: 9, uavgjort: 7, tap: 14, scoret: 38,
+      sluppet: 45, differanse: -7, poeng: 34, merke: null },
+    { plass: 5, lag: "Molde", kamper: 30, seier: 9, uavgjort: 6, tap: 15, scoret: 36,
+      sluppet: 44, differanse: -8, poeng: 33, merke: null },
+    { plass: 6, lag: "Rosenborg", kamper: 30, seier: 8, uavgjort: 7, tap: 15, scoret: 35,
+      sluppet: 47, differanse: -12, poeng: 31, merke: null },
+    { plass: 7, lag: "Lillestrom", kamper: 30, seier: 5, uavgjort: 5, tap: 20, scoret: 28,
+      sluppet: 60, differanse: -32, poeng: 20, merke: null });
   location.hash = "#/fotball/mittlag";
   window.addEventListener("load", function () { setTimeout(function () { try {
     var rot = document.getElementById("fotballInnhold");
@@ -7954,6 +7965,13 @@ const SAK_20D = kjor("mitt-lag-tom", FELLES + FOTBALL + `
            kort.textContent);
         ok("og resten av kortet star", !!kort.querySelector(".mittlag-plass") &&
            !!kort.querySelector(".mittlag-kamp"));
+        var rader = kort.querySelectorAll(".mittlag-tabell tbody tr");
+        ok("kortet viser hele tabellen, ikke fem rader rundt laget", rader.length === 7,
+           rader.length);
+        ok("med overskriften Tabellen og laget merket",
+           kort.querySelector(".mittlag-tabell .mittlag-del").textContent === "Tabellen" &&
+           rader[1].classList.contains("mittlag-egen"),
+           kort.querySelector(".mittlag-tabell .mittlag-del").textContent);
         // Veien videre er kortet der kampen avtales — en ekte lenke.
         var lenke = kort.querySelector(".mittlag-lenke");
         ok("neste kamp lenker til kampen i Kommende",

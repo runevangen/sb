@@ -750,13 +750,16 @@ function lagkort(lag, liga, tabellData, kamper) {
     kort.appendChild(el("p", "mittlag-merknad", "Fikk ikke hentet de kommende kampene: " + neste.feil));
   }
 
-  // Tabellen rundt laget: de samme radene som i fanen, bare fem av dem.
+  // Hele tabellen, med laget merket. Den var fem rader rundt laget til
+  // 24. september 2026 — «spander plass pa hele tabellen». Kortet ruller
+  // uansett, og det er tabellen du vil se nar laget ditt er det du folger.
   if (plass) {
+    const alle = rader.filter(Boolean);
     const del = el("div", "mittlag-tabell");
-    del.appendChild(el("h3", "mittlag-del", "Tabellen rundt"));
-    const t = tabell(plass.utsnitt);
+    del.appendChild(el("h3", "mittlag-del", "Tabellen"));
+    const t = tabell(alle);
     t.querySelectorAll("tbody tr").forEach((tr, i) => {
-      if (plass.utsnitt[i] === plass.rad) tr.classList.add("mittlag-egen");
+      if (alle[i] === plass.rad) tr.classList.add("mittlag-egen");
     });
     del.appendChild(t);
     kort.appendChild(del);

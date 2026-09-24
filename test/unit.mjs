@@ -1851,14 +1851,11 @@ ok("og et lag som ikke star noe sted gir ingen liga",
 
 let ml = plasseringFor(ML_TABELL, "Brann");
 ok("plassen og antallet lag", ml.rad.plass === 2 && ml.antall === 7);
-ok("utsnittet er fem rader ogsa nar laget star nest overst",
-   ml.utsnitt.map((r) => r.plass).join(",") === "1,2,3,4,5",
-   ml.utsnitt.map((r) => r.plass).join(","));
 ok("og avstanden til laget over og under er i poeng",
    avstandTekst(ml) === "4 poeng opp til 1. plass · 2 poeng ned til 3.", avstandTekst(ml));
 ml = plasseringFor(ML_TABELL, "Bryne");
-ok("nederst far de fire over seg", ml.utsnitt.map((r) => r.plass).join(",") === "3,4,5,6,7" &&
-   ml.under === null && avstandTekst(ml) === "5 poeng opp til 6. plass", avstandTekst(ml));
+ok("nederst er det ingen under", ml.under === null &&
+   avstandTekst(ml) === "5 poeng opp til 6. plass", avstandTekst(ml));
 // Like poeng skilles pa malforskjell. Da er «0 poeng opp» den sanne
 // opplysningen, ikke en feil.
 ok("like poeng gir 0 poeng opp",
