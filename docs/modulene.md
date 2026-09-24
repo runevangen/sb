@@ -594,6 +594,8 @@ portalen — en leser har ingen nytte av den.
   menypanelet med `.konto-modus` på: CSS-en tar bort søk, emner, deling og
   tema, og `#kontoSide` får plassen emnelista hadde, med kortene fra Mitt
   lag. Ett panel og ett kontopanel — to kopier kunne blitt uenige.
+  Tittelen i toppraden er «Mitt lag», og `#kontoSide` har ingen egen
+  overskrift; «Kontoen din» er panelets `aria-label`.
   `openMenu()` slår modusen av, så hamburgeren alltid gir menyen; navnet
   slår den på etterpå. **Kortene tegnes på nytt når lista endrer seg**
   (`kontoSideLag` i `visKontoLag()`): kontoen svarer gjerne etter at siden

@@ -706,16 +706,6 @@ body {
 }
 .konto-side[hidden] { display: none; }
 
-.konto-side-tittel {
-  margin: 0 0 10px;
-  font-family: 'Barlow Condensed', sans-serif;
-  font-weight: 700;
-  font-size: calc(18px * var(--fs));
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text);
-}
-
 .konto-pin {
   display: flex;
   flex-direction: column;
