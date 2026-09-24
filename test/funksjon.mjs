@@ -1588,6 +1588,190 @@ ok("en utlopt okt sletter ingenting", r.status === 401, r.status);
 r = await konto(kontoBe({ handling: "noe-annet", navn: "Ola", pin: "1234" }));
 ok("en ukjent handling avvises", r.status === 400, r.status);
 
+/* ---- favorittlagene folger kontoen (24. september 2026) ---- */
+
+// Menyen har lovet det siden innloggingen kom, og det var ikke sant:
+// lagene la i nettleseren, og ingenting sendte dem noe sted.
+
+// Stubben svarer per adresse og metode, slik Supabase gjor: PUT pa
+// /auth/v1/user gir brukeren tilbake med metadata FLETTET — navnet star
+// igjen ved siden av lagene. Det er tjenestens oppforsel, ikke vart onske.
+function stubAuth(ruter) {
+  const kall = [];
+  global.fetch = async (url, opsjoner) => {
+    const u = String(url);
+    const o = opsjoner || {};
+    kall.push({ url: u, opsjoner: o, metode: o.method || "GET",
+                kropp: o.body ? JSON.parse(o.body) : null });
+    const rute = ruter.find((r) => u.indexOf(r.sti) > -1 && (!r.metode || r.metode === (o.method || "GET")));
+    if (!rute) return new Response("{}", { status: 404 });
+    const k = kall[kall.length - 1];
+    const svar = typeof rute.svar === "function" ? rute.svar(k) : rute.svar;
+    const status = typeof rute.status === "function" ? rute.status(k) : rute.status;
+    if (svar === null) return new Response(null, { status: status || 204 });
+    return new Response(JSON.stringify(svar), { status: status || 200,
+      headers: { "Content-Type": "application/json" } });
+  };
+  return kall;
+}
+
+const METADATA = { navn: "Ola" };
+kall = stubAuth([{ sti: "/auth/v1/user", metode: "PUT",
+  svar: (k) => ({ id: "u-1", user_metadata: Object.assign({}, METADATA, k.kropp.data) }) }]);
+r = await konto(kontoBe({ handling: "lagre-lag", token: "okt-token-123",
+  lag: ["  Brann ", "Brann", 7, "Rosenborg"] }));
+let lagSvar = await r.json();
+ok("favorittlagene lagres pa kontoen", r.status === 200 &&
+   JSON.stringify(lagSvar.lag) === JSON.stringify(["Brann", "Rosenborg"]),
+   r.status + " " + JSON.stringify(lagSvar));
+ok("med PUT pa brukeren selv, i metadata",
+   kall.length === 1 && kall[0].metode === "PUT" &&
+   kall[0].url === "https://prosjekt.supabase.co/auth/v1/user" &&
+   JSON.stringify(kall[0].kropp) === JSON.stringify({ data: { lag: ["Brann", "Rosenborg"] } }),
+   JSON.stringify(kall[0] && kall[0].kropp));
+// Ingen nokkel som kan skrive hvem som helst sine metadata: brukerens egen
+// okt, som slettingen. ADR 0010.
+ok("og med leserens egen okt, aldri en admin-nokkel",
+   kall[0].opsjoner.headers.Authorization === "Bearer okt-token-123" &&
+   JSON.stringify(kall[0].opsjoner.headers).indexOf("service_role") === -1,
+   JSON.stringify(kall[0].opsjoner.headers));
+ok("lista som sendes er renset for den gar ut",
+   kall[0].kropp.data.lag.length === 2, JSON.stringify(kall[0].kropp));
+
+// Svaret er det som ligger der ETTER skrivingen, ikke det vi sendte.
+kall = stubAuth([{ sti: "/auth/v1/user", metode: "PUT",
+  svar: { id: "u-1", user_metadata: { navn: "Ola", lag: ["Molde"] } } }]);
+r = await konto(kontoBe({ handling: "lagre-lag", token: "t", lag: ["Brann"] }));
+lagSvar = await r.json();
+ok("appen far tjenestens liste tilbake, ikke sin egen",
+   JSON.stringify(lagSvar.lag) === JSON.stringify(["Molde"]), JSON.stringify(lagSvar));
+
+// Et svar uten lista er ikke «ingen lag». Sa vi det, tomte appen stjernene.
+kall = stubAuth([{ sti: "/auth/v1/user", metode: "PUT", svar: { id: "u-1" } }]);
+r = await konto(kontoBe({ handling: "lagre-lag", token: "t", lag: ["Brann"] }));
+lagSvar = await r.json();
+ok("et svar uten lista gir en feil, ikke en tom liste",
+   r.status === 502 && lagSvar.lag === undefined, r.status + " " + JSON.stringify(lagSvar));
+
+kall = stubAuth([]);
+r = await konto(kontoBe({ handling: "lagre-lag", lag: ["Brann"] }));
+ok("uten okt lagres ingenting", r.status === 401 && kall.length === 0,
+   r.status + " " + kall.length);
+
+kall = stubAuth([{ sti: "/auth/v1/user", metode: "PUT", status: 401,
+  svar: { message: "JWT expired" } }]);
+r = await konto(kontoBe({ handling: "lagre-lag", token: "gammel", lag: [] }));
+lagSvar = await r.json();
+ok("en utlopt okt sier det, med tjenestens ord",
+   r.status === 401 && lagSvar.feil.indexOf("Logg inn") > -1 &&
+   JSON.stringify(lagSvar.forsok).indexOf("JWT expired") > -1, JSON.stringify(lagSvar));
+
+// Fornyingen er runden der en annen telefons endring kommer fram.
+kall = stubAuth([{ sti: "grant_type=refresh_token",
+  svar: Object.assign({}, OKT, { refresh_token: "forny-9",
+    user: { id: "u-1", user_metadata: { navn: "Ola", lag: ["Brann"] } } }) }]);
+r = await konto(kontoBe({ handling: "forny", fornyer: "forny-1", navn: "Ola" }));
+lagSvar = await r.json();
+ok("fornyingen barer kontoens lag",
+   JSON.stringify(lagSvar.lag) === JSON.stringify(["Brann"]), JSON.stringify(lagSvar));
+
+// Og en konto som aldri har lagret lag, sier ingenting om dem — ikke en
+// tom liste. Den forste fornyingen etter utrullingen ville ellers tomt
+// stjernene til alle som hadde valgt lag for.
+kall = stubAuth([{ sti: "grant_type=refresh_token",
+  svar: Object.assign({}, OKT, { user: { id: "u-1", user_metadata: { navn: "Ola" } } }) }]);
+r = await konto(kontoBe({ handling: "forny", fornyer: "forny-1", navn: "Ola" }));
+lagSvar = await r.json();
+ok("en konto uten lagrede lag sender ingen liste",
+   r.status === 200 && !("lag" in lagSvar), JSON.stringify(lagSvar));
+
+/* ---- bytt PIN (24. september 2026) ---- */
+
+const OKT_NY = Object.assign({}, OKT, { access_token: "fersk-token", refresh_token: "fersk-forny",
+  user: { id: "u-1", user_metadata: { navn: "Ola", lag: ["Brann"] } } });
+// Tjenesten svarer 400 pa feil passord, og en okt pa riktig.
+const RIKTIG_GAMMEL = "1234:" + PEPPER;
+function stubBytt(overstyr) {
+  const ruter = [
+    { sti: "grant_type=password",
+      status: (k) => k.kropp.password === RIKTIG_GAMMEL ? 200 : 400,
+      svar: (k) => k.kropp.password === RIKTIG_GAMMEL ? OKT_NY
+        : { error_code: "invalid_credentials", msg: "Invalid login credentials" } },
+    { sti: "/auth/v1/user", metode: "PUT", svar: { id: "u-1" } },
+    { sti: "/auth/v1/logout", svar: null, status: 204 },
+  ];
+  return stubAuth(ruter.map((r) => Object.assign({}, r, (overstyr || {})[r.sti])));
+}
+
+kall = stubBytt();
+r = await konto(kontoBe({ handling: "bytt-pin", navn: "Ola", pin: "12 34", nyPin: "5678" }));
+let bytt = await r.json();
+ok("PIN-en byttes", r.status === 200 && bytt.token === "fersk-token",
+   r.status + " " + JSON.stringify(bytt));
+// Den gamle proves pa den eneste maten tjenesten kan: en innlogging.
+ok("den gamle PIN-en proves forst, med pepperet pa",
+   kall[0].url.indexOf("grant_type=password") > -1 &&
+   kall[0].kropp.email === "ola@pin.mvp-sb.netlify.app" &&
+   kall[0].kropp.password === "1234:" + PEPPER, JSON.stringify(kall[0] && kall[0].kropp));
+ok("og det er den ferske okta som bytter passordet",
+   !!kall[1] && kall[1].metode === "PUT" && kall[1].url.indexOf("/auth/v1/user") > -1 &&
+   kall[1].opsjoner.headers.Authorization === "Bearer fersk-token" &&
+   kall[1].kropp.password === "5678:" + PEPPER, JSON.stringify(kall[1] && kall[1].kropp));
+// Den vanlige grunnen til a bytte er at noen andre kan PIN-en.
+ok("etterpa logges alle andre okter ut",
+   !!kall[2] && kall[2].url === "https://prosjekt.supabase.co/auth/v1/logout?scope=others" &&
+   kall[2].opsjoner.headers.Authorization === "Bearer fersk-token",
+   kall[2] && kall[2].url);
+ok("og svaret sier at det gikk", bytt.andreUt === true, JSON.stringify(bytt));
+ok("den nye okta barer fornyeren og kontoens lag",
+   bytt.fornyer === "fersk-forny" && JSON.stringify(bytt.lag) === JSON.stringify(["Brann"]),
+   JSON.stringify(bytt));
+ok("og aldri pepperet eller adressen",
+   JSON.stringify(bytt).indexOf(PEPPER) === -1 &&
+   JSON.stringify(bytt).indexOf("pin.mvp-sb") === -1, JSON.stringify(bytt));
+ok("tre kall, i den rekkefolgen", kall.length === 3, kall.length);
+
+kall = stubBytt();
+r = await konto(kontoBe({ handling: "bytt-pin", navn: "Ola", pin: "9999", nyPin: "5678" }));
+bytt = await r.json();
+ok("feil gammel PIN bytter ingenting",
+   r.status === 401 && kall.length === 1 && bytt.feil.indexOf("stemmer ikke") > -1,
+   r.status + " " + kall.length + " " + bytt.feil);
+
+kall = stubBytt();
+r = await konto(kontoBe({ handling: "bytt-pin", navn: "Ola", pin: "1234", nyPin: "1234" }));
+ok("samme PIN som for stoppes for tjenesten rores", r.status === 400 && kall.length === 0,
+   r.status + " " + kall.length);
+
+kall = stubBytt();
+r = await konto(kontoBe({ handling: "bytt-pin", navn: "Ola", pin: "1234", nyPin: "12" }));
+ok("en for kort ny PIN stoppes ogsa", r.status === 400 && kall.length === 0,
+   r.status + " " + kall.length);
+
+kall = stubBytt();
+r = await konto(kontoBe({ handling: "bytt-pin", pin: "1234", nyPin: "5678" }));
+ok("uten navn byttes ingenting", r.status === 401 && kall.length === 0,
+   r.status + " " + kall.length);
+
+// Byttet feilet: da gjelder den gamle, og det skal sta.
+kall = stubBytt({ "/auth/v1/user": { status: 500, svar: { message: "Database error" } } });
+r = await konto(kontoBe({ handling: "bytt-pin", navn: "Ola", pin: "1234", nyPin: "5678" }));
+bytt = await r.json();
+ok("et bytte som feiler sier at den gamle PIN-en gjelder",
+   r.status === 502 && bytt.feil.indexOf("gamle gjelder") > -1 && kall.length === 2,
+   r.status + " " + bytt.feil + " " + kall.length);
+
+// Byttet gikk, utloggingen ikke. PIN-en ER byttet — svaret skal si det,
+// og si hva som ikke skjedde.
+kall = stubBytt({ "/auth/v1/logout": { status: 500, svar: { message: "Database error" } } });
+r = await konto(kontoBe({ handling: "bytt-pin", navn: "Ola", pin: "1234", nyPin: "5678" }));
+bytt = await r.json();
+ok("en utlogging som feiler velter ikke byttet",
+   r.status === 200 && bytt.token === "fersk-token" && bytt.andreUt === false,
+   r.status + " " + JSON.stringify(bytt));
+ok("men tjenestens ord folger med",
+   JSON.stringify(bytt.forsok || []).indexOf("Database error") > -1, JSON.stringify(bytt.forsok));
+
 delete process.env.SUPABASE_URL;
 delete process.env.SUPABASE_ANON_KEY;
 delete process.env.PIN_PEPPER;

@@ -384,6 +384,7 @@ Derfor må to innstillinger stå riktig:
 | --- | --- | --- |
 | *Authentication* → *Sign In / Providers* → Email | **Confirm email** | **av** |
 | *Authentication* → *Sign In / Providers* → Email | Minimum password length | 6 (standard, og pepperet dekker den) |
+| *Authentication* → *Sign In / Providers* → Email | Secure password change | valgfri — «Bytt PIN» logger inn med den gamle først, så økta er alltid fersk |
 
 **Ikke under *Authentication* → *Emails*.** Den sida er maler og SMTP, og
 har ingen slik bryter — den er lett å gå i, fordi «Confirm sign up» står

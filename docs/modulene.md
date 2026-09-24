@@ -312,6 +312,17 @@ kastet. `oktGyldig` og `oktUtloper` brukes av begge veier.
   ute.
 - **`PIN_DOMENE` er en nøkkel, ikke en postkasse.** Ingen e-post sendes
   dit, og adressen vises aldri i appen.
+- **`tolkPinOkt()` setter `lag` bare når kontoen har lagret en liste.**
+  «Aldri lagret» og «fjernet alle» er to svar. Ga begge `[]`, ville den
+  første fornyingen etter 24. september 2026 tømt stjernene til alle som
+  hadde valgt lag før. [ADR 0024](adr/0024-favorittlag-og-pin-pa-kontoen.md)
+- **`rensLag()` går begge veier** — det appen sender og det den får
+  tilbake. Brukeren kan skrive hva som helst i sine egne metadata, og
+  `sammeLag()` ville sagt «endret» om to lister som bare var renset ulikt.
+- **`flettLag()` brukes ved første møte, aldri ellers.** Sto den på
+  fornyingen, kunne et lag du fjernet på én telefon aldri forsvinne.
+- **`sjekkPinBytte()` er delt** så appen og funksjonen sier det samme om
+  hva som kan sendes. `gjenta` er valgfri fordi funksjonen ikke får den.
 - **`tolkBrukere()` skiller pålogging fra bruk.** `created_at` og
   `last_sign_in_at` er første og siste **pålogging**. Appen holder
   telefonen innlogget med roterende fornyere, og en fornying oppdaterer
@@ -558,6 +569,31 @@ portalen — en leser har ingen nytte av den.
 - **Svarnavnet hører til kontoen, ikke til telefonen.** Uten `svarnavnFor`
   ble navnet stående etter en utlogging, og neste som logget inn i samme
   nettleser skrev raden sin med forrige persons navn.
+- **Favorittlagene tegnes fra telefonen og flyttes av kontoen.**
+  [ADR 0024](adr/0024-favorittlag-og-pin-pa-kontoen.md). `prefs.lag` er
+  lista; `mottaKontoLag()` tar imot kontoens fra innlogging, fornying og
+  PIN-bytte, og `sendLag()` sender telefonens. To flagg i samme objekt:
+  `lagPaKonto` (har telefonen møtt kontoen — ellers flettes det) og
+  `lagUsendt` (ligger det en endring her som ikke kom fram — da vinner
+  telefonen). `lagUsendt` settes ved **trykket**, ikke når kallet feiler:
+  lukkes appen i pustet før sendingen, skal neste åpning vite det.
+  **`utenLag()` tar lista ut av økta** før den lagres. To kopier er to
+  sannheter. **Og `settFavorittlag()` merker stjernene på nytt**
+  (`merkFavoritter()` i `fotball.js`): kontoen svarer gjerne etter at
+  tabellen er tegnet, og da sto Brann tom i tabellen mens linja under
+  navnet sa «★ Brann». Testen lar fornyingen svare sent med vilje — svarte
+  den først, var tabellen riktig uansett og vakta beviste ingenting.
+- **Oppstarten fornyer en telefon som aldri har møtt kontoen**, selv med
+  et ferskt token. Fornyingen er det som bringer lista; uten det ville
+  linja i panelet sagt «henter fra kontoen» i opptil en time.
+- **Linja i kontopanelet er løftet, gjort synlig.** `visKontoLag()` har
+  fire tilstander og sier «følger kontoen» først når kontoen har svart. Den
+  må tegnes både når en stjerne trykkes og når kontoen svarer — den sto med
+  den gamle lista i første utkast.
+- **Bytt PIN tar plassen til knappene**, ikke en rad under dem.
+  `kontoByttar` er den ene tilstanden, og `visKonto()` leser den. Egne
+  felt, ikke PIN-feltene fra innloggingen: `autocomplete` må si hvilken som
+  er den gamle, ellers fyller telefonen den gamle inn der den nye skal.
 - **`aria-current`, ikke `aria-pressed`, på segmenter.** Et segment velger
   én av flere, det veksler ikke. Stjerna ved lagnavnet er motsatt:
   `aria-pressed`, fordi den er en av/på-bryter per lag.
@@ -849,7 +885,10 @@ side, ikke et avsnitt i menyen.
 - **Den beskriver det som faktisk skjer, ikke det som er lov.** Lagringen
   står felt for felt: hva som ligger i telefonen, hva som ligger hos
   Supabase, og hva den som drifter appen kan se.
-- **Endrer lagringen seg, endres sida i samme commit.** En
+- **Endrer lagringen seg, endres sida i samme commit.** Favorittlagene sto
+  som «bare i din egen nettleser» mens menyen lovet at de fulgte kontoen —
+  og sida hadde rett. Da lagene faktisk flyttet til kontoen 24. september
+  2026, flyttet raden i tabellen med. En
   personvernerklæring som ligger etter koden er en påstand som er blitt
   usann uten at noen sa det. Det er derfor «sist inne»
   ([ADR 0021](adr/0021-sist-inne-fra-oktene.md)) ble vurdert mot denne
@@ -915,6 +954,12 @@ Se [`nokler-og-tokens.md`](nokler-og-tokens.md).
   omfanget tilbake som bevis.
 - **`konto.mjs`** — innloggingen. Kallet går herfra så appen bare snakker
   med sitt eget domene, og `PIN_PEPPER` finnes bare her.
+  **`lagre-lag` og `bytt-pin` går med brukerens egen økt** mot
+  `/auth/v1/user` — ingen nøkkel som kan endre andres.
+  **`bytt-pin` logger inn med den gamle PIN-en først**: det beviser at den
+  som holder telefonen kan den, og gir en fersk økt som *Secure password
+  change* godtar. Så logges `scope=others` ut. Feiler bare utloggingen, er
+  svaret 200 med `andreUt: false` — PIN-en *er* byttet.
 - **`brukere.mjs`** — **det ene stedet med en `service_role`-nøkkel**, og et
   bevisst brudd på [ADR 0010](adr/0010-ingen-service-role.md): å slette en
   annens konto eller sette en annens PIN *er* å handle på vegne av andre, og

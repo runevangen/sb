@@ -103,7 +103,7 @@ export function tolkPinOkt(json, navn, naa = Date.now()) {
   const rent = normaliserPinNavn(navn);
   if (!token || !gyldigPinNavn(rent)) throw new Error("Uventet svar fra innloggingen");
 
-  return {
+  const okt = {
     token,
     navn: rent,
     // Id-en, ikke navnet, er den du er: to kan hete det samme, og lista
@@ -116,6 +116,77 @@ export function tolkPinOkt(json, navn, naa = Date.now()) {
     // token uten at PIN-en tastes pa nytt.
     fornyer: String((json && json.refresh_token) || ""),
   };
+  // Favorittlagene, slik kontoen husker dem. Bare nar feltet FINNES hos
+  // tjenesten: en konto som aldri har lagret lag, og en som har fjernet
+  // alle, er to ulike svar. Det forste betyr «ta telefonens», det andre
+  // «ingen». Ga de begge en tom liste, ville den forste fornyingen etter
+  // denne utrullingen tomt stjernene til alle som hadde valgt lag for.
+  const meta = json.user && json.user.user_metadata;
+  if (meta && Array.isArray(meta.lag)) okt.lag = rensLag(meta.lag);
+  return okt;
+}
+
+/* ---------- favorittlagene pa kontoen ---------- */
+
+// Lista skrives av appen, men leses tilbake fra en tjeneste der brukeren
+// selv kan skrive hva som helst i sine egne metadata. Den renses derfor
+// begge veier, med den samme funksjonen: det appen sender og det den far
+// tilbake skal se likt ut, ellers sier sammenlikningen «endret» om noe som
+// ikke er det.
+//
+// Taket er romslig. Ingen folger tjue lag; en liste pa tjue er en feil et
+// sted, og da skal den ikke vokse videre.
+export const LAG_MAKS = 20;
+export const LAGNAVN_MAKS = 60;
+
+export function rensLag(liste) {
+  if (!Array.isArray(liste)) return [];
+  const sett = [];
+  liste.forEach((n) => {
+    if (typeof n !== "string") return;
+    const navn = n.replace(/\s+/g, " ").trim().slice(0, LAGNAVN_MAKS);
+    if (navn && sett.indexOf(navn) === -1) sett.push(navn);
+  });
+  return sett.slice(0, LAG_MAKS);
+}
+
+// Innloggingen er ett oyeblikk der to lister moter hverandre: det kontoen
+// husker, og det du valgte pa denne telefonen for du logget inn. Ingen av
+// dem er feil, sa begge beholdes — kontoens forst, i den rekkefolgen den
+// har, og telefonens nye bak.
+//
+// Bare ved innlogging. Etter det er kontoen fasit: sto flettingen ogsa pa
+// fornyingen, kunne et lag du fjernet pa én telefon aldri forsvinne — den
+// andre ville lagt det tilbake hver time.
+export function flettLag(kontoen, telefonen) {
+  return rensLag(rensLag(kontoen).concat(rensLag(telefonen)));
+}
+
+export function sammeLag(a, b) {
+  return JSON.stringify(rensLag(a)) === JSON.stringify(rensLag(b));
+}
+
+/* ---------- bytt PIN ---------- */
+
+// Hva som ma sta for en PIN kan byttes, sagt ett sted for appen og
+// funksjonen. Tom streng betyr at det kan sendes.
+//
+// Den gamle kreves. PIN-en er en sperre mellom folk som deler en telefon
+// — det er det eneste den er — og kunne den byttes uten den gamle, kunne
+// hvem som helst med telefonen i handa ta kontoen fra deg.
+//
+// `gjenta` er valgfri her fordi funksjonen ikke far den: den sjekkes i
+// appen, der to felt faktisk finnes. Sendes den, sjekkes den.
+export function sjekkPinBytte(gammel, ny, gjenta) {
+  if (!gyldigPin(gammel)) return "Skriv PIN-en du har nå.";
+  if (!gyldigPin(ny)) return "Den nye PIN-en er " + PIN_MIN + " til " + PIN_MAKS + " siffer.";
+  if (normaliserPin(ny) === normaliserPin(gammel)) {
+    return "Den nye PIN-en er den samme som den gamle.";
+  }
+  if (gjenta !== undefined && normaliserPin(ny) !== normaliserPin(gjenta)) {
+    return "De to nye PIN-ene er ikke like.";
+  }
+  return "";
 }
 
 /* ---------- brukerlista i adminportalen ---------- */

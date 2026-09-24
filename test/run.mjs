@@ -6519,6 +6519,7 @@ const SAK_18 = kjor("innlogging", FELLES + `
       window.__konto.push(inn ? inn.handling : "oppsett");
       if (!inn) return svarMed({ klar: true, mangler: [] });
       if (inn.handling === "slett") return svarMed({ slettet: true });
+      if (inn.handling === "lagre-lag") return svarMed({ lag: inn.lag });
       // «Ola» finnes fra for, «Kari» er ledig.
       if (inn.handling === "finnes") {
         return svarMed({ navn: inn.navn, finnes: inn.navn === "Ola" });
@@ -6529,8 +6530,9 @@ const SAK_18 = kjor("innlogging", FELLES + `
             forsok: [{ kilde: "Supabase Auth", status: 400,
               melding: "Invalid login credentials" }] }, 401);
         }
+        // Kontoen husker Viking fra en annen telefon.
         return svarMed({ token: "okt-123", navn: inn.navn, bruker: "u-1",
-          utloper: new Date(Date.now() + 3600000).toISOString() });
+          utloper: new Date(Date.now() + 3600000).toISOString(), lag: ["Viking"] });
       }
       return svarMed({ feil: "Ukjent handling" }, 400);
     }
@@ -6660,6 +6662,13 @@ const SAK_18 = kjor("innlogging", FELLES + `
             ok("riktig PIN logger inn", lagret && lagret.token === "okt-123",
                JSON.stringify(lagret));
             ok("okta barer fornavnet", lagret && lagret.navn === "Ola", lagret && lagret.navn);
+            // Favorittlagene kommer med innloggingen, men bor i
+            // visningsvalgene — ikke i okta, der de ville blitt en kopi.
+            ok("kontoens favorittlag kommer med innloggingen",
+               JSON.stringify((JSON.parse(localStorage.getItem("sb-visning") || "{}")).lag) ===
+               JSON.stringify(["Viking"]), localStorage.getItem("sb-visning"));
+            ok("og legges ikke i okta", localStorage.getItem("sb-konto").indexOf("Viking") === -1,
+               localStorage.getItem("sb-konto"));
             ok("okta har et utlopstidspunkt", lagret && !isNaN(Date.parse(lagret.utloper)),
                lagret && lagret.utloper);
             ok("menyen viser fornavnet",
@@ -6683,14 +6692,20 @@ const SAK_18 = kjor("innlogging", FELLES + `
           // Det finnes bare én meny. Apnet fra navnet sa den ut som en
           // egen, storre variant: setningen «du er logget inn» og to
           // knapper stablet gjorde footeren 350 px mot hamburgerens 196.
-          // Malt med A+, som footertesten over. Na 265; taket er 280.
+          // Malt med A+, som footertesten over. Var 265 med taket 280.
+          // 24. september 2026 kom linja om favorittlagene (18 px + gap),
+          // og taket gikk til 300: den er stedet du SER at lagene folger
+          // kontoen, som menyen har lovet siden innloggingen kom. Tre
+          // knapper pa rad kostet ingenting — «Slett kontoen min» brakk
+          // over to linjer med lik bredde, og fikk plassen sin av at
+          // bredden na folger teksten. Na 291.
           document.documentElement.style.setProperty("--fs", "1.15");
           var kontoFooter = document.querySelector(".menu-actions").getBoundingClientRect().height;
           var utR = document.getElementById("kontoUt").getBoundingClientRect();
           var slettR = document.getElementById("kontoSlett").getBoundingClientRect();
           document.documentElement.style.removeProperty("--fs");
           ok("kontoen apnet fra navnet blaser ikke opp footeren",
-             kontoFooter < 280, Math.round(kontoFooter));
+             kontoFooter < 300, Math.round(kontoFooter));
           // Stablet er de en rad til, og raden er det emnelista mister.
           ok("logg ut og slett star pa samme linje",
              Math.abs(utR.top - slettR.top) < 2,
@@ -6754,6 +6769,223 @@ const SAK_18 = kjor("innlogging", FELLES + `
     setTimeout(function () {
       try { f(); } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); }
     }, 300);
+  }
+`);
+
+/* ---------------- 18c. favorittlagene folger kontoen, og PIN-en byttes ---------------- */
+
+// Menyen har lovet «favorittlagene folger kontoen, ikke telefonen» siden
+// innloggingen kom. Til 24. september 2026 la de i nettleseren og ble
+// aldri sendt noe sted. Her gar hele runden: en telefon som var innlogget
+// for utrullingen moter kontoen, lista flettes, en stjerne sendes, en
+// sending som svikter sier det og prover igjen, og PIN-en byttes.
+const SAK_18C = kjor("favoritter-og-pin", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  // Innlogget fra for, med et ferskt token: ingen fornying er «pa tide».
+  // Telefonen har valgt Molde, kontoen husker Brann fra en annen telefon.
+  localStorage.setItem("sb-konto", JSON.stringify({ token: "okt-1", navn: "Ola",
+    bruker: "u-1", fornyer: "forny-1",
+    utloper: new Date(Date.now() + 3600000).toISOString() }));
+  localStorage.setItem("sb-visning", JSON.stringify({ lag: ["Molde"] }));
+  ` + mockAlt("saker") + `
+  location.hash = "#/fotball/eliteserien/tabell";
+  var grunn = window.fetch;
+  window.__konto = [];
+  window.__lagFeil = false;
+  function svarMed(kropp, status) {
+    return Promise.resolve({ ok: !status || status < 400, status: status || 200,
+      statusText: "OK", text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, o) {
+    u = String(u);
+    if (u.indexOf("/api/konto") !== 0) return grunn(u, o);
+    var inn = o && o.body ? JSON.parse(o.body) : null;
+    window.__konto.push(inn || { handling: "oppsett" });
+    if (!inn) return svarMed({ klar: true, mangler: [] });
+    // Kontoen svarer etter at tabellen er tegnet, som pa en telefon: det
+    // er da stjernene ma merkes pa nytt.
+    if (inn.handling === "forny") {
+      return new Promise(function (ferdigSvar) { setTimeout(function () {
+        window.__tabellForForny = document.querySelectorAll(".tabell .lag-stjerne").length;
+        ferdigSvar(svarMed({ token: "okt-2", navn: "Ola", bruker: "u-1", fornyer: "forny-2",
+          utloper: new Date(Date.now() + 3600000).toISOString(), lag: ["Brann"] }));
+      }, 500); });
+    }
+    if (inn.handling === "lagre-lag") {
+      if (window.__lagFeil) {
+        return svarMed({ feil: "Fikk ikke lagret favorittlagene på kontoen.",
+          forsok: [{ kilde: "Supabase Auth", status: 500 }] }, 502);
+      }
+      return svarMed({ lag: inn.lag });
+    }
+    if (inn.handling === "bytt-pin") {
+      if (inn.pin !== "1234") return svarMed({ feil: "PIN-en du har nå stemmer ikke." }, 401);
+      return svarMed({ token: "etter-bytte", navn: "Ola", bruker: "", fornyer: "forny-ny",
+        utloper: new Date(Date.now() + 3600000).toISOString(), andreUt: true, lag: ["Brann", "Molde"] });
+    }
+    return svarMed({ feil: "Ukjent handling" }, 400);
+  };
+  function prefs() { return JSON.parse(localStorage.getItem("sb-visning") || "{}"); }
+  function handlinger(h) { return window.__konto.filter(function (k) { return k.handling === h; }); }
+  function linje() { return document.getElementById("kontoLag"); }
+  function steg(f, ms) {
+    setTimeout(function () {
+      try { f(); } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); }
+    }, ms || 700);
+  }
+
+  window.addEventListener("load", function () { steg(function () {
+    // En telefon som var innlogget for denne utrullingen, har aldri mott
+    // kontoens liste. Den fornyes ved oppstart selv om tokenet er ferskt.
+    ok("forste mote med kontoen henter lista med en gang",
+       handlinger("forny").length === 1, handlinger("forny").length);
+    // Ingen av listene er feil: kontoens forst, telefonens nye bak.
+    ok("kontoens og telefonens lag flettes",
+       JSON.stringify(prefs().lag) === JSON.stringify(["Brann", "Molde"]), JSON.stringify(prefs().lag));
+    var sendt = handlinger("lagre-lag");
+    ok("og den flettede lista sendes til kontoen",
+       sendt.length === 1 && JSON.stringify(sendt[0].lag) === JSON.stringify(["Brann", "Molde"]) &&
+       sendt[0].token === "okt-2", JSON.stringify(sendt));
+    // Lista bor i visningsvalgene, ikke i okta: to kopier er to sannheter.
+    // Tabellen sto framme for kontoen svarte. Stjerna ved Brann skal
+    // folge lista, ikke det den var da tabellen ble tegnet.
+    ok("tabellen sto framme for kontoen svarte", window.__tabellForForny === 3,
+       window.__tabellForForny);
+    ok("stjernene i tabellen merkes av kontoens liste",
+       document.querySelectorAll(".tabell .lag-stjerne")[1].getAttribute("aria-pressed") === "true",
+       document.querySelectorAll(".tabell .lag-stjerne")[1].getAttribute("aria-pressed"));
+    ok("okta lagres uten lista",
+       (localStorage.getItem("sb-konto") || "").indexOf("lag") === -1,
+       localStorage.getItem("sb-konto"));
+
+    // Det synlige beviset, der brukeren ser det: under navnet.
+    document.getElementById("hvemTag").click();
+    ok("kontoen viser favorittlagene",
+       !linje().hidden && linje().textContent.indexOf("Brann og Molde") > -1, linje().textContent);
+    ok("og at de folger kontoen", linje().textContent.indexOf("følger kontoen") > -1,
+       linje().textContent);
+
+    // En stjerne i tabellen gar til kontoen, etter et lite pust.
+    var stjerner = document.querySelectorAll(".tabell .lag-stjerne");
+    stjerner[0].click();   // Bodo/Glimt
+    ok("mens den sendes, sier linja det og ikke mer",
+       linje().textContent.indexOf("lagres") > -1, linje().textContent);
+    steg(function () {
+      var sist = handlinger("lagre-lag").pop();
+      ok("en ny stjerne sendes til kontoen",
+         sist && JSON.stringify(sist.lag) === JSON.stringify(["Brann", "Molde", "Bodo/Glimt"]),
+         JSON.stringify(sist));
+      ok("og linja sier at den folger kontoen igjen",
+         linje().textContent.indexOf("følger kontoen") > -1 && !prefs().lagUsendt,
+         linje().textContent);
+
+      // Sendingen svikter: stjerna blir staende, og linja sier det.
+      window.__lagFeil = true;
+      stjerner[0].click();   // Bodo/Glimt av
+      steg(function () {
+        ok("en sending som svikter tar ikke stjerna",
+           JSON.stringify(prefs().lag) === JSON.stringify(["Brann", "Molde"]),
+           JSON.stringify(prefs().lag));
+        ok("men den sier at kontoen ikke har den",
+           linje().textContent.indexOf("ikke lagret på kontoen") > -1 && prefs().lagUsendt === true,
+           linje().textContent);
+
+        // Neste gang appen tas fram, provest den igjen.
+        window.__lagFeil = false;
+        var for_ = handlinger("lagre-lag").length;
+        document.dispatchEvent(new Event("visibilitychange"));
+        steg(function () {
+          ok("den provest igjen nar appen kommer fram",
+             handlinger("lagre-lag").length === for_ + 1 && !prefs().lagUsendt,
+             handlinger("lagre-lag").length + " " + for_);
+          ok("og linja er sann igjen", linje().textContent.indexOf("følger kontoen") > -1,
+             linje().textContent);
+          byttPinRunden();
+        });
+      });
+    });
+  }, 1200); });
+
+  function byttPinRunden() {
+    var knapp = document.getElementById("kontoByttPin");
+    var skjema = document.getElementById("kontoPinSkjema");
+    var na = document.getElementById("kontoPinNa");
+    var ny = document.getElementById("kontoPinNy");
+    var ny2 = document.getElementById("kontoPinNy2");
+    var lagre = document.getElementById("kontoPinLagre");
+    var svar = document.getElementById("kontoSvar");
+    ok("innlogget star «Bytt PIN» ved siden av logg ut", !knapp.hidden && skjema.hidden);
+    var knappR = knapp.getBoundingClientRect();
+    var utR = document.getElementById("kontoUt").getBoundingClientRect();
+    ok("pa samme linje, ikke en rad til", Math.abs(knappR.top - utR.top) < 2,
+       Math.round(knappR.top) + " mot " + Math.round(utR.top));
+
+    knapp.click();
+    ok("trykk bytter knappene ut med skjemaet",
+       !skjema.hidden && document.getElementById("kontoPar").hidden && linje().hidden);
+    // Det som skjer med de andre telefonene, skal sta for du trykker.
+    var note = document.getElementById("kontoNote");
+    ok("og sier at de andre telefonene logges ut",
+       !note.hidden && note.textContent.indexOf("andre telefoner") > -1, note.textContent);
+    ok("den gamle PIN-en er et eget felt, som telefonen kan fylle",
+       na.getAttribute("autocomplete") === "current-password" &&
+       ny.getAttribute("autocomplete") === "new-password");
+
+    na.value = "1234"; ny.value = "1234"; ny2.value = "1234";
+    lagre.click();
+    ok("samme PIN som for stoppes her", svar.textContent.indexOf("samme") > -1 &&
+       handlinger("bytt-pin").length === 0, svar.textContent);
+
+    ny.value = "5678"; ny2.value = "5679";
+    lagre.click();
+    ok("to ulike nye stoppes ogsa", svar.textContent.indexOf("ikke like") > -1 &&
+       ny2.value === "" && handlinger("bytt-pin").length === 0, svar.textContent);
+
+    na.value = "9999"; ny2.value = "5678";
+    lagre.click();
+    steg(function () {
+      ok("feil gammel PIN sier ifra", svar.textContent.indexOf("stemmer ikke") > -1 &&
+         localStorage.getItem("sb-konto").indexOf("etter-bytte") === -1, svar.textContent);
+      ok("og skjemaet star, sa du kan prove igjen", !skjema.hidden);
+      // Lukkes menyen midt i, skal PIN-ene ikke ligge igjen til neste gang.
+      document.getElementById("menuLukk").click();
+      document.getElementById("hvemTag").click();
+      ok("apnes panelet pa nytt, star knappene og feltene er tomme",
+         skjema.hidden && !document.getElementById("kontoPar").hidden && na.value === "",
+         skjema.hidden + " " + na.value);
+      knapp.click();
+      ny.value = "5678"; ny2.value = "5678";
+
+      na.value = "1234";
+      lagre.click();
+      steg(function () {
+        var b = handlinger("bytt-pin").pop();
+        ok("byttet sender navnet og begge PIN-ene",
+           b && b.navn === "Ola" && b.pin === "1234" && b.nyPin === "5678", JSON.stringify(b));
+        var okt = JSON.parse(localStorage.getItem("sb-konto") || "null");
+        // Den gamle okta er logget ut med de andre; dette er den nye.
+        ok("den nye okta tar over", okt && okt.token === "etter-bytte" &&
+           okt.fornyer === "forny-ny", JSON.stringify(okt));
+        ok("og bruker-id-en overlever", okt && okt.bruker === "u-1", okt && okt.bruker);
+        ok("svaret sier at andre telefoner er logget ut",
+           svar.textContent.indexOf("PIN-en er byttet") > -1 &&
+           svar.textContent.indexOf("logget ut") > -1, svar.textContent);
+        ok("feltene tommes og knappene kommer tilbake",
+           na.value === "" && ny.value === "" && ny2.value === "" && skjema.hidden &&
+           !document.getElementById("kontoPar").hidden && note.hidden);
+
+        // Utlogget blir lagene staende pa telefonen, men glemmer kontoen.
+        document.getElementById("kontoUt").click();
+        ok("utlogget blir favorittlagene staende",
+           JSON.stringify(prefs().lag) === JSON.stringify(["Brann", "Molde"]),
+           JSON.stringify(prefs()));
+        ok("men telefonen glemmer at de har mott en konto",
+           prefs().lagPaKonto === undefined && prefs().lagUsendt === undefined, JSON.stringify(prefs()));
+        ok("og utlogget star verken linja eller bytt PIN",
+           linje().hidden && knapp.hidden && skjema.hidden);
+        ferdig();
+      });
+    });
   }
 `);
 
@@ -8397,7 +8629,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {
