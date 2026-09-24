@@ -31,7 +31,8 @@ import { normaliserEpost, gyldigEpost, normaliserKode, gyldigKode, maskerEpost,
 
 import { normaliserPinNavn, pinSlug, gyldigPinNavn, pinEpost, normaliserPin, gyldigPin,
          pinPassord, tolkPinOkt, tolkBrukere, sistInneTekst,
-         PIN_MIN, PIN_MAKS, PIN_DOMENE } from "../pin-data.js";
+         PIN_MIN, PIN_MAKS, PIN_DOMENE,
+         rensLag, flettLag, sammeLag, sjekkPinBytte, LAG_MAKS } from "../pin-data.js";
 
 import { normaliserNavn, gyldigNavn, svarRad, tolkSvar, perKamp, blirMedTekst,
          egetSvar, loftMedSvar, bareMedSvar, stederFraSvar, perSted,
@@ -1709,6 +1710,46 @@ ok("okta barer fornyeren fra tjenesten",
    tolkPinOkt({ access_token: "t", refresh_token: "f-1" }, "Ola", KONTO_NAA).fornyer === "f-1");
 ok("og et svar uten fornyer gir en tom, ikke en udefinert",
    tolkPinOkt({ access_token: "t" }, "Ola", KONTO_NAA).fornyer === "");
+// Favorittlagene pa kontoen (24. september 2026). Feltet star bare nar
+// kontoen HAR lagret en liste: «aldri lagret» og «fjernet alle» er to
+// ulike svar, og det forste ma ikke tomme telefonens stjerner.
+ok("okta barer kontoens lag nar de finnes",
+   JSON.stringify(tolkPinOkt({ access_token: "t",
+     user: { user_metadata: { navn: "Ola", lag: [" Brann ", "Brann"] } } }, "Ola", KONTO_NAA).lag) ===
+   JSON.stringify(["Brann"]));
+ok("og en tom liste er et svar", JSON.stringify(tolkPinOkt({ access_token: "t",
+     user: { user_metadata: { lag: [] } } }, "Ola", KONTO_NAA).lag) === "[]");
+ok("men en konto uten lista sier ingenting om den",
+   !("lag" in tolkPinOkt({ access_token: "t", user: { user_metadata: { navn: "Ola" } } },
+     "Ola", KONTO_NAA)));
+
+ok("lista renses: tomme, doble og ikke-tekst ut",
+   JSON.stringify(rensLag(["  Brann  ", "", "Brann", 7, null, "Rosenborg   BK"])) ===
+   JSON.stringify(["Brann", "Rosenborg BK"]), JSON.stringify(rensLag(["  Brann  ", "Brann"])));
+ok("og noe som ikke er en liste blir en tom", rensLag("Brann").length === 0 &&
+   rensLag(undefined).length === 0);
+ok("lista har et tak",
+   rensLag(Array.from({ length: 40 }, (_, i) => "Lag " + i)).length === LAG_MAKS);
+// Kontoens forst, i sin rekkefolge; telefonens nye bak. Ingen er feil.
+ok("ved innlogging flettes kontoen og telefonen",
+   JSON.stringify(flettLag(["Brann", "Molde"], ["Molde", "Rosenborg"])) ===
+   JSON.stringify(["Brann", "Molde", "Rosenborg"]),
+   JSON.stringify(flettLag(["Brann", "Molde"], ["Molde", "Rosenborg"])));
+ok("og en konto uten lag gir telefonens",
+   JSON.stringify(flettLag(undefined, ["Brann"])) === JSON.stringify(["Brann"]));
+ok("to lister er like nar de renses likt",
+   sammeLag([" Brann"], ["Brann"]) && !sammeLag(["Brann"], ["Brann", "Molde"]) &&
+   !sammeLag(["Molde", "Brann"], ["Brann", "Molde"]));
+
+// Bytt PIN: den gamle kreves, den nye er gyldig og ny, og gjentas likt.
+ok("et gyldig bytte slipper gjennom", sjekkPinBytte("1234", "5678", "5678") === "");
+ok("og uten gjenta — funksjonen far den ikke", sjekkPinBytte("1234", "5678") === "");
+ok("den gamle PIN-en kreves", sjekkPinBytte("", "5678", "5678").indexOf("du har nå") > -1);
+ok("den nye ma vaere en PIN", sjekkPinBytte("1234", "12", "12").indexOf("siffer") > -1);
+ok("og ikke den samme som den gamle",
+   sjekkPinBytte("1234", "12 34", "1234").indexOf("samme") > -1);
+ok("og gjentas likt", sjekkPinBytte("1234", "5678", "5679").indexOf("ikke like") > -1);
+
 // Adressen vi lagde av navnet er en nokkel, ikke noe a vise noen.
 ok("okta barer ikke adressen vi lagde",
    JSON.stringify(tolkPinOkt({ access_token: "t", user: { email: "ola@" + PIN_DOMENE } },

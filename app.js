@@ -10,10 +10,11 @@ import { LIGAER, tolkFotballHash, fotballHash, tolkKamplenke,
 import { ofteBrukt, noterPub } from "./pub-data.js";
 import { maskerEpost, oktGyldig, kanFornyes, maaFornyes,
          FORNY_MARGIN } from "./konto-data.js";
-import { normaliserPinNavn, gyldigPinNavn, normaliserPin, gyldigPin, PIN_MIN }
+import { normaliserPinNavn, gyldigPinNavn, normaliserPin, gyldigPin, PIN_MIN,
+         rensLag, flettLag, sammeLag, sjekkPinBytte }
   from "./pin-data.js";
 import { normaliserNavn } from "./svar-data.js";
-import { initFotball, visFotball } from "./fotball.js";
+import { initFotball, visFotball, merkFavoritter } from "./fotball.js";
 
 // Bytt WP_HOST til din egen WordPress-side når som helst.
 const WP_HOST  = "https://sportsbibelen.no";
@@ -1033,9 +1034,13 @@ applyPrefs(prefs);
 
 /* ---------- favorittlag ---------- */
 
-// Lagres i samme objekt som tema og skrift: ett valg, en nokkel, ingen
-// konto. Navnet er redaksjonens skrivemate (se fotball-data.js), sa det
-// samme ordet gir treff i feeden.
+// Lagres i samme objekt som tema og skrift, og virker uten konto. Navnet
+// er redaksjonens skrivemate (se fotball-data.js), sa det samme ordet gir
+// treff i feeden.
+//
+// Er du logget inn, far kontoen en kopi (`sendLag`), og det er kontoen
+// som er fasit mellom telefonene. Telefonens liste er den som tegnes —
+// ogsa nar nettet er borte — og kontoen er den som flytter den.
 
 function favorittlag() {
   return Array.isArray(prefs.lag) ? prefs.lag : [];
@@ -1055,7 +1060,126 @@ function vekslFavoritt(lag) {
   // Feeden star bak fanen. Bygg den om na, sa den er riktig nar leseren
   // kommer tilbake — men ikke over en feilmelding.
   if (hasContent) renderFeed(alleSaker, { behold: true });
+  // Usendt fra trykket av, ikke fra et kall som feilet: lukkes appen i
+  // pustet for sendingen, skal neste apning vite at kontoen ligger bak.
+  if (kontoOkt) {
+    prefs.lagUsendt = true;
+    savePrefs(prefs);
+    planleggLagSending();
+    visKontoLag();
+  }
   return valgt;
+}
+
+// Lista byttes ut av kontoen, ikke av en stjerne. Samme ombygging av
+// feeden, men ingen sending tilbake: det var kontoen som sa det.
+function settFavorittlag(liste) {
+  const ny = rensLag(liste);
+  if (sammeLag(ny, favorittlag())) return;
+  prefs.lag = ny;
+  savePrefs(prefs);
+  if (hasContent) renderFeed(alleSaker, { behold: true });
+  merkFavoritter();
+  visKontoLag();
+}
+
+// Sendingen til kontoen. Et lite pust forst: tre stjerner pa rad er én
+// endring for leseren, og skal vaere ett kall. Og bare ett av gangen —
+// to samtidige kunne landet i feil rekkefolge, og da vant den eldste.
+//
+// Svikter den, star `lagUsendt` til neste gang appen kommer fram, og
+// linja i kontopanelet sier det. Stjerna blir staende: valget ditt gjelder
+// pa denne telefonen uansett, det er bare kopien som ikke kom fram.
+let lagKlokke = null;
+let lagSendes = false;
+let lagIgjen = false;
+
+function planleggLagSending() {
+  if (!kontoOkt) return;
+  if (lagKlokke) clearTimeout(lagKlokke);
+  lagKlokke = setTimeout(() => { lagKlokke = null; sendLag(); }, 400);
+}
+
+async function sendLag() {
+  if (!kontoOkt) return;
+  if (lagSendes) { lagIgjen = true; return; }
+  lagSendes = true;
+  visKontoLag();
+  try {
+    if (maaFornyes(kontoOkt)) await fornyOkt();
+    if (!kontoOkt) return;
+    const data = await kontoKall({ handling: "lagre-lag", token: kontoOkt.token,
+      lag: favorittlag() });
+    // Det kontoen svarte, ikke det vi sendte. Er de ulike, har tjenesten
+    // renset noe — og da er det dens versjon som finnes pa neste telefon.
+    prefs.lagUsendt = false;
+    if (!lagIgjen && Array.isArray(data.lag)) settFavorittlag(data.lag);
+    savePrefs(prefs);
+  } catch (err) {
+    prefs.lagUsendt = true;
+    savePrefs(prefs);
+  } finally {
+    lagSendes = false;
+    visKontoLag();
+    if (lagIgjen) { lagIgjen = false; sendLag(); }
+  }
+}
+
+// Kontoens liste, slik den kom med en innlogging, en fornying eller et
+// PIN-bytte. `lag` er udefinert nar kontoen aldri har lagret noen, og det
+// er noe annet enn en tom liste: da er telefonens den eneste som finnes.
+//
+// **Forste mote flettes** (`flettLag`): ved innlogging, og forste gang en
+// telefon som alt var innlogget for denne utrullingen treffer kontoen.
+// Ingen av listene er feil der, og en telefon som tomte kontoen fordi den
+// selv ikke hadde valgt noe, ville tatt stjernene fra den andre.
+//
+// **Etterpa er kontoen fasit** — unntatt nar det ligger en endring her som
+// aldri kom fram (`lagUsendt`). Da vinner telefonen, for den er nyere enn
+// det kontoen vet.
+function mottaKontoLag(lag, vedInnlogging) {
+  const kjent = Array.isArray(lag);
+  if (vedInnlogging || prefs.lagPaKonto !== true) {
+    const flettet = flettLag(kjent ? lag : [], favorittlag());
+    settFavorittlag(flettet);
+    prefs.lagPaKonto = true;
+    savePrefs(prefs);
+    if (!kjent || !sammeLag(flettet, lag)) sendLag();
+  } else if (prefs.lagUsendt || !kjent) {
+    sendLag();
+  } else {
+    settFavorittlag(lag);
+  }
+  visKontoLag();
+}
+
+// Linja i kontopanelet. Fire tilstander, og hver sier det som faktisk er
+// sant akkurat na — «folger kontoen» star forst nar kontoen har svart.
+function visKontoLag() {
+  const linje = document.getElementById("kontoLag");
+  if (!kontoOkt || kontoByttar) { linje.hidden = true; return; }
+  linje.hidden = false;
+  const lag = favorittlag();
+  if (!lag.length && prefs.lagPaKonto === true && !prefs.lagUsendt && !lagSendes) {
+    linje.textContent = "Ingen favorittlag. Velg med ☆ i tabellen.";
+    return;
+  }
+  const hva = lag.length ? "★ " + listeTekst(lag) : "Ingen favorittlag";
+  let status = " — følger kontoen.";
+  if (lagSendes || lagKlokke) status = " — lagres på kontoen …";
+  else if (prefs.lagUsendt) status = " — ikke lagret på kontoen ennå.";
+  else if (prefs.lagPaKonto !== true) status = " — henter fra kontoen …";
+  linje.textContent = hva + status;
+}
+
+// Okta lagres uten lista. Den bor i visningsvalgene; en kopi i okta ville
+// vaert to sannheter om det samme, og den ene ville blitt gammel.
+function utenLag(okt) {
+  const kopi = Object.assign({}, okt);
+  delete kopi.lag;
+  delete kopi.andreUt;
+  delete kopi.forsok;
+  return kopi;
 }
 
 /* ---------- dine puber ---------- */
@@ -1625,6 +1749,13 @@ const KONTO_TEKST = {
     + " ikke bruker andre steder.",
   kjent: "Skriv PIN-en du valgte. Er du ikke denne personen, bytt navn."
     + " Favorittlagene og «jeg blir med» følger kontoen, ikke telefonen.",
+  // Det som skjer med de andre telefonene, sagt for det skjer. Den som
+  // bytter fordi noen andre kan PIN-en, skal vite at de er ute; den som
+  // bytter av andre grunner, skal ikke bli overrasket av en utlogging pa
+  // nettbrettet.
+  bytt: "Alle andre telefoner der du er logget inn, blir logget ut. Denne"
+    + " blir stående innlogget. Vi har ingen e-post å sende en ny PIN til,"
+    + " så skriv den nye to ganger.",
 };
 
 let kontoOkt = lesKonto();
@@ -1636,6 +1767,9 @@ let kontoOppsett = null;
 // som setter det, ikke noe appen gjetter.
 let kontoSteg = "navn";
 let kontoNavnet = "";
+// Innlogget har panelet to tilstander: knappene, eller skjemaet som
+// bytter PIN.
+let kontoByttar = false;
 
 function lesKonto() {
   let lagret = null;
@@ -1701,11 +1835,13 @@ async function fornyOkt() {
       // vet ikke appen hvilken rad i «blir med»-lista som er din: stedet
       // star umerket, kortet sier ingenting om hvor du skal, og
       // delingsteksten mister stedet. Det var nettopp det som skjedde.
-      const fornyet = Object.assign({}, data);
+      const fornyet = utenLag(data);
       if (!fornyet.bruker && kontoOkt.bruker) fornyet.bruker = kontoOkt.bruker;
       if (!fornyet.navn && kontoOkt.navn) fornyet.navn = kontoOkt.navn;
       lagreKonto(fornyet);
       planleggFornying();
+      // Fornyingen er runden der en annen telefons endring kommer hit.
+      mottaKontoLag(data.lag, false);
       return fornyet;
     }
     // Bare en avvist fornyer betyr utlogget: den er brukt, trukket
@@ -1782,6 +1918,8 @@ function visKonto() {
   const slett = document.getElementById("kontoSlett");
   const par = document.getElementById("kontoPar");
   const note = document.getElementById("kontoNote");
+  const byttPin = document.getElementById("kontoByttPin");
+  const pinSkjema = document.getElementById("kontoPinSkjema");
 
   visHvem();
 
@@ -1793,15 +1931,27 @@ function visKonto() {
     pin2.hidden = true;
     send.hidden = true;
     bytt.hidden = true;
-    par.hidden = false;
+    par.hidden = kontoByttar;
     ut.hidden = false;
     slett.hidden = false;
+    // Bytt PIN krever navnet: det er det PIN-en proves mot. En gammel okt
+    // fra e-postinnloggingen har ingen PIN a bytte.
+    byttPin.hidden = !kontoOkt.navn;
+    pinSkjema.hidden = !kontoByttar;
     // Ingen setning her. Du trykket pa ditt eget navn — at du er logget
     // inn er ikke en nyhet, og teksten gjorde bunnen av menyen nesten
-    // dobbelt sa hoy som emnelista over den.
-    note.hidden = true;
+    // dobbelt sa hoy som emnelista over den. Unntaket er PIN-byttet: det
+    // som skjer med de andre telefonene skal sta for du trykker.
+    note.hidden = !kontoByttar;
+    if (kontoByttar) note.textContent = KONTO_TEKST.bytt;
+    visKontoLag();
     return;
   }
+
+  kontoByttar = false;
+  byttPin.hidden = true;
+  pinSkjema.hidden = true;
+  document.getElementById("kontoLag").hidden = true;
 
   tekst.textContent = "Logg inn";
   note.hidden = false;
@@ -1954,7 +2104,8 @@ async function kontoPinSteget() {
   send.disabled = true;
   try {
     const okt = await kontoKall({ handling: "logg-inn", navn: kontoNavnet, pin });
-    lagreKonto(okt);
+    lagreKonto(utenLag(okt));
+    mottaKontoLag(okt.lag, true);
     // PIN-en skal ikke sta igjen i feltene etterpa.
     feltPin.value = "";
     feltPin2.value = "";
@@ -1975,8 +2126,22 @@ async function kontoPinSteget() {
   }
 }
 
+// Favorittlagene blir staende pa telefonen: de virket for du logget inn,
+// og de virker etter. Det som glemmes er at de har mott en konto — neste
+// som logger inn her, far dem flettet inn som ved en hvilken som helst
+// innlogging, og ikke skrevet over av en konto de aldri tilhorte.
+function glemKontoLag() {
+  delete prefs.lagPaKonto;
+  delete prefs.lagUsendt;
+  savePrefs(prefs);
+  if (lagKlokke) clearTimeout(lagKlokke);
+  lagKlokke = null;
+}
+
 function loggUt() {
   lagreKonto(null);
+  glemKontoLag();
+  kontoByttar = false;
   // Navnet vennene ser folger kontoen. Blir det staende, skriver neste
   // som logger inn i samme nettleser raden sin med forrige persons navn.
   glemSvarNavn();
@@ -1997,6 +2162,7 @@ function lukkKontoPanel() {
 // Fornavnet i toppfeltet er en knapp: den apner menyen med kontopanelet
 // ute, sa «logg ut» og «slett kontoen» er ett trykk unna der du ser navnet.
 document.getElementById("hvemTag").addEventListener("click", () => {
+  lukkPinBytte();
   openMenu();
   const panel = document.getElementById("kontoPanel");
   panel.hidden = false;
@@ -2014,6 +2180,7 @@ document.getElementById("kontoBtn").addEventListener("click", () => {
   panel.hidden = apen;
   knapp.setAttribute("aria-expanded", apen ? "false" : "true");
   if (apen) return;
+  lukkPinBytte();
   kontoSvar("");
   visKonto();
   sjekkKontoOppsett();
@@ -2027,6 +2194,82 @@ document.getElementById("kontoBtn").addEventListener("click", () => {
 document.getElementById("kontoSend").addEventListener("click", kontoSteget);
 document.getElementById("kontoBytt").addEventListener("click", kontoTilbake);
 document.getElementById("kontoUt").addEventListener("click", loggUt);
+
+// Bytt PIN. Skjemaet tar plassen til knappene, ikke en rad til under dem:
+// panelet er alt det storste i footeren.
+const PIN_FELT = ["kontoPinNa", "kontoPinNy", "kontoPinNy2"];
+
+function tomPinFelt() {
+  PIN_FELT.forEach((id) => { document.getElementById(id).value = ""; });
+}
+
+// Panelet apner alltid pa knappene. Et halvutfylt PIN-skjema fra sist
+// skal ikke sta og vente — og PIN-ene skal ikke ligge igjen i feltene.
+function lukkPinBytte() {
+  kontoByttar = false;
+  tomPinFelt();
+}
+
+function settPinBytte(apen) {
+  kontoByttar = apen;
+  tomPinFelt();
+  kontoSvar("");
+  visKonto();
+  if (apen) document.getElementById("kontoPinNa").focus();
+}
+
+async function byttPin() {
+  if (!kontoOkt) return;
+  const lagre = document.getElementById("kontoPinLagre");
+  const [na, ny, ny2] = PIN_FELT.map((id) => document.getElementById(id).value);
+
+  const feil = sjekkPinBytte(na, ny, ny2);
+  if (feil) {
+    kontoSvar(feil);
+    // Fokus dit feilen er: den gamle, den nye, eller gjentakelsen.
+    const felt = !gyldigPin(na) ? "kontoPinNa"
+      : (!gyldigPin(ny) || normaliserPin(ny) === normaliserPin(na)) ? "kontoPinNy" : "kontoPinNy2";
+    if (felt === "kontoPinNy2") document.getElementById(felt).value = "";
+    document.getElementById(felt).focus();
+    return;
+  }
+
+  lagre.disabled = true;
+  try {
+    const okt = await kontoKall({ handling: "bytt-pin", navn: kontoOkt.navn,
+      pin: normaliserPin(na), nyPin: normaliserPin(ny) });
+    // Okta byttes ut: den gamle er logget ut sammen med de andre
+    // telefonene, og dette er innloggingen denne fortsetter med.
+    const nyOkt = utenLag(okt);
+    if (!nyOkt.bruker && kontoOkt.bruker) nyOkt.bruker = kontoOkt.bruker;
+    lagreKonto(nyOkt);
+    planleggFornying();
+    mottaKontoLag(okt.lag, false);
+    kontoByttar = false;
+    tomPinFelt();
+    visKonto();
+    // Byttet er gjort uansett. Gikk utloggingen av de andre galt, er det
+    // det som skal sta — ikke at alt gikk bra, og ikke at byttet feilet.
+    kontoSvar(okt.andreUt === false
+      ? "PIN-en er byttet. Men andre telefoner kan fortsatt være innlogget"
+        + tjenestenSa(okt) + "."
+      : "PIN-en er byttet. Andre telefoner er logget ut.");
+    track("PIN byttet");
+  } catch (err) {
+    kontoSvar(err.message);
+  } finally {
+    lagre.disabled = false;
+  }
+}
+
+document.getElementById("kontoByttPin").addEventListener("click", () => settPinBytte(true));
+document.getElementById("kontoPinAvbryt").addEventListener("click", () => settPinBytte(false));
+document.getElementById("kontoPinLagre").addEventListener("click", byttPin);
+PIN_FELT.forEach((id) => {
+  document.getElementById(id).addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); byttPin(); }
+  });
+});
 
 // Sletting er endelig, sa den krever to trykk: det forste sier hva som
 // kommer til a skje, det andre gjor det. Ingen dialogboks — den ville
@@ -2045,6 +2288,7 @@ document.getElementById("kontoSlett").addEventListener("click", async () => {
   try {
     await kontoKall({ handling: "slett", token: kontoOkt && kontoOkt.token });
     lagreKonto(null);
+    glemKontoLag();
     glemSvarNavn();
     kontoSteg = "navn";
     kontoNavnet = "";
@@ -2258,7 +2502,11 @@ function fangFokus(e) {
 
 // Er tokenet gammelt, fornyes det med en gang appen apnes — og ellers
 // settes klokka som holder det ferskt mens appen star apen.
-if (maaFornyes(kontoOkt)) fornyOkt();
+//
+// En telefon som var innlogget for favorittlagene fulgte kontoen, har
+// aldri mott kontoens liste. Den fornyes med en gang, for fornyingen er
+// det som bringer lista — ellers ville panelet sagt «henter» i en time.
+if (maaFornyes(kontoOkt) || (kanFornyes(kontoOkt) && prefs.lagPaKonto !== true)) fornyOkt();
 else planleggFornying();
 
 // Telefonen fryser tidtakere nar appen ligger i bakgrunnen, sa klokka
@@ -2266,7 +2514,11 @@ else planleggFornying();
 // det ogsa nar appen kommer fram igjen: det er nettopp da man tar den
 // opp for a trykke pa noe.
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && maaFornyes(kontoOkt)) fornyOkt();
+  if (document.visibilityState !== "visible") return;
+  if (maaFornyes(kontoOkt)) fornyOkt();
+  // En endring som ikke kom fram sist, prover igjen her: det er nettopp
+  // da appen tas fram, og det er det linja i panelet lover.
+  else if (kontoOkt && prefs.lagUsendt) sendLag();
 });
 
 initFotball(

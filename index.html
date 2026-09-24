@@ -139,12 +139,36 @@
                  aria-label="Gjenta PIN-koden" maxlength="6" hidden>
           <button class="konto-send" id="kontoSend" type="button">Fortsett</button>
           <button class="konto-ut" id="kontoBytt" type="button" hidden>Bytt navn</button>
-          <!-- Innlogget er panelet disse to. De star ved siden av hverandre,
+          <!-- Favorittlagene, og om kontoen har dem. Menyen har lovet at de
+               folger kontoen; linja er stedet du ser at det faktisk skjedde. -->
+          <p class="konto-lag" id="kontoLag" hidden></p>
+          <!-- Innlogget er panelet disse tre. De star ved siden av hverandre,
                som Del og Installer i footeren over: stablet er de en rad til,
                og raden er det emnelista mister. -->
           <div class="konto-par" id="kontoPar" hidden>
+            <button class="konto-ut" id="kontoByttPin" type="button" hidden>Bytt PIN</button>
             <button class="konto-ut" id="kontoUt" type="button" hidden>Logg ut</button>
             <button class="konto-slett" id="kontoSlett" type="button" hidden>Slett kontoen min</button>
+          </div>
+          <!-- Bytt PIN. Tre felt: den du har, og den nye to ganger — samme
+               grunn som ved opprettelsen, vi har ingen e-post a sende en ny
+               med. Egne felt, ikke de over: autocomplete ma si hvilken PIN
+               som er den gamle, ellers fyller telefonen den gamle inn der
+               den nye skal. -->
+          <div class="konto-pin" id="kontoPinSkjema" hidden>
+            <input class="konto-felt" id="kontoPinNa" type="password" inputmode="numeric"
+                   autocomplete="current-password" placeholder="PIN-en du har nå"
+                   aria-label="PIN-en du har nå" maxlength="6">
+            <input class="konto-felt" id="kontoPinNy" type="password" inputmode="numeric"
+                   autocomplete="new-password" placeholder="Ny PIN (4–6 siffer)"
+                   aria-label="Ny PIN" maxlength="6">
+            <input class="konto-felt" id="kontoPinNy2" type="password" inputmode="numeric"
+                   autocomplete="new-password" placeholder="Gjenta ny PIN"
+                   aria-label="Gjenta ny PIN" maxlength="6">
+            <div class="konto-par">
+              <button class="konto-send" id="kontoPinLagre" type="button">Bytt PIN</button>
+              <button class="konto-ut" id="kontoPinAvbryt" type="button">Avbryt</button>
+            </div>
           </div>
           <p class="konto-svar" id="kontoSvar" aria-live="polite"></p>
         </div>

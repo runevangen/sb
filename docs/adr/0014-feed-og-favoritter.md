@@ -16,7 +16,10 @@ innenfor hver gruppe.
 - Sammenlikningen folder norske tegn og HTML-entiteter, så «Bodø/Glimt»
   treffer tittelen «Bod&#248;/Glimt».
 - **Favorittlag** velges med stjernen i tabellen og lagres lokalt
-  (`sb-visning`, feltet `lag`). Ingen konto, ingen data hos oss. Feeden
+  (`sb-visning`, feltet `lag`). Ingen konto kreves. *Er du logget inn,
+  følger lista kontoen — se [ADR 0024](0024-favorittlag-og-pin-pa-kontoen.md);
+  til 24. september 2026 sto det «ingen data hos oss» her, og menyen lovet
+  det motsatte.* Feeden
   løfter sakene med samme `rangerTreff()`, men med **terskel 2**: bare
   saker som har laget i tittelen eller som kategori. En sak som nevner
   laget i forbifarten skal ikke skyve dagens toppsak nedover.

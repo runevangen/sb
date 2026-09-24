@@ -25,6 +25,13 @@
 // Nyeste først.
 export const VERSJONER = [
   {
+    versjon: "2026.09.24",
+    endringer: [
+      { hva: "Favorittlagene følger kontoen, slik menyen alltid har sagt. Logger du inn på en ny telefon, er stjernene der — og under navnet ditt står det at de er lagret." },
+      { hva: "Du kan bytte PIN selv: trykk på navnet ditt og velg «Bytt PIN». Alle andre telefoner blir logget ut." },
+    ],
+  },
+  {
     versjon: "2026.09.22",
     endringer: [
       { hva: "Hver pub og hvert stadion har fått «Veien dit» — én trykk inn i kartet på telefonen, med sving for sving.", issue: 144 },
