@@ -140,6 +140,22 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   gir «Kopier lenke». `user-select: all` ble prøvd og tatt ut igjen — den
   gjør at ett trykk *markerer* framfor å følge, og kjøper altså
   kopieringen ved å selge trykket.
+- **Favorittlagene følger kontoen — og det står under navnet ditt.**
+  Menyen lovet det fra dag én; til 24. september 2026 lå lagene i
+  nettleseren og ble aldri sendt noe sted, mens personvernsida sa «bare i
+  din egen nettleser». Nå ligger de i `user_metadata.lag`, skrevet med din
+  egen økt. **Første møte flettes, etterpå er kontoen fasit** — unntatt en
+  endring som aldri kom fram (`lagUsendt`), for da er telefonen nyere.
+  «Aldri lagret» er ikke «ingen lag»: en tom liste der ville tømt
+  stjernene til alle ved første fornying.
+  **Og løftet er synlig:** linja i kontopanelet sier «følger kontoen» først
+  når kontoen har svart. [ADR 0024](docs/adr/0024-favorittlag-og-pin-pa-kontoen.md)
+- **Bytt PIN krever den gamle, og logger ut alle andre telefoner.** PIN-en
+  er en sperre mellom folk som deler en telefon; kunne den byttes uten den
+  gamle, kunne hvem som helst med telefonen ta kontoen. Den gamle prøves
+  med en innlogging, og den ferske økta bytter passordet. At de andre
+  logges ut, står i skjemaet **før** du trykker. Feiler bare utloggingen,
+  sier svaret at PIN-en er byttet *og* at andre kan være inne.
 - **Ingen knapp navngir noe appen ikke har.** «Del i chatten» sto til
   19. september 2026, og Sportsbibelen har ingen chat — knappen lovet et
   sted å sende den. Hvor teksten havner er leserens valg i

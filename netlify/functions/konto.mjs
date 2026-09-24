@@ -24,11 +24,13 @@
 // Husk at funksjonene leser miljoet ved utrulling: en ny variabel krever
 // en ny deploy, og miljovariabler er versalfolsomme.
 //
-// Hva vi lagrer om en leser: fornavnet, hos Supabase. Ingen adresse,
-// ingenting annet, og ingenting her.
+// Hva vi lagrer om en leser: fornavnet og favorittlagene, hos Supabase,
+// i brukerens egne metadata. Ingen adresse, ingenting annet, og ingenting
+// her.
 
 import { tolkPinOkt, normaliserPinNavn, gyldigPinNavn, normaliserPin, gyldigPin,
-         pinEpost, pinSlug, pinPassord, PIN_MIN, PIN_MAKS } from "../../pin-data.js";
+         pinEpost, pinSlug, pinPassord, PIN_MIN, PIN_MAKS,
+         rensLag, sjekkPinBytte } from "../../pin-data.js";
 
 import { tjenestensOrd, diagnosekropp }
   from "../../tjeneste-data.js";
@@ -61,6 +63,8 @@ export default async (req) => {
   if (inn.handling === "logg-inn") return loggInn(inn);
   if (inn.handling === "slett") return slettMeg(inn);
   if (inn.handling === "forny") return fornyOkt(inn);
+  if (inn.handling === "lagre-lag") return lagreLag(inn);
+  if (inn.handling === "bytt-pin") return byttPin(inn);
   return svar({ feil: "Ukjent handling" }, 400);
 };
 
@@ -275,6 +279,105 @@ function pinFeil(r) {
   return svar({ feil: "Navnet eller PIN-en stemmer ikke.", forsok: r.forsok }, 401);
 }
 
+// Favorittlagene pa kontoen.
+//
+// Menyen har sagt «favorittlagene folger kontoen, ikke telefonen» siden
+// innloggingen kom, og til 24. september 2026 var det ikke sant: lagene
+// la i nettleseren, sammen med tema og skriftstorrelse, og ingenting sendte
+// dem noe sted. Logget du inn pa en ny telefon, var stjernene borte.
+//
+// De ligger i `user_metadata.lag`, ikke i en egen tabell. Supabase lar
+// brukeren skrive sine egne metadata med sin egen okt — ingen
+// service_role, ingen RLS a holde i takt — og de forsvinner med kontoen
+// uten at noe ma huske a slette dem. En tabell ville gitt en rad per
+// konto og en regel til om hvem som kan lese den.
+//
+// Tjenesten fletter metadata pa toppnivaet: `navn` blir staende nar vi
+// skriver `lag`. Svaret er brukeren slik den ligger ETTER skrivingen, og
+// det er det appen far tilbake — ikke det den sendte. En skriving som
+// svarer 200 er ikke bevis pa at raden ligger der.
+async function lagreLag(inn) {
+  const token = String(inn.token || "");
+  if (!token) return svar({ feil: "Logg inn først" }, 401);
+  const lag = rensLag(inn.lag);
+
+  const r = await hosSupabase("/auth/v1/user", { data: { lag } }, { metode: "PUT", token });
+  if (r.ok && r.json) {
+    const meta = r.json.user_metadata || (r.json.user && r.json.user.user_metadata) || {};
+    // Et svar uten lista er ikke «ingen lag». Sa vi det, ville appen tomt
+    // stjernene pa telefonen for et svar vi ikke kjente igjen.
+    if (!Array.isArray(meta.lag)) {
+      return svar({ feil: "Uventet svar fra kontoen", forsok: r.forsok }, 502);
+    }
+    return svar({ lag: rensLag(meta.lag) }, 200);
+  }
+  if (r.status === 401 || r.status === 403) {
+    return svar({ feil: "Økten gjelder ikke lenger. Logg inn på nytt.", forsok: r.forsok }, 401);
+  }
+  console.error("[konto] lagre-lag feilet:", r.status, r.melding);
+  return svar({ feil: "Fikk ikke lagret favorittlagene på kontoen.", forsok: r.forsok },
+    r.status === 429 ? 429 : 502);
+}
+
+// Bytt PIN.
+//
+// Den gamle PIN-en kreves, og den provest pa den eneste maten tjenesten
+// kan prove den: en innlogging. Det gir oss en fersk okt, og det er den
+// som bytter passordet. To grunner til ikke a bruke okta appen alt har:
+//
+//   1. Okta beviser at telefonen en gang var logget inn, ikke at den som
+//      holder den na kan PIN-en. Det er hele jobben PIN-en har.
+//   2. Supabase kan kreve at et passordbytte skjer kort tid etter en
+//      innlogging («Secure password change»). En okt som ble fornyet i
+//      tre uker er ikke det; en som ble til for et halvt sekund siden er.
+//
+// Etterpa logges ALLE ANDRE okter ut. Den vanlige grunnen til a bytte PIN
+// er at noen andre kan den, og da er en telefon som fortsatt er inne det
+// ene som ikke skal overleve byttet. Okta vi lagde over er ikke «en
+// annen», sa den er den appen far tilbake — ogsa telefonen du sto pa ble
+// logget ut, og dette er innloggingen den fortsetter med.
+async function byttPin(inn) {
+  const navn = normaliserPinNavn(inn.navn);
+  if (!gyldigPinNavn(navn)) return svar({ feil: "Logg inn først" }, 401);
+  const feil = sjekkPinBytte(inn.pin, inn.nyPin);
+  if (feil) return svar({ feil }, 400);
+
+  const pepper = process.env.PIN_PEPPER;
+  const inne = await hosSupabase("/auth/v1/token?grant_type=password",
+    { email: pinEpost(navn), password: pinPassord(inn.pin, pepper) });
+  if (!(inne.ok && inne.json && inne.json.access_token)) {
+    if (inne.status === 429 || inne.status >= 500 || inne.status === 0) return pinFeil(inne);
+    return svar({ feil: "PIN-en du har nå stemmer ikke.", forsok: inne.forsok }, 401);
+  }
+  const token = inne.json.access_token;
+
+  const byttet = await hosSupabase("/auth/v1/user",
+    { password: pinPassord(inn.nyPin, pepper) }, { metode: "PUT", token });
+  let forsok = inne.forsok.concat(byttet.forsok);
+  if (!byttet.ok) {
+    console.error("[konto] bytt-pin feilet:", byttet.status, byttet.melding);
+    return svar({ feil: "Fikk ikke byttet PIN-en. Den gamle gjelder fortsatt.", forsok },
+      byttet.status === 429 ? 429 : 502);
+  }
+
+  // PIN-en ER byttet her, uansett hva som skjer videre. Gar utloggingen
+  // av de andre galt, er det det svaret skal si — ikke at byttet feilet,
+  // og ikke ingenting.
+  const ut = await hosSupabase("/auth/v1/logout?scope=others", {}, { token });
+  forsok = forsok.concat(ut.forsok);
+  if (!ut.ok) console.error("[konto] fikk ikke logget ut andre okter:", ut.status, ut.melding);
+
+  let okt;
+  try {
+    okt = tolkPinOkt(inne.json, navn);
+  } catch (err) {
+    return svar({ feil: "Uventet svar fra innloggingen", forsok }, 502);
+  }
+  okt.andreUt = ut.ok;
+  if (!ut.ok) okt.forsok = forsok;
+  return svar(okt, 200);
+}
+
 // Sletting av egen konto. Normalt krever det admin-tilgang hos Supabase,
 // og en service_role-nokkel som kan slette hvem som helst — den finnes
 // ikke her, med vilje. I stedet ligger det en databasefunksjon
@@ -347,16 +450,22 @@ function base() {
 // melding, uten nokkel og uten adresser — slik fotball- og
 // vaerfunksjonen gjor det: da kan en feil leses fra nettleseren framfor
 // a graves fram av funksjonsloggen.
-async function hosSupabase(sti, kropp) {
+//
+// Med `token` gar kallet som den innloggede brukeren — det er slik en
+// bruker endrer sitt eget passord og sine egne metadata uten at vi har en
+// nokkel som kan endre hvem som helst sine.
+async function hosSupabase(sti, kropp, valg = {}) {
   const forsok = { kilde: "Supabase Auth", sti };
+  const headere = {
+    "apikey": process.env.SUPABASE_ANON_KEY,
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+  };
+  if (valg.token) headere.Authorization = "Bearer " + valg.token;
   try {
     const respons = await fetch(base() + sti, {
-      method: "POST",
-      headers: {
-        "apikey": process.env.SUPABASE_ANON_KEY,
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-      },
+      method: valg.metode || "POST",
+      headers: headere,
       body: JSON.stringify(kropp),
     });
     forsok.status = respons.status;

@@ -630,7 +630,10 @@ body {
   align-items: stretch;
 }
 
-.konto-par > * { flex: 1; }
+/* Tre knapper, og de er ikke like lange. Lik bredde ga «Slett kontoen
+   min» en tredjedel av raden, og da brakk den over to linjer med A+ —
+   en rad hoyere for alle for a gi én knapp plass. */
+.konto-par > * { flex: 1 1 auto; }
 /* display: flex slar [hidden] fra nettleserens eget stilark. */
 .konto-par[hidden] { display: none; }
 .konto-slett:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -643,6 +646,27 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* Favorittlagene pa kontoen: en opplysning, ikke en handling. Liten og
+   dempet, som svaret under — men den er der, for «folger kontoen» er et
+   lofte, og et lofte du ikke kan se er holdt, er et du ma tro pa. */
+.konto-lag {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.konto-lag[hidden] { display: none; }
+
+.konto-pin {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* display: flex slar [hidden] fra nettleserens eget stilark. */
+.konto-pin[hidden] { display: none; }
 
 .konto-svar {
   margin: 0;

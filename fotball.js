@@ -470,9 +470,20 @@ function stjerne(lag) {
   knapp.type = "button";
   knapp.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">'
     + '<path d="M10 1.8l2.5 5.4 5.9.7-4.4 4 1.2 5.8L10 14.8l-5.2 2.9 1.2-5.8-4.4-4 5.9-.7z"/></svg>';
+  knapp.dataset.lag = lag;
   merkStjerne(knapp, lag, favoritter.er(lag));
   knapp.addEventListener("click", () => merkStjerne(knapp, lag, favoritter.veksle(lag)));
   return knapp;
+}
+
+// Lista kan byttes uten at en stjerne ble trykket: kontoen svarer etter at
+// tabellen er tegnet, med lag fra en annen telefon. Stjernene som alt star
+// merkes pa nytt fra lista — ellers sto Brann tom i tabellen mens linja
+// under navnet sa «★ Brann».
+export function merkFavoritter() {
+  document.querySelectorAll(".lag-stjerne").forEach((knapp) => {
+    if (knapp.dataset.lag) merkStjerne(knapp, knapp.dataset.lag, favoritter.er(knapp.dataset.lag));
+  });
 }
 
 function merkStjerne(knapp, lag, valgt) {
