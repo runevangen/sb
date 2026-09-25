@@ -54,7 +54,10 @@
                 aria-label="Åpne meny" aria-expanded="false" aria-controls="menuPanel">
           <span class="bars" aria-hidden="true"></span>
         </button>
-        <h1 class="logo"><img src="/logo-mark.png" alt="Sportsbibelen"></h1>
+        <!-- Logoen er veien hjem: nyhetene, uten sok eller emne, fra toppen.
+             En lenke til "/" og ikke en knapp — lang trykk og ny fane virker
+             som pa andre lenker, og uten skript laster den forsiden. -->
+        <h1 class="logo"><a class="logo-hjem" id="logoHjem" href="/"><img src="/logo-mark.png" alt="Sportsbibelen — til forsiden"></a></h1>
         <!-- Fylles av app.js: ren tekst i fotball, en brikke med kryss nar
              et sok eller en kategori filtrerer nyhetene. -->
         <span class="filter-tag" id="filterTag"></span>

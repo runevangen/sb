@@ -1249,6 +1249,58 @@ function mockAlt(saker, fotballFeil) {
   };`;
 }
 
+// Logoen er veien hjem. Eldre lesere roter seg bort — et sok, fotball-
+// fanen, langt ned i feeden — og logoen er det ene de alltid ser.
+const SAK_6B = kjor("logo-hjem", FELLES + FOTBALL + `
+  var saker = lagSaker(30);
+  ` + mockAlt("saker") + `
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var logo = document.getElementById("logoHjem");
+    ok("logoen er en lenke til forsiden", !!logo && logo.tagName === "A" &&
+       logo.getAttribute("href") === "/" && !!logo.querySelector("img"),
+       logo && logo.outerHTML.slice(0, 80));
+
+    // Bort: et sok, rullet ned, og over i fotballen.
+    document.getElementById("sokFelt").value = "Brann";
+    document.getElementById("sokForm").dispatchEvent(new Event("submit", { cancelable: true }));
+    setTimeout(function () { try {
+      var feed = document.getElementById("feed");
+      ok("soket filtrerer, og det star i toppfeltet",
+         !!document.querySelector("#filterTag .filter-chip"));
+      feed.scrollTop = 400;
+      document.getElementById("fanenFotball").click();
+      ok("og fotballen star framme", document.getElementById("fotball").hidden === false);
+
+      // Et trykk med Ctrl gar til nettleseren: ny fane pa forsiden.
+      var ctrl = new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true, button: 0 });
+      logo.dispatchEvent(ctrl);
+      ok("Ctrl-trykk fanges ikke", ctrl.defaultPrevented === false &&
+         document.getElementById("fotball").hidden === false);
+
+      var vanlig = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+      logo.dispatchEvent(vanlig);
+      ok("et vanlig trykk laster ikke sida pa nytt", vanlig.defaultPrevented === true);
+      ok("og tar deg til nyhetene", document.getElementById("feed").hidden === false &&
+         document.getElementById("fotball").hidden === true &&
+         document.getElementById("fanenNyheter").getAttribute("aria-current") === "true");
+      ok("uten sok", !document.querySelector("#filterTag .filter-chip") &&
+         document.getElementById("sokFelt").value === "",
+         document.getElementById("filterTag").textContent);
+
+      // Rullet langt ned i nyhetene, uten filter: logoen tar deg til toppen.
+      // Egen runde, for en skjult feed har ingen rulleposisjon a male.
+      setTimeout(function () { try {
+        feed.scrollTop = 600;
+        var nede = feed.scrollTop;
+        logo.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+        ok("rullet ned i nyhetene tar logoen deg til toppen", nede > 0 && feed.scrollTop === 0,
+           nede + " -> " + feed.scrollTop);
+        ferdig();
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1000); });
+`);
+
 const SAK_6 = kjor("fotball", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   ` + mockAlt("saker") + `
@@ -8770,7 +8822,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

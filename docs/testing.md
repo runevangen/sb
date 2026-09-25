@@ -6,7 +6,7 @@ dager. Legger du til tester, er det denne fila som skal rettes.
 
     node test/unit.mjs      874 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  439 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       932 tester, 3–20 s, headless Chromium
+    node test/run.mjs       940 tester, 3–20 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det

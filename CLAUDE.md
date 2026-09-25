@@ -646,6 +646,14 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   også i et element som aldri settes inn i dokumentet, og også når vi
   kaster alt utenom teksten rett etterpå.
 - Filtrerer noe feeden, står det som en knapp med kryss i toppfeltet.
+- **Logoen er veien hjem.** Nyhetene, uten søk eller emne, fra toppen —
+  fra fotballfanen, fra et søk du ikke husker at du gjorde, fra langt ned i
+  feeden. Meldt 25. september 2026: eldre lesere roter seg bort, og logoen
+  er det ene de alltid ser. Den er en `<a href="/">`, ikke en knapp, og
+  `preventDefault()` bare på et vanlig trykk — samme regel som sakene. Den
+  laster ikke sida på nytt: `tilForsiden()` bruker de samme veiene som
+  fanen og krysset i toppfeltet, og rullingen til toppen er svaret som
+  synes.
 - **Portalen er sammenleggbar, og et lukket hode bærer et tall.** Den var
   sju seksjoner åpne samtidig, og stedsskjemaet alene var 201 av 288
   linjer markup — kampene, som er det du kom for, lå øverst i noe du måtte

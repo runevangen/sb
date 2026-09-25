@@ -590,6 +590,12 @@ portalen — en leser har ingen nytte av den.
   fire tilstander og sier «følger kontoen» først når kontoen har svart. Den
   må tegnes både når en stjerne trykkes og når kontoen svarer — den sto med
   den gamle lista i første utkast.
+- **`tilForsiden()` bygger ingen ny vei.** Logoen går gjennom
+  `settFane("nyheter")`, `visAlleSaker()` — den samme som krysset i
+  toppfeltet — og `feed.scrollTop = 0`. En egen nullstilling ved siden av
+  kunne glidd fra de to, og da hadde «hjem» betydd noe annet enn krysset.
+  Rullingen testes i en egen runde, uten fanebytte: en skjult feed har
+  ingen rulleposisjon, og testen målte 0 uansett til den ble delt.
 - **Navnet i toppfeltet åpner kontosiden, ikke menyen.** Kontosiden er
   menypanelet med `.konto-modus` på: CSS-en tar bort søk, emner, deling og
   tema, og `#kontoSide` får plassen emnelista hadde, med kortene fra Mitt

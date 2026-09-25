@@ -883,6 +883,11 @@ body {
   width: auto;
 }
 
+/* Logoen er en lenke hjem. Ingen understrek eller farge — den ser ut som
+   logoen, og det er nettopp den leseren kjenner igjen. */
+.logo-hjem { display: block; border-radius: 6px; }
+.logo-hjem:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 .feed {
   overflow-y: auto;
   flex: 1;
