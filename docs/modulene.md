@@ -590,6 +590,12 @@ portalen — en leser har ingen nytte av den.
   fire tilstander og sier «følger kontoen» først når kontoen har svart. Den
   må tegnes både når en stjerne trykkes og når kontoen svarer — den sto med
   den gamle lista i første utkast.
+- **`tilForsiden()` bygger ingen ny vei.** Logoen går gjennom
+  `settFane("nyheter")`, `visAlleSaker()` — den samme som krysset i
+  toppfeltet — og `feed.scrollTop = 0`. En egen nullstilling ved siden av
+  kunne glidd fra de to, og da hadde «hjem» betydd noe annet enn krysset.
+  Rullingen testes i en egen runde, uten fanebytte: en skjult feed har
+  ingen rulleposisjon, og testen målte 0 uansett til den ble delt.
 - **Navnet i toppfeltet åpner kontosiden, ikke menyen.** Kontosiden er
   menypanelet med `.konto-modus` på: CSS-en tar bort søk, emner, deling og
   tema, og `#kontoSide` får plassen emnelista hadde, med kortene fra Mitt
@@ -624,6 +630,11 @@ portalen — en leser har ingen nytte av den.
 
 [ADR 0012](adr/0012-kampkortet.md).
 
+- **Stjerna i `tabell()` har sin egen kolonne, først i raden** (`.kol-stjerne`,
+  med `aria-label="Favoritt"` på overskriften). Den sto ytterst i lagcellen,
+  inntil tallene, til 25. september 2026. Egen kolonne, ikke først i
+  lagcellen: da står den på samme linje i hver rad uansett hvor langt navnet
+  er, og lagknappen er fortsatt bare navnet.
 - **Mitt lag-kortene tegnes to steder**, i fanen og på kontosiden, av den
   samme `tegnMittLag(rot, gjelder, iFanen)`. `gjelder()` erstatter
   `aktivDel === "mittlag"` som vakt mot et svar som lander etter at rota er

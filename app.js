@@ -1508,6 +1508,28 @@ function visAlleSaker() {
   loadFeed();
 }
 
+// Logoen er hjem-knappen. Meldt 25. september 2026: eldre lesere roter seg
+// bort — et sok de ikke husker at de gjorde, et emne, fotballfanen, langt
+// ned i feeden — og logoen er det ene de alltid ser. Hjem er nyhetene, uten
+// filter, fra toppen. Den laster ikke sida pa nytt: det ville kostet alt
+// som er hentet, og en rullet feed som hopper til toppen er svaret som
+// synes.
+function tilForsiden() {
+  closeMenu();
+  if (aktivVisning !== "nyheter") settFane("nyheter");
+  if (sokeord || activeCategory !== null || toppTekst) visAlleSaker();
+  document.getElementById("feed").scrollTop = 0;
+  document.querySelector(".phone").classList.remove("komprimert");
+}
+
+document.getElementById("logoHjem").addEventListener("click", (e) => {
+  // Bare et vanlig trykk. Ctrl, Cmd, Shift, Alt og midtklikk gar til
+  // nettleseren, som pa sakene: ny fane pa forsiden er ogsa hjem.
+  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  tilForsiden();
+});
+
 /* ---------- visninger ---------- */
 
 // Nyheter og fotball bytter plass i det samme kortet. Begge ligger i

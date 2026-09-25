@@ -25,6 +25,13 @@
 // Nyeste først.
 export const VERSJONER = [
   {
+    versjon: "2026.09.25",
+    endringer: [
+      { hva: "Logoen er hjem-knappen: trykk på den, så står du på nyhetene uten søk eller emne, øverst i lista." },
+      { hva: "Stjerna i tabellen står helt til venstre, i sin egen kolonne — ikke inntil tallene." },
+    ],
+  },
+  {
     versjon: "2026.09.24",
     endringer: [
       { hva: "Favorittlagene følger kontoen, slik menyen alltid har sagt. Logger du inn på en ny telefon, er stjernene der — og under navnet ditt står det at de er lagret." },
