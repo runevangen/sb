@@ -1817,7 +1817,7 @@ a.ad-cta:focus-visible {
   color: var(--text-strong);
   font-weight: 600;
   /* Et langt lagnavn brytes over to linjer framfor a gjore tabellen
-     bredere enn telefonen: stjernen skal ha plass ved siden av. */
+     bredere enn telefonen. */
   white-space: normal;
 }
 
@@ -1850,8 +1850,6 @@ a.ad-cta:focus-visible {
   border-radius: 3px;
 }
 
-/* Navn til venstre, stjerne til hoyre. Cellen har width: 100 %, sa
-   stjernen far plass uten a presse tallkolonnene. */
 /* Merket ved lagnavnet. Fast storrelse i piksler, ikke skalert av --fs:
    det er et bilde, ikke tekst, og et merke som vokser med skriften ville
    skjovet tabellen bredere nettopp nar den alt er trang. */
@@ -1872,18 +1870,20 @@ a.ad-cta:focus-visible {
    se poengsummen er verre. */
 .lag-navn { min-width: 0; overflow-wrap: anywhere; }
 
-.lag-celle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
+/* Stjerna har sin egen kolonne, forst i raden. Ingen luft til venstre:
+   tabellen er trang, og cellens egen padding holder den fra kanten. */
+.tabell .kol-stjerne {
+  width: 26px;
+  padding-left: 0;
+  padding-right: 2px;
+  text-align: left;
 }
 
 .lag-stjerne {
   flex: 0 0 auto;
   width: 26px;
   height: 26px;
-  margin: -6px -4px -6px 0;
+  margin: -6px 0;
   padding: 0;
   border: 0;
   border-radius: 50%;

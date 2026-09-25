@@ -417,6 +417,14 @@ function tabell(rader) {
   const tab = el("table", "tabell");
 
   const hode = el("tr");
+  // Stjerna star forst, helt til venstre. Den sto ytterst i lagcellen,
+  // inntil tallene, og der leste den som en del av dem. Meldt 25. september
+  // 2026: «Flytt stjerne helt til venstre». Egen kolonne, sa den star pa
+  // samme linje i hver rad uansett hvor langt lagnavnet er.
+  const stjerneHode = el("th", "kol-stjerne");
+  stjerneHode.scope = "col";
+  stjerneHode.setAttribute("aria-label", "Favoritt");
+  hode.appendChild(stjerneHode);
   KOLONNER.forEach(([navn, felt]) => {
     const celle = el("th", felt === "lag" ? "kol-lag" : null, navn);
     celle.scope = "col";
@@ -429,6 +437,9 @@ function tabell(rader) {
   const kropp = el("tbody");
   rader.forEach((rad) => {
     const tr = el("tr");
+    const stjerneCelle = el("td", "kol-stjerne");
+    stjerneCelle.appendChild(stjerne(rad.lag));
+    tr.appendChild(stjerneCelle);
     KOLONNER.forEach(([, felt]) => {
       if (felt === "lag") {
         const td = el("td", "kol-lag");
@@ -446,10 +457,7 @@ function tabell(rader) {
         if (merke) knapp.appendChild(merke);
         knapp.appendChild(el("span", "lag-navn", rad.lag));
         knapp.addEventListener("click", () => sokEtterLag(rad.lag));
-        const celle = el("div", "lag-celle");
-        celle.appendChild(knapp);
-        celle.appendChild(stjerne(rad.lag));
-        td.appendChild(celle);
+        td.appendChild(knapp);
         tr.appendChild(td);
         return;
       }

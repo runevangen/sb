@@ -1353,6 +1353,21 @@ const SAK_6 = kjor("fotball", FELLES + FOTBALL + `
       // En adresse som ikke er https skal ikke lastes fra appen.
       ok("et merke uten https tegnes ikke", !rader[2].querySelector(".lag-merke"));
 
+      // Stjerna star helt til venstre, i sin egen kolonne — ikke ytterst i
+      // lagcellen, inntil tallene. Meldt 25.09.2026.
+      var forste = rader[0].firstElementChild;
+      ok("stjerna star helt til venstre i raden",
+         !!forste && !!forste.querySelector(".lag-stjerne") &&
+         !rader[0].querySelector(".kol-lag .lag-stjerne") &&
+         forste.getBoundingClientRect().left <=
+           rader[0].querySelector(".kol-lag").getBoundingClientRect().left,
+         forste && forste.className);
+      var hodet = document.querySelector(".tabell thead tr").firstElementChild;
+      ok("og kolonnen har et navn skjermleseren kan si",
+         hodet.getAttribute("aria-label") === "Favoritt" &&
+         document.querySelector(".tabell thead tr").children.length === rader[0].children.length,
+         hodet.getAttribute("aria-label"));
+
       ok("poengsummen star sist",
          rader[0].querySelector(".kol-poeng").textContent === "68",
          rader[0].querySelector(".kol-poeng").textContent);

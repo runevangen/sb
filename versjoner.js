@@ -28,6 +28,7 @@ export const VERSJONER = [
     versjon: "2026.09.25",
     endringer: [
       { hva: "Logoen er hjem-knappen: trykk på den, så står du på nyhetene uten søk eller emne, øverst i lista." },
+      { hva: "Stjerna i tabellen står helt til venstre, i sin egen kolonne — ikke inntil tallene." },
     ],
   },
   {

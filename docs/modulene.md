@@ -630,6 +630,11 @@ portalen — en leser har ingen nytte av den.
 
 [ADR 0012](adr/0012-kampkortet.md).
 
+- **Stjerna i `tabell()` har sin egen kolonne, først i raden** (`.kol-stjerne`,
+  med `aria-label="Favoritt"` på overskriften). Den sto ytterst i lagcellen,
+  inntil tallene, til 25. september 2026. Egen kolonne, ikke først i
+  lagcellen: da står den på samme linje i hver rad uansett hvor langt navnet
+  er, og lagknappen er fortsatt bare navnet.
 - **Mitt lag-kortene tegnes to steder**, i fanen og på kontosiden, av den
   samme `tegnMittLag(rot, gjelder, iFanen)`. `gjelder()` erstatter
   `aktivDel === "mittlag"` som vakt mot et svar som lander etter at rota er
