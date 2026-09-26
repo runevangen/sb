@@ -486,6 +486,29 @@ Netlify-funksjonene og testene.
 
 ---
 
+### `fantasy-data.js` — hva fantasy-spillene gir oss
+
+Rene funksjoner for sonden i portalen: `fantasyFunn()` leser et
+`bootstrap-static`-svar, `fantasySondeTekst()` skriver det som tekst. Ingen
+av API-ene vi betaler for har fantasy-data, så kildene er Fantasy Premier
+League og Eliteserien Fantasy — **uoffisielle og udokumenterte**, og
+dataene eies av ligaene.
+
+- **Feltnavnene er FPL sine, og ingen har sett Eliteseriens svar.**
+  Miljøet koden ble skrevet i nektet begge adressene. Hele poenget med
+  sonden er å se om Eliteserien svarer likt — det kan ingen test si.
+- **«Duger» krever pris, poeng totalt og poeng i runden**
+  (`FANTASY_KREVER`). Mangler ett, er det statistikk, ikke fantasy, og
+  svaret navngir feltet som mangler.
+- **Prisen ligger i tideler.** 145 er 14,5 mill.; delt på ti i funnet, ikke
+  i teksten, så begge leser det samme tallet.
+- **Eksempelet er den med flest poeng**, ikke den første raden — den er
+  gjerne en keeper uten minutter, og sier ingenting om hva feltene bærer.
+- **Ingenting herfra når leserne.** Det er en sonde, ikke en funksjon i
+  appen. Om vi får vise dataene, er et spørsmål om vilkårene.
+
+---
+
 ### `versjoner.js`
 
 Hva som har endret seg, og hvilken sak det svarte på. Leses bare av
@@ -1032,6 +1055,13 @@ Se [`nokler-og-tokens.md`](nokler-og-tokens.md).
   fordi hvert trykk koster seks kall mot en tjeneste som ber om fair use.
   Den finnes i tillegg til verktøyet fordi den som eier prosjektet sitter
   med en telefon: en oppgave som krever en terminal er ingen oppgave.
+- **`fantasysonde.mjs`** — hva Fantasy Premier League og Eliteserien
+  Fantasy svarer, spurt fra Netlify. Ett kall til hver, **samtidig**, med
+  en frist på åtte sekunder per kilde — under Netlifys ti. En kilde som
+  nekter, ikke svarer eller svarer med HTML, sier det med egne ord og tar
+  ikke den andre med seg. Ingen nøkkel, men bak `ADMIN_PASSORD` som de
+  andre sondene: et endepunkt hvem som helst kan trykke på, mot en tjeneste
+  som ikke er laget for oss, er et endepunkt noen trykker på tusen ganger.
 
 ---
 

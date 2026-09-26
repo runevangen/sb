@@ -55,6 +55,9 @@ modul for modul.
     svar-data.js / netlify/functions/svar.mjs
     visning-data.js / netlify/functions/visninger.mjs
     admin.html / admin.js / netlify/functions/brukere.mjs
+    fantasy-data.js / netlify/functions/fantasysonde.mjs
+                    sonden i portalen: hva fantasy-spillene gir oss.
+                    Uoffisielle API-er — ingenting herfra når leserne
 
     verktoy/        diagnostikk som kjores for hand, ikke av CI
                     kanalsjekk.mjs: neste runde mot det kanaler.js pastar

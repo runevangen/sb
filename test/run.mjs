@@ -5239,6 +5239,19 @@ const SAK_15G = kjor("admin-seksjoner", `
       if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [] });
       return svar(200, { ok: true, visninger: [] });
     }
+    if (u.indexOf("/api/fantasy-sonde") === 0) {
+      window.__fantasyBody = opt && opt.body;
+      return svar(200, { kilder: [
+        { nokkel: "eliteserien", navn: "Eliteserien Fantasy", adresse: "fantasy.eliteserien.no",
+          utfall: "svarte med 1 spillere",
+          funn: { spillere: 1, lag: 1, runder: 1, naa: "Runde 22", neste: null,
+                  felt: ["web_name", "now_cost"], mangler: [],
+                  duger: "JA — raden bærer pris, poeng totalt og poeng i runden",
+                  eksempel: { navn: "Berisha", lag: "Brann", pris: 9.5, poeng: 70, eierandel: "33.0" } } },
+        { nokkel: "premier", navn: "Fantasy Premier League", adresse: "fantasy.premierleague.com",
+          utfall: "svarte HTTP 403", hvorfor: "tjenesten nekter" }
+      ] });
+    }
     return svar(200, {});
   };
 
@@ -5484,7 +5497,25 @@ const SAK_15G = kjor("admin-seksjoner", `
            felt("kampTall").textContent);
         ok("og den er merket som noe som venter",
            felt("kampTall").classList.contains("venter"), felt("kampTall").className);
-        ferdig();
+
+        // Fantasy-sonden, under Verktoy. Svaret som tekst, med passordet
+        // med — og ingen av API-ene vi betaler for er med i den.
+        felt("verktoyHode").click();
+        felt("fantasyKjor").click();
+        setTimeout(function () { try {
+          var tekst = felt("fantasySvar").textContent;
+          ok("fantasy-sonden viser svaret som tekst",
+             felt("fantasySvar").hidden === false &&
+             tekst.indexOf("Eliteserien Fantasy (fantasy.eliteserien.no)") > -1 &&
+             tekst.indexOf("DUGER: JA") > -1 && tekst.indexOf("9,5 mill.") > -1, tekst);
+          ok("og sier hva den som nektet svarte",
+             tekst.indexOf("svarte HTTP 403") > -1, tekst);
+          ok("med passordet i kallet",
+             JSON.parse(window.__fantasyBody || "{}").passord === "hemmelig", window.__fantasyBody);
+          ok("og en kvittering som ikke er en feil",
+             felt("fantasyMelding").className.indexOf("ok") > -1, felt("fantasyMelding").textContent);
+          ferdig();
+        } catch (e) { ok("ingen unntak i fantasy-sonden", false, e.message); ferdig(); } }, 300);
       } catch (e) { ok("ingen unntak i skjemaet", false, e.message); ferdig(); } }, 400);
     } catch (e) { ok("ingen unntak i portalen", false, e.message); ferdig(); } }, 600);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });

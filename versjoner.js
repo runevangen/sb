@@ -25,6 +25,12 @@
 // Nyeste først.
 export const VERSJONER = [
   {
+    versjon: "2026.09.26",
+    endringer: [
+      { hva: "Ny sonde i portalen under Verktøy: «Hva gir fantasy-API-ene oss?» spør Eliteserien Fantasy og Fantasy Premier League og viser hva som finnes. Bare for admin." },
+    ],
+  },
+  {
     versjon: "2026.09.25",
     endringer: [
       { hva: "Logoen er hjem-knappen: trykk på den, så står du på nyhetene uten søk eller emne, øverst i lista." },

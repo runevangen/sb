@@ -8,6 +8,7 @@
 // Alt som trenger DOM ligger i test/run.mjs.
 
 import { readFileSync, readdirSync, existsSync, rmSync } from "node:fs";
+import { FANTASY_KILDER, FANTASY_STI, fantasyFunn, fantasySondeTekst } from "../fantasy-data.js";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
@@ -3744,6 +3745,64 @@ ok("portalen leser bare felt stempelet faktisk skriver",
    "leser: " + [...LEST].join(", ") + " | mangler: " + uskrevne.join(", "));
 
 rmSync(BYGG_UT, { force: true });
+
+/* ---------------- fantasy: hva spillene gir oss ---------------- */
+
+// Stubben modellerer bootstrap-static slik FPL dokumenterer den seg selv
+// i praksis: elements, teams, events, med pris i tideler. Tallene er
+// oppdiktede. Det sonden skal finne ut, er om Eliteserien svarer likt —
+// det kan ingen test her si.
+const FPL = {
+  elements: [
+    { id: 1, web_name: "Keeper", team: 1, now_cost: 45, total_points: 12,
+      event_points: 2, selected_by_percent: "1.2", element_type: 1 },
+    { id: 2, web_name: "Haaland", team: 2, now_cost: 145, total_points: 88,
+      event_points: 13, selected_by_percent: "61.4", element_type: 4 },
+  ],
+  teams: [{ id: 1, name: "Brann" }, { id: 2, name: "Man City" }],
+  events: [
+    { id: 6, name: "Gameweek 6", is_current: true, is_next: false },
+    { id: 7, name: "Gameweek 7", is_current: false, is_next: true,
+      deadline_time: "2026-10-03T17:30:00Z" },
+  ],
+};
+const FF = fantasyFunn(FPL);
+ok("fantasy: spillere, lag og runder telles",
+   FF.spillere === 2 && FF.lag === 2 && FF.runder === 2, JSON.stringify(FF).slice(0, 120));
+ok("fantasy: runden vi star i og den neste, med frist",
+   FF.naa === "Gameweek 6" && FF.neste.navn === "Gameweek 7" &&
+   FF.neste.frist === "2026-10-03T17:30:00Z", FF.naa);
+ok("fantasy: eksempelet er den med flest poeng, ikke den forste raden",
+   FF.eksempel.navn === "Haaland" && FF.eksempel.lag === "Man City" &&
+   FF.eksempel.poeng === 88, JSON.stringify(FF.eksempel));
+// Prisen ligger i tideler hos FPL. 145 som «145 mill.» ville vaert usant.
+ok("fantasy: prisen deles pa ti", FF.eksempel.pris === 14.5, FF.eksempel.pris);
+ok("fantasy: med alle tre feltene duger raden",
+   FF.duger.indexOf("JA") === 0 && FF.mangler.length === 0, FF.duger);
+const UTEN_PRIS = fantasyFunn({ elements: [{ web_name: "X", total_points: 3, event_points: 1 }] });
+ok("fantasy: uten pris er det statistikk, ikke fantasy — og svaret navngir feltet",
+   UTEN_PRIS.duger.indexOf("NEI") === 0 && UTEN_PRIS.duger.indexOf("now_cost") > -1,
+   UTEN_PRIS.duger);
+ok("fantasy: et svar uten spillere sier det", fantasyFunn({ teams: [] }).duger.indexOf("ingen spillere") > -1);
+ok("fantasy: tomt og tull kaster ikke",
+   fantasyFunn(null).spillere === 0 && fantasyFunn("tull").spillere === 0 &&
+   fantasyFunn({ elements: "ikke en liste" }).spillere === 0);
+
+const FT = fantasySondeTekst({ kilder: [
+  { navn: "Eliteserien Fantasy", adresse: "fantasy.eliteserien.no",
+    utfall: "svarte med 2 spillere", funn: FF },
+  { navn: "Fantasy Premier League", adresse: "fantasy.premierleague.com",
+    utfall: "svarte HTTP 403", hvorfor: "tjenesten nekter" },
+] });
+ok("fantasy: teksten navngir begge kildene og hva de svarte",
+   FT.indexOf("Eliteserien Fantasy (fantasy.eliteserien.no)") > -1 &&
+   FT.indexOf("svarte HTTP 403") > -1 && FT.indexOf("tjenesten nekter") > -1, FT);
+ok("fantasy: og avgjorelsen star med ord, med pris i norsk form",
+   FT.indexOf("DUGER: JA") > -1 && FT.indexOf("14,5 mill.") > -1 &&
+   FT.indexOf("valgt av 61.4 %") > -1, FT);
+ok("fantasy: begge kildene spørres, fra rota og ikke fra en vilkarlig sti",
+   FANTASY_KILDER.length === 2 && FANTASY_KILDER.every((k) => k.rot.indexOf("https://fantasy.") === 0) &&
+   FANTASY_STI === "/api/bootstrap-static/");
 
 /* ---------------- rapport ---------------- */
 
