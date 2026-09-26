@@ -20,6 +20,7 @@ import konto from "../netlify/functions/konto.mjs";
 import brukere from "../netlify/functions/brukere.mjs";
 import svarfunksjon from "../netlify/functions/svar.mjs";
 import tsdbsonde from "../netlify/functions/tsdbsonde.mjs";
+import fantasysonde from "../netlify/functions/fantasysonde.mjs";
 
 // SUITEN SETTER SITT EGET MILJO, framfor a arve maskinens.
 //
@@ -2815,6 +2816,76 @@ ok("sonden caches aldri",
 
 delete process.env.ADMIN_PASSORD;
 delete process.env.THESPORTSDB_KEY;
+
+/* ---------------- /api/fantasy-sonde: hva fantasy-spillene gir -------- */
+
+// Som tsdb-sonden: det som testes er VAKTA, at begge kildene spørres, og
+// at en kilde som feiler ikke tar den andre med seg. Hva spillene faktisk
+// svarer, vet ingen test — det er grunnen til at sonden finnes.
+function fantasyBe(kropp, metode) {
+  return new Request("https://mvp-sb.netlify.app/api/fantasy-sonde", {
+    method: metode || "POST",
+    headers: { "Content-Type": "application/json" },
+    body: metode === "GET" ? undefined : JSON.stringify(kropp),
+  });
+}
+
+delete process.env.ADMIN_PASSORD;
+let fantasySvar = await fantasysonde(fantasyBe({ passord: "x" }));
+ok("fantasy-sonden uten ADMIN_PASSORD svarer 503", fantasySvar.status === 503, fantasySvar.status);
+
+process.env.ADMIN_PASSORD = "riktig-passord";
+let fantasyKall = [];
+globalThis.fetch = async (u) => { fantasyKall.push(String(u)); return new Response("{}"); };
+fantasySvar = await fantasysonde(fantasyBe({ passord: "feil" }));
+ok("feil passord slipper ikke inn i fantasy-sonden", fantasySvar.status === 401, fantasySvar.status);
+ok("og spillene spørres aldri", fantasyKall.length === 0, fantasyKall.join(" "));
+ok("fantasy-sonden tar bare POST",
+   (await fantasysonde(fantasyBe(null, "GET"))).status === 405);
+
+// Eliteserien svarer som FPL, FPL nekter. Stubben modellerer FORMEN pa
+// bootstrap-static; tallene er oppdiktede.
+fantasyKall = [];
+globalThis.fetch = async (u, o) => {
+  const url = String(u);
+  fantasyKall.push({ url, ua: o && o.headers && o.headers["User-Agent"] });
+  if (url.indexOf("fantasy.eliteserien.no/api/bootstrap-static/") > -1) {
+    return new Response(JSON.stringify({
+      elements: [{ web_name: "Berisha", team: 1, now_cost: 95, total_points: 70,
+                   event_points: 6, selected_by_percent: "33.0" }],
+      teams: [{ id: 1, name: "Brann" }],
+      events: [{ id: 22, name: "Runde 22", is_current: true }],
+    }), { status: 200 });
+  }
+  return new Response("Forbidden", { status: 403, statusText: "Forbidden" });
+};
+fantasySvar = await fantasysonde(fantasyBe({ passord: "riktig-passord" }));
+const fantasyKropp = JSON.parse(await fantasySvar.text());
+ok("riktig passord gir et svar fra fantasy-sonden", fantasySvar.status === 200, fantasySvar.status);
+ok("begge kildene spørres",
+   fantasyKall.length === 2 &&
+   fantasyKall.some((k) => k.url.indexOf("fantasy.eliteserien.no") > -1) &&
+   fantasyKall.some((k) => k.url.indexOf("fantasy.premierleague.com") > -1),
+   fantasyKall.map((k) => k.url).join(" "));
+ok("og sier hvem som spør", fantasyKall.every((k) => (k.ua || "").indexOf("Sportsbibelen") === 0));
+const esf = fantasyKropp.kilder.find((k) => k.nokkel === "eliteserien");
+const fpl = fantasyKropp.kilder.find((k) => k.nokkel === "premier");
+ok("kilden som svarte, blir lest", !!esf && esf.funn && esf.funn.spillere === 1 &&
+   esf.funn.duger.indexOf("JA") === 0, esf && JSON.stringify(esf.funn));
+ok("kilden som nektet, sier det — og tar ikke den andre med seg",
+   !!fpl && fpl.utfall === "svarte HTTP 403" && !fpl.funn && (fpl.hvorfor || "").indexOf("nekter") > -1,
+   fpl && JSON.stringify(fpl));
+
+// En forbindelse som ikke kommer i stand, er noe annet enn et nei.
+globalThis.fetch = async () => { throw new TypeError("fetch failed"); };
+fantasySvar = await fantasysonde(fantasyBe({ passord: "riktig-passord" }));
+const fantasyNede = JSON.parse(await fantasySvar.text());
+ok("en kilde som ikke svarer, sier «fikk ikke svar» med tjenestens ord",
+   fantasyNede.kilder.every((k) => k.utfall === "fikk ikke svar" && k.hvorfor === "fetch failed"),
+   JSON.stringify(fantasyNede.kilder));
+ok("fantasy-sonden caches aldri", fantasySvar.headers.get("Cache-Control") === "no-store");
+
+delete process.env.ADMIN_PASSORD;
 
 /* ---------------- vakt: baselinja maa dekke alt funksjonene leser ---- */
 

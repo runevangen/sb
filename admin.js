@@ -23,6 +23,7 @@ import { KURATERTE } from "./puber.js";
 import { VERSJONER } from "./versjoner.js";
 import { oktGyldig, kanFornyes } from "./konto-data.js";
 import { LIGAER, kampNokkel } from "./fotball-data.js";
+import { fantasySondeTekst } from "./fantasy-data.js";
 import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
 import { publisteRad, alleredeILista, erTips, forslagVekt, sorterForslagKo }
   from "./pub-forslag-data.js";
@@ -471,6 +472,37 @@ felt("sondeKjor").addEventListener("click", async () => {
     m.className = "melding feil";
   }
   felt("sondeKjor").disabled = false;
+});
+
+/* ---------- sonden mot fantasy-spillene ---------- */
+
+// Samme form som sonden over: svaret som tekst, og en feil som sier hva
+// som skjedde. Teksten bygges i fantasy-data.js, der den kan testes uten
+// en nettleser.
+felt("fantasyKjor").addEventListener("click", async () => {
+  const m = felt("fantasyMelding");
+  felt("fantasyKjor").disabled = true;
+  m.textContent = "Spør fantasy-spillene …";
+  m.className = "melding";
+  try {
+    const respons = await fetch("/api/fantasy-sonde", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passord }),
+    });
+    const data = JSON.parse(await respons.text());
+    if (!respons.ok || data.feil) {
+      throw new Error(data.feil || ("Tjenesten svarte " + respons.status));
+    }
+    felt("fantasySvar").textContent = fantasySondeTekst(data);
+    felt("fantasySvar").hidden = false;
+    m.textContent = "Svaret står over. To kall brukt, ett til hver.";
+    m.className = "melding ok";
+  } catch (err) {
+    m.textContent = err.message;
+    m.className = "melding feil";
+  }
+  felt("fantasyKjor").disabled = false;
 });
 
 function visAdgang(tekst, art) {
