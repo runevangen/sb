@@ -21,6 +21,7 @@ import brukere from "../netlify/functions/brukere.mjs";
 import svarfunksjon from "../netlify/functions/svar.mjs";
 import tsdbsonde from "../netlify/functions/tsdbsonde.mjs";
 import fantasysonde from "../netlify/functions/fantasysonde.mjs";
+import tilbakemelding from "../netlify/functions/tilbakemelding.mjs";
 
 // SUITEN SETTER SITT EGET MILJO, framfor a arve maskinens.
 //
@@ -1139,6 +1140,187 @@ const utenForslagTabell = await r.json();
 ok("mangler tabellen, star det hva som mangler",
    r.status === 503 && utenForslagTabell.feil.indexOf("pub_forslag") > -1,
    utenForslagTabell.feil);
+
+/* ---------------- feil og onsker fra leserne ---------------- */
+
+// Samme to lasar som forslagskoen. Stubben modellerer PostgREST: en POST
+// med return=representation gir raden tilbake med basens egne felt
+// (id, sendt_av, status, sendt) — det er databasen som setter dem, ikke
+// funksjonen. En PATCH som RLS avviser, svarer 200 med en tom liste.
+const MELD_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const MELD_BRUKER = "12345678-1234-1234-1234-123456789abc";
+
+function stubMelding(opts) {
+  const o = opts || {};
+  const kall = [];
+  global.fetch = async (url, opsjoner) => {
+    const op = opsjoner || {};
+    kall.push({ url: String(url), metode: op.method || "GET", opsjoner: op });
+    if (o.status) {
+      return new Response(JSON.stringify({ message: o.melding || "nei", code: o.kode || "x" }),
+        { status: o.status });
+    }
+    if (op.method === "POST") {
+      if (o.tom) return new Response("[]", { status: 201 });
+      const rad = JSON.parse(op.body);
+      return new Response(JSON.stringify([Object.assign({
+        id: MELD_ID, sendt_av: MELD_BRUKER, status: "ny",
+        sendt: "2026-09-27T10:00:00Z", behandlet: null }, rad)]), { status: 201 });
+    }
+    if (op.method === "PATCH") {
+      if (o.tom) return new Response("[]", { status: 200 });
+      const endring = JSON.parse(op.body);
+      return new Response(JSON.stringify([Object.assign({
+        id: MELD_ID, art: "feil", tekst: "Tabellen er tom", sendt_av: MELD_BRUKER,
+        sendt: "2026-09-27T10:00:00Z" }, endring)]), { status: 200 });
+    }
+    return new Response(JSON.stringify(o.rader || []), { status: 200 });
+  };
+  return kall;
+}
+
+function meldBe(kropp, metode) {
+  return new Request("https://mvp-sb.netlify.app/api/tilbakemelding", {
+    method: metode || "POST",
+    headers: { "Content-Type": "application/json" },
+    body: metode === "GET" ? undefined : JSON.stringify(kropp),
+  });
+}
+
+const EN_MELDING = { handling: "send", token: FORSLAG_OKT, art: "feil",
+  tekst: "Tabellen er tom på Resultater", skjerm: "Fotball › Eliteserien › Resultater",
+  versjon: "2026.09.27" };
+
+delete process.env.ADMIN_PASSORD;
+kall = stubMelding();
+r = await tilbakemelding(meldBe(EN_MELDING));
+ok("tilbakemelding: uten oppsett svarer den 503, og sier hva som mangler",
+   r.status === 503 && (await r.json()).mangler.indexOf("ADMIN_PASSORD") > -1, r.status);
+ok("tilbakemelding: og ingenting ble sendt noe sted", kall.length === 0, kall.length);
+process.env.ADMIN_PASSORD = PASSORD;
+
+r = await tilbakemelding(meldBe(null, "GET"));
+ok("tilbakemelding: GET avvises med 405", r.status === 405, r.status);
+
+kall = stubMelding();
+r = await tilbakemelding(meldBe({ handling: "slett-alt", token: FORSLAG_OKT }));
+ok("tilbakemelding: en ukjent handling avvises", r.status === 400 && kall.length === 0, r.status);
+
+kall = stubMelding();
+r = await tilbakemelding(meldBe(Object.assign({}, EN_MELDING, { token: "" })));
+const meldUtlogget = await r.json();
+ok("tilbakemelding: utlogget avvises innsendingen med en grunn",
+   r.status === 401 && meldUtlogget.feil.indexOf("Logg inn") > -1, meldUtlogget.feil);
+ok("tilbakemelding: og den rorer ikke Supabase", kall.length === 0, kall.length);
+
+kall = stubMelding();
+r = await tilbakemelding(meldBe(Object.assign({}, EN_MELDING, { tekst: "hei" })));
+ok("tilbakemelding: en for kort melding avvises for basen",
+   r.status === 400 && kall.length === 0, r.status);
+
+kall = stubMelding();
+r = await tilbakemelding(meldBe(Object.assign({}, EN_MELDING, { art: "klage" })));
+ok("tilbakemelding: en ukjent art avvises", r.status === 400 && kall.length === 0, r.status);
+
+kall = stubMelding();
+r = await tilbakemelding(meldBe(EN_MELDING));
+const meldSendt = await r.json();
+ok("tilbakemelding: en gyldig melding lagres",
+   r.status === 200 && meldSendt.ok === true && meldSendt.melding.status === "ny",
+   r.status + " " + JSON.stringify(meldSendt));
+const meldSkriv = kall.find((k) => k.metode === "POST");
+const meldRad = JSON.parse(meldSkriv.opsjoner.body);
+ok("tilbakemelding: skrivingen gar med leserens egen okt",
+   meldSkriv.opsjoner.headers["Authorization"] === "Bearer " + FORSLAG_OKT);
+ok("tilbakemelding: raden sender aldri sendt_av eller status",
+   !("sendt_av" in meldRad) && !("status" in meldRad), meldSkriv.opsjoner.body);
+ok("tilbakemelding: skjerm og versjon blir med nar de er satt",
+   meldRad.skjerm === EN_MELDING.skjerm && meldRad.versjon === "2026.09.27", meldSkriv.opsjoner.body);
+ok("tilbakemelding: adminpassordet nar aldri Supabase",
+   kall.every((k) => JSON.stringify(k.opsjoner).indexOf(PASSORD) === -1));
+
+kall = stubMelding();
+r = await tilbakemelding(meldBe(Object.assign({}, EN_MELDING, { skjerm: "", versjon: "" })));
+const meldNaken = JSON.parse(kall.find((k) => k.metode === "POST").opsjoner.body);
+ok("tilbakemelding: fjernet leseren dem, sendes bare teksten",
+   !("skjerm" in meldNaken) && !("versjon" in meldNaken), JSON.stringify(meldNaken));
+
+kall = stubMelding({ tom: true });
+r = await tilbakemelding(meldBe(EN_MELDING));
+ok("tilbakemelding: en skriving uten rad tilbake meldes som feil", r.status === 502, r.status);
+
+kall = stubMelding({ rader: [{ id: MELD_ID, art: "onske", tekst: "Mørkt tema",
+  sendt_av: MELD_BRUKER, status: "lest", sendt: "2026-09-27T10:00:00Z" }] });
+r = await tilbakemelding(meldBe({ handling: "mine", token: FORSLAG_OKT, bruker: MELD_BRUKER }));
+const mineMeld = await r.json();
+ok("tilbakemelding: dine egne leses med status",
+   r.status === 200 && mineMeld.meldinger.length === 1 && mineMeld.meldinger[0].status === "lest",
+   JSON.stringify(mineMeld));
+ok("tilbakemelding: og de filtreres pa deg, med din okt",
+   kall[0].url.indexOf("sendt_av=eq." + MELD_BRUKER) > -1
+   && kall[0].opsjoner.headers["Authorization"] === "Bearer " + FORSLAG_OKT, kall[0].url);
+
+kall = stubMelding();
+r = await tilbakemelding(meldBe({ handling: "mine", token: FORSLAG_OKT, bruker: "x&or=(id.gt.0)" }));
+ok("tilbakemelding: en bruker-id som ikke er en uuid nar ikke adressen",
+   r.status === 400 && kall.length === 0, r.status);
+
+kall = stubMelding();
+r = await tilbakemelding(meldBe({ handling: "liste", passord: "feil", token: FORSLAG_OKT }));
+ok("tilbakemelding: feil passord slipper ikke inn i koen",
+   r.status === 401 && kall.length === 0, r.status);
+
+kall = stubMelding();
+r = await tilbakemelding(meldBe({ handling: "liste", passord: PASSORD, token: "" }));
+ok("tilbakemelding: riktig passord uten okt slipper heller ikke inn",
+   r.status === 401 && kall.length === 0, r.status);
+
+kall = stubMelding({ rader: [{ id: MELD_ID, art: "feil", tekst: "Tabellen er tom",
+  sendt_av: MELD_BRUKER, status: "ny", sendt: "2026-09-27T10:00:00Z" }] });
+r = await tilbakemelding(meldBe({ handling: "liste", passord: PASSORD, token: FORSLAG_OKT }));
+const meldKo = await r.json();
+ok("tilbakemelding: koen leses med passord og okt",
+   r.status === 200 && meldKo.meldinger.length === 1 && meldKo.meldinger[0].sendtAv === MELD_BRUKER,
+   JSON.stringify(meldKo));
+
+kall = stubMelding();
+r = await tilbakemelding(meldBe({ handling: "behandle", passord: PASSORD, token: FORSLAG_OKT,
+  id: "ikke-en-uuid", status: "lest" }));
+ok("tilbakemelding: en id som ikke er en uuid avvises", r.status === 400 && kall.length === 0, r.status);
+
+kall = stubMelding();
+r = await tilbakemelding(meldBe({ handling: "behandle", passord: PASSORD, token: FORSLAG_OKT,
+  id: MELD_ID, status: "ny" }));
+ok("tilbakemelding: status ny kan ikke settes herfra", r.status === 400 && kall.length === 0, r.status);
+
+kall = stubMelding();
+r = await tilbakemelding(meldBe({ handling: "behandle", passord: PASSORD, token: FORSLAG_OKT,
+  id: MELD_ID, status: "fikset" }));
+const meldFikset = await r.json();
+const meldPatch = kall.find((k) => k.metode === "PATCH");
+ok("tilbakemelding: en melding kan settes til fikset",
+   r.status === 200 && meldFikset.melding.status === "fikset", JSON.stringify(meldFikset));
+ok("tilbakemelding: som PATCH pa den ene id-en, med tidspunkt",
+   meldPatch.url.indexOf("id=eq." + MELD_ID) > -1
+   && JSON.parse(meldPatch.opsjoner.body).behandlet, meldPatch.url);
+
+kall = stubMelding({ tom: true });
+r = await tilbakemelding(meldBe({ handling: "behandle", passord: PASSORD, token: FORSLAG_OKT,
+  id: MELD_ID, status: "lest" }));
+const meldAvvist = await r.json();
+ok("tilbakemelding: en PATCH RLS avviste er ingen suksess",
+   r.status === 502 && meldAvvist.feil.indexOf("visning_skrivere") > -1, meldAvvist.feil);
+
+kall = stubMelding({ status: 404, kode: "42P01", melding: "relation \"tilbakemelding\" does not exist" });
+r = await tilbakemelding(meldBe(EN_MELDING));
+const utenMeldTabell = await r.json();
+ok("tilbakemelding: mangler tabellen, star det hvor SQL-en er",
+   r.status === 503 && utenMeldTabell.feil.indexOf("del 9") > -1, utenMeldTabell.feil);
+
+kall = stubMelding({ status: 401, melding: "JWT expired" });
+r = await tilbakemelding(meldBe(EN_MELDING));
+ok("tilbakemelding: en utlopt okt sier det", r.status === 401
+   && (await r.json()).feil.indexOf("Økten") > -1, r.status);
 
 delete process.env.ADMIN_PASSORD;
 delete process.env.SUPABASE_URL;

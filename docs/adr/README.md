@@ -38,3 +38,4 @@ som går gjennom reglene fil for fil.
 | [0022](0022-antatte-steder.md) | Et antatt sted vises, og sier at det er antatt |
 | [0023](0023-tipset-som-tar-et-sted-ut.md) | Et tips kan ta et sted ut (fullfører 0022) |
 | [0024](0024-favorittlag-og-pin-pa-kontoen.md) | Favorittlagene følger kontoen, og PIN-en kan byttes (utvider 0009 og 0014) |
+| [0025](0025-feil-og-onsker.md) | Feil og ønsker går i en kø, og leseren ser svaret |

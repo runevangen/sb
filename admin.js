@@ -25,6 +25,8 @@ import { oktGyldig, kanFornyes } from "./konto-data.js";
 import { LIGAER, kampNokkel } from "./fotball-data.js";
 import { fantasySondeTekst } from "./fantasy-data.js";
 import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
+import { ARTER, STATUS_LESER, STATUS_HANDLING, tolkTilbakemeldinger,
+         sorterTilbakemeldinger } from "./tilbakemelding-data.js";
 import { publisteRad, alleredeILista, erTips, forslagVekt, sorterForslagKo }
   from "./pub-forslag-data.js";
 import { PUBTYPER, PUBSIKKERHET, pubNokkel, sjekkPubRad, slaSammenPuber,
@@ -285,6 +287,7 @@ async function loggInn() {
   hentKamper();
   hentBrukere();
   hentForslag();
+  hentTilbakemeldinger();
   hentSteder();
   fyllSondeLigaer();
   tegnVersjon();
@@ -833,9 +836,150 @@ async function behandleForslag(f, status) {
   }
 }
 
+/* ---------- feil og onsker fra leserne ---------- */
+
+// Samme form som forslagskoen: lest og skrevet med admins egen okt, og
+// passordet i tillegg. Status som settes her, ser leseren pa kontosiden —
+// derfor er «Lest» et svar, ikke bare en hake for deg.
+async function tilbakemeldingKall(kropp) {
+  const okt = lesOkt();
+  if (!okt || !okt.token) {
+    throw new Error("Logg inn i appen først. Meldingene leses med din egen økt.");
+  }
+  const respons = await fetch("/api/tilbakemelding", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(Object.assign({ passord, token: okt.token }, kropp)),
+  });
+  let data = null;
+  try { data = JSON.parse(await respons.text()); } catch (e) { data = null; }
+  if (!respons.ok || !data || data.feil) {
+    throw new Error((data && data.feil) || ("Tjenesten svarte " + respons.status + "."));
+  }
+  return data;
+}
+
+// Meldingene slik de sist ble hentet. Holdes fordi navnene kommer fra
+// brukerlista, som lander i sitt eget tempo: kommer den etter koen, tegnes
+// koen om — ellers ble «fra en leser» staende over en melding fra Rune.
+let tilbakemeldinger = null;
+let brukerNavn = {};
+
+async function hentTilbakemeldinger() {
+  felt("tilbakemeldingHint").textContent = "Henter meldingene …";
+  felt("tilbakemeldingHint").hidden = false;
+  try {
+    const data = await tilbakemeldingKall({ handling: "liste" });
+    tegnTilbakemeldinger(tolkTilbakemeldinger(data.meldinger));
+  } catch (err) {
+    // Et tall som blir staende etter et feilet kall, pastar en ko vi ikke
+    // har spurt om.
+    tilbakemeldinger = null;
+    settTall("tilbakemeldingTall", "");
+    felt("tilbakemeldingListe").textContent = "";
+    felt("tilbakemeldingHint").textContent = err.message;
+  }
+}
+
+function tegnTilbakemeldingerIgjen() {
+  if (tilbakemeldinger) tegnTilbakemeldinger(tilbakemeldinger);
+}
+
+function tegnTilbakemeldinger(liste) {
+  tilbakemeldinger = Array.isArray(liste) ? liste : [];
+  const boks = felt("tilbakemeldingListe");
+  boks.textContent = "";
+
+  // Alle, ikke bare de nye: en melding som er «Lest» skal kunne bli
+  // «Fikset», og det er det leseren venter pa. De nye star forst.
+  const sortert = sorterTilbakemeldinger(tilbakemeldinger);
+  const nye = sortert.filter((m) => m.status === "ny").length;
+
+  settTall("tilbakemeldingTall", nye ? String(nye) : "", true);
+  apneHvisUrort(felt("tilbakemeldingHode"), nye > 0);
+
+  felt("tilbakemeldingHint").hidden = false;
+  if (!sortert.length) {
+    felt("tilbakemeldingHint").textContent = "Ingen har meldt noe ennå.";
+    return;
+  }
+  const behandlet = sortert.length - nye;
+  felt("tilbakemeldingHint").textContent = (nye ? nye + " nye" : "Ingen nye")
+    + (behandlet ? ". " + behandlet + " behandlet." : ".");
+
+  sortert.forEach((m) => boks.appendChild(tilbakemeldingRad(m)));
+}
+
+function tilbakemeldingRad(m) {
+  const rad = document.createElement("div");
+  rad.className = "forslag tilbake" + (m.status === "ny" ? " tilbake-ny" : "");
+  rad.dataset.id = m.id;
+
+  const tittel = document.createElement("p");
+  tittel.className = "forslag-navn";
+  // Navnet fra brukerlista. Mangler det, star det ingenting framfor et
+  // gjettet navn: lista kan ha feilet, og kontoen kan vaere slettet.
+  const navn = brukerNavn[m.sendtAv];
+  tittel.textContent = (ARTER[m.art] || "Melding") + (navn ? " fra " + navn : "");
+  rad.appendChild(tittel);
+
+  const tekst = document.createElement("p");
+  tekst.className = "tilbake-tekst";
+  tekst.textContent = m.tekst;
+  rad.appendChild(tekst);
+
+  // Skjerm og versjon er det leseren lot sta i skjemaet. Fjernet de dem,
+  // star det ingenting — ikke «ukjent», som ville sagt at vi mistet noe.
+  const under = document.createElement("p");
+  under.className = "forslag-under";
+  under.textContent = [
+    sistInneTekst(m.sendt),
+    m.skjerm,
+    m.versjon ? "versjon " + m.versjon : "",
+    "Leseren ser: " + (STATUS_LESER[m.status] || m.status),
+  ].filter(Boolean).join(" · ");
+  rad.appendChild(under);
+
+  // Én knapp per status meldingen ikke alt har. «Ny» er ingen handling:
+  // en melding blir ikke ny igjen av at noen har sett den.
+  const knapper = document.createElement("div");
+  knapper.className = "forslag-knapper";
+  Object.keys(STATUS_HANDLING).filter((s) => s !== m.status).forEach((s) => {
+    const k = document.createElement("button");
+    k.className = "lenke";
+    k.type = "button";
+    k.dataset.status = s;
+    k.textContent = STATUS_HANDLING[s];
+    k.addEventListener("click", () => behandleTilbakemelding(m, s, knapper));
+    knapper.appendChild(k);
+  });
+  rad.appendChild(knapper);
+  return rad;
+}
+
+async function behandleTilbakemelding(m, status, knapper) {
+  const meld = felt("tilbakemeldingMelding");
+  Array.from(knapper.querySelectorAll("button")).forEach((b) => { b.disabled = true; });
+  try {
+    await tilbakemeldingKall({ handling: "behandle", id: m.id, status });
+    meld.textContent = "Satt til «" + STATUS_HANDLING[status] + "». Leseren ser det på kontosiden.";
+    meld.className = "melding ok";
+    hentTilbakemeldinger();
+  } catch (err) {
+    meld.textContent = err.message;
+    meld.className = "melding feil";
+    Array.from(knapper.querySelectorAll("button")).forEach((b) => { b.disabled = false; });
+  }
+}
+
 function tegnBrukere(liste) {
   const kropp = felt("brukerRader");
   kropp.textContent = "";
+
+  // Navnene til koen over. Den kan ha landet forst.
+  brukerNavn = {};
+  liste.forEach((b) => { if (b && b.id) brukerNavn[String(b.id)] = b.navn || ""; });
+  tegnTilbakemeldingerIgjen();
 
   settTall("brukerTall", liste.length ? String(liste.length) : "");
 

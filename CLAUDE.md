@@ -48,7 +48,10 @@ modul for modul.
     tjeneste-data.js hva en tjeneste SA da noe gikk galt — ord, ikke
                     konvolutt. Delt av alle funksjonene.
     versjoner.js    hva som endret seg og hvilken sak det svarte på
-                    — vises bare i portalen
+                    — vises i portalen; appen leser bare det øverste
+                    nummeret, til en melding om feil
+    tilbakemelding-data.js / netlify/functions/tilbakemelding.mjs
+                    feil og ønsker fra leserne, køen i portalen
     bygg.js         hvilken utrulling dette ER — generert av
                     verktoy/lag-bygg.mjs, i .gitignore, finnes ikke lokalt
     konto-data.js / pin-data.js / netlify/functions/konto.mjs
@@ -173,6 +176,16 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   som Del og Installer, litt lavere og i dempet tekst — de er sekundære, og
   i full størrelse brøt «Personvern og sletting» over to linjer og ga en
   footer på 230 px mot taket på 220 i SAK_1.
+- **En melding om feil sier hva som følger med — før den sendes.**
+  «Meld feil eller ønske» på kontosiden sender teksten, og skjermen og
+  versjonen i ord. De to siste står synlige over sendknappen med en knapp
+  som tar dem bort: en opplysning vi sender om deg, skal du kunne lese og
+  slette før den går. Ingen nettleser, ingen logg over trykk — det ville
+  vært en teller vi fører. **Og svaret står der du sendte fra:** «Dine
+  meldinger» viser Sendt / Lest / Fikset / Ikke nå. En innsending uten
+  svar tilbake er et hull i veggen. Bare innlogget, som pubforslagene:
+  kontoen er sperren mot spam, og alternativet var å telle IP-adresser.
+  [ADR 0025](docs/adr/0025-feil-og-onsker.md)
 - **Bytt PIN krever den gamle, og logger ut alle andre telefoner.** PIN-en
   er en sperre mellom folk som deler en telefon; kunne den byttes uten den
   gamle, kunne hvem som helst med telefonen ta kontoen. Den gamle prøves
