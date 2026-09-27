@@ -25,6 +25,13 @@
 // Nyeste først.
 export const VERSJONER = [
   {
+    versjon: "2026.09.27",
+    endringer: [
+      { hva: "«Meld feil eller ønske» på kontosiden: send en feil eller et ønske rett til admin, og se under «Dine meldinger» når den er lest eller fikset. Skjermen og versjonen følger med, synlig, og kan fjernes før du sender." },
+      { hva: "Portalen har en ny kø, «Feil og ønsker», med Lest, Fikset og Ikke nå." },
+    ],
+  },
+  {
     versjon: "2026.09.26",
     endringer: [
       { hva: "Ny sonde i portalen under Verktøy: «Hva gir fantasy-API-ene oss?» spør Eliteserien Fantasy og Fantasy Premier League og viser hva som finnes. Bare for admin." },

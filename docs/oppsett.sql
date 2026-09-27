@@ -437,3 +437,58 @@ $$;
 
 revoke all on function public.sist_inne() from public, anon, authenticated;
 grant execute on function public.sist_inne() to service_role;
+
+
+-- ---------------------------------------------------------------
+-- 9. tilbakemelding — feil og ønsker fra leserne
+-- ---------------------------------------------------------------
+-- Samme form som pub_forslag: en kø i portalen, skrevet med leserens egen
+-- økt, lest av den som står i visning_skrivere. Bare innlogget — kontoen er
+-- sperren mot spam, og uten den måtte vi talt IP-adresser (ADR 0004).
+--
+-- **`sendt_av` er `on delete cascade`, ikke `set null`.** Sletter du
+-- kontoen, forsvinner det du har skrevet. En melding er fri tekst, og fri
+-- tekst om en feil du møtte kan være noe du ikke vil ha liggende igjen uten
+-- deg. Personvernsida lover at kontoen og det som hører til den går.
+--
+-- `skjerm` og `versjon` følger med fordi leseren så dem i skjemaet og lot
+-- dem stå. De kan være tomme: den som skrev kan ha fjernet dem.
+
+create table if not exists tilbakemelding (
+  id            uuid primary key default gen_random_uuid(),
+  art           text not null check (art in ('feil', 'onske')),
+  tekst         text not null check (char_length(tekst) between 5 and 1000),
+  skjerm        text check (char_length(skjerm) <= 80),
+  versjon       text check (char_length(versjon) <= 20),
+  sendt_av      uuid not null default auth.uid()
+                references auth.users (id) on delete cascade,
+  sendt         timestamptz not null default now(),
+  status        text not null default 'ny'
+                check (status in ('ny', 'lest', 'fikset', 'ikke-na')),
+  behandlet     timestamptz
+);
+
+alter table tilbakemelding enable row level security;
+
+-- Send: den som er logget inn, i eget navn — og bare som ny. Uten
+-- `status = 'ny'` i sjekken kunne en leser sendt inn en melding som
+-- allerede sto som fikset.
+drop policy if exists "send i eget navn" on tilbakemelding;
+create policy "send i eget navn" on tilbakemelding
+  for insert to authenticated
+  with check (sendt_av = auth.uid() and status = 'ny' and behandlet is null);
+
+-- Les: dine egne, og alt for den som behandler dem.
+drop policy if exists "les egne og alle for skrivere" on tilbakemelding;
+create policy "les egne og alle for skrivere" on tilbakemelding
+  for select to authenticated using (
+    sendt_av = auth.uid()
+    or exists (select 1 from visning_skrivere s where s.bruker = auth.uid()));
+
+drop policy if exists "behandle som skriver" on tilbakemelding;
+create policy "behandle som skriver" on tilbakemelding
+  for update to authenticated using (
+    exists (select 1 from visning_skrivere s where s.bruker = auth.uid()));
+
+create index if not exists tilbakemelding_status_idx on tilbakemelding (status, sendt);
+create index if not exists tilbakemelding_sendt_av_idx on tilbakemelding (sendt_av);

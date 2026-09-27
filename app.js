@@ -6,7 +6,7 @@
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug, rangerTreff, listeTekst }
   from "./lib.js";
 import { LIGAER, tolkFotballHash, fotballHash, tolkKamplenke,
-         ligaForKategori } from "./fotball-data.js";
+         ligaForKategori, DEL_NAVN } from "./fotball-data.js";
 import { ofteBrukt, noterPub } from "./pub-data.js";
 import { maskerEpost, oktGyldig, kanFornyes, maaFornyes,
          FORNY_MARGIN } from "./konto-data.js";
@@ -15,6 +15,9 @@ import { normaliserPinNavn, gyldigPinNavn, normaliserPin, gyldigPin, PIN_MIN,
   from "./pin-data.js";
 import { normaliserNavn } from "./svar-data.js";
 import { initFotball, visFotball, merkFavoritter, tegnMittLag } from "./fotball.js";
+import { ARTER, TEKST_MAKS, STATUS_LESER, skjermTekst, sjekkTilbakemelding }
+  from "./tilbakemelding-data.js";
+import { VERSJONER } from "./versjoner.js";
 
 // Bytt WP_HOST til din egen WordPress-side når som helst.
 const WP_HOST  = "https://sportsbibelen.no";
@@ -1157,7 +1160,10 @@ function mottaKontoLag(lag, vedInnlogging) {
 // sant akkurat na — «folger kontoen» star forst nar kontoen har svart.
 function visKontoLag() {
   const linje = document.getElementById("kontoLag");
-  if (erKontoModus() && isMenuOpen() && favorittlag().join("|") !== kontoSideLag) tegnKontoside();
+  // Bare kortene tegnes pa nytt. Star skjemaet for tilbakemelding framme,
+  // ville en ny tegning tatt med seg det leseren holder pa a skrive.
+  if (erKontoModus() && isMenuOpen() && kontoSideVisning === "lag"
+      && favorittlag().join("|") !== kontoSideLag) tegnKontoside();
   if (!kontoOkt || kontoByttar) { linje.hidden = true; return; }
   linje.hidden = false;
   linje.textContent = kontoLagTekst();
@@ -1978,6 +1984,7 @@ function visKonto() {
     // fra e-postinnloggingen har ingen PIN a bytte.
     byttPin.hidden = !kontoOkt.navn;
     pinSkjema.hidden = !kontoByttar;
+    document.getElementById("kontoMeld").hidden = kontoByttar;
     // Ingen setning her. Du trykket pa ditt eget navn — at du er logget
     // inn er ikke en nyhet, og teksten gjorde bunnen av menyen nesten
     // dobbelt sa hoy som emnelista over den. Unntaket er PIN-byttet: det
@@ -1992,6 +1999,7 @@ function visKonto() {
   byttPin.hidden = true;
   pinSkjema.hidden = true;
   document.getElementById("kontoLag").hidden = true;
+  document.getElementById("kontoMeld").hidden = true;
   // Logget du ut fra kontosiden, er det ingen konto a sta pa. Menyen tar
   // over, med innloggingen der den pleier a vaere.
   if (erKontoModus()) settKontoModus(false);
@@ -2236,6 +2244,7 @@ function settKontoModus(pa) {
   document.getElementById("menuLukk").textContent = pa ? "Lukk" : "Lukk menyen";
   document.getElementById("kontoSide").hidden = !pa;
   kontoSideLag = null;
+  kontoSideVisning = "lag";
   if (pa) tegnKontoside();
 }
 
@@ -2248,8 +2257,19 @@ function erKontoModus() {
 // flettes inn — og da ma kortene tegnes pa nytt, som tegnSvar i fanene.
 let kontoSideLag = null;
 
+// Kontosiden viser en av to ting: kortene fra Mitt lag, eller skjemaet for
+// feil og ønsker. Samme flate, byttet med knappen i kontopanelet — skjemaet
+// trenger plass, og bunnen av panelet har ingen a gi.
+let kontoSideVisning = "lag";
+
 function tegnKontoside() {
   const side = document.getElementById("kontoSide");
+  const melding = kontoSideVisning === "melding";
+  document.querySelector("#menuPanel .menu-title").textContent =
+    melding ? "Meld feil eller ønske" : "Mitt lag";
+  document.getElementById("kontoMeld").textContent =
+    melding ? "← Tilbake til Mitt lag" : "Meld feil eller ønske";
+  if (melding) { tegnMeldingSide(side); return; }
   const nokkel = favorittlag().join("|");
   kontoSideLag = nokkel;
   const kort = document.createElement("div");
@@ -2260,6 +2280,181 @@ function tegnKontoside() {
 
 
 document.getElementById("menuLukk").addEventListener("click", closeMenu);
+
+/* ---------- feil og ønsker ---------- */
+
+// Hvor leseren sto og hvilken versjon de hadde, i ord. Folger med bare
+// hvis leseren lar det sta: det star i skjemaet, med en knapp som fjerner
+// det. Regnes nar skjemaet tegnes — det er da leseren kom fra et sted.
+function meldingVedlegg() {
+  return {
+    skjerm: skjermTekst({
+      visning: aktivVisning,
+      liga: LIGAER[fotballLiga] ? LIGAER[fotballLiga].navn : "",
+      del: DEL_NAVN[fotballDel] || "",
+      filter: toppTekst,
+    }),
+    versjon: (VERSJONER[0] && VERSJONER[0].versjon) || "",
+  };
+}
+
+let meldArt = "feil";
+let meldVedlegg = null;
+
+function tegnMeldingSide(side) {
+  meldArt = "feil";
+  meldVedlegg = meldingVedlegg();
+
+  const boks = el("div", "meld");
+  const valg = el("div", "segment meld-art");
+  valg.setAttribute("role", "group");
+  valg.setAttribute("aria-label", "Hva gjelder det?");
+  Object.keys(ARTER).forEach((art) => {
+    const b = el("button", "segment-del", ARTER[art]);
+    b.type = "button";
+    b.dataset.art = art;
+    if (art === meldArt) b.setAttribute("aria-current", "true");
+    b.addEventListener("click", () => {
+      meldArt = art;
+      valg.querySelectorAll(".segment-del").forEach((x) => {
+        if (x.dataset.art === art) x.setAttribute("aria-current", "true");
+        else x.removeAttribute("aria-current");
+      });
+    });
+    valg.appendChild(b);
+  });
+  boks.appendChild(valg);
+
+  const felt = el("textarea", "konto-felt meld-tekst");
+  felt.id = "meldTekst";
+  felt.rows = 5;
+  felt.maxLength = TEKST_MAKS;
+  felt.placeholder = "Hva skjedde — eller hva ønsker du deg?";
+  felt.setAttribute("aria-label", "Meldingen din");
+  boks.appendChild(felt);
+
+  // Det som folger med, star her FOR du trykker — en opplysning vi sender
+  // videre om deg, skal du kunne lese og ta bort.
+  const vedlegg = el("p", "meld-vedlegg");
+  vedlegg.id = "meldVedlegg";
+  vedlegg.appendChild(document.createTextNode("Følger med: " + meldVedlegg.skjerm
+    + (meldVedlegg.versjon ? " · versjon " + meldVedlegg.versjon : "") + " "));
+  const fjern = el("button", "meld-fjern", "Fjern");
+  fjern.type = "button";
+  fjern.id = "meldFjern";
+  fjern.addEventListener("click", () => {
+    meldVedlegg = null;
+    vedlegg.textContent = "Bare teksten sendes.";
+  });
+  vedlegg.appendChild(fjern);
+  boks.appendChild(vedlegg);
+
+  const send = el("button", "konto-send", "Send");
+  send.type = "button";
+  send.id = "meldSend";
+  const svar = el("p", "konto-svar");
+  svar.id = "meldSvar";
+  svar.setAttribute("aria-live", "polite");
+  send.addEventListener("click", () => sendMelding(felt, send, svar));
+  boks.appendChild(send);
+  boks.appendChild(svar);
+
+  boks.appendChild(el("h3", "meld-tittel", "Dine meldinger"));
+  const liste = el("ul", "meld-liste");
+  liste.id = "meldListe";
+  boks.appendChild(liste);
+
+  side.replaceChildren(boks);
+  side.scrollTop = 0;
+  hentMineMeldinger(liste);
+}
+
+async function sendMelding(felt, knapp, svarFelt) {
+  const inn = { art: meldArt, tekst: felt.value };
+  // Samme regler som tjenesten, for vi sender: et svar som sier «noe er
+  // galt» etter en rundtur er verre enn et som sier hva, med en gang.
+  const problemer = sjekkTilbakemelding(inn);
+  if (problemer.length) { svarFelt.textContent = problemer[0]; felt.focus(); return; }
+  if (!kontoOkt || !kontoOkt.token) { svarFelt.textContent = "Logg inn for å sende."; return; }
+
+  knapp.disabled = true;
+  svarFelt.textContent = "Sender …";
+  try {
+    const kropp = Object.assign({ handling: "send", token: kontoOkt.token }, inn,
+      meldVedlegg || {});
+    const respons = await fetch("/api/tilbakemelding", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(kropp),
+    });
+    const data = await respons.json().catch(() => ({}));
+    if (!respons.ok || !data.ok) throw new Error(data.feil || ("Tjenesten svarte " + respons.status));
+    felt.value = "";
+    svarFelt.textContent = "Sendt. Takk! Du ser under når noen har lest den.";
+    hentMineMeldinger(document.getElementById("meldListe"));
+  } catch (err) {
+    // Tjenestens egne ord: «Økten gjelder ikke lenger» krever noe annet
+    // av leseren enn «lageret svarer ikke».
+    svarFelt.textContent = err.message;
+  } finally {
+    knapp.disabled = false;
+  }
+}
+
+// Dine egne meldinger, med hva som skjedde med dem. Uten dette forsvant
+// meldingen for den som sendte den i det de trykket.
+async function hentMineMeldinger(liste) {
+  if (!liste) return;
+  // Uten bruker-id vet vi ikke hvem vi skal spørre om. Det sier vi, framfor
+  // en tom liste som ville lest som «ingen».
+  if (!kontoOkt || !kontoOkt.token || !kontoOkt.bruker) {
+    liste.replaceChildren(el("li", "meld-tom", "Logg inn på nytt for å se meldingene dine her."));
+    return;
+  }
+  liste.replaceChildren(el("li", "meld-tom", "Henter …"));
+  try {
+    const respons = await fetch("/api/tilbakemelding", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ handling: "mine", token: kontoOkt.token, bruker: kontoOkt.bruker }),
+    });
+    const data = await respons.json().catch(() => ({}));
+    if (!respons.ok) throw new Error(data.feil || ("Tjenesten svarte " + respons.status));
+    tegnMineMeldinger(liste, data.meldinger || []);
+  } catch (err) {
+    // Lista er et tillegg til skjemaet, men den er HELE svaret pa «hva
+    // skjedde med meldingen min». En stille tom liste ville sagt «ingen».
+    liste.replaceChildren(el("li", "meld-tom", "Fikk ikke hentet meldingene dine: " + err.message));
+  }
+}
+
+function tegnMineMeldinger(liste, meldinger) {
+  if (!meldinger.length) {
+    liste.replaceChildren(el("li", "meld-tom", "Ingen ennå."));
+    return;
+  }
+  liste.replaceChildren(...meldinger.map((m) => {
+    const li = el("li", "meld-rad");
+    const hode = el("p", "meld-hode");
+    hode.appendChild(el("span", "meld-status meld-status-" + m.status, STATUS_LESER[m.status] || m.status));
+    const dato = m.sendt ? new Date(m.sendt) : null;
+    hode.appendChild(document.createTextNode(" " + (ARTER[m.art] || "")
+      + (dato && !Number.isNaN(dato.getTime())
+        ? " · " + dato.toLocaleDateString("nb-NO", { day: "numeric", month: "short" }) : "")));
+    li.appendChild(hode);
+    li.appendChild(el("p", "meld-utdrag", m.tekst.length > 140 ? m.tekst.slice(0, 140) + " …" : m.tekst));
+    return li;
+  }));
+}
+
+document.getElementById("kontoMeld").addEventListener("click", () => {
+  // Fra menyen (en okt uten navn) er kontosiden ikke apen ennå.
+  if (!erKontoModus()) settKontoModus(true);
+  kontoSideVisning = kontoSideVisning === "melding" ? "lag" : "melding";
+  kontoSideLag = null;
+  tegnKontoside();
+  if (kontoSideVisning === "melding") document.getElementById("meldTekst").focus();
+});
 
 document.getElementById("kontoBtn").addEventListener("click", () => {
   const panel = document.getElementById("kontoPanel");
@@ -2367,8 +2562,9 @@ document.getElementById("kontoSlett").addEventListener("click", async () => {
   if (knapp.dataset.sikker !== "ja") {
     knapp.dataset.sikker = "ja";
     knapp.textContent = "Ja, slett alt. Dette kan ikke angres";
-    kontoSvar("Fornavnet ditt og alle «jeg blir med» forsvinner, og navnet"
-      + " blir ledig for andre. Trykk en gang til.");
+    kontoSvar("Fornavnet ditt, alle «jeg blir med» og meldingene du har"
+      + " sendt oss forsvinner, og navnet blir ledig for andre."
+      + " Trykk en gang til.");
     return;
   }
 

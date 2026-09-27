@@ -402,6 +402,33 @@ er regnet ut for alle tre delene i alle ligaene fra før.
   nyere blir aldri behandlet. Lista den får må være den **sammenslåtte**:
   et antatt sted i en ny by ligger i basen, ikke i fila.
 
+### `tilbakemelding-data.js` — feil og ønsker fra leserne
+
+[ADR 0025](adr/0025-feil-og-onsker.md).
+
+- **Samme form som pubforslagene.** En kø i portalen, skrevet med leserens
+  egen økt, og bare innlogget. Kontoen er sperren mot spam; uten den måtte
+  vi talt IP-adresser, og det er sporing.
+- **`tilbakemeldingRad()` sender verken `sendt_av` eller `status`.**
+  Databasen setter den første fra økta og den andre fra sin default, og
+  skriveregelen krever begge. Sendte funksjonen dem, kunne en feil her
+  skrive i en annens navn — eller melde noe som alt fikset.
+- **Skjerm og versjon blir med bare når de er satt.** Leseren så dem i
+  skjemaet og kunne fjerne dem, og en tom streng er ikke «fjernet».
+- **`sjekkTilbakemelding()` er delt**, så appen og tjenesten sier det samme
+  om hva en gyldig melding er. Samme form som `sjekkForslag`: en liste,
+  tom når alt er i orden.
+- **`STATUS_LESER` og `STATUS_HANDLING` er to ordlister for samme felt.**
+  «Ny» er et ord for den som behandler; for den som sendte, er meldingen
+  «Sendt» til noen har sett den. Og «Ny» er ingen knapp i portalen: en
+  melding blir ikke ny igjen av at noen har sett den.
+- **`sorterTilbakemeldinger()`: de nye først, eldst først blant dem.**
+  Køen er arbeid som ligger. Det som er behandlet står under, nyeste først:
+  det er det du husker.
+- **`skjermTekst()` sier hvor leseren sto, i ord** — «Fotball › Eliteserien
+  › Tabell», «Nyheter › Brann». Ikke en URL: den som leser køen skal forstå
+  den uten å åpne noe.
+
 ---
 
 ## De redaksjonelle filene
@@ -635,6 +662,16 @@ portalen — en leser har ingen nytte av den.
   i kortene går til kampen og tabellen bak panelet. Stjerna bytter ingen
   visning og lar siden stå. Logger du ut der, tar menyen over i
   `visKonto()`.
+- **«Meld feil eller ønske» er en side i kontosiden, ikke et nytt panel.**
+  `kontoSideVisning` er `"lag"` eller `"melding"`, og `tegnKontoside()`
+  leser den; `settKontoModus()` setter den tilbake til lagene, så navnet
+  alltid åpner Mitt lag. Knappen bytter tekst til «← Tilbake til Mitt lag»
+  framfor å bli en knapp til. **Det som følger med står i skjemaet**
+  (`meldingVedlegg()` — skjerm og versjon, i ord), med en knapp som
+  fjerner det: en opplysning vi sender om deg, skal du kunne lese og slette
+  før den går. **«Dine meldinger» står under**, med status i leserens ord
+  (`STATUS_LESER`) — en innsending uten svar tilbake er et hull i veggen.
+  Utlogget står ikke knappen: tjenesten ville avvist den.
 - **Bytt PIN tar plassen til knappene**, ikke en rad under dem.
   `kontoByttar` er den ene tilstanden, og `visKonto()` leser den. Egne
   felt, ikke PIN-feltene fra innloggingen: `autocomplete` må si hvilken som
@@ -926,6 +963,13 @@ portalen — en leser har ingen nytte av den.
   å si imot, og «Ikke denne kvelden» uteblir. Men den står over en
   avkryssing som ikke er lagret: `tegnKamper` bygger lista på nytt fra
   `visninger`, og hakene ville ryket.
+- **«Feil og ønsker» er en kø, som forslagene.** De nye først, tallet i
+  hodet teller dem, og seksjonen åpner seg selv til du har rørt den. Men
+  **alle** meldinger står, ikke bare de nye: en som er «Lest» skal kunne
+  bli «Fikset», og det er det leseren venter på. Navnet kommer fra
+  brukerlista (`brukerNavn`), og `tegnBrukere()` tegner køen om — lista
+  lander i sitt eget tempo. Mangler navnet, står det ingenting framfor et
+  gjettet et.
 - **`stedKall()` krever økta bare av de kallene som skriver.**
   `STED_LESER` er de tre som ikke gjør det — `liste`, `sok`,
   `sok-adresse` — og tjenesten krever ingen token for dem. Sto kravet på
@@ -953,6 +997,9 @@ side, ikke et avsnitt i menyen.
   ny opplysning om noen, og da hadde sida allerede rett.
 - **Navnet er synlig for andre, og det står der.** Fornavnet i «blir
   med»-lista er det andre lesere ser.
+- **Feil og ønsker står med kontoen, og slettes med den.** Teksten,
+  skjermen og versjonen — det du så i skjemaet før du sendte — og at
+  admin ser dem sammen med fornavnet ditt.
 
 ### `app.css`
 
@@ -1062,6 +1109,13 @@ Se [`nokler-og-tokens.md`](nokler-og-tokens.md).
   ikke den andre med seg. Ingen nøkkel, men bak `ADMIN_PASSORD` som de
   andre sondene: et endepunkt hvem som helst kan trykke på, mot en tjeneste
   som ikke er laget for oss, er et endepunkt noen trykker på tusen ganger.
+- **`tilbakemelding.mjs`** — feil og ønsker. Fire handlinger: `send` og
+  `mine` med leserens egen økt, `liste` og `behandle` med `ADMIN_PASSORD`
+  **og** en økt i `visning_skrivere` — samme to låser som forslagskøen.
+  `mine` filtrerer på `sendt_av`, men det er RLS som faktisk holder deg
+  til dine egne: filteret er for å få riktig liste, ikke for å stenge.
+  En `behandle` som svarer med en tom liste er en RLS-avvisning, ikke en
+  suksess, og sier det.
 
 ---
 

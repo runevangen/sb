@@ -5528,6 +5528,134 @@ const SAK_15G = kjor("admin-seksjoner", `
     + '"gren":"main","kontekst":"production","utrulling":"6ab1d31b"};',
 });
 
+/* ---------------- 15K. feil og onsker i portalen ---------------- */
+
+// Koen: de nye forst, tallet i hodet teller dem, og seksjonen apner seg av
+// det. Navnene kommer fra brukerlista, som her lander ETTER koen — da skal
+// koen tegnes om, ellers star «Feil» uten navn over en melding fra Kari.
+const SAK_15K = kjor("admin-feil-og-onsker", `
+  try {
+    localStorage.setItem("sb-konto", JSON.stringify({
+      token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
+      utloper: Date.now() + 3600000,
+    }));
+  } catch (e) { /* privat modus */ }
+
+  var meldinger = [
+    { id: "aaaaaaaa-0000-0000-0000-000000000001", art: "onske", tekst: "Mørkt tema",
+      sendt_av: "u-2", sendt: "2026-09-20T10:00:00Z", status: "lest" },
+    { id: "aaaaaaaa-0000-0000-0000-000000000002", art: "feil", tekst: "Tabellen viste feil lag",
+      skjerm: "Fotball › Eliteserien › Tabell", versjon: "2026.09.27",
+      sendt_av: "u-1", sendt: "2026-09-27T10:00:00Z", status: "ny" }
+  ];
+  window.__meld = [];
+  function svar(status, kropp) {
+    return Promise.resolve({ ok: status < 400, status: status, text: function () {
+      return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("/api/fotball") === 0) {
+      return svar(200, { liga: "Eliteserien", sesong: 2026, kilde: "TheSportsDB",
+                         runde: "Runde 21", runder: ["Runde 21"], kamper: [] });
+    }
+    if (u.indexOf("/api/pub-liste") === 0) return svar(200, { puber: [], klar: true });
+    if (u.indexOf("/api/pub-forslag") === 0) return svar(200, { forslag: [] });
+    if (u.indexOf("/api/tilbakemelding") === 0) {
+      var k = JSON.parse(opt.body);
+      window.__meld.push(k);
+      if (k.handling === "behandle") {
+        meldinger = meldinger.map(function (m) {
+          return m.id === k.id ? Object.assign({}, m, { status: k.status }) : m; });
+        return svar(200, { ok: true });
+      }
+      return svar(200, { meldinger: meldinger });
+    }
+    if (u.indexOf("/api/brukere") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [] });
+      // Brukerlista lander etter koen.
+      return new Promise(function (ferdigSvar) { setTimeout(function () {
+        ferdigSvar(svar(200, { brukere: [
+          { id: "u-1", navn: "Kari", slug: "kari", forst: "2026-09-01T10:00:00Z",
+            sist: "2026-09-12T19:00:00Z", aktiv: "" },
+          { id: "u-2", navn: "Ola", slug: "ola", forst: "2026-08-20T10:00:00Z",
+            sist: "2026-08-20T10:00:00Z", aktiv: "" }
+        ] }));
+      }, 500); });
+    }
+    if (u.indexOf("/api/visninger") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [] });
+      return svar(200, { ok: true, visninger: [] });
+    }
+    return svar(200, {});
+  };
+
+  function felt(id) { return document.getElementById(id); }
+  function rader() { return felt("tilbakemeldingListe").querySelectorAll(".tilbake"); }
+  function knapper(rad) {
+    return Array.prototype.map.call(rad.querySelectorAll("button"), function (b) {
+      return b.textContent; }).join(",");
+  }
+
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    felt("passord").value = "hemmelig";
+    felt("loggInn").click();
+
+    setTimeout(function () { try {
+      ok("koen hentes med passord og admins okt",
+         window.__meld.length === 1 && window.__meld[0].handling === "liste" &&
+         window.__meld[0].passord === "hemmelig" && window.__meld[0].token === "okt-token",
+         JSON.stringify(window.__meld));
+      ok("tallet i hodet teller de nye, i aksentfargen",
+         felt("tilbakemeldingTall").textContent === "1" &&
+         felt("tilbakemeldingTall").classList.contains("venter"),
+         felt("tilbakemeldingTall").textContent);
+      ok("og seksjonen apner seg selv", felt("tilbakemeldingHode").getAttribute("aria-expanded") === "true");
+      var r = rader();
+      ok("den nye star forst, og alle star", r.length === 2 &&
+         r[0].classList.contains("tilbake-ny") && r[0].textContent.indexOf("Tabellen viste feil lag") > -1,
+         r.length);
+      ok("for brukerlista har landet, star det ikke et gjettet navn",
+         r[0].querySelector(".forslag-navn").textContent === "Feil",
+         r[0].querySelector(".forslag-navn").textContent);
+      var under = r[0].querySelector(".forslag-under").textContent;
+      ok("skjermen, versjonen og hva leseren ser star under",
+         under.indexOf("Fotball › Eliteserien › Tabell") > -1 && under.indexOf("versjon 2026.09.27") > -1 &&
+         under.indexOf("Leseren ser: Sendt") > -1, under);
+      ok("en ny melding har alle tre svarene",
+         knapper(r[0]) === "Lest,Fikset,Ikke nå", knapper(r[0]));
+      ok("en lest har ikke Lest igjen", knapper(r[1]) === "Fikset,Ikke nå", knapper(r[1]));
+      ok("hinten teller begge", felt("tilbakemeldingHint").textContent === "1 nye. 1 behandlet.",
+         felt("tilbakemeldingHint").textContent);
+
+      setTimeout(function () { try {
+        var r2 = rader();
+        ok("nar brukerlista lander, far koen navnene",
+           r2[0].querySelector(".forslag-navn").textContent === "Feil fra Kari" &&
+           r2[1].querySelector(".forslag-navn").textContent === "Ønske fra Ola",
+           r2[0].querySelector(".forslag-navn").textContent);
+
+        r2[0].querySelector("button[data-status=fikset]").click();
+        setTimeout(function () { try {
+          var b = window.__meld.filter(function (m) { return m.handling === "behandle"; });
+          ok("Fikset sender den ene id-en med passord og okt",
+             b.length === 1 && b[0].id === "aaaaaaaa-0000-0000-0000-000000000002" &&
+             b[0].status === "fikset" && b[0].passord === "hemmelig" && b[0].token === "okt-token",
+             JSON.stringify(b));
+          ok("kvitteringen sier at leseren ser det",
+             felt("tilbakemeldingMelding").textContent.indexOf("Leseren ser det") > -1,
+             felt("tilbakemeldingMelding").textContent);
+          ok("koen hentes pa nytt, og tallet gar bort",
+             felt("tilbakemeldingTall").textContent === "" &&
+             rader()[0].textContent.indexOf("Leseren ser: Fikset") > -1,
+             felt("tilbakemeldingTall").textContent);
+          ferdig();
+        } catch (e) { ok("ingen unntak etter behandlingen", false, e.message); ferdig(); } }, 300);
+      } catch (e) { ok("ingen unntak etter brukerlista", false, e.message); ferdig(); } }, 700);
+    } catch (e) { ok("ingen unntak i portalen", false, e.message); ferdig(); } }, 300);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
+`, null, adminSide);
+
 /* ---------------- 16. puben bekrefter kampen ---------------- */
 
 // Visningene admin setter skal treffe leseren: pubene som viser nettopp
@@ -7210,6 +7338,152 @@ const SAK_18D = kjor("konto-uten-navn", FELLES + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700); });
 `);
 
+/* ---------------- 18E. meld feil eller onske ---------------- */
+
+// Fra kontosiden, bare innlogget. Det som folger med star synlig for du
+// sender, og kan fjernes. Svaret — Lest, Fikset — star under, der du sendte
+// fra: en innsending uten svar tilbake er et hull i veggen.
+const SAK_18E = kjor("meld-feil", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  localStorage.setItem("sb-konto", JSON.stringify({ token: "okt-1", navn: "Ola",
+    bruker: "12345678-1234-1234-1234-123456789abc", fornyer: "forny-1",
+    utloper: new Date(Date.now() + 3600000).toISOString() }));
+  localStorage.setItem("sb-visning", JSON.stringify({ lag: ["Brann"] }));
+  ` + mockAlt("saker") + `
+  location.hash = "#/fotball/eliteserien/tabell";
+  var grunn = window.fetch;
+  window.__meld = [];
+  function svarMed(kropp, status) {
+    return Promise.resolve({ ok: !status || status < 400, status: status || 200, statusText: "OK",
+      json: function () { return Promise.resolve(kropp); },
+      text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, o) {
+    u = String(u);
+    if (u.indexOf("/api/konto") === 0) {
+      var k = o && o.body ? JSON.parse(o.body) : null;
+      if (k && k.handling === "forny") {
+        return svarMed({ token: "okt-1", navn: "Ola", bruker: "12345678-1234-1234-1234-123456789abc",
+          fornyer: "forny-2", utloper: new Date(Date.now() + 3600000).toISOString(), lag: ["Brann"] });
+      }
+      if (k && k.handling === "lagre-lag") return svarMed({ lag: k.lag });
+      return svarMed({ klar: true, mangler: [], ok: true });
+    }
+    if (u.indexOf("/api/tilbakemelding") === 0) {
+      var inn = JSON.parse(o.body);
+      window.__meld.push(inn);
+      if (inn.handling === "mine") {
+        return svarMed({ meldinger: [{ id: "m1", art: "onske", tekst: "Mørkt tema i portalen",
+          sendtAv: inn.bruker, sendt: "2026-09-26T10:00:00Z", status: "lest" }] });
+      }
+      if (inn.handling === "send") return svarMed({ ok: true, melding: { id: "m2", status: "ny" } });
+      return svarMed({ feil: "Ukjent handling" }, 400);
+    }
+    return grunn(u, o);
+  };
+  function felt(id) { return document.getElementById(id); }
+  function vises(id) { return felt(id) && felt(id).getClientRects().length > 0; }
+  function sendte(h) { return window.__meld.filter(function (m) { return m.handling === h; }); }
+  function steg(f, ms) {
+    setTimeout(function () {
+      try { f(); } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); }
+    }, ms || 400);
+  }
+
+  window.addEventListener("load", function () { steg(function () {
+    felt("hvemTag").click();
+    var panel = felt("menuPanel");
+    ok("kontosiden har «Meld feil eller ønske»",
+       vises("kontoMeld") && felt("kontoMeld").textContent === "Meld feil eller ønske",
+       felt("kontoMeld").textContent);
+    felt("kontoMeld").click();
+    ok("knappen apner skjemaet i kontosiden, og tittelen sier det",
+       !!felt("meldTekst") && vises("meldTekst") &&
+       panel.querySelector(".menu-title").textContent === "Meld feil eller ønske",
+       panel.querySelector(".menu-title").textContent);
+    ok("og knappen blir veien tilbake, ikke en knapp til",
+       felt("kontoMeld").textContent.indexOf("Tilbake til Mitt lag") > -1, felt("kontoMeld").textContent);
+    var vedlegg = felt("meldVedlegg").textContent;
+    ok("det som folger med star synlig: skjermen i ord",
+       vedlegg.indexOf("Fotball › Eliteserien › Tabell") > -1, vedlegg);
+    ok("og versjonen", vedlegg.indexOf("versjon 20") > -1, vedlegg);
+    ok("med en knapp som fjerner det", vises("meldFjern"));
+    ok("feil er valgt fra start",
+       document.querySelector(".meld-art [aria-current]").dataset.art === "feil");
+
+    // For kort: sagt for rundturen, og ingenting sendes.
+    felt("meldTekst").value = "hei";
+    felt("meldSend").click();
+    ok("en for kort melding sier hva som mangler, uten a sende",
+       felt("meldSvar").textContent.indexOf("Skriv litt") > -1 && sendte("send").length === 0,
+       felt("meldSvar").textContent);
+
+    steg(function () {
+      // Svaret fra forrige gang star under, med leserens ord for status.
+      var rader = felt("meldListe").querySelectorAll(".meld-rad");
+      ok("dine meldinger hentes med din okt og din id",
+         sendte("mine").length === 1 && sendte("mine")[0].token === "okt-1" &&
+         sendte("mine")[0].bruker === "12345678-1234-1234-1234-123456789abc",
+         JSON.stringify(sendte("mine")));
+      ok("og star under med status i ord",
+         rader.length === 1 && rader[0].querySelector(".meld-status-lest") &&
+         rader[0].querySelector(".meld-status").textContent === "Lest" &&
+         rader[0].textContent.indexOf("Mørkt tema") > -1,
+         felt("meldListe").textContent);
+
+      felt("meldTekst").value = "Tabellen viste feil lag";
+      felt("meldSend").click();
+      steg(function () {
+        var forste = sendte("send")[0];
+        ok("meldingen sendes med okta, og skjerm og versjon folger med",
+           !!forste && forste.token === "okt-1" && forste.art === "feil" &&
+           forste.tekst === "Tabellen viste feil lag" &&
+           forste.skjerm === "Fotball › Eliteserien › Tabell" && !!forste.versjon,
+           JSON.stringify(forste));
+        ok("svaret sier at den er sendt, og hvor du ser svaret",
+           felt("meldSvar").textContent.indexOf("Sendt") === 0, felt("meldSvar").textContent);
+        ok("feltet tommes, og lista hentes pa nytt",
+           felt("meldTekst").value === "" && sendte("mine").length === 2, sendte("mine").length);
+
+        // Onske, og uten vedlegg.
+        document.querySelector(".meld-art [data-art=onske]").click();
+        felt("meldFjern").click();
+        ok("fjernet star det at bare teksten sendes",
+           felt("meldVedlegg").textContent === "Bare teksten sendes.", felt("meldVedlegg").textContent);
+        felt("meldTekst").value = "Kan dere vise hvem som scoret?";
+        felt("meldSend").click();
+        steg(function () {
+          var andre = sendte("send")[1];
+          ok("et onske uten vedlegg sender bare art og tekst",
+             !!andre && andre.art === "onske" && !("skjerm" in andre) && !("versjon" in andre),
+             JSON.stringify(andre));
+
+          felt("kontoMeld").click();
+          ok("tilbake gir Mitt lag igjen",
+             panel.querySelector(".menu-title").textContent === "Mitt lag" && !felt("meldTekst") &&
+             felt("kontoMeld").textContent === "Meld feil eller ønske",
+             panel.querySelector(".menu-title").textContent);
+
+          // Og navnet apner alltid Mitt lag, ikke der du slapp.
+          felt("kontoMeld").click();
+          felt("menuLukk").click();
+          felt("hvemTag").click();
+          ok("navnet apner Mitt lag, ikke skjemaet du forlot",
+             panel.querySelector(".menu-title").textContent === "Mitt lag" && !felt("meldTekst"),
+             panel.querySelector(".menu-title").textContent);
+
+          // Utlogget: tjenesten ville avvist den, sa knappen star ikke.
+          felt("kontoUt").click();
+          steg(function () {
+            ok("utlogget star ikke knappen", felt("kontoMeld").hidden === true && !vises("kontoMeld"));
+            ferdig();
+          });
+        });
+      });
+    });
+  }, 700); });
+`);
+
 /* ---------------- 19. jeg blir med ---------------- */
 
 const SAK_19 = kjor("blir-med", FELLES + FOTBALL + `
@@ -8868,7 +9142,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

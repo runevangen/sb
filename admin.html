@@ -151,6 +151,10 @@
                   border: 1px solid var(--ramme); border-radius: 6px;
                   font-size: 12px; line-height: 1.5; white-space: pre; }
   .forslag-knapper { display: flex; gap: 14px; }
+  /* Feil og onsker: teksten er selve saken, sa den far brytes som
+     leseren skrev den. De nye har margen, som tipsene. */
+  .tilbake-tekst { margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .tilbake-ny { border-left: 3px solid var(--aksent); padding-left: 10px; }
   h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tekst-dim); margin: 0 0 10px; }
   label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
   /* **Seksten piksler, ikke femten.** Safari pa iPhone zoomer inn av seg
@@ -447,6 +451,28 @@
       <p class="hint" id="forslagHint">Henter forslagene …</p>
       <div id="forslagListe"></div>
       <p class="melding" id="forslagMelding" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- Feil og onsker fra leserne. Samme form som forslagskoen: den apner
+       seg nar det ligger noe nytt der, og tallet i hodet teller de nye.
+       Status du setter her, ser leseren pa kontosiden sin — «Lest» er et
+       svar, ikke bare en hake for deg. -->
+  <section class="seksjon">
+    <h2 class="seksjon-tittel">
+      <button class="seksjon-hode" id="tilbakemeldingHode" type="button"
+              aria-expanded="false" aria-controls="tilbakemeldingKropp">
+        <span class="seksjon-navn">Feil og ønsker</span>
+        <span class="seksjon-tall" id="tilbakemeldingTall"></span>
+        <span class="seksjon-pil" aria-hidden="true">▾</span>
+      </button>
+    </h2>
+    <div class="seksjon-kropp" id="tilbakemeldingKropp" hidden>
+      <p class="hint">Sendt fra kontosiden i appen. Statusen du setter,
+        ser den som sendte — under «Dine meldinger».</p>
+      <p class="hint" id="tilbakemeldingHint">Henter meldingene …</p>
+      <div id="tilbakemeldingListe"></div>
+      <p class="melding" id="tilbakemeldingMelding" role="status" aria-live="polite"></p>
     </div>
   </section>
 

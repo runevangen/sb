@@ -688,6 +688,61 @@ body {
 .menu-panel.har-navn:not(.konto-modus) #kontoBtn,
 .menu-panel.har-navn:not(.konto-modus) #kontoPanel { display: none; }
 
+/* Feil og ønsker. Knappen star i kontopanelet i full bredde, og skjemaet
+   tegnes i kontosiden der kortene sto — bunnen av panelet har ingen plass
+   a gi. */
+.konto-meld { width: 100%; }
+
+.meld { display: flex; flex-direction: column; gap: 10px; }
+.meld-art { align-self: flex-start; }
+.meld-art .segment-del { padding: 7px 16px; font-size: calc(13px * var(--fs)); }
+.meld-tekst { min-height: 120px; resize: vertical; line-height: 1.4; }
+
+/* Det som folger med meldingen, star for du trykker — og kan tas bort. */
+.meld-vedlegg {
+  margin: 0;
+  font-size: calc(12px * var(--fs));
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.meld-fjern {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+.meld-fjern:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.meld-tittel {
+  margin: 14px 0 0;
+  font-size: calc(12px * var(--fs));
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.meld-liste { list-style: none; margin: 0; padding: 0; }
+.meld-rad { padding: 10px 0; border-bottom: 1px solid var(--border-faint); }
+.meld-rad:last-child { border-bottom: 0; }
+.meld-hode { margin: 0 0 4px; font-size: calc(12px * var(--fs)); color: var(--text-dim); }
+.meld-utdrag { margin: 0; font-size: calc(14px * var(--fs)); color: var(--text); line-height: 1.4; }
+.meld-tom { padding: 8px 0; font-size: calc(13px * var(--fs)); color: var(--text-dim); }
+
+/* Statusen i ord, med farge som tillegg — ikke som eneste bærer. */
+.meld-status {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-weight: 600;
+  background: var(--bg-raised);
+  color: var(--text-dim);
+}
+.meld-status-fikset { background: var(--accent-wash); color: var(--accent); }
+
 .konto-side {
   flex: 1;
   overflow-y: auto;

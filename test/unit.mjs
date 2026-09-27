@@ -9,6 +9,9 @@
 
 import { readFileSync, readdirSync, existsSync, rmSync } from "node:fs";
 import { FANTASY_KILDER, FANTASY_STI, fantasyFunn, fantasySondeTekst } from "../fantasy-data.js";
+import { ARTER, TEKST_MIN, TEKST_MAKS, SKJERM_MAKS, VERSJON_MAKS, STATUSER, STATUS_LESER,
+         STATUS_HANDLING, sjekkTilbakemelding, tilbakemeldingRad, tolkTilbakemeldinger,
+         sorterTilbakemeldinger, skjermTekst } from "../tilbakemelding-data.js";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
@@ -3803,6 +3806,95 @@ ok("fantasy: og avgjorelsen star med ord, med pris i norsk form",
 ok("fantasy: begge kildene spørres, fra rota og ikke fra en vilkarlig sti",
    FANTASY_KILDER.length === 2 && FANTASY_KILDER.every((k) => k.rot.indexOf("https://fantasy.") === 0) &&
    FANTASY_STI === "/api/bootstrap-static/");
+
+/* ---------------- feil og onsker fra leserne ---------------- */
+
+ok("tilbakemelding: en gyldig melding har ingen feil",
+   sjekkTilbakemelding({ art: "feil", tekst: "Tabellen er tom" }).length === 0);
+ok("tilbakemelding: uten art sier den hva som mangler",
+   sjekkTilbakemelding({ tekst: "Tabellen er tom" })[0].indexOf("feil eller et ønske") > -1);
+ok("tilbakemelding: en art utenfor lista avvises, ogsa en arvet egenskap",
+   sjekkTilbakemelding({ art: "klage", tekst: "Tabellen er tom" }).length === 1 &&
+   sjekkTilbakemelding({ art: "toString", tekst: "Tabellen er tom" }).length === 1);
+ok("tilbakemelding: mellomrom teller ikke som tekst",
+   sjekkTilbakemelding({ art: "onske", tekst: "   hei    " }).length === 1);
+ok("tilbakemelding: for lang tekst sier grensa",
+   sjekkTilbakemelding({ art: "onske", tekst: "x".repeat(TEKST_MAKS + 1) })[0].indexOf(String(TEKST_MAKS)) > -1);
+
+const TR = tilbakemeldingRad({ art: "feil", tekst: "  Tabellen er tom  ", skjerm: "Nyheter",
+  versjon: "2026.09.27", sendt_av: "noen-andre", status: "fikset" });
+ok("tilbakemelding: raden bærer art, tekst, skjerm og versjon — trimmet",
+   TR.art === "feil" && TR.tekst === "Tabellen er tom" && TR.skjerm === "Nyheter" &&
+   TR.versjon === "2026.09.27", JSON.stringify(TR));
+ok("tilbakemelding: raden sender aldri sendt_av eller status, selv om de kom inn",
+   !("sendt_av" in TR) && !("status" in TR) && !("behandlet" in TR), JSON.stringify(TR));
+const TR_NAKEN = tilbakemeldingRad({ art: "feil", tekst: "Tabellen er tom", skjerm: "  ", versjon: "" });
+ok("tilbakemelding: fjernet skjerm og versjon er fravaer, ikke tomme strenger",
+   !("skjerm" in TR_NAKEN) && !("versjon" in TR_NAKEN), JSON.stringify(TR_NAKEN));
+ok("tilbakemelding: skjerm og versjon kappes til grensene",
+   tilbakemeldingRad({ art: "feil", tekst: "Tabellen er tom", skjerm: "s".repeat(200),
+     versjon: "v".repeat(50) }).skjerm.length === SKJERM_MAKS);
+
+const TT = tolkTilbakemeldinger([
+  { id: "a", art: "onske", tekst: "Mørkt tema", sendt_av: "u1", status: "lest",
+    sendt: "2026-09-27T10:00:00Z" },
+  { id: "b", art: "tull", tekst: "X", status: "rart" },
+  { art: "feil", tekst: "uten id" },
+  null,
+]);
+ok("tilbakemelding: tolkeren leser radene og hopper over de uten id",
+   TT.length === 2 && TT[0].sendtAv === "u1" && TT[0].status === "lest", JSON.stringify(TT));
+ok("tilbakemelding: ukjent art og status blir feil og ny, ikke et krasj",
+   TT[1].art === "feil" && TT[1].status === "ny", JSON.stringify(TT[1]));
+ok("tilbakemelding: tolkeren tåler å kjøres to ganger",
+   JSON.stringify(tolkTilbakemeldinger(tolkTilbakemeldinger([{ id: "a", art: "onske", tekst: "t",
+     sendt_av: "u1", status: "lest" }]).map((m) => ({ id: m.id, art: m.art, tekst: m.tekst,
+     sendt_av: m.sendtAv, status: m.status })))) ===
+   JSON.stringify(tolkTilbakemeldinger([{ id: "a", art: "onske", tekst: "t", sendt_av: "u1", status: "lest" }])));
+ok("tilbakemelding: tull gir en tom liste", tolkTilbakemeldinger(null).length === 0 &&
+   tolkTilbakemeldinger({ feil: "x" }).length === 0);
+
+const TS = sorterTilbakemeldinger([
+  { id: "gammel-lest", status: "lest", sendt: "2026-09-20T10:00:00Z" },
+  { id: "ny-sen", status: "ny", sendt: "2026-09-27T10:00:00Z" },
+  { id: "fersk-fikset", status: "fikset", sendt: "2026-09-26T10:00:00Z" },
+  { id: "ny-tidlig", status: "ny", sendt: "2026-09-21T10:00:00Z" },
+]).map((m) => m.id).join(",");
+ok("tilbakemelding: de nye først og eldst først blant dem, resten nyeste først",
+   TS === "ny-tidlig,ny-sen,fersk-fikset,gammel-lest", TS);
+
+ok("tilbakemelding: skjermen i ord, fotball med liga og del",
+   skjermTekst({ visning: "fotball", liga: "Eliteserien", del: "Tabell" }) === "Fotball › Eliteserien › Tabell",
+   skjermTekst({ visning: "fotball", liga: "Eliteserien", del: "Tabell" }));
+ok("tilbakemelding: nyhetene med og uten filter",
+   skjermTekst({ visning: "nyheter" }) === "Nyheter" &&
+   skjermTekst({ visning: "nyheter", filter: "Brann" }) === "Nyheter › Brann");
+ok("tilbakemelding: skjermteksten holder seg under grensa basen setter",
+   skjermTekst({ visning: "nyheter", filter: "x".repeat(300) }).length <= SKJERM_MAKS);
+
+ok("tilbakemelding: leseren har et ord for hver status",
+   STATUSER.every((st) => typeof STATUS_LESER[st] === "string" && STATUS_LESER[st]));
+ok("tilbakemelding: og portalen har en knapp for hver, unntatt ny",
+   !("ny" in STATUS_HANDLING) && STATUSER.filter((st) => st !== "ny")
+     .every((st) => STATUS_HANDLING[st]));
+
+// Grensene star to steder: her og i basen. Glir de fra hverandre, sier
+// appen «sendt» om noe basen avviser — eller avviser noe basen ville tatt.
+const OPPSETT_SQL = readFileSync(new URL("../docs/oppsett.sql", import.meta.url), "utf8");
+const TB_SQL = OPPSETT_SQL.slice(OPPSETT_SQL.indexOf("create table if not exists tilbakemelding"));
+const sqlListe = (felt) => {
+  const m = TB_SQL.match(new RegExp("check \\(" + felt + " in \\(([^)]*)\\)"));
+  return m ? m[1].split(",").map((x) => x.trim().replace(/'/g, "")).join(",") : "";
+};
+ok("tilbakemelding: basens statusliste er STATUSER",
+   sqlListe("status") === STATUSER.join(","), sqlListe("status"));
+ok("tilbakemelding: basens artliste er ARTER",
+   sqlListe("art") === Object.keys(ARTER).join(","), sqlListe("art"));
+ok("tilbakemelding: basens tekstgrenser er TEKST_MIN og TEKST_MAKS",
+   TB_SQL.indexOf("char_length(tekst) between " + TEKST_MIN + " and " + TEKST_MAKS) > -1);
+ok("tilbakemelding: og skjerm og versjon har samme tak",
+   TB_SQL.indexOf("char_length(skjerm) <= " + SKJERM_MAKS) > -1 &&
+   TB_SQL.indexOf("char_length(versjon) <= " + VERSJON_MAKS) > -1);
 
 /* ---------------- rapport ---------------- */
 
