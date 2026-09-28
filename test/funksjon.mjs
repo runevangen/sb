@@ -3034,7 +3034,8 @@ globalThis.fetch = async (u, o) => {
   if (url.indexOf("fantasy.eliteserien.no/api/bootstrap-static/") > -1) {
     return new Response(JSON.stringify({
       elements: [{ web_name: "Berisha", team: 1, now_cost: 95, total_points: 70,
-                   event_points: 6, selected_by_percent: "33.0" }],
+                   event_points: 6, selected_by_percent: "33.0",
+                   goals_scored: 9, assists: 4 }],
       teams: [{ id: 1, name: "Brann" }],
       events: [{ id: 22, name: "Runde 22", is_current: true }],
     }), { status: 200 });
@@ -3054,6 +3055,14 @@ const esf = fantasyKropp.kilder.find((k) => k.nokkel === "eliteserien");
 const fpl = fantasyKropp.kilder.find((k) => k.nokkel === "premier");
 ok("kilden som svarte, blir lest", !!esf && esf.funn && esf.funn.spillere === 1 &&
    esf.funn.duger.indexOf("JA") === 0, esf && JSON.stringify(esf.funn));
+// Funnet regnes i tjenesten og skrives i portalen. Toppscorerne maa
+// komme hele gjennom JSON-en — ellers sier portalen ingenting om det
+// sonden fant.
+ok("toppscorerne kommer med i svaret til portalen",
+   !!esf && esf.funn && Array.isArray(esf.funn.toppscorere) &&
+   esf.funn.toppscorere.length === 1 && esf.funn.toppscorere[0].mal === 9 &&
+   (esf.funn.toppscorer || "").indexOf("JA") === 0,
+   esf && JSON.stringify(esf.funn && esf.funn.toppscorere));
 ok("kilden som nektet, sier det — og tar ikke den andre med seg",
    !!fpl && fpl.utfall === "svarte HTTP 403" && !fpl.funn && (fpl.hvorfor || "").indexOf("nekter") > -1,
    fpl && JSON.stringify(fpl));

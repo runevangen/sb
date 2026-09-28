@@ -531,6 +531,24 @@ dataene eies av ligaene.
   i teksten, så begge leser det samme tallet.
 - **Eksempelet er den med flest poeng**, ikke den første raden — den er
   gjerne en keeper uten minutter, og sier ingenting om hva feltene bærer.
+- **Toppscorer sjekkes mot hele raden, ikke de seksten som skrives ut.**
+  `TOPPSCORER_FELT` er `goals_scored` og `assists`. Eliteserien svarte
+  28. september 2026 med seksten felt om pris først, og det er den samme
+  fella TheSportsDB-sonden gikk i: `intHomeScore` sto ikke blant feltene
+  den viste. Sjekket vi bare utdraget, ville et felt som finnes sett ut
+  som et som mangler. Feltlista sier derfor «16 av N».
+  **Et ja krever mål, ikke bare feltene.** Står feltene der og ingen har
+  scoret, er svaret nei med hvorfor — et ja ville lovet en tom liste.
+  Tre med flest mål, likt antall brutt på målgivende så rekkefølgen ikke
+  hopper mellom to trykk.
+- **Lagene deles i dem med og dem uten spillere, med navn.** Eliteserien
+  Fantasy svarte med 32 lag i en liga med 16. 538 spillere på 16 lag er 34
+  per lag, som FPL — antakelsen er 16 lag uten spillere. Navnene avgjør
+  den i ett trykk, uansett hvilken vei den går.
+- **Funnet regnes i tjenesten og skrives i portalen**, så teksten tåler et
+  funn uten de nye feltene: linjene står ikke der, framfor å si «0 med
+  spillere» om noe som aldri ble talt.
+- **Andelen skrives med komma**, som prisen på samme linje.
 - **Ingenting herfra når leserne.** Det er en sonde, ikke en funksjon i
   appen. Om vi får vise dataene, er et spørsmål om vilkårene.
 

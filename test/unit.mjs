@@ -8,7 +8,8 @@
 // Alt som trenger DOM ligger i test/run.mjs.
 
 import { readFileSync, readdirSync, existsSync, rmSync } from "node:fs";
-import { FANTASY_KILDER, FANTASY_STI, fantasyFunn, fantasySondeTekst } from "../fantasy-data.js";
+import { FANTASY_KILDER, FANTASY_STI, fantasyFunn, fantasySondeTekst,
+         TOPPSCORER_FELT } from "../fantasy-data.js";
 import { ARTER, TEKST_MIN, TEKST_MAKS, SKJERM_MAKS, VERSJON_MAKS, STATUSER, STATUS_LESER,
          STATUS_HANDLING, sjekkTilbakemelding, tilbakemeldingRad, tolkTilbakemeldinger,
          sorterTilbakemeldinger, skjermTekst } from "../tilbakemelding-data.js";
@@ -3758,9 +3759,11 @@ rmSync(BYGG_UT, { force: true });
 const FPL = {
   elements: [
     { id: 1, web_name: "Keeper", team: 1, now_cost: 45, total_points: 12,
-      event_points: 2, selected_by_percent: "1.2", element_type: 1 },
+      event_points: 2, selected_by_percent: "1.2", element_type: 1,
+      goals_scored: 0, assists: 0 },
     { id: 2, web_name: "Haaland", team: 2, now_cost: 145, total_points: 88,
-      event_points: 13, selected_by_percent: "61.4", element_type: 4 },
+      event_points: 13, selected_by_percent: "61.4", element_type: 4,
+      goals_scored: 11, assists: 2 },
   ],
   teams: [{ id: 1, name: "Brann" }, { id: 2, name: "Man City" }],
   events: [
@@ -3802,7 +3805,100 @@ ok("fantasy: teksten navngir begge kildene og hva de svarte",
    FT.indexOf("svarte HTTP 403") > -1 && FT.indexOf("tjenesten nekter") > -1, FT);
 ok("fantasy: og avgjorelsen star med ord, med pris i norsk form",
    FT.indexOf("DUGER: JA") > -1 && FT.indexOf("14,5 mill.") > -1 &&
-   FT.indexOf("valgt av 61.4 %") > -1, FT);
+   FT.indexOf("valgt av 61,4 %") > -1, FT);
+// ---- toppscorer: ett kall for hele lista? ----
+//
+// Toppscorer sto som et nei: TheSportsDB krevde ett kall per spiller.
+// bootstrap-static gir alle spillerne i ett svar, og sporsmalet er om
+// maal og maalgivende staar paa raden.
+ok("fantasy: med maal og maalgivende paa raden er toppscorer et ja",
+   FF.toppscorer.indexOf("JA") === 0, FF.toppscorer);
+ok("fantasy: og den med flest maal staar forst, med lag, maal og maalgivende",
+   FF.toppscorere.length === 1 && FF.toppscorere[0].navn === "Haaland" &&
+   FF.toppscorere[0].lag === "Man City" && FF.toppscorere[0].mal === 11 &&
+   FF.toppscorere[0].malgivende === 2, JSON.stringify(FF.toppscorere));
+// En spiller uten maal er ikke en toppscorer. Keeperen med null sto ellers
+// i en liste over dem som scorer.
+ok("fantasy: den uten maal kommer ikke med", FF.toppscorere.every((t) => t.mal > 0));
+
+// **Feltene sjekkes mot HELE raden, ikke de seksten som skrives ut.**
+// Eliteserien Fantasy svarte 28. september 2026 med seksten felt om pris
+// forst. TheSportsDB-sonden gikk i akkurat denne fella: `intHomeScore`
+// sto ikke blant feltene den viste, og da saa det ut som om den manglet.
+const FF_PRISFELT = {};
+for (let i = 0; i < 20; i += 1) FF_PRISFELT["price_felt_" + i] = 0;
+const FF_DYPT = fantasyFunn({ elements: [Object.assign({}, FF_PRISFELT,
+  { web_name: "Dyp", team: 1, now_cost: 50, total_points: 9, event_points: 1,
+    goals_scored: 4, assists: 1 })], teams: [{ id: 1, name: "Viking" }] });
+ok("fantasy: maalfeltet finnes selv om det staar etter de seksten som vises",
+   FF_DYPT.felt.indexOf("goals_scored") === -1 && FF_DYPT.toppscorer.indexOf("JA") === 0,
+   FF_DYPT.felt.length + " vist, " + FF_DYPT.toppscorer);
+ok("fantasy: og funnet sier hvor mange felt det er i alt",
+   FF_DYPT.feltAntall === 27, FF_DYPT.feltAntall);
+
+const FF_UTEN_MAL = fantasyFunn({ elements: [{ web_name: "X", team: 1, now_cost: 1,
+  total_points: 3, event_points: 1 }] });
+ok("fantasy: uten maalfeltene er toppscorer et nei, og feltene navngis",
+   FF_UTEN_MAL.toppscorer.indexOf("NEI") === 0 &&
+   TOPPSCORER_FELT.every((f) => FF_UTEN_MAL.toppscorer.indexOf(f) > -1), FF_UTEN_MAL.toppscorer);
+ok("fantasy: og da er lista tom, ikke en liste med null maal",
+   FF_UTEN_MAL.toppscorere.length === 0);
+// Feltene staar der, men ingen har scoret: for forste runde, eller et felt
+// som alltid er null. Et ja her ville lovet en liste som er tom.
+const FF_NULL_MAL = fantasyFunn({ elements: [{ web_name: "X", team: 1, now_cost: 1,
+  total_points: 3, event_points: 1, goals_scored: 0, assists: 0 }] });
+ok("fantasy: feltene uten et eneste maal er et nei, med hvorfor",
+   FF_NULL_MAL.toppscorer.indexOf("NEI") === 0 && FF_NULL_MAL.toppscorer.indexOf("ingen har maal".replace(/aa/g, "å")) > -1,
+   FF_NULL_MAL.toppscorer);
+
+// Tre, ikke alle: tre er nok til aa se om tallene ligner virkeligheten.
+// Likt antall maal: flest maalgivende forst, saa rekkefolgen ikke hopper
+// mellom to trykk.
+const FF_MANGE = fantasyFunn({ elements: [
+  { web_name: "A", team: 1, now_cost: 1, total_points: 1, event_points: 1, goals_scored: 9, assists: 1 },
+  { web_name: "B", team: 1, now_cost: 1, total_points: 1, event_points: 1, goals_scored: 12, assists: 0 },
+  { web_name: "C", team: 1, now_cost: 1, total_points: 1, event_points: 1, goals_scored: 9, assists: 6 },
+  { web_name: "D", team: 1, now_cost: 1, total_points: 1, event_points: 1, goals_scored: 3, assists: 9 },
+], teams: [{ id: 1, name: "Brann" }] });
+ok("fantasy: tre med flest maal, likt antall brutt paa maalgivende",
+   FF_MANGE.toppscorere.map((t) => t.navn).join(",") === "B,C,A",
+   FF_MANGE.toppscorere.map((t) => t.navn + " " + t.mal + "/" + t.malgivende).join(", "));
+
+// ---- lagene: hvilke har spillere? ----
+//
+// Eliteserien Fantasy svarte 28. september 2026 med 32 lag i en liga med
+// 16. 538 spillere paa 16 lag er 34 per lag, som FPL — antakelsen er 16
+// lag uten spillere. Navnene i hver gruppe avgjor den.
+const FF_TRETTITO = fantasyFunn({
+  elements: [
+    { web_name: "A", team: 1, now_cost: 1, total_points: 1, event_points: 1 },
+    { web_name: "B", team: 2, now_cost: 1, total_points: 1, event_points: 1 },
+  ],
+  teams: [{ id: 1, name: "Viking" }, { id: 2, name: "Brann" }, { id: 3, name: "Odd" }],
+});
+ok("fantasy: lagene deles i dem med og dem uten spillere, med navn",
+   FF_TRETTITO.lagMed.join(",") === "Viking,Brann" && FF_TRETTITO.lagUten.join(",") === "Odd",
+   FF_TRETTITO.lagMed.join(",") + " / " + FF_TRETTITO.lagUten.join(","));
+const FF_TT = fantasySondeTekst({ kilder: [{ navn: "E", adresse: "e", utfall: "u", funn: FF_TRETTITO }] });
+ok("fantasy: og teksten sier begge gruppene, med antall",
+   FF_TT.indexOf("lag med spillere (2): Viking, Brann") > -1 &&
+   FF_TT.indexOf("lag uten spillere (1): Odd") > -1, FF_TT);
+
+// ---- teksten ----
+ok("fantasy: teksten viser de med flest maal og avgjorelsen i ord",
+   FT.indexOf("flest mål: Haaland (Man City) 11 mål, 2 målgivende") > -1 &&
+   FT.indexOf("TOPPSCORER: JA") > -1, FT);
+ok("fantasy: feltlista sier at den er et utdrag",
+   FT.indexOf("felt (") > -1 && FT.indexOf(" av ") > -1, FT);
+// Funnet regnes i tjenesten og skrives i portalen. En eldre tjeneste
+// sender et funn uten de nye feltene — da staar linjene ikke der, framfor
+// aa si «0 med spillere» om noe som aldri ble talt.
+const FF_GAMMEL = fantasySondeTekst({ kilder: [{ navn: "E", adresse: "e", utfall: "u",
+  funn: { spillere: 1, lag: 1, runder: 0, naa: "", neste: null, felt: ["a"], duger: "JA" } }] });
+ok("fantasy: et funn fra en eldre tjeneste gir ingen linjer om det den ikke talte",
+   FF_GAMMEL.indexOf("lag med spillere") === -1 && FF_GAMMEL.indexOf("TOPPSCORER") === -1 &&
+   FF_GAMMEL.indexOf("DUGER: JA") > -1, FF_GAMMEL);
+
 ok("fantasy: begge kildene spørres, fra rota og ikke fra en vilkarlig sti",
    FANTASY_KILDER.length === 2 && FANTASY_KILDER.every((k) => k.rot.indexOf("https://fantasy.") === 0) &&
    FANTASY_STI === "/api/bootstrap-static/");
