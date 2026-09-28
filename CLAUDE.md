@@ -71,6 +71,8 @@ modul for modul.
     docs/           adr/, modulene.md, hendelser.md, testing.md,
                     nokler-og-tokens.md, oppsett.sql, kampdag-dypdykk.md
                     kom-i-gang.md: veien inn for en ny person, som PDF
+                    swift-skall.md: plan for App Store, push og AdMob
+                    uten omskriving — ikke besluttet
     BACKLOGG.md     peker til issues, som er den ekte backloggen
 
 **Mønsteret:** `*-data.js` er rene funksjoner — ingen DOM, ingen
