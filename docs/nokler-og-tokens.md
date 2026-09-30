@@ -259,6 +259,34 @@ kan holdes mot det du vet om ligaen.
 **Men et ja der er ikke et ja til leserne.** Adressene er uoffisielle, og
 dataene eies av ligaene. Om vi får vise dem, er et spørsmål om vilkårene
 — og til det er avgjort, står nei-et over.
+
+**Sonden svarte JA 30. september 2026** (Rune leste det av i portalen).
+Toppscorerlista er teknisk ett kall unna. De tre øverste navnene ble ikke
+notert, så tallene er ikke holdt mot den offisielle lista — gjør det før
+noen bygger på det.
+
+**Vilkårene er ikke lest, og det er ikke avklart.** Sidene som ville svart
+(fantasy.eliteserien.no, fotball.no, NTB, premierleague.com) er stengt fra
+miljøet dette ble skrevet i, så det som står her er **søketreff, ikke
+vilkårene selv**:
+- NTB er offisiell dataleverandør til Norsk Toppfotball og til Eliteserien
+  Fantasy. Dataene har altså en rettighetshaver som selger dem videre, og
+  det er ikke noe vi kan anta er gratis å vise.
+- Premier Leagues vilkår skal forby kommersiell bruk og gjengivelse eller
+  videreformidling uten skriftlig tillatelse. Sportsbibelen har annonser
+  (og AdMob er på vei, se `docs/swift-skall.md`), så den bruken er
+  kommersiell.
+
+**Derfor står nei-et:** den uoffisielle veien er ikke en vei vi kan bygge
+på uten å ha spurt. Det som er åpent, i rekkefølge av hva det koster:
+1. **API-Football har `players/topscorers`** — de 20 øverste for én liga og
+   sesong, ett kall, og den kilden betaler vi alt for og har lisens til.
+   Ikke målt: om Eliteserien har spillerstatistikk på vår plan
+   (dekningsflagget i `/leagues` sier det), og hva kallet koster mot
+   døgnkvoten på hundre. Neste skritt er at sonden spør om nettopp det.
+2. **Spørre Norsk Toppfotball** om vi får bruke Fantasy-dataene. Et svar
+   fra rettighetshaveren er det eneste som gjør den uoffisielle veien til
+   en vei.
 - **Lages på:** thesportsdb.com → Patreon-abonnement
 - **Utløper:** når abonnementet gjør det. Symptomet er ikke en feilmelding, men at tabellen stille går tilbake til fjoråret — se symptomtabellen nedenfor.
 
