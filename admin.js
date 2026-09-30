@@ -18,6 +18,33 @@
 //
 // Passordet ligger i en variabel her, ikke i sessionStorage: en
 // oppfriskning er billigere enn et passord som blir liggende.
+//
+// **Ett unntak, og det er kort:** «Admin» i appens meny ber om passordet i
+// menyen (iPhone apner bare tastaturet i selve trykket, aldri pa en ny side) og
+// leverer det hit via sessionStorage. Det slettes i det siden leser det, for
+// noe annet skjer, og gjelder bare i et minutt: et passord som ikke ble hentet,
+// er akkurat det et passord som blir liggende er.
+const ADMIN_NOKKEL = "sb-admin-pw";
+const ADMIN_LEVERT_MS = 60 * 1000;
+
+function hentLevertPassord() {
+  let rad = null;
+  try {
+    rad = sessionStorage.getItem(ADMIN_NOKKEL);
+    sessionStorage.removeItem(ADMIN_NOKKEL);
+  } catch (err) { return ""; }
+  if (!rad) return "";
+  try {
+    const levert = JSON.parse(rad);
+    if (levert && typeof levert.pw === "string" && Date.now() - levert.t < ADMIN_LEVERT_MS) {
+      return levert.pw;
+    }
+  } catch (err) { /* ikke vart */ }
+  return "";
+}
+// Lest og slettet na, for resten av fila rekker a kjore: det er hele poenget
+// med at det slettes «i det siden leser det».
+const LEVERT_PASSORD = hentLevertPassord();
 
 import { KURATERTE } from "./puber.js";
 import { VERSJONER } from "./versjoner.js";
@@ -242,6 +269,11 @@ async function sjekkOppsett() {
     // Nettverksfeil her skal ikke lase portalen.
   }
 }
+
+// Passordet er det første du gjør her, sa feltet har fokus nar siden apnes.
+// iPhone apner ikke tastaturet av et fokus som ikke kommer fra et trykk, sa der
+// ma du fortsatt trykke i feltet en gang; pa alle andre er det klart til a skrive.
+felt("passord").focus();
 
 felt("loggInn").addEventListener("click", loggInn);
 felt("passord").addEventListener("keydown", (e) => {
@@ -2538,3 +2570,11 @@ felt("stedFilterBy").addEventListener("change", () => {
   stedFilter = felt("stedFilterBy").value;
   tegnSteder();
 });
+
+// Kommer du fra «Admin» i appens meny, er passordet allerede skrevet. Det
+// provde vi na, pa vanlig mate: samme kall, samme melding hvis det er feil, og
+// feltet star utfylt sa du kan rette det.
+if (LEVERT_PASSORD) {
+  felt("passord").value = LEVERT_PASSORD;
+  loggInn();
+}

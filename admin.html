@@ -389,13 +389,15 @@
     <h2>Adgang</h2>
     <label for="passord">Adminpassord</label>
     <div class="rad">
-      <input type="password" id="passord" autocomplete="current-password">
+      <input type="password" id="passord" autocomplete="current-password" autofocus>
       <button id="loggInn" type="button">Logg inn</button>
     </div>
     <p class="melding" id="adgangMelding" role="status" aria-live="polite"></p>
     <p class="hint" id="adgangHint">
-      Passordet ligger bare i denne fanen så lenge den er åpen — verken i
-      nettadressen eller i lagringen. Oppfrisker du siden, logger du inn på nytt.
+      Passordet ligger bare i denne fanen så lenge den er åpen — ikke i
+      nettadressen, og ikke varig i lagringen. Kommer du fra «Admin» i appen,
+      leveres det via fanens lagring og slettes i det siden leser det.
+      Oppfrisker du siden, logger du inn på nytt.
     </p>
   </section>
 

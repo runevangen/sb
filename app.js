@@ -1770,6 +1770,7 @@ function openMenu() {
   // Hamburgeren apner alltid menyen. Kontosiden er noe bare navnet gjor,
   // og den skal ikke henge igjen til neste gang.
   settKontoModus(false);
+  settAdminSteg(false);
   panel.classList.add("open");
   btn.setAttribute("aria-expanded", "true");
   document.getElementById("menuClose").focus();
@@ -1780,6 +1781,7 @@ function openMenu() {
 function closeMenu() {
   const panel = document.getElementById("menuPanel");
   const btn = document.getElementById("menuBtn");
+  settAdminSteg(false);
   if (!panel.classList.contains("open")) return;
   panel.classList.remove("open");
   btn.setAttribute("aria-expanded", "false");
@@ -2158,6 +2160,13 @@ async function kontoNavnSteget() {
     return;
   }
 
+  // Fokus i selve trykket. iPhone apner bare tastaturet for et felt som far
+  // fokus mens trykket ennå pågår, og svaret under kommer over nettet,
+  // etterpa. Uten dette lukket tastaturet seg her, og PIN-feltet matte
+  // trykkes pa for a skrive i det. Dette usynlige feltet holder tastaturet
+  // oppe til svaret er der og fokus kan flyttes til PIN-en.
+  document.getElementById("kontoFokus").focus();
+
   send.disabled = true;
   try {
     const data = await kontoKall({ handling: "finnes", navn });
@@ -2168,6 +2177,8 @@ async function kontoNavnSteget() {
     document.getElementById("kontoPin").focus();
   } catch (err) {
     kontoSvar(err.message);
+    // Navnet ble avvist: du star pa navnesteget, og det er der du skal skrive.
+    feltNavn.focus();
   } finally {
     send.disabled = false;
   }
@@ -2532,6 +2543,67 @@ function fyllKontoPanel() {
 }
 
 document.getElementById("kontoSend").addEventListener("click", kontoSteget);
+
+// «Admin» i menyen: passordet skrives her, for a fa tastaturet oppe. Nokkelen
+// og levetiden star ogsa i admin.js, som leser og sletter den i det siden apnes.
+const ADMIN_NOKKEL = "sb-admin-pw";
+
+function settAdminSteg(apen) {
+  const steg = document.getElementById("adminSteg");
+  const rad = document.getElementById("adminRad");
+  const felt = document.getElementById("adminPassord");
+  if (!steg) return;
+  steg.hidden = !apen;
+  rad.hidden = apen;
+  felt.value = "";
+  // Fokus i selve trykket, etter at feltet er vist: et skjult felt far ikke
+  // fokus, og et fokus etter trykket apner ikke tastaturet pa iPhone.
+  if (apen) felt.focus();
+}
+
+function gaTilAdmin() {
+  const felt = document.getElementById("adminPassord");
+  if (!felt.value) { felt.focus(); return; }
+  // Levert via fanens lagring og slettet av portalen i det den leser det —
+  // aldri i adressen. Mislykkes lagringen (privat modus), apner portalen
+  // likevel og ber om passordet selv.
+  try {
+    sessionStorage.setItem(ADMIN_NOKKEL, JSON.stringify({ pw: felt.value, t: Date.now() }));
+  } catch (err) { /* privat modus */ }
+  location.href = document.getElementById("adminLenke").href;
+}
+
+// Et vanlig trykk apner passordfeltet. Ctrl, Cmd, Shift, Alt og midtklikk gar
+// til nettleseren, som pa sakene og logoen: ny fane pa portalen er ogsa greit.
+document.getElementById("adminLenke").addEventListener("click", (e) => {
+  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  settAdminSteg(true);
+});
+document.getElementById("adminGa").addEventListener("click", gaTilAdmin);
+document.getElementById("adminAvbryt").addEventListener("click", () => settAdminSteg(false));
+document.getElementById("adminPassord").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); gaTilAdmin(); }
+  else if (e.key === "Escape") { e.preventDefault(); settAdminSteg(false); }
+});
+
+// Enter i et felt skal gjore det samme som knappen: feltene ligger ikke i
+// et skjema, fordi et skjema i menyen ville sendt sokeskjemaet. I PIN-feltet
+// nar en ny PIN lages, er neste steg «Gjenta» — og det far fokus i selve
+// trykket, sa tastaturet blir oppe.
+["kontoNavn", "kontoPin", "kontoPin2"].forEach((id) => {
+  document.getElementById(id).addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (document.getElementById("kontoSend").disabled) return;
+    const pin2 = document.getElementById("kontoPin2");
+    if (id === "kontoPin" && kontoSteg === "ny" && !pin2.hidden && !pin2.value) {
+      pin2.focus();
+      return;
+    }
+    kontoSteget();
+  });
+});
 document.getElementById("kontoBytt").addEventListener("click", kontoTilbake);
 document.getElementById("kontoUt").addEventListener("click", loggUt);
 
@@ -2645,14 +2717,6 @@ document.getElementById("kontoSlett").addEventListener("click", async () => {
     knapp.disabled = false;
   }
 });
-// Enter i et felt skal gjore det samme som knappen: feltene ligger ikke i
-// et skjema, fordi et skjema i menyen ville sendt sokeskjemaet.
-["kontoNavn", "kontoPin", "kontoPin2"].forEach((id) => {
-  document.getElementById(id).addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); kontoSteget(); }
-  });
-});
-
 visKonto();
 
 /* ---------- detaljvisning ---------- */

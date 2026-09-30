@@ -539,6 +539,19 @@ body {
   text-decoration: none;
 }
 
+/* Passordet til portalen, skrevet i menyen (se index.html). Tar plassen til
+   raden med Personvern og Admin mens det star apent, og er like hoyt, sa
+   bunnen av menyen ikke vokser. display satt her, sa [hidden] ma sies. */
+.admin-steg {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.admin-steg[hidden], .action-lenker[hidden] { display: none; }
+
+.admin-steg .konto-felt { flex: 1; min-width: 0; }
+
 /* Innloggingen: to felt og en knapp, rett under knappen som apner den.
    Ingen dialog — det er ett sporsmal, og menyen er alt apen. */
 .konto-panel {
@@ -650,6 +663,20 @@ body {
 /* display: flex slar [hidden] fra nettleserens eget stilark. */
 .konto-par[hidden] { display: none; }
 .konto-slett:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Holder tastaturet oppe mellom navnet og PIN-en (se index.html). Ikke
+   display: none — et skjult felt kan ikke fa fokus. 16 px: under det zoomer
+   Safari inn. */
+.konto-fokus {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+  font-size: 16px;
+}
 
 .konto-send:disabled { opacity: 0.45; cursor: default; }
 .konto-send[hidden], .konto-ut[hidden] { display: none; }

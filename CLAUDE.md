@@ -210,6 +210,23 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   **Navnet i toppfeltet har en rund initial foran seg** (#170), tegnet av
   `::before` med `data-initial`. Teksten i knappen er fortsatt bare navnet.
   Fargene er `--avatar-bg` og `--avatar-ink`, ikke skrevet inn.
+- **Fokus flyttes i selve trykket, ikke etter svaret.** Navn → PIN ga et
+  PIN-felt som hadde fokus og ikke noe tastatur: iPhone åpner bare tastaturet
+  for et felt som får fokus mens trykket pågår, og «finnes navnet?» svarer
+  over nettet, etterpå. `kontoNavnSteget()` gir derfor det usynlige
+  `#kontoFokus` fokus **før** den venter, og flytter det til PIN-feltet når
+  svaret er der; blir navnet avvist, går det tilbake til navnefeltet. Enter er
+  det samme som Fortsett, og i PIN-feltet ved ny konto går det til «Gjenta».
+  Målt i Chromium (at fokus står riktig i hvert øyeblikk), **ikke** på en
+  iPhone — om tastaturet faktisk blir oppe, er det bare en telefon som kan si.
+  **Og passordet til portalen skrives i menyen, ikke på portalen.** En ny
+  side får aldri tastaturet på iPhone. «Admin» åpner et passordfelt der
+  raden med Personvern og Admin sto (like høyt), med fokus i trykket, og Enter
+  leverer passordet via `sessionStorage` og går til lenkas adresse. Portalen
+  leser og **sletter** det i det den åpnes, og bruker det bare i et minutt — et
+  passord som ikke ble hentet er nettopp det regelen «variabel, ikke
+  `sessionStorage`» var skrevet mot. Aldri i adressen. Ctrl/Cmd/midtklikk går
+  til nettleseren, som på sakene. Målt i Chromium, ikke på en iPhone.
 - **Et fornavn er ikke en e-postadresse.** Feltet spør om fornavnet, men
   noen skrev adressen sin, og den sto i «blir med»-lista, synlig for alle
   uten innlogging — mens personvernsida lover at vi ikke viser e-post

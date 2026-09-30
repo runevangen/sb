@@ -1025,6 +1025,14 @@ portalen — en leser har ingen nytte av den.
   Supabase — derfor må du være logget inn i appen for å lagre.
 - **Passordet ligger i en variabel, ikke i `sessionStorage`.** En
   oppfriskning er billigere enn et passord som blir liggende.
+  **Ett unntak, og det er kort:** «Admin» i appens meny ber om passordet der
+  (iPhone åpner bare tastaturet i selve trykket, aldri på en ny side) og
+  leverer det via `sessionStorage` under nøkkelen `sb-admin-pw`, som
+  `{pw, t}`. `hentLevertPassord()` leser og **sletter** det øverst i fila,
+  før noe annet kjører, og bruker det bare når `t` er under et minutt gammelt.
+  Utløpet er ikke pynt: et passord som ikke ble hentet er det regelen er
+  skrevet mot. Feil passord gir den vanlige meldingen, med passordet i feltet
+  så det kan rettes.
 - **Portalen er skjult til tjenesten har godtatt passordet.** Det er ikke
   sikkerheten — den ligger i funksjonen og i basen — men det er ordenen, og
   det sparer et kall mot API-Football per åpning.
