@@ -5873,8 +5873,15 @@ const VER_HJELP = `
 // `loggSvar` og `sjekk` er kildekode for funksjoner: scenene er
 // mal-literaler, og en funksjon kan ikke sendes inn i nettleseren som noe
 // annet enn tekst.
-function adminLoggScene(okt, loggSvar, sjekk) {
-  return `
+function adminLoggScene(okt, loggSvar, sjekk, levert) {
+  // `levert`: passordet kommer fra «Admin» i appens meny, via sessionStorage,
+  // i stedet for a bli skrevet her. «ok», «gammel» (over et minutt) eller «feil».
+  var levertSkript = levert ? `
+  try { sessionStorage.setItem("sb-admin-pw", JSON.stringify({
+    pw: "` + (levert === "feil" ? "feil-passord" : "hemmelig") + `",
+    t: Date.now() - ` + (levert === "gammel" ? "120000" : "1000") + ` })); } catch (e) { /* privat modus */ }
+  ` : "";
+  return levertSkript + `
   try {
     ` + (okt
     ? `localStorage.setItem("sb-konto", JSON.stringify({
@@ -5942,11 +5949,11 @@ function adminLoggScene(okt, loggSvar, sjekk) {
     import("/versjoner.js").then(function (m) {
       VER = m.VERSJONER;
       setTimeout(function () { try {
-        felt("passord").value = "hemmelig";
-        felt("loggInn").click();
+        ` + (levert ? "" : `felt("passord").value = "hemmelig";
+        felt("loggInn").click();`) + `
         setTimeout(function () { try {
           sjekkFn(VER, felt);
-        } catch (e) { ok("ingen unntak i sjekken", false, e.message); ferdig(); } }, 250);
+        } catch (e) { ok("ingen unntak i sjekken", false, e.message); ferdig(); } }, ` + (levert ? "500" : "250") + `);
       } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 200);
     });
   });
@@ -7749,6 +7756,76 @@ const SAK_18J = kjor("pin-far-fokus", epostSide(false) + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
 `);
 
+// «Admin» i menyen: passordet skrives der, for en ny side far aldri tastaturet
+// pa iPhone. Malt: fokus i trykket, samme hoyde i bunnen, vanlige unntak for
+// Ctrl/Cmd, og at passordet leveres (aldri i adressen) og at knappen bruker
+// lenkas adresse. Adressen byttes til en hash i testen, sa siden ikke forlates.
+const SAK_18K = kjor("admin-fra-menyen", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  ` + mockAlt("saker") + `
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.getElementById("menuBtn").click();
+    var lenke = document.getElementById("adminLenke");
+    var steg = document.getElementById("adminSteg");
+    var rad = document.getElementById("adminRad");
+    var felt = document.getElementById("adminPassord");
+    var bunn = document.querySelector(".menu-actions");
+    var hoydeFor = bunn.getBoundingClientRect().height;
+
+    var ctrl = new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true, button: 0 });
+    lenke.dispatchEvent(ctrl);
+    ok("Ctrl-trykk gar til nettleseren og apner ikke passordfeltet",
+       ctrl.defaultPrevented === false && steg.hidden === true);
+
+    var vanlig = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+    lenke.dispatchEvent(vanlig);
+    ok("et vanlig trykk apner passordfeltet i menyen, ikke en ny side",
+       vanlig.defaultPrevented === true && steg.hidden === false && rad.hidden === true,
+       steg.hidden + " " + rad.hidden);
+    ok("med fokus i selve trykket, sa tastaturet kommer opp", document.activeElement === felt,
+       document.activeElement && document.activeElement.id);
+    ok("og 16 px, sa Safari ikke zoomer", parseFloat(getComputedStyle(felt).fontSize) >= 16,
+       getComputedStyle(felt).fontSize);
+    ok("bunnen av menyen blir ikke hoyere", bunn.getBoundingClientRect().height <= hoydeFor + 4,
+       hoydeFor + " -> " + bunn.getBoundingClientRect().height);
+
+    // Tomt passord gjor ingenting.
+    felt.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    ok("Enter uten passord sender ingen steder", sessionStorage.getItem("sb-admin-pw") === null &&
+       document.activeElement === felt);
+
+    // Avbryt og Escape gir raden tilbake, og feltet er tomt neste gang.
+    felt.value = "noe";
+    document.getElementById("adminAvbryt").click();
+    ok("Avbryt gir Personvern og Admin tilbake", steg.hidden === true && rad.hidden === false);
+    lenke.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+    ok("og passordet star ikke igjen i feltet", felt.value === "", felt.value);
+    felt.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    ok("Escape gjor det samme", steg.hidden === true && rad.hidden === false);
+
+    // Lukkes menyen mens passordfeltet star apent, er det borte neste gang.
+    lenke.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+    felt.value = "hemmelig";
+    document.getElementById("menuLukk").click();
+    document.getElementById("menuBtn").click();
+    ok("lukket meny tar med seg passordfeltet", steg.hidden === true && rad.hidden === false && felt.value === "",
+       steg.hidden + " " + felt.value);
+
+    // Enter med passord: leveres i fanens lagring, aldri i adressen.
+    lenke.setAttribute("href", "#admintest");
+    lenke.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+    felt.value = "hemmelig";
+    felt.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    var levert = null;
+    try { levert = JSON.parse(sessionStorage.getItem("sb-admin-pw")); } catch (e) { levert = null; }
+    ok("Enter leverer passordet i fanens lagring", !!levert && levert.pw === "hemmelig" &&
+       Math.abs(Date.now() - levert.t) < 5000, JSON.stringify(levert));
+    ok("og gar til adressen lenka har, uten passord i", location.hash === "#admintest" &&
+       location.href.indexOf("hemmelig") === -1, location.href);
+    ferdig();
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
+`);
+
 // Portalen: passordet er det første du gjør, så feltet har fokus når siden åpnes.
 const SAK_15S = kjor("admin-fokus", `
   window.addEventListener("load", function () { setTimeout(function () { try {
@@ -7758,6 +7835,41 @@ const SAK_15S = kjor("admin-fokus", `
     ferdig();
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
 `, null, adminSide);
+
+// «Admin» i appens meny ber om passordet der (tastaturet), og leverer det hit.
+// Tre utfall: levert og riktig apner portalen uten a skrive noe, for gammelt
+// brukes ikke, og feil gir en feilmelding med passordet i feltet. I alle tre er
+// nokkelen slettet.
+const SAK_15T = kjor("admin-fra-appen", adminLoggScene(true, `function (VER, k, svar) {
+    return svar(200, { ok: true, innlogging: { id: "l3", bruker: "u-admin", tid: "2026-09-30T10:00:00Z" },
+      forrige: null, forrigeFeil: false });
+  }`, `function (VER, felt) {
+    ok("et levert passord apner portalen uten a skrive noe", felt("portal").hidden === false,
+       felt("adgangMelding").textContent);
+    ok("og er slettet fra lagringen", sessionStorage.getItem("sb-admin-pw") === null);
+    ferdig();
+  }`, "ok"), null, adminSide);
+
+const SAK_15U = kjor("admin-fra-appen-gammelt", adminLoggScene(true, `function (VER, k, svar) {
+    return svar(200, { ok: true });
+  }`, `function (VER, felt) {
+    ok("et passord som ble liggende i over et minutt brukes ikke", felt("portal").hidden === true);
+    ok("og er slettet likevel", sessionStorage.getItem("sb-admin-pw") === null);
+    ok("uten at noen ble logget inn", window.__logg.length === 0, JSON.stringify(window.__logg));
+    ferdig();
+  }`, "gammel"), null, adminSide);
+
+const SAK_15V = kjor("admin-fra-appen-feil", adminLoggScene(true, `function (VER, k, svar) {
+    return svar(200, { ok: true });
+  }`, `function (VER, felt) {
+    ok("et levert passord som er feil, apner ikke portalen", felt("portal").hidden === true);
+    ok("og sier hvorfor", felt("adgangMelding").textContent.indexOf("Feil passord") > -1,
+       felt("adgangMelding").textContent);
+    ok("med passordet i feltet, sa det kan rettes", felt("passord").value === "feil-passord",
+       felt("passord").value);
+    ok("og slettet fra lagringen", sessionStorage.getItem("sb-admin-pw") === null);
+    ferdig();
+  }`, "feil"), null, adminSide);
 
 /* ---------------- 18c. favorittlagene folger kontoen, og PIN-en byttes ---------------- */
 
@@ -9898,7 +10010,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_2B, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_18J, SAK_15S, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_2B, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_18J, SAK_18K, SAK_15S, SAK_15T, SAK_15U, SAK_15V, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

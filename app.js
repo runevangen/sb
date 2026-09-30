@@ -1770,6 +1770,7 @@ function openMenu() {
   // Hamburgeren apner alltid menyen. Kontosiden er noe bare navnet gjor,
   // og den skal ikke henge igjen til neste gang.
   settKontoModus(false);
+  settAdminSteg(false);
   panel.classList.add("open");
   btn.setAttribute("aria-expanded", "true");
   document.getElementById("menuClose").focus();
@@ -1780,6 +1781,7 @@ function openMenu() {
 function closeMenu() {
   const panel = document.getElementById("menuPanel");
   const btn = document.getElementById("menuBtn");
+  settAdminSteg(false);
   if (!panel.classList.contains("open")) return;
   panel.classList.remove("open");
   btn.setAttribute("aria-expanded", "false");
@@ -2541,6 +2543,49 @@ function fyllKontoPanel() {
 }
 
 document.getElementById("kontoSend").addEventListener("click", kontoSteget);
+
+// «Admin» i menyen: passordet skrives her, for a fa tastaturet oppe. Nokkelen
+// og levetiden star ogsa i admin.js, som leser og sletter den i det siden apnes.
+const ADMIN_NOKKEL = "sb-admin-pw";
+
+function settAdminSteg(apen) {
+  const steg = document.getElementById("adminSteg");
+  const rad = document.getElementById("adminRad");
+  const felt = document.getElementById("adminPassord");
+  if (!steg) return;
+  steg.hidden = !apen;
+  rad.hidden = apen;
+  felt.value = "";
+  // Fokus i selve trykket, etter at feltet er vist: et skjult felt far ikke
+  // fokus, og et fokus etter trykket apner ikke tastaturet pa iPhone.
+  if (apen) felt.focus();
+}
+
+function gaTilAdmin() {
+  const felt = document.getElementById("adminPassord");
+  if (!felt.value) { felt.focus(); return; }
+  // Levert via fanens lagring og slettet av portalen i det den leser det —
+  // aldri i adressen. Mislykkes lagringen (privat modus), apner portalen
+  // likevel og ber om passordet selv.
+  try {
+    sessionStorage.setItem(ADMIN_NOKKEL, JSON.stringify({ pw: felt.value, t: Date.now() }));
+  } catch (err) { /* privat modus */ }
+  location.href = document.getElementById("adminLenke").href;
+}
+
+// Et vanlig trykk apner passordfeltet. Ctrl, Cmd, Shift, Alt og midtklikk gar
+// til nettleseren, som pa sakene og logoen: ny fane pa portalen er ogsa greit.
+document.getElementById("adminLenke").addEventListener("click", (e) => {
+  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  settAdminSteg(true);
+});
+document.getElementById("adminGa").addEventListener("click", gaTilAdmin);
+document.getElementById("adminAvbryt").addEventListener("click", () => settAdminSteg(false));
+document.getElementById("adminPassord").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); gaTilAdmin(); }
+  else if (e.key === "Escape") { e.preventDefault(); settAdminSteg(false); }
+});
 
 // Enter i et felt skal gjore det samme som knappen: feltene ligger ikke i
 // et skjema, fordi et skjema i menyen ville sendt sokeskjemaet. I PIN-feltet

@@ -539,6 +539,19 @@ body {
   text-decoration: none;
 }
 
+/* Passordet til portalen, skrevet i menyen (se index.html). Tar plassen til
+   raden med Personvern og Admin mens det star apent, og er like hoyt, sa
+   bunnen av menyen ikke vokser. display satt her, sa [hidden] ma sies. */
+.admin-steg {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.admin-steg[hidden], .action-lenker[hidden] { display: none; }
+
+.admin-steg .konto-felt { flex: 1; min-width: 0; }
+
 /* Innloggingen: to felt og en knapp, rett under knappen som apner den.
    Ingen dialog — det er ett sporsmal, og menyen er alt apen. */
 .konto-panel {

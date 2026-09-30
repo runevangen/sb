@@ -196,9 +196,21 @@
         <!-- To bokser pa én rad, som Del og Installer. Adminportalen er
              apen, men uten passord skjer ingenting der. Personvern star
              forst: den gjelder alle som apner menyen, admin gjelder én. -->
-        <div class="action-par action-lenker">
+        <div class="action-par action-lenker" id="adminRad">
           <a class="action-btn" href="/personvern.html">Personvern og sletting</a>
-          <a class="action-btn" href="/admin.html">Admin</a>
+          <a class="action-btn" href="/admin.html" id="adminLenke">Admin</a>
+        </div>
+        <!-- Passordet skrives her, ikke pa portalen: iPhone apner bare
+             tastaturet for et felt som far fokus i selve trykket, og en
+             ny side far det aldri. Trykket pa «Admin» gir dette feltet
+             fokus, og Enter tar deg videre til portalen. Erstatter raden
+             over mens det star apent. -->
+        <div class="admin-steg" id="adminSteg" hidden>
+          <input class="konto-felt" id="adminPassord" type="password"
+                 autocomplete="current-password" placeholder="Adminpassord"
+                 aria-label="Adminpassord" enterkeyhint="go">
+          <button class="konto-send" id="adminGa" type="button">Gå</button>
+          <button class="konto-ut" id="adminAvbryt" type="button">Avbryt</button>
         </div>
         <!-- Krysset i toppen ligger under statuslinja pa iPhone og er vondt
              a treffe med tommelen. Denne star der hanmden er. -->
