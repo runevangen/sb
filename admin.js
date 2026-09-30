@@ -243,6 +243,11 @@ async function sjekkOppsett() {
   }
 }
 
+// Passordet er det første du gjør her, sa feltet har fokus nar siden apnes.
+// iPhone apner ikke tastaturet av et fokus som ikke kommer fra et trykk, sa der
+// ma du fortsatt trykke i feltet en gang; pa alle andre er det klart til a skrive.
+felt("passord").focus();
+
 felt("loggInn").addEventListener("click", loggInn);
 felt("passord").addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); loggInn(); }

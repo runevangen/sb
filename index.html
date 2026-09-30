@@ -134,16 +134,25 @@
                den. Ett trykk framfor a taste fornavnet pa nytt hver gang. -->
           <input class="konto-felt" id="kontoNavn" type="text"
                  autocomplete="username" placeholder="Fornavn"
-                 aria-label="Fornavnet vennene ser" maxlength="24">
+                 aria-label="Fornavnet vennene ser" maxlength="24" enterkeyhint="next">
           <input class="konto-felt" id="kontoPin" type="password" inputmode="numeric"
                  autocomplete="current-password" placeholder="PIN (4 siffer)"
-                 aria-label="PIN-koden din" maxlength="6" hidden>
+                 aria-label="PIN-koden din" maxlength="6" enterkeyhint="go" hidden>
+          <!-- Holder tastaturet oppe mellom navnet og PIN-en. iPhone apner bare
+               tastaturet for et felt som far fokus i selve trykket, og svaret
+               pa «finnes navnet?» kommer over nettet, etterpa — sa PIN-feltet
+               far fokus for seint og tastaturet lukker seg. Dette feltet far
+               det i trykket, og fokus flyttes videre til PIN-en nar svaret er
+               der. Usynlig, ikke et tabulatorstopp, og 16 px sa Safari ikke
+               zoomer. -->
+          <input class="konto-fokus" id="kontoFokus" type="text" inputmode="numeric"
+                 tabindex="-1" aria-hidden="true" autocomplete="off">
           <!-- Gjenta star bare nar en PIN lages. En feiltastet PIN her er
                ikke til a rette opp: vi har ingen e-post a sende en ny kode
                til, sa kontoen ville vaert utilgjengelig og navnet brent. -->
           <input class="konto-felt" id="kontoPin2" type="password" inputmode="numeric"
                  autocomplete="new-password" placeholder="Gjenta PIN-en"
-                 aria-label="Gjenta PIN-koden" maxlength="6" hidden>
+                 aria-label="Gjenta PIN-koden" maxlength="6" enterkeyhint="go" hidden>
           <button class="konto-send" id="kontoSend" type="button">Fortsett</button>
           <button class="konto-ut" id="kontoBytt" type="button" hidden>Bytt navn</button>
           <!-- Favorittlagene, og om kontoen har dem. Menyen har lovet at de

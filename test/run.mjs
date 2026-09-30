@@ -7671,6 +7671,94 @@ const SAK_18I = kjor("rund-initial", epostSide(true) + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
 `);
 
+// Navn, så PIN uten ekstra trykk (Rune, 30. september 2026). iPhone åpner bare
+// tastaturet for et felt som får fokus i selve trykket, og «finnes navnet?»
+// svarer over nettet, etterpå. Testen måler begge halvdelene: at et felt har
+// fokus MENS trykket pågår (ellers lukkes tastaturet), og at PIN-feltet har det
+// når svaret er der. Svaret er forsinket, så de to kan skilles.
+const SAK_18J = kjor("pin-far-fokus", epostSide(false) + `
+  var fetchFor = window.fetch;
+  window.fetch = function (u, o) {
+    var inn = o && o.body ? JSON.parse(o.body) : null;
+    if (String(u).indexOf("/api/konto") === 0 && inn && inn.handling === "finnes") {
+      return new Promise(function (klar) { setTimeout(function () { klar(fetchFor(u, o)); }, 120); });
+    }
+    return fetchFor(u, o);
+  };
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.getElementById("menuBtn").click();
+    document.getElementById("kontoBtn").click();
+    var navn = document.getElementById("kontoNavn");
+    var pin = document.getElementById("kontoPin");
+    var pin2 = document.getElementById("kontoPin2");
+    var fokus = document.getElementById("kontoFokus");
+    var send = document.getElementById("kontoSend");
+    var bytt = document.getElementById("kontoBytt");
+
+    // 1. Fortsett-knappen.
+    navn.value = "Ola";
+    send.click();
+    ok("i selve trykket far et felt fokus, sa tastaturet blir oppe",
+       document.activeElement === fokus, document.activeElement && document.activeElement.id);
+    ok("og det er ikke til a se eller tabbe til",
+       getComputedStyle(fokus).opacity === "0" && fokus.getBoundingClientRect().width <= 1 &&
+       fokus.tabIndex === -1, getComputedStyle(fokus).opacity + " " + fokus.getBoundingClientRect().width);
+    ok("og 16 px, sa Safari ikke zoomer", parseFloat(getComputedStyle(fokus).fontSize) >= 16,
+       getComputedStyle(fokus).fontSize);
+    setTimeout(function () { try {
+      ok("nar svaret er der, har PIN-feltet fokus", document.activeElement === pin,
+         document.activeElement && document.activeElement.id);
+
+      // 2. Tastaturets Neste, pa et nytt navn.
+      bytt.click();
+      navn.value = "Kari";
+      var antall = window.__konto.filter(function (h) { return h === "finnes"; }).length;
+      navn.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+      ok("med fokus i trykket", document.activeElement === fokus,
+         document.activeElement && document.activeElement.id);
+      setTimeout(function () { try {
+        // Kallet logges nar det nar tjenesten, 120 ms etter trykket.
+        ok("Enter i navnefeltet gjor det samme som Fortsett",
+           window.__konto.filter(function (h) { return h === "finnes"; }).length === antall + 1,
+           window.__konto.join(","));
+        ok("og i PIN-feltet nar svaret er der", document.activeElement === pin,
+           document.activeElement && document.activeElement.id);
+
+        // 3. En ny PIN lages: Enter i PIN gar til Gjenta, uten a sende noe.
+        pin.value = "1234";
+        pin.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+        ok("Enter i PIN gar til Gjenta nar en ny PIN lages", document.activeElement === pin2,
+           document.activeElement && document.activeElement.id);
+        ok("og sender ingenting ennå, ikke en feil om at PIN-ene ikke er like",
+           window.__konto.indexOf("logg-inn") === -1 &&
+           document.getElementById("kontoSvar").textContent === "",
+           window.__konto.join(",") + " | " + document.getElementById("kontoSvar").textContent);
+
+        // 4. Et navn som avvises: fokus tilbake i navnefeltet, ikke i det usynlige.
+        bytt.click();
+        navn.value = "ola@epost.no";
+        send.click();
+        setTimeout(function () { try {
+          ok("et avvist navn gir fokus tilbake i navnefeltet",
+             document.activeElement === navn && !navn.hidden,
+             document.activeElement && document.activeElement.id);
+          ferdig();
+        } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
+`);
+
+// Portalen: passordet er det første du gjør, så feltet har fokus når siden åpnes.
+const SAK_15S = kjor("admin-fokus", `
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    ok("passordfeltet har fokus nar portalen apnes",
+       document.activeElement === document.getElementById("passord"),
+       document.activeElement && (document.activeElement.id || document.activeElement.tagName));
+    ferdig();
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
+`, null, adminSide);
+
 /* ---------------- 18c. favorittlagene folger kontoen, og PIN-en byttes ---------------- */
 
 // Menyen har lovet «favorittlagene folger kontoen, ikke telefonen» siden
@@ -9810,7 +9898,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_2B, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_2B, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_18J, SAK_15S, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

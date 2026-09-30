@@ -651,6 +651,20 @@ body {
 .konto-par[hidden] { display: none; }
 .konto-slett:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* Holder tastaturet oppe mellom navnet og PIN-en (se index.html). Ikke
+   display: none — et skjult felt kan ikke fa fokus. 16 px: under det zoomer
+   Safari inn. */
+.konto-fokus {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+  font-size: 16px;
+}
+
 .konto-send:disabled { opacity: 0.45; cursor: default; }
 .konto-send[hidden], .konto-ut[hidden] { display: none; }
 .konto-send, .konto-ut { -webkit-appearance: none; }

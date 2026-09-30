@@ -210,6 +210,17 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   **Navnet i toppfeltet har en rund initial foran seg** (#170), tegnet av
   `::before` med `data-initial`. Teksten i knappen er fortsatt bare navnet.
   Fargene er `--avatar-bg` og `--avatar-ink`, ikke skrevet inn.
+- **Fokus flyttes i selve trykket, ikke etter svaret.** Navn → PIN ga et
+  PIN-felt som hadde fokus og ikke noe tastatur: iPhone åpner bare tastaturet
+  for et felt som får fokus mens trykket pågår, og «finnes navnet?» svarer
+  over nettet, etterpå. `kontoNavnSteget()` gir derfor det usynlige
+  `#kontoFokus` fokus **før** den venter, og flytter det til PIN-feltet når
+  svaret er der; blir navnet avvist, går det tilbake til navnefeltet. Enter er
+  det samme som Fortsett, og i PIN-feltet ved ny konto går det til «Gjenta».
+  Målt i Chromium (at fokus står riktig i hvert øyeblikk), **ikke** på en
+  iPhone — om tastaturet faktisk blir oppe, er det bare en telefon som kan si.
+  Portalens passordfelt har fokus ved åpning, men der kan iPhone ikke åpne
+  tastaturet uten et trykk.
 - **Et fornavn er ikke en e-postadresse.** Feltet spør om fornavnet, men
   noen skrev adressen sin, og den sto i «blir med»-lista, synlig for alle
   uten innlogging — mens personvernsida lover at vi ikke viser e-post

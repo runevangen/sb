@@ -2158,6 +2158,13 @@ async function kontoNavnSteget() {
     return;
   }
 
+  // Fokus i selve trykket. iPhone apner bare tastaturet for et felt som far
+  // fokus mens trykket ennå pågår, og svaret under kommer over nettet,
+  // etterpa. Uten dette lukket tastaturet seg her, og PIN-feltet matte
+  // trykkes pa for a skrive i det. Dette usynlige feltet holder tastaturet
+  // oppe til svaret er der og fokus kan flyttes til PIN-en.
+  document.getElementById("kontoFokus").focus();
+
   send.disabled = true;
   try {
     const data = await kontoKall({ handling: "finnes", navn });
@@ -2168,6 +2175,8 @@ async function kontoNavnSteget() {
     document.getElementById("kontoPin").focus();
   } catch (err) {
     kontoSvar(err.message);
+    // Navnet ble avvist: du star pa navnesteget, og det er der du skal skrive.
+    feltNavn.focus();
   } finally {
     send.disabled = false;
   }
@@ -2532,6 +2541,24 @@ function fyllKontoPanel() {
 }
 
 document.getElementById("kontoSend").addEventListener("click", kontoSteget);
+
+// Enter i et felt skal gjore det samme som knappen: feltene ligger ikke i
+// et skjema, fordi et skjema i menyen ville sendt sokeskjemaet. I PIN-feltet
+// nar en ny PIN lages, er neste steg «Gjenta» — og det far fokus i selve
+// trykket, sa tastaturet blir oppe.
+["kontoNavn", "kontoPin", "kontoPin2"].forEach((id) => {
+  document.getElementById(id).addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (document.getElementById("kontoSend").disabled) return;
+    const pin2 = document.getElementById("kontoPin2");
+    if (id === "kontoPin" && kontoSteg === "ny" && !pin2.hidden && !pin2.value) {
+      pin2.focus();
+      return;
+    }
+    kontoSteget();
+  });
+});
 document.getElementById("kontoBytt").addEventListener("click", kontoTilbake);
 document.getElementById("kontoUt").addEventListener("click", loggUt);
 
@@ -2645,14 +2672,6 @@ document.getElementById("kontoSlett").addEventListener("click", async () => {
     knapp.disabled = false;
   }
 });
-// Enter i et felt skal gjore det samme som knappen: feltene ligger ikke i
-// et skjema, fordi et skjema i menyen ville sendt sokeskjemaet.
-["kontoNavn", "kontoPin", "kontoPin2"].forEach((id) => {
-  document.getElementById(id).addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); kontoSteget(); }
-  });
-});
-
 visKonto();
 
 /* ---------- detaljvisning ---------- */
