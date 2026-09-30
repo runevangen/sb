@@ -293,6 +293,11 @@
   .hint.feil { color: var(--feil); }
   .hint[hidden] { display: none; }
   .melding:empty { display: none; padding: 0; }
+  /* En melding som sier «logg inn i appen» far veien dit: en lenke, pa samme
+     adresse, stor nok til a treffe med en tommel. */
+  .melding-vei { display: block; margin-top: 8px; padding: 11px 18px; border-radius: 8px;
+    background: var(--aksent); color: var(--aksent-blekk); font-weight: 600;
+    text-align: center; text-decoration: none; }
   .hint { font-size: 12px; color: var(--tekst-svak); margin: 8px 0 0; }
   /* Feltene som MA fylles ut. Stjerna er for oyet — skjermleseren far
      aria-required, og «stjerne» lest hoyt atte ganger er stoy. */
