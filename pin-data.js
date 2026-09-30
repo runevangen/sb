@@ -52,6 +52,31 @@ export function pinSlug(navn) {
     .slice(0, NAVN_MAKS);
 }
 
+// **Et fornavn er ikke en e-postadresse.** Feltet spør om fornavnet, men
+// noen skriver adressen sin, og da sto den i «blir med»-lista, synlig for
+// alle uten innlogging (#142). Personvernsida lover at vi ikke viser
+// e-post.
+//
+// `@` er hele regelen, og det er med vilje ikke mer: ingen fornavn har
+// en, og en rekke som «ola.hansen på gmail» kan ingen regel fange uten å
+// avvise ekte navn. Sperra tar den vanlige feilen, ikke den tenkte.
+//
+// Den står HER og ikke i `gyldigPinNavn`: den som alt har en konto med en
+// adresse som navn, må fortsatt kunne logge inn. Sperra gjelder å
+// *lage* en konto og å *vise* et navn, ikke å komme inn.
+export function navnErEpost(verdi) {
+  return String(verdi == null ? "" : verdi).indexOf("@") > -1;
+}
+
+// Tekstene står ved regelen, så appen og tjenesten aldri sier hver sin
+// ting om den samme avvisningen.
+export const EPOST_SOM_NAVN =
+  "Skriv fornavnet ditt, ikke en e-postadresse. Vi trenger ingen e-post, og vi viser aldri noen.";
+// For den som alt er inne med en adresse som navn: det er ikke noe å
+// skrive om igjen, så veien videre må stå i setningen.
+export const EPOST_SOM_NAVN_INNE =
+  "Navnet ditt er en e-postadresse, og vi viser ikke e-post. Logg ut og lag en konto med fornavnet ditt.";
+
 // To bokstaver er nok — «Jo» er et fornavn. Men et navn som bare er
 // tegnsetting blir en tom nokkel, og en tom nokkel er alles konto.
 export function gyldigPinNavn(verdi) {

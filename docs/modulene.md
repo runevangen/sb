@@ -310,6 +310,25 @@ kastet. `oktGyldig` og `oktUtloper` brukes av begge veier.
   grunner: fire siffer er 10 000 forsøk som ellers kunne gjettes rett mot
   Supabase, og Supabase krever minst seks tegn. Et nytt pepper låser alle
   ute.
+- **`navnErEpost()` er `@`, og ikke mer.** Fornavnsfeltet tok imot
+  adressen til noen, og den sto i «blir med»-lista, synlig for alle uten
+  innlogging ([#142](https://github.com/runevangen/sb/issues/142)).
+  Ingen fornavn har en `@`, og en regel som fanget «ola.hansen på gmail»
+  måtte avvise ekte navn. Sperra tar den vanlige feilen, ikke den tenkte.
+  **Den står ikke i `gyldigPinNavn`**, og det er hele poenget: den som
+  alt har en konto med en adresse som navn, må fortsatt kunne logge inn.
+  Sperra gjelder å *lage* en konto (`finnes` for et navn som er nytt, og
+  `signup` som siste sjanse — et kall som hopper over `finnes` kommer hit
+  likevel) og å *vise* et navn (`gyldigNavn` i `svar-data.js`, som skriving
+  og alle lister bruker). Den siste er grunnen til at en rad som alt ligger
+  i basen, forsvinner fra lista i stedet for å stå der til noen rydder.
+  Navnet kommer fra klienten ved hvert svar, så en sperre bare ved
+  opprettelsen hjelper ikke mot den som er inne fra før, eller mot et
+  direkte kall.
+  **Tekstene står ved regelen** (`EPOST_SOM_NAVN`, `EPOST_SOM_NAVN_INNE`):
+  den som er inne får ikke «skriv fornavnet ditt», for navnet er der, og
+  det er det som er galt. Veien videre står i setningen: logg ut og lag
+  en konto med fornavnet.
 - **`PIN_DOMENE` er en nøkkel, ikke en postkasse.** Ingen e-post sendes
   dit, og adressen vises aldri i appen.
 - **`tolkPinOkt()` setter `lag` bare når kontoen har lagret en liste.**

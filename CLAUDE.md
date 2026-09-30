@@ -186,6 +186,16 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   svar tilbake er et hull i veggen. Bare innlogget, som pubforslagene:
   kontoen er sperren mot spam, og alternativet var å telle IP-adresser.
   [ADR 0025](docs/adr/0025-feil-og-onsker.md)
+- **Et fornavn er ikke en e-postadresse.** Feltet spør om fornavnet, men
+  noen skrev adressen sin, og den sto i «blir med»-lista, synlig for alle
+  uten innlogging — mens personvernsida lover at vi ikke viser e-post
+  ([#142](https://github.com/runevangen/sb/issues/142)). `navnErEpost()` er
+  `@`, og ikke mer. **Den gjelder å lage en konto og å vise et navn, ikke
+  å komme inn:** en konto som alt finnes med en adresse som navn kan
+  fortsatt logge inn, men navnet vises ikke, og «Jeg skal hit» sier at hen
+  må logge ut og lage en ny. Navnet kommer fra klienten ved hvert svar,
+  så sperra må stå i `gyldigNavn` også — en sperre bare ved opprettelsen
+  hjelper ikke mot dem som er inne fra før.
 - **Bytt PIN krever den gamle, og logger ut alle andre telefoner.** PIN-en
   er en sperre mellom folk som deler en telefon; kunne den byttes uten den
   gamle, kunne hvem som helst med telefonen ta kontoen. Den gamle prøves

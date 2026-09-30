@@ -10,6 +10,7 @@
 import { LIGAER, DELER, FANER, DEL_NAVN, HVOR, STED_MAKS, delingstekst, tidstekst,
          kamplenke, invitasjonstekst, stedtekst, kampeneFramover,
          kampNokkel, kanalFor } from "./fotball-data.js";
+import { navnErEpost, EPOST_SOM_NAVN_INNE } from "./pin-data.js";
 import { tolkSvar, perKamp, blirMedTekst, egetSvar, gyldigNavn, normaliserNavn,
          loftMedSvar, bareMedSvar, stederFraSvar, perSted, KAMPER_MAKS,
          stedNokkel, blirMedLinje, mittSted, navnIRad } from "./svar-data.js";
@@ -1741,6 +1742,13 @@ async function svarSted(kamp, panel, hvor, sted, melding, avmeld) {
     return;
   }
   const navn = normaliserNavn(konto.navn());
+  // Adressen som navn er ikke «vi mangler fornavnet»: navnet er der, og
+  // det er det som er galt. Den som ser «logg inn på nytt», skriver det
+  // samme igjen (#142).
+  if (navnErEpost(navn)) {
+    melding.textContent = EPOST_SOM_NAVN_INNE;
+    return;
+  }
   if (!gyldigNavn(navn)) {
     melding.textContent = "Logg inn på nytt — vi mangler fornavnet ditt.";
     return;

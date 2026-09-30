@@ -1620,6 +1620,25 @@ r = await konto(kontoBe({ handling: "finnes", navn: "Nykar" }));
 ok("et ledig navn sier ogsa fra",
    r.status === 200 && (await r.json()).finnes === false, r.status);
 
+// ---- e-post som fornavn (#142) ----
+//
+// Et NYTT navn som er en adresse sies det fra om for PIN-en tastes to
+// ganger. Et navn som alt finnes slipper gjennom: kontoen er laget for
+// regelen kom, og eieren maa fortsatt kunne logge inn.
+kall = stubSupabase([]);
+r = await konto(kontoBe({ handling: "finnes", navn: "ola@epost.no" }));
+const epostNavn = await r.json();
+ok("et nytt navn som er en e-postadresse avvises for PIN-en tastes",
+   r.status === 400 && (epostNavn.feil || "").indexOf("e-postadresse") > -1,
+   r.status + " " + JSON.stringify(epostNavn));
+
+kall = stubSupabase([{ slug: "olaepostno" }]);
+r = await konto(kontoBe({ handling: "finnes", navn: "ola@epost.no" }));
+const gammelKonto = await r.json();
+ok("men et navn som alt finnes som adresse slipper gjennom, sa eieren ikke laases ute",
+   r.status === 200 && gammelKonto.finnes === true, r.status + " " + JSON.stringify(gammelKonto));
+ok("oppslaget gikk paa slugen", kall[0].url.indexOf("slug=eq.olaepostno") > -1, kall[0].url);
+
 kall = stubSupabase({});
 r = await konto(kontoBe({ handling: "finnes", navn: "•" }));
 ok("et navn som ikke er et navn stoppes for oppslaget",
@@ -1645,6 +1664,26 @@ ok("et navn som er tatt sier det",
 ok("og navngir navnet, sa man kan velge et annet", tatt.feil.indexOf("Ola") > -1, tatt.feil);
 ok("begge forsokene star i forsok", (tatt.forsok || []).length === 2,
    JSON.stringify(tatt.forsok));
+
+// **Signup er siste sjanse.** Et kall som hopper over `finnes` kommer hit
+// likevel. Innloggingen avvises (ingen konto), og da skal kontoen IKKE
+// lages med en adresse som navn (#142).
+kall = stubAvvistDeretter({ user: { id: "u-9", identities: [{ id: "i-9" }] } });
+r = await konto(kontoBe({ handling: "logg-inn", navn: "ola@epost.no", pin: "1234" }));
+const epostSignup = await r.json();
+ok("en ny konto med en adresse som navn lages ikke",
+   r.status === 400 && (epostSignup.feil || "").indexOf("e-postadresse") > -1,
+   r.status + " " + JSON.stringify(epostSignup));
+ok("tjenesten bad aldri om a lage den — bare innloggingen ble proevd",
+   kall.length === 1 && kall.every((k) => k.url.indexOf("/signup") === -1),
+   kall.map((k) => k.url).join(" "));
+
+// Og den som alt har en konto, kommer inn. Det er hele grunnen til at
+// sperra sitter paa signup og ikke paa gyldigPinNavn.
+kall = stubSupabase(OKT);
+r = await konto(kontoBe({ handling: "logg-inn", navn: "ola@epost.no", pin: "1234" }));
+ok("en konto som alt finnes med en adresse som navn, kan logge inn",
+   r.status === 200 && (await r.json()).token === "okt-token-123", r.status);
 
 // De to kallene svarer ulikt, sa stubben ma skille dem: innloggingen
 // avvises, og det er signup-svaret vi vil se pa.
@@ -2349,6 +2388,18 @@ ok("uten okt far man ikke skrive", r.status === 401 && kall.length === 0, r.stat
 kall = stubSupabase(SVAR_RADER);
 r = await svarfunksjon(svarBe({ token: "okt-1", kampId: 7, navn: "  ", hvor: "pub" }));
 ok("uten navn far man ikke skrive", r.status === 400 && kall.length === 0, r.status);
+
+// **Navnet kommer fra klienten ved hvert svar** (#142). En sperre bare ved
+// kontoopprettelse hjelper ikke mot den som alt har en adresse som navn,
+// eller mot et direkte kall.
+kall = stubSupabase(SVAR_RADER);
+r = await svarfunksjon(svarBe({ token: "okt-1", kampId: 7, navn: "ola@epost.no", hvor: "pub" }));
+const epostSvar = await r.json();
+ok("en adresse som navn kan ikke skrives inn i lista",
+   r.status === 400 && kall.length === 0, r.status + " " + kall.length);
+ok("og den som er inne far en vei videre, ikke «skriv navnet» en gang til",
+   (epostSvar.feil || "").indexOf("Logg ut") > -1 && (epostSvar.feil || "").indexOf("e-post") > -1,
+   epostSvar.feil);
 
 kall = stubSupabase(SVAR_RADER);
 r = await svarfunksjon(svarBe({ token: "okt-1", kampId: "7; drop", navn: "Ola" }));

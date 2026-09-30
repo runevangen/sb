@@ -9,6 +9,40 @@ disse så ut som noe annet enn den var.
 
 ---
 
+## 30. september 2026 — adressen som sto i «blir med»-lista
+
+**Meldt som:** [#142](https://github.com/runevangen/sb/issues/142): en
+e-postadresse vises som navn i «blir med»-lista, synlig uten innlogging.
+Personvernsida lover at vi ikke viser e-post.
+
+**Hva som var galt.** Fornavnsfeltet spør om et fornavn, men `gyldigPinNavn()`
+sjekket bare at navnet ble minst to tegn etter at tegnsetting var strippet.
+«ola@epost.no» ble «olaepostno» som nøkkel, og hele adressen ble navnet
+vennene så.
+
+**Hvorfor den enkle fiksen ikke holdt.** Vi skulle avvise `@` i feltet. Men
+navnet i lista kommer fra *klienten* ved hvert svar, og `gyldigNavn()` sjekket
+bare lengde. En sperre ved kontoopprettelse ville ikke rydde dem som alt var
+inne, og ikke stoppe et direkte kall. Den motsatte feilen lurte også: la vi
+sperra i `gyldigPinNavn`, ble den som alt hadde en konto med en adresse som
+navn låst ute — akkurat den regelen skulle hjelpe.
+
+**Det som ble gjort.** `navnErEpost()` (`@`) gjelder å lage en konto og å vise
+et navn, ikke å komme inn. Den står i `finnes` for et nytt navn, i `signup`
+som siste sjanse, og i `gyldigNavn()`, som skriving og alle lister bruker — så
+en rad som alt lig­ger i basen, forsvinner fra lista. Den som er inne med en
+adresse som navn får en setning som sier hva hen kan gjøre, ikke «vi mangler
+fornavnet ditt».
+
+**Ikke gjort:** å rette kontoene som alt finnes. Det krever `service_role`
+(`brukere.mjs`), og vi vet ikke hvor mange det er.
+
+**Lærdommen:** en regel som skal verne mot noe som vises, må stå der det
+vises, ikke bare der det lages. Og en sperre som låser ute dem som alt er
+inne, er ikke en sperre mot feilen, men mot personene.
+
+---
+
 ## 22. september 2026 — stempelet som leste et miljø som ikke var der
 
 **Meldt som:** «Byggemiljoet oppgir ingen commit — lista under sier hva

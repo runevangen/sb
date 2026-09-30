@@ -28,7 +28,8 @@
 // i brukerens egne metadata. Ingen adresse, ingenting annet, og ingenting
 // her.
 
-import { tolkPinOkt, normaliserPinNavn, gyldigPinNavn, normaliserPin, gyldigPin,
+import { tolkPinOkt, normaliserPinNavn, gyldigPinNavn, navnErEpost, EPOST_SOM_NAVN,
+  normaliserPin, gyldigPin,
          pinEpost, pinSlug, pinPassord, PIN_MIN, PIN_MAKS,
          rensLag, sjekkPinBytte } from "../../pin-data.js";
 
@@ -127,7 +128,13 @@ async function finnesNavnet(inn) {
   const r = await iKontolista("GET",
     "?select=slug&slug=eq." + encodeURIComponent(pinSlug(navn)) + "&limit=1", null, null);
   if (!r.ok) return listeFeil(r);
-  return svar({ navn, finnes: Array.isArray(r.json) && r.json.length > 0 }, 200);
+  const finnes = Array.isArray(r.json) && r.json.length > 0;
+  // Et NYTT navn som er en adresse, sier vi fra om her, før PIN-en tastes
+  // to ganger: skrevet inn feil sted er det ikke til å finne ut etterpå.
+  // Et navn som alt finnes slipper gjennom, for kontoen er laget før
+  // regelen kom, og eieren må fortsatt kunne logge inn (#142).
+  if (!finnes && navnErEpost(navn)) return svar({ feil: EPOST_SOM_NAVN }, 400);
+  return svar({ navn, finnes }, 200);
 }
 
 // Ett kall for de fleste, to for den forste gangen.
@@ -159,6 +166,11 @@ async function loggInn(inn) {
   // tjenestefeil eller en sperre skal derimot ikke legge en runde til pa
   // noe som alt er galt et annet sted.
   if (!(inne.status > 0 && inne.status < 500 && inne.status !== 429)) return pinFeil(inne);
+
+  // Kontoen lages her, og da er det siste sjanse til å si nei til en
+  // adresse som navn (#142). Et kall som hopper over `finnes` kommer hit
+  // likevel, og innloggingen over slapp gjennom de som alt har en konto.
+  if (navnErEpost(navn)) return svar({ feil: EPOST_SOM_NAVN }, 400);
 
   // Navnet folger med som metadata, skrevet slik personen selv skrev
   // det. Adressen barer bare slugen («bjoernaage»), og den er riktig men
