@@ -34,6 +34,7 @@ import { normaliserEpost, gyldigEpost, normaliserKode, gyldigKode, maskerEpost,
          FORNY_MARGIN } from "../konto-data.js";
 
 import { normaliserPinNavn, pinSlug, gyldigPinNavn, pinEpost, normaliserPin, gyldigPin,
+         navnErEpost, EPOST_SOM_NAVN, EPOST_SOM_NAVN_INNE,
          pinPassord, tolkPinOkt, tolkBrukere, sistInneTekst,
          PIN_MIN, PIN_MAKS, PIN_DOMENE,
          rensLag, flettLag, sammeLag, sjekkPinBytte, LAG_MAKS } from "../pin-data.js";
@@ -1680,6 +1681,35 @@ ok("tegnsetting og mellomrom faller bort", pinSlug("Ola-Kari") === "olakari",
 ok("et navn som bare er tegnsetting er ikke et navn",
    !gyldigPinNavn("•••") && !gyldigPinNavn("") && !gyldigPinNavn(null) && !gyldigPinNavn("  "));
 ok("ett tegn er for lite, to er nok", !gyldigPinNavn("J") && gyldigPinNavn("Jo"));
+
+// ---- e-post som fornavn (#142) ----
+//
+// Feltet spor om fornavnet, men noen skriver adressen sin, og da sto den
+// i «blir med»-lista, synlig for alle uten innlogging. Personvernsida
+// lover at vi ikke viser e-post.
+ok("en adresse er ikke et fornavn",
+   navnErEpost("ola@epost.no") && navnErEpost("@ola") && navnErEpost(" ola@x "));
+ok("men et navn uten @ er det",
+   !navnErEpost("Ola") && !navnErEpost("Bj\u00f8rn \u00c5ge") && !navnErEpost("Jo-Ann") &&
+   !navnErEpost("") && !navnErEpost(null) && !navnErEpost(undefined));
+// **Sperra gjelder a LAGE en konto og a VISE et navn, ikke a komme inn.**
+// Den som alt har en konto med en adresse som navn, maa fortsatt kunne
+// logge inn — ellers laaste regelen ute akkurat dem den skulle hjelpe.
+ok("gyldigPinNavn slipper en adresse gjennom, sa de som alt har en konto kommer inn",
+   gyldigPinNavn("ola@epost.no"));
+ok("med samme slug som for, sa den alt lagrede kontoen finnes",
+   pinSlug("ola@epost.no") === "olaepostno", pinSlug("ola@epost.no"));
+ok("men en adresse kan ikke vises som navn", !gyldigNavn("ola@epost.no") && gyldigNavn("Ola"));
+ok("og en rad som alt ligger i basen med en adresse, forsvinner fra lista",
+   tolkSvar([
+     { kamp_id: "k1", navn: "ola@epost.no", bruker: "u-1" },
+     { kamp_id: "k1", navn: "Kari", bruker: "u-2" },
+   ]).map((r) => r.navn).join(",") === "Kari");
+// Tekstene star ved regelen. To avvisninger som sa hver sin ting om det
+// samme ville blitt to sannheter.
+ok("tekstene sier hva som er galt, og den som er inne far en vei videre",
+   EPOST_SOM_NAVN.indexOf("e-postadresse") > -1 && EPOST_SOM_NAVN.indexOf("fornavn") > -1 &&
+   EPOST_SOM_NAVN_INNE.indexOf("Logg ut") > -1, EPOST_SOM_NAVN_INNE);
 
 ok("navnet blir en adresse pa vart eget domene",
    pinEpost("Bjørn Åge") === "bjoernaage@" + PIN_DOMENE, pinEpost("Bjørn Åge"));

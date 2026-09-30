@@ -25,6 +25,12 @@
 // Nyeste først.
 export const VERSJONER = [
   {
+    versjon: "2026.09.30",
+    endringer: [
+      { hva: "Fornavnsfeltet avviser e-postadresser, og en adresse som alt sto som navn vises ikke lenger i «blir med»-lista.", issue: 142 },
+    ],
+  },
+  {
     versjon: "2026.09.27",
     endringer: [
       { hva: "«Meld feil eller ønske» på kontosiden: send en feil eller et ønske rett til admin, og se under «Dine meldinger» når den er lest eller fikset. Skjermen og versjonen følger med, synlig, og kan fjernes før du sender." },
