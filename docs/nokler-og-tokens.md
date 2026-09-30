@@ -248,6 +248,17 @@ Spørsmålet kommer igjen, så svaret står her framfor i en PR-tekst.
 Skal spørsmålet opp igjen, er det sonden som svarer: trykk «Spør kilden»
 i portalen framfor å gjette på nytt. Den gjetta adressen står med vilje
 igjen blant de seks — koster ett kall, og sier om noe har endret seg.
+
+**En annen vei, ikke målt ennå: fantasy-spillene.** Eliteserien Fantasy
+og FPL gir *alle* spillerne i ett kall (`bootstrap-static`) — 538 i
+Eliteserien, målt 28. september 2026. Punkt 3 over faller da bort. Står
+mål og målgivende på raden, som de gjør i FPL, er hele toppscorerlista
+ett kall. Fantasy-sonden i portalen svarer på det: den sier
+`TOPPSCORER: JA` eller `NEI`, og viser de tre med flest mål, så tallene
+kan holdes mot det du vet om ligaen.
+**Men et ja der er ikke et ja til leserne.** Adressene er uoffisielle, og
+dataene eies av ligaene. Om vi får vise dem, er et spørsmål om vilkårene
+— og til det er avgjort, står nei-et over.
 - **Lages på:** thesportsdb.com → Patreon-abonnement
 - **Utløper:** når abonnementet gjør det. Symptomet er ikke en feilmelding, men at tabellen stille går tilbake til fjoråret — se symptomtabellen nedenfor.
 
