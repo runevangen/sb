@@ -190,6 +190,13 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   svar tilbake er et hull i veggen. Bare innlogget, som pubforslagene:
   kontoen er sperren mot spam, og alternativet var å telle IP-adresser.
   [ADR 0025](docs/adr/0025-feil-og-onsker.md)
+- **Bilder lastes i riktig størrelse, ikke originalen.** Feeden hentet
+  `source_url` — opptil 2560 px — til et bilde som vises i 76 (#141).
+  `bildeFor()` i `lib.js` velger blant `media_details.sizes` på **bredde,
+  høyde og adresse**, ikke på nøkkelnavn (et tema legger til egne), og gir
+  `srcset` så nettleseren velger etter skjermtetthet. Mangler størrelsene, er
+  originalen svaret. **`srcset` fra artikkelteksten er alt eller ingenting:**
+  én adresse som ikke er `http(s)` forkaster hele lista.
 - **«Logg inn» er en knapp der leseren står.** «Logg inn i menyen — et
   fornavn og en PIN — …» sto i kampkortet til 30. september 2026, og
   «Jeg skal hit» er appens viktigste handling: den hadde ingen vei inn

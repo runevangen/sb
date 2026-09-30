@@ -3,7 +3,8 @@
 // De rene hjelpefunksjonene ligger i lib.js for a kunne enhetstestes uten
 // nettleser. Alt her nede rorer DOM, nettverk eller lagring.
 
-import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug, rangerTreff, listeTekst }
+import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug, rangerTreff, listeTekst,
+         bildeFor, renSrcset, renSizes, renMaal }
   from "./lib.js";
 import { LIGAER, tolkFotballHash, fotballHash, tolkKamplenke,
          ligaForKategori, DEL_NAVN } from "./fotball-data.js";
@@ -118,11 +119,24 @@ function el(tag, className, text) {
 }
 
 
-function imageEl(url, lazy) {
+// Bildet slik `bildeFor()` gir det: riktig størrelse for der det vises, med
+// `srcset` så nettleseren velger etter skjermtetthet. Bredde og høyde er
+// bildets egne mål — CSS bestemmer hvor stort det vises, men tallene lar
+// nettleseren sette av plass før det er lastet (#141).
+function imageEl(bilde, lazy) {
   const img = document.createElement("img");
-  img.src = url;
+  img.src = bilde.src;
+  if (bilde.srcset) {
+    img.srcset = bilde.srcset;
+    if (bilde.sizes) img.sizes = bilde.sizes;
+  }
+  if (bilde.width && bilde.height) {
+    img.width = bilde.width;
+    img.height = bilde.height;
+  }
   img.alt = "";
   img.loading = lazy ? "lazy" : "eager";
+  img.decoding = "async";
   return img;
 }
 
@@ -154,10 +168,10 @@ function timeEl(post, className) {
   return node;
 }
 
-function getImage(post) {
-  const embedded = post._embedded || {};
-  const media = embedded["wp:featuredmedia"] && embedded["wp:featuredmedia"][0];
-  return safeUrl(media && media.source_url);
+// `bruk` sier hvor bildet skal vises: «rad», «hero» eller «sak». Det er
+// det som avgjør hvilken størrelse som er riktig — originalen er aldri det.
+function getImage(post, bruk) {
+  return bildeFor(post, bruk);
 }
 
 function getCategory(post) {
@@ -204,7 +218,7 @@ const ALLOWED = {
   FIGURE: [], FIGCAPTION: [],
   TABLE: [], THEAD: [], TBODY: [], TFOOT: [], TR: [], TH: [], TD: [],
   A: ["href", "data-slug"],
-  IMG: ["src", "alt"],
+  IMG: ["src", "alt", "srcset", "sizes", "width", "height"],
   IFRAME: ["src", "title", "allowfullscreen"]
 };
 
@@ -288,6 +302,22 @@ function cleanChildren(root) {
       }
       node.setAttribute("src", src);
       node.setAttribute("loading", "lazy");
+      node.setAttribute("decoding", "async");
+      // `srcset` og `sizes` lar nettleseren velge en passende størrelse
+      // i stedet for originalen (#141). Begge er fritekst fra en fremmed
+      // side, så de renses som resten: `srcset` alt eller ingenting, og
+      // `sizes` er uten verdi uten en `srcset` å styre.
+      const srcset = renSrcset(node.getAttribute("srcset"));
+      if (srcset) node.setAttribute("srcset", srcset);
+      else node.removeAttribute("srcset");
+      const sizes = srcset ? renSizes(node.getAttribute("sizes")) : null;
+      if (sizes) node.setAttribute("sizes", sizes);
+      else node.removeAttribute("sizes");
+      ["width", "height"].forEach((navn) => {
+        const maal = renMaal(node.getAttribute(navn));
+        if (maal) node.setAttribute(navn, maal);
+        else node.removeAttribute(navn);
+      });
     }
 
     if (tag === "IFRAME") {
@@ -906,7 +936,7 @@ function sakLenke(klasse, post, apne) {
 function buildHero(post) {
   const button = sakLenke("card-btn hero", post, (a) => visArtikkel(post, a));
 
-  const img = getImage(post);
+  const img = getImage(post, "hero");
   if (img) button.appendChild(imageEl(img, false));
 
   const overlay = el("div", "hero-overlay");
@@ -921,7 +951,7 @@ function buildHero(post) {
 function buildRow(post) {
   const button = sakLenke("card-btn row", post, (a) => visArtikkel(post, a));
 
-  const img = getImage(post);
+  const img = getImage(post, "rad");
   button.appendChild(img ? imageEl(img, true) : el("div", "thumb-empty"));
 
   const body = el("div", "row-body");
@@ -2693,7 +2723,7 @@ function openDetail(post, trigger) {
   const card = document.getElementById("detailCard");
   card.replaceChildren();
 
-  const img = getImage(post);
+  const img = getImage(post, "sak");
   if (img) card.appendChild(imageEl(img, false));
 
   const body = el("div", "detail-body");
