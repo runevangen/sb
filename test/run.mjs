@@ -4592,7 +4592,16 @@ const SAK_15F = kjor("admin-ikke-denne-kvelden", `
 // kvelden» kunne ikke sta noe sted uansett hvor riktig knappen var
 // bygget. Meldt 21. september 2026: «ser ingen forskjell pa admin?»
 const SAK_15H = kjor("admin-uten-okt", `
-  try { localStorage.removeItem("sb-konto"); } catch (e) { /* privat modus */ }
+  // Okta finnes da portalen apnes — uten den apner den ikke (ADR 0026,
+  // innloggingen skrives i loggen med din egen okt). Den forsvinner rett
+  // etterpa, i stubben under: slik utloper den midt i en okt, og det er
+  // den tilstanden scenen handler om.
+  try {
+    localStorage.setItem("sb-konto", JSON.stringify({
+      token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
+      utloper: Date.now() + 3600000,
+    }));
+  } catch (e) { /* privat modus */ }
 
   var IDAG = new Date().toISOString().slice(0, 10);
   var MED = { nokkel: "sportsbaren-bodo", navn: "Sportsbaren Bodø", bydel: "Sentrum",
@@ -4616,6 +4625,11 @@ const SAK_15H = kjor("admin-uten-okt", `
   }
   window.fetch = function (u, opt) {
     u = String(u);
+    if (u.indexOf("/api/admin-logg") === 0) {
+      try { localStorage.removeItem("sb-konto"); } catch (e) { /* privat modus */ }
+      return svar(200, { ok: true, innlogging: { id: "l1", bruker: "u-admin", tid: new Date().toISOString() },
+                         forrige: null, forrigeFeil: false });
+    }
     if (u.indexOf("/api/visninger") === 0) {
       if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [], visninger: [] });
       var v = JSON.parse(opt.body);
@@ -4712,7 +4726,16 @@ const SAK_15H = kjor("admin-uten-okt", `
 // den hele veien. Da er det ingen ting som tegner lista om — uten at noen
 // gjor det med vilje.
 const SAK_15I = kjor("admin-rettelsen-lander-sist", `
-  try { localStorage.removeItem("sb-konto"); } catch (e) { /* privat modus */ }
+  // Okta finnes da portalen apnes — uten den apner den ikke (ADR 0026,
+  // innloggingen skrives i loggen med din egen okt). Den forsvinner rett
+  // etterpa, i stubben under: slik utloper den midt i en okt, og det er
+  // den tilstanden scenen handler om.
+  try {
+    localStorage.setItem("sb-konto", JSON.stringify({
+      token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
+      utloper: Date.now() + 3600000,
+    }));
+  } catch (e) { /* privat modus */ }
 
   var IDAG = new Date().toISOString().slice(0, 10);
   var RETTET = { nokkel: "andyspub", navn: "Andy's Pub", bydel: "Sentrum",
@@ -4742,6 +4765,11 @@ const SAK_15I = kjor("admin-rettelsen-lander-sist", `
   }
   window.fetch = function (u, opt) {
     u = String(u);
+    if (u.indexOf("/api/admin-logg") === 0) {
+      try { localStorage.removeItem("sb-konto"); } catch (e) { /* privat modus */ }
+      return svar(200, { ok: true, innlogging: { id: "l1", bruker: "u-admin", tid: new Date().toISOString() },
+                         forrige: null, forrigeFeil: false });
+    }
     if (u.indexOf("/api/visninger") === 0) {
       if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [], visninger: [] });
       var v = JSON.parse(opt.body);
@@ -5740,6 +5768,248 @@ const SAK_15K = kjor("admin-feil-og-onsker", `
     } catch (e) { ok("ingen unntak i portalen", false, e.message); ferdig(); } }, 300);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
 `, null, adminSide);
+
+/* ---------------- 15L. adminloggen ---------------- */
+
+// Nyeste versjon og linjene i den, som scenene regner fra. Staar her som
+// kildekode fordi scenene er tekst.
+const VER_HJELP = `
+  function linjer(v) { return v.endringer.length; }
+  function sum(VER) { return VER.reduce(function (s, v) { return s + v.endringer.length; }, 0); }
+`;
+
+// Innloggingen skrives i loggen for portalen apnes, og svaret sier hva som er
+// nytt siden forrige gang. Stubben modellerer TJENESTEN: den svarer med en
+// forrige innlogging, og portalen regner selv ut hva som er nytt av den
+// ekte versjoner.js — sa scenene bryter ikke nar lista vokser.
+//
+// `loggSvar` og `sjekk` er kildekode for funksjoner: scenene er
+// mal-literaler, og en funksjon kan ikke sendes inn i nettleseren som noe
+// annet enn tekst.
+function adminLoggScene(okt, loggSvar, sjekk) {
+  return `
+  try {
+    ` + (okt
+    ? `localStorage.setItem("sb-konto", JSON.stringify({
+         token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
+         utloper: Date.now() + 3600000 }));`
+    : `localStorage.removeItem("sb-konto");`) + `
+  } catch (e) { /* privat modus */ }
+
+  window.__logg = [];
+  var VER = null;
+  var LISTE = [
+    { id: "l3", bruker: "u-admin", tid: new Date().toISOString(), versjon: "2026.09.30", antall: 2 },
+    { id: "l2", bruker: "u-2", tid: "2026-09-28T10:00:00Z", versjon: "2026.09.27", antall: 2 },
+    { id: "l1", bruker: "u-borte", tid: "2026-09-20T10:00:00Z", versjon: "2026.09.26", antall: 1 }
+  ];
+  function svar(status, kropp) {
+    return Promise.resolve({ ok: status < 400, status: status, text: function () {
+      return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  var loggSvar = ` + loggSvar + `;
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("/api/admin-logg") === 0) {
+      var k = JSON.parse(opt.body);
+      window.__logg.push(k);
+      if (k.passord !== "hemmelig") return svar(401, { feil: "Feil passord" });
+      if (k.handling === "liste") return svar(200, { logg: LISTE });
+      return loggSvar(VER, k, svar);
+    }
+    if (u.indexOf("/api/fotball") === 0) {
+      return svar(200, { liga: "Eliteserien", sesong: 2026, kilde: "TheSportsDB",
+                         runde: "Runde 21", runder: ["Runde 21"], kamper: [] });
+    }
+    if (u.indexOf("/api/pub-liste") === 0) return svar(200, { puber: [], klar: true });
+    if (u.indexOf("/api/pub-forslag") === 0) return svar(200, { forslag: [] });
+    if (u.indexOf("/api/tilbakemelding") === 0) return svar(200, { meldinger: [] });
+    if (u.indexOf("/api/brukere") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [] });
+      // Brukerlista lander ETTER loggen, som pa en telefon.
+      return new Promise(function (ferdigSvar) { setTimeout(function () {
+        ferdigSvar(svar(200, { brukere: [
+          { id: "u-admin", navn: "Rune", slug: "rune", forst: "2026-09-01T10:00:00Z",
+            sist: "2026-09-12T19:00:00Z", aktiv: "" },
+          { id: "u-2", navn: "Kari", slug: "kari", forst: "2026-09-01T10:00:00Z",
+            sist: "2026-09-12T19:00:00Z", aktiv: "" }
+        ] }));
+      }, 600); });
+    }
+    if (u.indexOf("/api/visninger") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [], visninger: [] });
+      var v = JSON.parse(opt.body);
+      if (v.handling === "sjekk") {
+        return v.passord === "hemmelig" ? svar(200, { ok: true }) : svar(401, { feil: "Feil passord" });
+      }
+      return svar(200, { ok: true, visninger: [] });
+    }
+    return svar(200, {});
+  };
+
+  function felt(id) { return document.getElementById(id); }
+  ` + VER_HJELP + `
+  var sjekkFn = ` + sjekk + `;
+
+  window.addEventListener("load", function () {
+    import("/versjoner.js").then(function (m) {
+      VER = m.VERSJONER;
+      setTimeout(function () { try {
+        felt("passord").value = "hemmelig";
+        felt("loggInn").click();
+        setTimeout(function () { try {
+          sjekkFn(VER, felt);
+        } catch (e) { ok("ingen unntak i sjekken", false, e.message); ferdig(); } }, 250);
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 200);
+    });
+  });
+`;
+}
+
+// Samme dag, en linje til: DETTE er grunnen til at raden husker et antall og
+// ikke bare en versjon. Med bare nummeret ville den ikke vaert ny.
+const SAK_15L = kjor("admin-logg-delvis-nytt", adminLoggScene(true, `function (VER, k, svar) {
+    var n = VER[0];
+    return svar(200, { ok: true, innlogging: { id: "l3", bruker: "u-admin", tid: new Date().toISOString() },
+      forrige: { id: "l2", bruker: "u-admin", tid: new Date(Date.now() - 7200000).toISOString(),
+                 versjon: n.versjon, antall: n.endringer.length - 1 },
+      forrigeFeil: false });
+  }`, `function (VER, felt) {
+    var n = VER[0];
+    var innlogget = window.__logg.filter(function (k) { return k.handling === "innlogget"; });
+    ok("portalen er apnet", felt("portal").hidden === false);
+    ok("innloggingen sender nyeste versjon og antall linjer",
+       innlogget.length === 1 && innlogget[0].versjon === n.versjon &&
+       innlogget[0].antall === n.endringer.length && innlogget[0].token === "okt-token",
+       JSON.stringify(innlogget));
+    ok("og ikke hvem du er: det sier basen",
+       !("bruker" in innlogget[0]) && !("tid" in innlogget[0]), JSON.stringify(innlogget[0]));
+    ok("boksen star der", felt("nyttSiden").hidden === false);
+    var li = felt("nyttListe").querySelectorAll("li");
+    ok("med akkurat den ene nye linja", li.length === 1, li.length);
+    ok("som er den siste i dagens oppforing",
+       li.length === 1 && li[0].textContent.indexOf(n.endringer[n.endringer.length - 1].hva) === 0,
+       li.length ? li[0].textContent : "ingen");
+    ok("under riktig versjon",
+       felt("nyttListe").querySelector(".versjon-nr").textContent === n.versjon);
+    ok("og hinten sier en endring, ikke flere",
+       felt("nyttHint").textContent.indexOf("1 endring siden du var inne") === 0,
+       felt("nyttHint").textContent);
+    felt("nyttSkjul").click();
+    ok("Skjul legger den bort", felt("nyttSiden").hidden === true);
+    ferdig();
+  }`), null, adminSide);
+
+// Alt er nytt: forrige gang var for lenge siden.
+const SAK_15M = kjor("admin-logg-alt-nytt", adminLoggScene(true, `function (VER, k, svar) {
+    return svar(200, { ok: true, innlogging: { id: "l3", bruker: "u-admin", tid: new Date().toISOString() },
+      forrige: { id: "l1", bruker: "u-admin", tid: "2026-01-01T10:00:00Z", versjon: "2000.01.01", antall: 0 },
+      forrigeFeil: false });
+  }`, `function (VER, felt) {
+    ok("boksen star der", felt("nyttSiden").hidden === false);
+    ok("med hver linje i hver versjon",
+       felt("nyttListe").querySelectorAll("li").length === sum(VER),
+       felt("nyttListe").querySelectorAll("li").length + " mot " + sum(VER));
+    ok("og en boks per versjon, nyeste forst",
+       felt("nyttListe").querySelectorAll(".versjon-boks").length === VER.length &&
+       felt("nyttListe").querySelector(".versjon-nr").textContent === VER[0].versjon);
+    ok("hinten teller linjer",
+       felt("nyttHint").textContent.indexOf(sum(VER) + " endringer siden du var inne") === 0,
+       felt("nyttHint").textContent);
+    ferdig();
+  }`), null, adminSide);
+
+// Ingenting er nytt: da skal boksen tie. En boks som sier «ingenting nytt»
+// er en pastand portalen ikke kan vite er sann.
+const SAK_15N = kjor("admin-logg-ingenting-nytt", adminLoggScene(true, `function (VER, k, svar) {
+    var n = VER[0];
+    return svar(200, { ok: true, innlogging: { id: "l3", bruker: "u-admin", tid: new Date().toISOString() },
+      forrige: { id: "l2", bruker: "u-admin", tid: new Date(Date.now() - 600000).toISOString(),
+                 versjon: n.versjon, antall: n.endringer.length },
+      forrigeFeil: false });
+  }`, `function (VER, felt) {
+    ok("portalen er apnet", felt("portal").hidden === false);
+    ok("boksen er skjult nar ingenting er nytt", felt("nyttSiden").hidden === true);
+    ok("og den er tom", felt("nyttListe").children.length === 0);
+    ferdig();
+  }`), null, adminSide);
+
+// Forste innlogging: ingen forrige a sammenlikne med. Hele lista kalt
+// «nytt» ville vaert en pastand uten grunn. Her testes ogsa loggseksjonen,
+// fordi navnene kommer fra brukerlista som lander etterpa.
+const SAK_15O = kjor("admin-logg-forste-og-seksjon", adminLoggScene(true, `function (VER, k, svar) {
+    return svar(200, { ok: true, innlogging: { id: "l3", bruker: "u-admin", tid: new Date().toISOString() },
+      forrige: null, forrigeFeil: false });
+  }`, `function (VER, felt) {
+    ok("forste innlogging sier det", felt("nyttSiden").hidden === false &&
+       felt("nyttTittel").textContent === "Første innlogging", felt("nyttTittel").textContent);
+    ok("og kaller ikke hele lista nytt", felt("nyttListe").children.length === 0);
+
+    // Loggseksjonen, for brukerlista har landet: navnet er ikke kjent, og da
+    // star det hva vi vet framfor et gjettet navn.
+    var rader = felt("loggListe").querySelectorAll(".logg-rad");
+    ok("loggen viser alle radene", rader.length === 3, rader.length);
+    ok("tallet i hodet teller dem", felt("loggTall").textContent === "3", felt("loggTall").textContent);
+    ok("for brukerlista har landet, star det ingen gjettet navn",
+       rader[0].querySelector(".logg-navn").textContent.indexOf("Ukjent konto") === 0,
+       rader[0].querySelector(".logg-navn").textContent);
+    setTimeout(function () { try {
+      var r2 = felt("loggListe").querySelectorAll(".logg-rad");
+      ok("nar brukerlista lander, far loggen navnene",
+         r2[0].querySelector(".logg-navn").textContent === "Rune (deg)" &&
+         r2[1].querySelector(".logg-navn").textContent === "Kari",
+         r2[0].querySelector(".logg-navn").textContent + " / " + r2[1].querySelector(".logg-navn").textContent);
+      ok("en konto som ikke finnes lenger, far ikke et navn",
+         r2[2].querySelector(".logg-navn").textContent === "Ukjent konto u-borte",
+         r2[2].querySelector(".logg-navn").textContent);
+      ok("og versjonen star ved tidspunktet",
+         r2[1].querySelector(".logg-tid").textContent.indexOf("versjon 2026.09.27") > -1,
+         r2[1].querySelector(".logg-tid").textContent);
+      ferdig();
+    } catch (e) { ok("ingen unntak etter brukerlista", false, e.message); ferdig(); } }, 700);
+  }`), null, adminSide);
+
+// Loggen ble skrevet, men forrige gang lot seg ikke lese: da sier boksen det.
+const SAK_15P = kjor("admin-logg-forrige-feilet", adminLoggScene(true, `function (VER, k, svar) {
+    return svar(200, { ok: true, innlogging: { id: "l3", bruker: "u-admin", tid: new Date().toISOString() },
+      forrige: null, forrigeFeil: true });
+  }`, `function (VER, felt) {
+    ok("portalen er apnet", felt("portal").hidden === false);
+    ok("boksen sier at forrige gang ikke ble lest",
+       felt("nyttSiden").hidden === false && felt("nyttHint").textContent.indexOf("Fikk ikke hentet") === 0,
+       felt("nyttHint").textContent);
+    ok("og den sier ikke at noe er nytt", felt("nyttListe").children.length === 0);
+    ferdig();
+  }`), null, adminSide);
+
+// Uten okt vet vi ikke hvem som kom inn, og da apner ikke portalen.
+const SAK_15Q = kjor("admin-logg-uten-okt", adminLoggScene(false, `function (VER, k, svar) {
+    return svar(200, { ok: true, innlogging: { id: "l3", bruker: "u-admin", tid: "2026-09-30T10:00:00Z" },
+      forrige: null, forrigeFeil: false });
+  }`, `function (VER, felt) {
+    ok("portalen er ikke apnet uten okt", felt("portal").hidden === true);
+    ok("og sier hvorfor, med det leseren kan gjore",
+       felt("adgangMelding").textContent.indexOf("Logg inn i appen først") === 0,
+       felt("adgangMelding").textContent);
+    ok("uten a rore loggen", window.__logg.length === 0, JSON.stringify(window.__logg));
+    ok("knappen kan proves igjen", felt("loggInn").disabled === false);
+    ok("og passordet ligger ikke i variabelen som apner noe",
+       felt("adgang").hidden === false);
+    ferdig();
+  }`), null, adminSide);
+
+// Innlogget, men ikke skriver: databasen sier nei, og portalen sier det i
+// dens ord. Ikke «logg inn pa nytt» — det hjelper ikke.
+const SAK_15R = kjor("admin-logg-uten-adgang", adminLoggScene(true, `function (VER, k, svar) {
+    return svar(403, { feil: "Kontoen din har ikke adgang til portalen: den står ikke i visning_skrivere. Be en som har adgang om å legge deg til." });
+  }`, `function (VER, felt) {
+    ok("portalen er ikke apnet", felt("portal").hidden === true);
+    ok("og meldingen navngir tabellen, sa den kan gjores noe med",
+       felt("adgangMelding").textContent.indexOf("visning_skrivere") > -1,
+       felt("adgangMelding").textContent);
+    ok("knappen kan proves igjen", felt("loggInn").disabled === false);
+    ferdig();
+  }`), null, adminSide);
 
 /* ---------------- 16. puben bekrefter kampen ---------------- */
 
@@ -9446,7 +9716,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

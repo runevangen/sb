@@ -492,3 +492,53 @@ create policy "behandle som skriver" on tilbakemelding
 
 create index if not exists tilbakemelding_status_idx on tilbakemelding (status, sendt);
 create index if not exists tilbakemelding_sendt_av_idx on tilbakemelding (sendt_av);
+
+-- ---------------------------------------------------------------
+-- 10. admin_logg — hvem var inne i portalen
+-- ---------------------------------------------------------------
+-- En rad per innlogging i portalen, skrevet med den innloggedes egen økt
+-- (netlify/functions/admin-logg.mjs). Raden husker også hva portalen viste —
+-- nyeste versjon og hvor mange linjer den hadde — så neste innlogging kan
+-- svare på «hva har skjedd siden sist?» ved å sammenlikne to rader.
+--
+-- **Bare å legge til.** Ingen policy for oppdatering eller sletting, så en
+-- innlogget økt kan verken endre eller fjerne en rad — heller ikke sin egen.
+-- En logg der den som er logget kan rydde etter seg, er ikke en logg. (Den
+-- som har SQL-editoren kan fortsatt; det er databaseeieren, ikke portalen.)
+--
+-- **`on delete cascade`, som resten.** Personvernsida lover at sletter du
+-- kontoen, går det som hører til den med. Skulle raden bli stående, ville
+-- en uid uten navn ligge igjen om en person som ba om å bli glemt.
+--
+-- Bare de som står i visning_skrivere kommer inn. Dette er ikke telling av
+-- lesere (ADR 0004) — det er de få som kan endre noe, og hvem som gjorde det.
+
+create table if not exists admin_logg (
+  id        uuid primary key default gen_random_uuid(),
+  bruker    uuid not null default auth.uid()
+            references auth.users (id) on delete cascade,
+  tid       timestamptz not null default now(),
+  versjon   text check (char_length(versjon) <= 20),
+  antall    integer check (antall between 0 and 500)
+);
+
+alter table admin_logg enable row level security;
+
+-- Skriv: bare i eget navn, og bare som skriver. Uten `exists` kunne enhver
+-- innlogget leser lagt rader i loggen og fylt den med støy.
+drop policy if exists "logg i eget navn som skriver" on admin_logg;
+create policy "logg i eget navn som skriver" on admin_logg
+  for insert to authenticated
+  with check (
+    bruker = auth.uid()
+    and exists (select 1 from visning_skrivere s where s.bruker = auth.uid()));
+
+-- Les: de som står i visning_skrivere ser hele loggen. Det er hele poenget —
+-- å se hvem som har vært inne.
+drop policy if exists "skrivere leser loggen" on admin_logg;
+create policy "skrivere leser loggen" on admin_logg
+  for select to authenticated using (
+    exists (select 1 from visning_skrivere s where s.bruker = auth.uid()));
+
+create index if not exists admin_logg_bruker_idx on admin_logg (bruker, tid desc);
+create index if not exists admin_logg_tid_idx on admin_logg (tid desc);
