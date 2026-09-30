@@ -37,6 +37,7 @@ export const VERSJONER = [
       { hva: "Fornavnsfeltet avviser e-postadresser, og en adresse som alt sto som navn vises ikke lenger i «blir med»-lista.", issue: 142 },
       { hva: "Portalen logger hvem som er inne: hver innlogging blir en rad med navn og tidspunkt, og du ser loggen under «Adminlogg». Portalen åpner bare når du er innlogget i appen." },
       { hva: "Når noe har skjedd siden sist du var inne, står det øverst i portalen under «Nytt siden sist»." },
+      { hva: "Portalen sier ikke bare «Logg inn i appen først», men har en knapp til appen: innloggingen ligger per adresse, og en forhåndsvisning har ikke den du har i prod." },
       { hva: "Bildene i feeden og i artiklene lastes i riktig størrelse, ikke originalen på flere tusen piksler: en lettere feed, særlig på mobilnett.", issue: 141 },
     ],
   },

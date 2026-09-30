@@ -6078,6 +6078,13 @@ const SAK_15Q = kjor("admin-logg-uten-okt", adminLoggScene(false, `function (VER
     ok("og sier hvorfor, med det leseren kan gjore",
        felt("adgangMelding").textContent.indexOf("Logg inn i appen først") === 0,
        felt("adgangMelding").textContent);
+    // Meldingen sa hva som manglet og ikke hvor du trykker (#181-monsteret).
+    // Lenka gar til appen pa samme adresse: okta ligger per adresse.
+    var vei = felt("adgangMelding").querySelector("a.melding-vei");
+    ok("meldingen har en lenke til appen", !!vei && vei.getAttribute("href") === "/" &&
+       vei.textContent === "Åpne appen og logg inn", vei && vei.outerHTML);
+    ok("som er stor nok til a treffe", vei && vei.getBoundingClientRect().height >= 40,
+       vei && vei.getBoundingClientRect().height);
     ok("uten a rore loggen", window.__logg.length === 0, JSON.stringify(window.__logg));
     ok("knappen kan proves igjen", felt("loggInn").disabled === false);
     ok("og passordet ligger ikke i variabelen som apner noe",

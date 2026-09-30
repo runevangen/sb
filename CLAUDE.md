@@ -228,6 +228,10 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   innlogging kan si hva som er nytt siden sist. **Derfor legges nye linjer
   nederst i dagens oppføring i `versjoner.js`**: et antall leser rekkefølgen.
   Dette er ikke telling av lesere — det rører bare dem i `visning_skrivere`.
+  **«Logg inn i appen først» har en lenke til appen** (`visAdgang`). Økta
+  ligger i `localStorage`, altså **per adresse**: en forhåndsvisning
+  (`deploy-preview-…`) har ikke den du har i prod, og meldingen sa ikke hvor
+  du trykker. Lenka er til `/` på samme adresse, ikke en fast prod-URL.
   [ADR 0026](docs/adr/0026-adminloggen.md)
 - **Bytt PIN krever den gamle, og logger ut alle andre telefoner.** PIN-en
   er en sperre mellom folk som deler en telefon; kunne den byttes uten den
