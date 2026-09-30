@@ -20,7 +20,8 @@ import { ARTER, TEKST_MIN, TEKST_MAKS, SKJERM_MAKS, VERSJON_MAKS, STATUSER, STAT
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
-         foldTekst, treffScore, rangerTreff, listeTekst } from "../lib.js";
+         foldTekst, treffScore, rangerTreff, listeTekst,
+         BILDE_BRUK, bildeFor, renSrcset, renSizes, renMaal } from "../lib.js";
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          SPORTER, sportFor, tolkDatasett, kommendeKamper, kallPerSport, DOGNKVOTE,
          ligaForKategori,
@@ -4144,6 +4145,128 @@ ok("adminlogg: bare skrivere leser loggen", /for select to authenticated using \
 ok("adminlogg: raden slettes med kontoen, som resten",
    /references auth\.users \(id\) on delete cascade/.test(LOGG_SQL));
 ok("adminlogg: loggen har et tak for hva portalen leser", LOGG_MAKS === 50);
+
+/* ---------------- bilder: riktig størrelse (#141) ---------------- */
+
+// Slik WordPress legger dem ved: originalen er «scaled» på 2560 px, og de
+// ferdige størrelsene ligger i media_details.sizes. Adressene er oppdiktede,
+// formen er WordPress sin.
+const BB = "https://sportsbibelen.no/wp-content/uploads/2026/09/";
+function saksbilde(sizes, dim) {
+  const d = dim || { width: 2560, height: 1440 };
+  return { _embedded: { "wp:featuredmedia": [{
+    source_url: BB + "bilde-scaled.jpg",
+    media_details: Object.assign({}, d, { sizes }) }] } };
+}
+const BILDE_WP = {
+  thumbnail: { source_url: BB + "bilde-150x150.jpg", width: 150, height: 150 },
+  medium: { source_url: BB + "bilde-300x169.jpg", width: 300, height: 169 },
+  medium_large: { source_url: BB + "bilde-768x432.jpg", width: 768, height: 432 },
+  large: { source_url: BB + "bilde-1024x576.jpg", width: 1024, height: 576 },
+  "1536x1536": { source_url: BB + "bilde-1536x864.jpg", width: 1536, height: 864 },
+  full: { source_url: BB + "bilde-scaled.jpg", width: 2560, height: 1440 },
+};
+const BILDE_HERO = bildeFor(saksbilde(BILDE_WP), "hero");
+const BILDE_RAD = bildeFor(saksbilde(BILDE_WP), "rad");
+const BILDE_SAK = bildeFor(saksbilde(BILDE_WP), "sak");
+
+ok("bilde: en sak uten bilde gir null, ikke et krasj",
+   bildeFor({}, "hero") === null && bildeFor(null, "rad") === null &&
+   bildeFor({ _embedded: { "wp:featuredmedia": [{}] } }, "hero") === null);
+ok("bilde: originalen er aldri svaret når det finnes ferdige størrelser",
+   BILDE_HERO.src !== BB + "bilde-scaled.jpg" && BILDE_RAD.src !== BB + "bilde-scaled.jpg" && BILDE_SAK.src !== BB + "bilde-scaled.jpg",
+   BILDE_HERO.src + " " + BILDE_RAD.src);
+ok("bilde: heroen får den minste som dekker dobbel tetthet (780 px)",
+   BILDE_HERO.src === BB + "bilde-1024x576.jpg" && BILDE_HERO.width === 1024 && BILDE_HERO.height === 576, JSON.stringify(BILDE_HERO));
+ok("bilde: raden får den minste som dekker 152 px, ikke kvadratet på 150",
+   BILDE_RAD.src === BB + "bilde-300x169.jpg" && BILDE_RAD.width === 300, JSON.stringify(BILDE_RAD));
+ok("bilde: heroens srcset har bare bredder appen kan bruke (maks 1200), uten originalen",
+   BILDE_HERO.srcset === BB + "bilde-300x169.jpg 300w, " + BB + "bilde-768x432.jpg 768w, " + BB + "bilde-1024x576.jpg 1024w",
+   BILDE_HERO.srcset);
+ok("bilde: kvadratet hører ikke hjemme i en bred hero — det er et utsnitt, ikke samme bilde",
+   BILDE_HERO.srcset.indexOf("150x150") === -1 && BILDE_SAK.srcset.indexOf("150x150") === -1);
+ok("bilde: men raden vises som kvadrat, og der er alle forhold gode nok",
+   BILDE_RAD.srcset === BB + "bilde-150x150.jpg 150w, " + BB + "bilde-300x169.jpg 300w", BILDE_RAD.srcset);
+ok("bilde: raden tar ikke 768 px til 76 px",
+   BILDE_RAD.srcset.indexOf("768") === -1);
+ok("bilde: sizes sier hvor bredt det vises, så nettleseren kan velge",
+   BILDE_HERO.sizes === BILDE_BRUK.hero.sizes && BILDE_RAD.sizes === "76px", BILDE_HERO.sizes + " / " + BILDE_RAD.sizes);
+ok("bilde: heroen og saken deler tallene (appen er 390 px bred også på en stor skjerm)",
+   JSON.stringify(BILDE_HERO) === JSON.stringify(BILDE_SAK));
+
+// Ingen størrelser: originalen er svaret, som før.
+const BILDE_UTEN = bildeFor(saksbilde(undefined, { width: 800, height: 450 }), "rad");
+ok("bilde: uten media_details.sizes er originalen svaret, med egne mål",
+   BILDE_UTEN.src === BB + "bilde-scaled.jpg" && BILDE_UTEN.srcset === "" && BILDE_UTEN.sizes === "" &&
+   BILDE_UTEN.width === 800 && BILDE_UTEN.height === 450, JSON.stringify(BILDE_UTEN));
+ok("bilde: tomme størrelser og tull gir originalen, ikke et krasj",
+   bildeFor(saksbilde({}), "hero").src === BB + "bilde-scaled.jpg" &&
+   bildeFor(saksbilde("tull"), "hero").src === BB + "bilde-scaled.jpg" &&
+   bildeFor(saksbilde([]), "hero").src === BB + "bilde-scaled.jpg");
+ok("bilde: uten mål på originalen står ingen width/height, framfor 0",
+   (() => { const b = bildeFor(saksbilde({}, {}), "hero"); return !b.width && !b.height; })());
+
+// Én størrelse: ingen srcset å velge mellom.
+const BILDE_EN = bildeFor(saksbilde({ medium: BILDE_WP.medium }), "rad");
+ok("bilde: én størrelse gir ingen srcset og ingen sizes",
+   BILDE_EN.src === BB + "bilde-300x169.jpg" && BILDE_EN.srcset === "" && BILDE_EN.sizes === "", JSON.stringify(BILDE_EN));
+
+// Størrelser med søppel i seg hoppes over, ikke tas med.
+const BILDE_SOPP = bildeFor(saksbilde({
+  a: { source_url: "javascript:alert(1)", width: 300, height: 169 },
+  b: { source_url: BB + "b.jpg", width: 0, height: 169 },
+  c: { source_url: BB + "c.jpg", width: "x", height: 169 },
+  d: null,
+  e: { source_url: BB + "bilde-768x432.jpg", width: 768, height: 432 },
+  f: { source_url: BB + "bilde-768x432.jpg", width: 768, height: 432 },
+}), "hero");
+ok("bilde: en størrelse uten gyldig adresse eller mål hoppes over, og doble telles en gang",
+   BILDE_SOPP.src === BB + "bilde-768x432.jpg" && BILDE_SOPP.srcset === "", JSON.stringify(BILDE_SOPP));
+
+// Nøklene leses ikke: et tema kan legge til egne.
+const BILDE_EGNE = bildeFor(saksbilde({
+  "tema-stor": { source_url: BB + "tema-1000x563.jpg", width: 1000, height: 563 } }), "hero");
+ok("bilde: en størrelse med et navn vi ikke kjenner brukes likevel",
+   BILDE_EGNE.src === BB + "tema-1000x563.jpg", JSON.stringify(BILDE_EGNE));
+ok("bilde: alle størrelsene er for store til bruken: originalen, ikke den minste av de store",
+   bildeFor(saksbilde({ stor: { source_url: BB + "s.jpg", width: 2000, height: 1125 } }), "hero").src === BB + "bilde-scaled.jpg");
+ok("bilde: en ukjent bruk faller til hero, ikke til ingenting",
+   bildeFor(saksbilde(BILDE_WP), "noe-annet").src === BILDE_HERO.src);
+
+// srcset fra artikkeltekst.
+ok("srcset: en gyldig liste beholdes med bredder",
+   renSrcset(BB + "a-300.jpg 300w, " + BB + "a-1024.jpg 1024w") === BB + "a-300.jpg 300w, " + BB + "a-1024.jpg 1024w");
+ok("srcset: tetthet (2x) og ingen angivelse er lov",
+   renSrcset(BB + "a.jpg 1x, " + BB + "b.jpg 2x") === BB + "a.jpg 1x, " + BB + "b.jpg 2x" &&
+   renSrcset(BB + "a.jpg") === BB + "a.jpg");
+ok("srcset: én dårlig adresse forkaster hele lista — alt eller ingenting",
+   renSrcset("javascript:alert(1) 300w, " + BB + "a.jpg 600w") === null &&
+   renSrcset(BB + "a.jpg 300w, data:image/png;base64,AAAA 600w") === null);
+ok("srcset: en ukjent angivelse forkaster lista",
+   renSrcset(BB + "a.jpg 300px") === null && renSrcset(BB + "a.jpg 300w 2x") === null &&
+   renSrcset(BB + "a.jpg 1e3w") === null);
+ok("srcset: tomt og tull gir null",
+   renSrcset("") === null && renSrcset(null) === null && renSrcset(undefined) === null &&
+   renSrcset("  ,  ") === null);
+ok("srcset: en relativ adresse gjøres absolutt mot grunnen",
+   renSrcset("/wp/a.jpg 300w", "https://sportsbibelen.no/") === "https://sportsbibelen.no/wp/a.jpg 300w");
+
+ok("sizes: en vanlig liste beholdes",
+   renSizes("(max-width: 600px) 100vw, 600px") === "(max-width: 600px) 100vw, 600px" &&
+   renSizes("calc(100vw - 32px)") === "calc(100vw - 32px)");
+ok("sizes: tegn den ikke trenger slipper ikke gjennom (semikolon, hermetegn, klammer, url())",
+   renSizes("100vw; background: url(x)") === null && renSizes('100vw"><script>') === null &&
+   renSizes("100vw'") === null && renSizes("100vw {x}") === null && renSizes("100vw@x") === null);
+ok("sizes: en mediebetingelse med >= er lov, som i moderne CSS",
+   renSizes("(width >= 600px) 600px, 100vw") === "(width >= 600px) 600px, 100vw");
+ok("sizes: tomt og for langt gir null",
+   renSizes("") === null && renSizes(null) === null && renSizes("1".repeat(201)) === null);
+
+ok("mål: hele positive tall beholdes", renMaal("1024") === "1024" && renMaal(" 600 ") === "600");
+ok("mål: alt annet fjernes",
+   renMaal("abc") === null && renMaal("-5") === null && renMaal("0") === null &&
+   renMaal("12.5") === null && renMaal("100%") === null && renMaal("") === null &&
+   renMaal(null) === null && renMaal("123456") === null && renMaal("1e3") === null);
 
 /* ---------------- rapport ---------------- */
 

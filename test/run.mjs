@@ -617,6 +617,93 @@ const SAK_2 = kjor("artikkel", FELLES + `
   }, 900); });
 `);
 
+// Bilder i riktig størrelse (#141). Feeden lastet originalen på opptil
+// 2560 px til et bilde som vises i 76. Adressene peker på en port ingen
+// lytter på, så nettleseren gir opp med en gang og scenen står ikke og
+// venter på nett.
+const SAK_2B = kjor("bilder-riktig-storrelse", FELLES + `
+  var saker = lagSaker(4);
+  var U = "http://127.0.0.1:1/wp/";
+  function media(navn, sizes, b, h) {
+    return [{ source_url: U + navn + "-scaled.jpg",
+              media_details: { width: b, height: h, sizes: sizes } }];
+  }
+  var STORE = {
+    thumbnail: { source_url: U + "a-150x150.jpg", width: 150, height: 150 },
+    medium: { source_url: U + "a-300x169.jpg", width: 300, height: 169 },
+    medium_large: { source_url: U + "a-768x432.jpg", width: 768, height: 432 },
+    large: { source_url: U + "a-1024x576.jpg", width: 1024, height: 576 },
+    full: { source_url: U + "a-scaled.jpg", width: 2560, height: 1440 }
+  };
+  // Hero, rad med størrelser, rad uten størrelser.
+  saker[0]._embedded["wp:featuredmedia"] = media("a", STORE, 2560, 1440);
+  saker[1]._embedded["wp:featuredmedia"] = media("a", STORE, 2560, 1440);
+  saker[2]._embedded["wp:featuredmedia"] = media("b", undefined, 800, 450);
+  // Artikkelen bak heroen: et bilde med gyldig srcset, og et med søppel.
+  saker[0].content.rendered =
+    "<p>Tekst</p>" +
+    "<img id='bra' src='" + U + "c-1024.jpg' srcset='" + U + "c-300.jpg 300w, " + U + "c-1024.jpg 1024w'" +
+    " sizes='(max-width: 600px) 100vw, 600px' width='1024' height='576'>" +
+    "<img id='sopp' src='" + U + "d.jpg' srcset='javascript:alert(1) 300w, " + U + "d-300.jpg 300w'" +
+    " sizes='100vw' width='abc' height='-5' onerror='document.body.dataset.pwned4=1'>";
+  ` + mockFetch("saker") + `
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var hero = document.querySelector(".hero img");
+    var rader = document.querySelectorAll(".row img");
+    var U = "http://127.0.0.1:1/wp/";
+    ok("heroen viser ikke originalen",
+       !!hero && hero.getAttribute("src") === U + "a-1024x576.jpg", hero && hero.getAttribute("src"));
+    ok("og den har srcset uten originalen, og sizes",
+       hero.getAttribute("srcset").indexOf("a-768x432.jpg 768w") > -1 &&
+       hero.getAttribute("srcset").indexOf("scaled") === -1 &&
+       hero.getAttribute("sizes").indexOf("390px") > -1, hero.getAttribute("srcset"));
+    ok("og bildets egne mål, sa plassen er satt av for det er lastet",
+       hero.getAttribute("width") === "1024" && hero.getAttribute("height") === "576");
+    ok("heroen lastes med en gang, raden venter", hero.loading === "eager" && rader[0].loading === "lazy");
+
+    ok("raden far en liten versjon, ikke heroens",
+       rader[0].getAttribute("src") === U + "a-300x169.jpg" &&
+       rader[0].getAttribute("srcset").indexOf("a-150x150.jpg 150w") > -1 &&
+       rader[0].getAttribute("srcset").indexOf("768") === -1, rader[0].getAttribute("srcset"));
+    ok("og sizes sier 76 px", rader[0].getAttribute("sizes") === "76px");
+    ok("raden vises fortsatt som 76 x 76",
+       Math.round(rader[0].getBoundingClientRect().width) === 76 &&
+       Math.round(rader[0].getBoundingClientRect().height) === 76,
+       rader[0].getBoundingClientRect().width + " x " + rader[0].getBoundingClientRect().height);
+    ok("uten ferdige storrelser er originalen svaret, uten srcset",
+       rader[1].getAttribute("src") === U + "b-scaled.jpg" && !rader[1].hasAttribute("srcset") &&
+       !rader[1].hasAttribute("sizes"), rader[1].outerHTML);
+    ok("en sak uten bilde far fortsatt sin tomme rute",
+       document.querySelectorAll(".row .thumb-empty").length === 1, document.querySelectorAll(".row .thumb-empty").length);
+
+    document.querySelector(".hero").click();
+    setTimeout(function () { try {
+      var topp = document.querySelector("#detailCard > img");
+      ok("saken viser heller ikke originalen i toppen",
+         !!topp && topp.getAttribute("src") === U + "a-1024x576.jpg", topp && topp.getAttribute("src"));
+      // Sanitizeren fjerner id, sa bildene finnes etter rekkefolge.
+      var bilder = document.querySelectorAll(".detail-content img");
+      var bra = bilder[0];
+      var sopp = bilder[1];
+      ok("begge bildene i teksten finnes", bilder.length === 2, bilder.length);
+      ok("srcset, sizes og mal i artikkelteksten beholdes nar de er gyldige",
+         !!bra && bra.getAttribute("srcset") === U + "c-300.jpg 300w, " + U + "c-1024.jpg 1024w" &&
+         bra.getAttribute("sizes") === "(max-width: 600px) 100vw, 600px" &&
+         bra.getAttribute("width") === "1024" && bra.getAttribute("height") === "576",
+         bra && bra.outerHTML);
+      ok("en srcset med en farlig adresse forkastes helt — og sizes med den",
+         !!sopp && !sopp.hasAttribute("srcset") && !sopp.hasAttribute("sizes"), sopp && sopp.outerHTML);
+      ok("mal som ikke er tall fjernes", !!sopp && !sopp.hasAttribute("width") && !sopp.hasAttribute("height"),
+         sopp && sopp.outerHTML);
+      ok("onerror fjernes, og ingenting kjorer", !!sopp && !sopp.hasAttribute("onerror") &&
+         document.body.dataset.pwned4 === undefined);
+      ok("src star igjen som for", !!sopp && sopp.getAttribute("src") === U + "d.jpg");
+      ok("bildene i teksten lastes sent", !!bra && bra.getAttribute("loading") === "lazy");
+      ferdig();
+    } catch (e) { ok("ingen unntak i saken", false, e.message); ferdig(); } }, 500);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
+`);
+
 /* ---------------- 3. rulling og endringssjekk ---------------- */
 
 const SAK_3 = kjor("oppdatering", FELLES + `
@@ -9716,7 +9803,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_2B, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

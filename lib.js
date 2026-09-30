@@ -179,3 +179,130 @@ export function listeTekst(navn) {
   if (l.length < 2) return l.join("");
   return l.slice(0, -1).join(", ") + " og " + l[l.length - 1];
 }
+
+/* ---------- bilder: riktig størrelse, ikke originalen (#141) ---------- */
+
+// Feeden lastet `media.source_url` — originalen, opptil 2560×1440 — til et
+// bilde som vises i 76×76. WordPress legger ferdige størrelser ved hver
+// fil (`media_details.sizes`), så svaret var alt i hånda; vi leste bare
+// ikke det.
+//
+// **Nøkkelnavnene leses ikke.** «thumbnail» og «medium_large» er
+// WordPress-standard, men et tema kan legge til egne («post-thumbnail»,
+// «1536x1536»), og en liste over navn vi kjenner ville mangle noen. Hver
+// størrelse bærer sin egen bredde, høyde og adresse, og det er dem vi
+// velger på.
+//
+// `css` er hvor bredt bildet vises, `maks` er den største versjonen vi
+// vil ha på listen — tre ganger skjermbredden er det en telefon kan bruke,
+// og alt over det er bytes uten skarphet. Appen er 390 px bred også på en
+// stor skjerm (`.phone`), så «hero» og «sak» deler tallene.
+export const BILDE_BRUK = {
+  rad:  { css: 76,  maks: 450,  sizes: "76px" },
+  hero: { css: 390, maks: 1200, sizes: "(min-width: 390px) 390px, 100vw" },
+  sak:  { css: 390, maks: 1200, sizes: "(min-width: 390px) 390px, 100vw" },
+};
+
+// Forholdet bredde/høyde kan avvike så mye fra originalens før en versjon
+// regnes som et utsnitt. WordPress beskjærer «thumbnail» til et kvadrat, og
+// et kvadrat i lista for en bred hero ville blitt valgt av nettleseren på
+// feil grunnlag — den teller bare bredde.
+const FORHOLD_TOLERANSE = 0.06;
+
+function heltall(x) {
+  const n = Number(x);
+  return Number.isInteger(n) && n > 0 ? n : 0;
+}
+
+// Bildet for en sak, i den formen `<img>` trenger: `{src, srcset, sizes,
+// width, height}` — eller null når saken ikke har et bilde.
+//
+// Mangler `media_details.sizes`, er originalen svaret, som før. Et bilde
+// uten størrelser er ikke et bilde som mangler.
+export function bildeFor(post, bruk) {
+  const oppsett = BILDE_BRUK[bruk] || BILDE_BRUK.hero;
+  const emb = (post && post._embedded) || {};
+  const media = emb["wp:featuredmedia"] && emb["wp:featuredmedia"][0];
+  const original = safeUrl(media && media.source_url);
+  if (!original) return null;
+
+  const detaljer = (media && media.media_details) || {};
+  const origB = heltall(detaljer.width);
+  const origH = heltall(detaljer.height);
+  const forhold = origB && origH ? origB / origH : 0;
+
+  const liste = [];
+  const sett = {};
+  const sizes = detaljer.sizes && typeof detaljer.sizes === "object" ? detaljer.sizes : {};
+  Object.keys(sizes).forEach((nokkel) => {
+    const s = sizes[nokkel] || {};
+    const url = safeUrl(s.source_url);
+    const b = heltall(s.width);
+    const h = heltall(s.height);
+    if (!url || !b || !h || sett[url]) return;
+    if (b > oppsett.maks) return;
+    // Bredde i motsetning til kvadrat: et utsnitt er ikke samme bilde.
+    // Raden vises som kvadrat uansett (`object-fit: cover`), så der er
+    // alle forhold gode nok.
+    if (bruk !== "rad" && forhold && Math.abs(b / h - forhold) / forhold > FORHOLD_TOLERANSE) return;
+    sett[url] = true;
+    liste.push({ url, width: b, height: h });
+  });
+  liste.sort((a, b) => a.width - b.width);
+
+  if (!liste.length) {
+    return { src: original, srcset: "", sizes: "", width: origB, height: origH };
+  }
+
+  // Den minste som dekker dobbel tetthet; ingen som gjør det, gir den
+  // største vi har. Nettleseren velger selv blant `srcset` — `src` er det
+  // den som ikke forstår `srcset` får.
+  const passer = liste.find((b) => b.width >= oppsett.css * 2) || liste[liste.length - 1];
+  return {
+    src: passer.url,
+    srcset: liste.length > 1
+      ? liste.map((b) => b.url + " " + b.width + "w").join(", ") : "",
+    sizes: liste.length > 1 ? oppsett.sizes : "",
+    width: passer.width,
+    height: passer.height,
+  };
+}
+
+// `srcset` fra artikkelteksten, renset. **Alt eller ingenting:** hver
+// kandidat er en adresse pluss en bredde- eller tetthetsangivelse, og hver
+// adresse må være http(s). Feiler én, forkastes hele lista og `src` står
+// igjen — en halv liste kunne pekt nettleseren til en adresse vi ikke har
+// vurdert, og en adresse med komma i seg ville blitt kuttet i to.
+export function renSrcset(verdi, base) {
+  const tekst = String(verdi == null ? "" : verdi).trim();
+  if (!tekst) return null;
+  const ut = [];
+  const deler = tekst.split(",");
+  for (let i = 0; i < deler.length; i += 1) {
+    const biter = deler[i].trim().split(/\s+/);
+    if (biter.length < 1 || biter.length > 2) return null;
+    const url = safeUrl(biter[0], base);
+    if (!url) return null;
+    if (biter.length === 2 && !/^(\d+w|\d+(\.\d+)?x)$/.test(biter[1])) return null;
+    ut.push(biter.length === 2 ? url + " " + biter[1] : url);
+  }
+  return ut.length ? ut.join(", ") : null;
+}
+
+// `sizes` er en liste av mediebetingelser og lengder. Det kjører ingenting,
+// men det er fritekst fra en fremmed side, så bare tegnene den trenger
+// slipper gjennom.
+export function renSizes(verdi) {
+  const tekst = String(verdi == null ? "" : verdi).trim();
+  if (!tekst || tekst.length > 200) return null;
+  return /^[A-Za-z0-9\s,()%.:<>=\-+*\/]+$/.test(tekst) ? tekst : null;
+}
+
+// `width` og `height` er presentasjonstips som lar nettleseren sette av
+// plass før bildet er lastet. Bare hele positive tall.
+export function renMaal(verdi) {
+  const tekst = String(verdi == null ? "" : verdi).trim();
+  if (!/^\d{1,5}$/.test(tekst)) return null;
+  const n = Number(tekst);
+  return n >= 1 ? String(n) : null;
+}

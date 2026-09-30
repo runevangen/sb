@@ -75,6 +75,32 @@ kunne testes i Node på millisekunder.
   sak som nevner laget i forbifarten, uten at leseren ser hvorfor.
   Sorteringen er stabil, og tomt søkeord lar lista stå urørt.
 
+- **`bildeFor()` velger størrelse på bredde, høyde og adresse — aldri på
+  nøkkelnavnet.** Feeden lastet `source_url`, originalen på opptil 2560 px, til
+  et bilde som vises i 76 (#141). WordPress legger ferdige størrelser ved i
+  `media_details.sizes`, og «thumbnail» og «medium_large» er bare standard:
+  et tema kan legge til egne, og en liste over navn vi kjenner ville mangle
+  noen. `BILDE_BRUK` sier hvor bredt bildet vises (`css`) og den største
+  versjonen vi vil ha på lista (`maks`) — tre ganger skjermbredden er det en
+  telefon kan bruke. Appen er 390 px bred også på en stor skjerm, så `hero`
+  og `sak` deler tallene.
+- **Utsnitt er ikke samme bilde.** WordPress beskjærer «thumbnail» til et
+  kvadrat, og nettleseren velger i `srcset` på bredde alene. Et kvadrat i
+  lista for en bred hero ville blitt valgt på feil grunnlag, så for `hero` og
+  `sak` må forholdet ligge innenfor seks prosent av originalens. Raden vises
+  som kvadrat uansett (`object-fit: cover`), og der er alle forhold gode nok.
+- **Uten `sizes` er originalen svaret**, med sine egne mål — som før. Et bilde
+  uten ferdige størrelser er ikke et bilde som mangler. Er alle størrelsene
+  større enn `maks`, er det også originalen, ikke den minste av de store.
+- **`renSrcset()` er alt eller ingenting.** Hver kandidat er en adresse pluss
+  en bredde- eller tetthetsangivelse, og hver adresse må være `http(s)`.
+  Feiler én, forkastes hele lista og `src` står igjen: en halv liste kunne
+  pekt nettleseren til en adresse vi ikke har vurdert, og en adresse med komma
+  i seg ville blitt kuttet i to og gitt en feil adresse som ser gyldig ut.
+  `renSizes()` slipper bare gjennom tegnene den trenger, og `renMaal()` bare
+  hele positive tall. Sanitizeren i `app.js` bruker alle tre; `sizes` uten en
+  `srcset` å styre fjernes.
+
 ### `fotball-data.js` — formen på sportsdataene
 
 Delt mellom Netlify-funksjonen og nettleseren, så formen er definert ett
@@ -651,6 +677,14 @@ portalen — en leser har ingen nytte av den.
   framfor å lage unntak.
 - **`stripHtml` dekoder ikke to ganger.** `textContent` dekoder allerede én
   gang; en gang til ville gjort `&lt;img onerror=…&gt;` til en levende tag.
+- **Bildene er tre bruk, og hvert har sin størrelse.** `getImage(post, bruk)`
+  — «rad», «hero» eller «sak» — gir `bildeFor()` sitt svar, og `imageEl()`
+  setter `srcset`, `sizes`, `width` og `height` av det. CSS bestemmer fortsatt
+  hvor stort bildet *vises* (raden er 76 × 76, heroen 220 høy); målene er
+  bildets egne, og lar nettleseren sette av plass før det er lastet. I
+  artikkelteksten slipper nå `srcset`, `sizes`, `width` og `height` gjennom
+  sanitizeren — renset — så WordPress sine egne størrelser brukes også der
+  (#141). `id` og alt annet på bildet fjernes som før.
 - **Hash-ruting, ikke sti-ruting.** [ADR 0002](adr/0002-hash-ruting.md). En
   sti ville gitt 404 ved oppfriskning uten en ny regel i `netlify.toml`, og
   den regelen skal holdes smal.
