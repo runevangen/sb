@@ -31,6 +31,9 @@ export const VERSJONER = [
   {
     versjon: "2026.09.30",
     endringer: [
+      { hva: "«Logg inn» er en knapp i kampkortet, ikke en setning som peker på menyen: ett trykk, og innloggingen står framme med feltet klart.", issue: 180 },
+      { hva: "Navnet ditt i toppfeltet har en rund initial foran seg, lys blå med mørk blå bokstav.", issue: 170 },
+      { hva: "Fornavnsfeltet avviser e-postadresser, og en adresse som alt sto som navn vises ikke lenger i «blir med»-lista.", issue: 142 },
       { hva: "Portalen logger hvem som er inne: hver innlogging blir en rad med navn og tidspunkt, og du ser loggen under «Adminlogg». Portalen åpner bare når du er innlogget i appen." },
       { hva: "Når noe har skjedd siden sist du var inne, står det øverst i portalen under «Nytt siden sist»." },
     ],

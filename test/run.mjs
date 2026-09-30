@@ -2048,8 +2048,11 @@ const SAK_12 = kjor("kamp-deling", FELLES + FOTBALL + `
          valgtChip && valgtChip.classList.contains("valgt"),
          valgtChip && valgtChip.className);
       ok("og utlogget star det hvorfor man ikke kommer pa lista",
-         panel.querySelector(".kamp-svar").textContent.indexOf("Logg inn") === 0,
+         panel.querySelector(".kamp-svar").textContent.indexOf("Et fornavn og en PIN") === 0 &&
+         panel.querySelector(".kamp-svar").textContent.indexOf("i menyen") === -1,
          panel.querySelector(".kamp-svar").textContent);
+      ok("med en knapp i svaret som apner innloggingen",
+         !!panel.querySelector(".kamp-svar .kamp-logginn"));
       ok("men lista er ikke en port: kortet lover ikke noe annet",
          panel.querySelector(".kamp-note").textContent.indexOf("virker uansett") > -1,
          panel.querySelector(".kamp-note").textContent);
@@ -6961,8 +6964,9 @@ const SAK_17 = kjor("kamp-lenke", FELLES + FOTBALL + `
     // Den som kommer fra en delt lenke er utlogget. Da skal det sta hva
     // som mangler — og at resten virker uansett.
     ok("utlogget star det hva som skal til for a bli med",
-       panel.querySelector(".kamp-note").textContent.indexOf("Logg inn i menyen") > -1 &&
-       panel.querySelector(".kamp-note").textContent.indexOf("virker uansett") > -1,
+       panel.querySelector(".kamp-note").textContent.indexOf("Et fornavn og en PIN") > -1 &&
+       panel.querySelector(".kamp-note").textContent.indexOf("virker uansett") > -1 &&
+       panel.querySelector(".kamp-note").textContent.indexOf("i menyen") === -1,
        panel.querySelector(".kamp-note").textContent);
 
     // Trykker du pa et sted uten a vaere logget inn, skal du fa vite det
@@ -6971,7 +6975,8 @@ const SAK_17 = kjor("kamp-lenke", FELLES + FOTBALL + `
     // lagret, sier at det virket.
     pekt.querySelector(".sted-knapp").click();
     ok("et trykk utlogget sier at det krever innlogging",
-       panel.querySelector(".kamp-svar").textContent.indexOf("Logg inn i menyen") === 0,
+       panel.querySelector(".kamp-svar").textContent.indexOf("Et fornavn og en PIN") === 0 &&
+       !!panel.querySelector(".kamp-svar .kamp-logginn"),
        panel.querySelector(".kamp-svar").textContent);
     ok("og det sier hva stedet da er godt for",
        panel.querySelector(".kamp-svar").textContent.indexOf("deler kampen") > -1,
@@ -7275,6 +7280,219 @@ const SAK_18 = kjor("innlogging", FELLES + `
       try { f(); } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); }
     }, 300);
   }
+`);
+
+/* ---------------- 18f. en adresse er ikke et fornavn (#142) ---------------- */
+
+// Feltet spor om fornavnet, men noen skriver adressen sin, og da sto den
+// i «blir med»-lista, synlig for alle uten innlogging. To veier inn, og
+// begge maa stoppes hvor leseren ser det — derfor to scener: den ene
+// starter innlogget, den andre utlogget, og en okt i minnet kan ikke
+// «logges ut» av a rore localStorage.
+//
+//   A. Innloggingen: et NYTT navn med @ avvises for PIN-en tastes.
+//   B. Den som alt er inne med en adresse som navn: «Jeg skal hit» sier
+//      hva som er galt og hva som kan gjores — ikke «vi mangler
+//      fornavnet ditt», for navnet er der, og det er det som er galt.
+//
+// Stubben modellerer tjenestens SVAR (teksten tjenesten faktisk sender),
+// ikke koden som lager det.
+function epostSide(innlogget) {
+  return FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
+  window.__konto = [];
+  window.__svarKall = [];
+  function svarMed(kropp, status) {
+    return Promise.resolve({ ok: !status || status < 400, status: status || 200,
+      statusText: "OK", text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, o) {
+    u = String(u);
+    var inn = o && o.body ? JSON.parse(o.body) : null;
+    if (u.indexOf("/api/konto") === 0) {
+      window.__konto.push(inn ? inn.handling : "oppsett");
+      if (!inn) return svarMed({ klar: true, mangler: [] });
+      if (inn.handling === "finnes") {
+        if (String(inn.navn).indexOf("@") > -1) {
+          return svarMed({ feil: "Skriv fornavnet ditt, ikke en e-postadresse. Vi trenger ingen e-post, og vi viser aldri noen." }, 400);
+        }
+        return svarMed({ navn: inn.navn, finnes: false });
+      }
+      return svarMed({ feil: "Ukjent handling" }, 400);
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      window.__svarKall.push(inn);
+      return svarMed({ svar: [], visninger: [] });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 ||
+        u.indexOf("/api/pub-liste") === 0 || u.indexOf("overpass") > -1) return svarMed({}, 502);
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return svarMed(kropp);
+    }
+    return svarMed(u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker);
+  };
+  ${innlogget ? `
+  // En konto fra for regelen kom, med adressen som navn.
+  localStorage.setItem("sb-konto", JSON.stringify({ token: "okt-1",
+    navn: "ola@epost.no", bruker: "u-1",
+    utloper: new Date(Date.now() + 3600000).toISOString() }));
+  location.hash = "#/fotball/eliteserien/neste";` : ""}
+
+  function setFo(f) {
+    setTimeout(function () {
+      try { f(); } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); }
+    }, 300);
+  }
+`;
+}
+
+// B: innlogget med en adresse som navn.
+const SAK_18F = kjor("epost-som-navn-inne", epostSide(true) + `
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.querySelectorAll(".kamp.delbar")[0].querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    setFo(function () {
+      var knapp = panel.querySelector(".sted-knapp");
+      ok("kortet har et sted aa trykke paa", !!knapp);
+      knapp.click();
+      setFo(function () {
+        var tekst = panel.textContent;
+        ok("«Jeg skal hit» sier at navnet er en adresse", tekst.indexOf("e-postadresse") > -1, tekst.slice(-240));
+        ok("og hva som kan gjores: logge ut og lage en konto med fornavnet",
+           tekst.indexOf("Logg ut") > -1 && tekst.indexOf("fornavnet") > -1, tekst.slice(-240));
+        // «Vi mangler fornavnet ditt» hadde faatt leseren til a skrive det
+        // samme en gang til.
+        ok("ikke «vi mangler fornavnet ditt»: navnet er der, det er det som er galt",
+           tekst.indexOf("vi mangler fornavnet") === -1, tekst.slice(-240));
+        ok("og ingenting ble sendt til lista",
+           window.__svarKall.filter(Boolean).length === 0, JSON.stringify(window.__svarKall));
+        ferdig();
+      });
+    });
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
+`);
+
+// A: utlogget, et nytt navn med @.
+const SAK_18G = kjor("epost-som-navn-ny", epostSide(false) + `
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.getElementById("menuBtn").click();
+    document.getElementById("kontoBtn").click();
+    var feltNavn = document.getElementById("kontoNavn");
+    var feltPin = document.getElementById("kontoPin");
+    var send = document.getElementById("kontoSend");
+    ok("innloggingen star paa navnesteget", !feltNavn.hidden && feltPin.hidden,
+       feltNavn.hidden + " " + feltPin.hidden);
+    feltNavn.value = "ola@epost.no";
+    send.click();
+    setFo(function () {
+      var svar = document.getElementById("kontoSvar").textContent;
+      ok("en adresse som nytt navn avvises med tjenestens ord",
+         svar.indexOf("e-postadresse") > -1, svar);
+      // Skjemaet skal ikke gaa videre: PIN-en ville blitt tastet to ganger
+      // til en konto som aldri kan lages.
+      ok("og man star fortsatt paa navnesteget, uten PIN-felt",
+         !feltNavn.hidden && feltPin.hidden && send.textContent === "Fortsett",
+         feltNavn.hidden + " " + feltPin.hidden + " " + send.textContent);
+      ok("navnet staar igjen, saa det kan rettes i stedet for skrives paa nytt",
+         feltNavn.value === "ola@epost.no", feltNavn.value);
+      ok("det ble spurt om navnet, men ingen konto ble forsoekt laget",
+         window.__konto.indexOf("finnes") > -1 && window.__konto.indexOf("logg-inn") === -1,
+         window.__konto.join(","));
+      ferdig();
+    });
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
+`);
+
+// «Logg inn» i kampkortet er en knapp, og den apner innloggingen der leseren
+// er (#180). Malt hele veien: trykk i kortet, meny med feltet i fokus,
+// innlogging, og kortet som ikke lenger ber deg logge inn. Utlogget, med
+// en mock som tar imot et ekte navn og en ekte PIN.
+const SAK_18H = kjor("logg-inn-fra-kortet", epostSide(false) + `
+  location.hash = "#/fotball/eliteserien/neste";
+  var fetchFor = window.fetch;
+  window.fetch = function (u, o) {
+    var inn = o && o.body ? JSON.parse(o.body) : null;
+    if (String(u).indexOf("/api/konto") === 0 && inn) {
+      if (inn.handling === "finnes") return svarMed({ navn: inn.navn, finnes: true });
+      if (inn.handling === "logg-inn") {
+        return svarMed({ token: "okt-7", navn: inn.navn, bruker: "u-7",
+          utloper: new Date(Date.now() + 3600000).toISOString() });
+      }
+    }
+    return fetchFor(u, o);
+  };
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.querySelectorAll(".kamp.delbar")[0].querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    setFo(function () {
+      var note = panel.querySelector(".kamp-note");
+      var knapp = note && note.querySelector("button.kamp-logginn");
+      ok("notatet i kortet har en Logg inn-knapp", !!knapp, note && note.innerHTML);
+      ok("og setningen peker ikke lenger pa menyen",
+         note.textContent.indexOf("i menyen") === -1 && note.textContent.indexOf("virker uansett") > -1,
+         note.textContent);
+      ok("menyen er lukket for trykket",
+         !document.getElementById("menuPanel").classList.contains("open"));
+      knapp.click();
+      ok("trykket apner menyen", document.getElementById("menuPanel").classList.contains("open"));
+      ok("med innloggingen ute", document.getElementById("kontoPanel").hidden === false &&
+         document.getElementById("kontoBtn").getAttribute("aria-expanded") === "true");
+      ok("og navnefeltet i fokus, sa du kan skrive med en gang",
+         document.activeElement === document.getElementById("kontoNavn"),
+         document.activeElement && document.activeElement.id);
+      var feltNavn = document.getElementById("kontoNavn");
+      var feltPin = document.getElementById("kontoPin");
+      var send = document.getElementById("kontoSend");
+      feltNavn.value = "Ola";
+      send.click();
+      setFo(function () {
+        feltPin.value = "1234";
+        send.click();
+        setFo(function () {
+          ok("innloggingen gar gjennom", !!localStorage.getItem("sb-konto"));
+          ok("menyen lukkes og du star i kortet igjen",
+             !document.getElementById("menuPanel").classList.contains("open") &&
+             !!document.querySelector(".kamp-panel"));
+          ok("og kortet ber deg ikke lenger logge inn",
+             !document.querySelector(".kamp-panel .kamp-note") &&
+             !document.querySelector(".kamp-panel .kamp-logginn"),
+             document.querySelector(".kamp-panel").innerHTML.slice(-300));
+          ferdig();
+        });
+      });
+    });
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
+`);
+
+// Den runde initialen i toppfeltet (#170). Bokstaven er CSS (::before), sa
+// teksten i knappen er fortsatt navnet; malt pa den ferdige siden.
+const SAK_18I = kjor("rund-initial", epostSide(true) + `
+  localStorage.setItem("sb-konto", JSON.stringify({ token: "okt-1",
+    navn: "ola", bruker: "u-1",
+    utloper: new Date(Date.now() + 3600000).toISOString() }));
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var hvem = document.getElementById("hvemTag");
+    var ring = getComputedStyle(hvem, "::before");
+    ok("knappen viser navnet, uten initialen i teksten",
+       !hvem.hidden && hvem.textContent === "ola", hvem.textContent);
+    ok("initialen er den forste bokstaven, stor", ring.content === '"O"', ring.content);
+    ok("og den er en sirkel",
+       ring.borderRadius === "50%" && ring.width === ring.height && parseFloat(ring.width) >= 20,
+       ring.borderRadius + " " + ring.width + " " + ring.height);
+    ok("lys bla bakgrunn, morkt bla bokstav (#142680)",
+       ring.color === "rgb(20, 38, 128)" && ring.backgroundColor === "rgb(220, 232, 255)",
+       ring.color + " " + ring.backgroundColor);
+    var boks = hvem.getBoundingClientRect();
+    ok("knappen er innenfor toppfeltet og minst 28 px hoy", boks.height >= 28 && boks.width > 40,
+       boks.width + "x" + boks.height);
+    ferdig();
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
 `);
 
 /* ---------------- 18c. favorittlagene folger kontoen, og PIN-en byttes ---------------- */
@@ -9412,7 +9630,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {
