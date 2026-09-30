@@ -784,6 +784,15 @@ function renderFeed(saker, opts) {
   if (!posts.length) {
     const state = el("div", "state");
     state.appendChild(el("p", null, "Ingen artikler funnet."));
+    // Krysset for a fjerne et sok star bare i toppfeltet, og da er dette en
+    // blindvei: teksten sier hva som er galt og ingenting om hva du gjor na
+    // (#181). Knappen bruker den samme veien som krysset.
+    if (sokeord || activeCategory !== null) {
+      const fjern = el("button", "retry-btn", sokeord ? "Fjern søket" : "Vis alle saker");
+      fjern.type = "button";
+      fjern.addEventListener("click", visAlleSaker);
+      state.appendChild(fjern);
+    }
     feed.appendChild(state);
     return;
   }

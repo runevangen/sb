@@ -307,7 +307,10 @@ export async function visFotball(liga, del, invitasjon) {
   } catch (err) {
     if (aktivLiga !== liga || aktivDel !== del) return;
     console.error("[Sportsbibelen] fotball · " + nokkel + " feilet:", err);
-    rot.replaceChildren(tilstand(err.message || "Klarte ikke å hente data."));
+    rot.replaceChildren(feilTilstand(
+      "Klarte ikke å hente fotballdata akkurat nå.",
+      err.message || "Klarte ikke å hente data.",
+      () => { if (aktivLiga === liga && aktivDel === del) visFotball(liga, del, invitasjon); }));
   }
 }
 
@@ -339,10 +342,36 @@ async function hent(liga, del) {
   return data;
 }
 
-function tilstand(tekst) {
+// En tilstand som stopper leseren sier ogsa hva som kan gjores na (#181):
+// en knapp, ikke en setning som peker pa en. `knapp` er {tekst, gjor}, og
+// `detaljer` er diagnosen — den som ville kastet en leser som ikke kjenner
+// leverandoren, og som derfor star i en lukket «Tekniske detaljer», som
+// nyhetsfeilen i app.js. Den er der for den som skal rette det.
+function tilstand(tekst, knapp, detaljer) {
   const boks = el("div", "state");
   boks.appendChild(el("p", null, tekst));
+  if (knapp) {
+    const k = el("button", "retry-btn", knapp.tekst);
+    k.type = "button";
+    k.addEventListener("click", knapp.gjor);
+    boks.appendChild(k);
+  }
+  if (detaljer) {
+    const d = document.createElement("details");
+    d.className = "err-details";
+    d.appendChild(el("summary", null, "Tekniske detaljer"));
+    d.appendChild(el("p", "err-line", detaljer));
+    boks.appendChild(d);
+  }
   return boks;
+}
+
+// Feilen sier hva som ikke virket i ord leseren kjenner, og veien videre er
+// en knapp. «Fikk ikke svar fra API-Football» navnga en leverandor ingen
+// leser har hort om, og ga ingenting a trykke pa. Tjenestens egne ord
+// (CLAUDE.md: feilmeldinger bærer tjenestens egne ord) star i detaljene.
+function feilTilstand(tekst, detaljer, proev) {
+  return tilstand(tekst, { tekst: "Prøv igjen", gjor: proev }, detaljer);
 }
 
 function tegn(rot, del, data) {
@@ -555,7 +584,8 @@ async function visVenner(rot) {
     runder = await Promise.all(Object.keys(LIGAER).map((liga) =>
       hent(liga, "neste").catch(() => null)));
   } catch (err) {
-    rot.replaceChildren(tilstand("Klarte ikke å hente kampene."));
+    rot.replaceChildren(feilTilstand("Klarte ikke å hente kampene.", err && err.message,
+      () => { if (aktivDel === "venner") visVenner(rot); }));
     return;
   }
   if (aktivDel !== "venner") return;
@@ -585,7 +615,8 @@ async function visVenner(rot) {
   // liste er ikke til a skille fra et tomt svar, og da er det den som
   // leter som betaler.
   if (hentet.feil) {
-    rot.replaceChildren(tilstand(hentet.feil));
+    rot.replaceChildren(feilTilstand(hentet.feil, null,
+      () => { if (aktivDel === "venner") visVenner(rot); }));
     return;
   }
 
@@ -598,7 +629,8 @@ async function visVenner(rot) {
     // skal det sta hva som skal til, ikke bare at det er tomt.
     rot.replaceChildren(tilstand(
       "Ingen har sagt at de blir med ennå. Åpne en kamp under Kommende"
-      + " og si hvor du ser den, så står den her."));
+      + " og si hvor du ser den, så står den her.",
+      { tekst: "Gå til Kommende", gjor: () => naviger(aktivLiga, "neste") }));
     return;
   }
 

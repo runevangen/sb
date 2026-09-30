@@ -740,6 +740,18 @@ portalen — en leser har ingen nytte av den.
 
 [ADR 0012](adr/0012-kampkortet.md).
 
+- **`tilstand()` tar en knapp, og `feilTilstand()` er den som feiler**
+  (#181). En tilstand som stopper leseren — feil, tom Venner-liste — sa hva
+  som var galt og ingenting om hva du gjør nå. `tilstand(tekst, knapp,
+  detaljer)`: knappen er `{tekst, gjor}`, og `detaljer` er diagnosen i en
+  lukket «Tekniske detaljer» (samme `.err-details` som nyhetsfeilen i
+  `app.js`). **Leverandørnavnet hører i detaljene**, ikke i teksten:
+  «Fikk ikke svar fra API-Football» navnga en tjeneste ingen leser kjenner
+  og ga ingenting å trykke på, mens diagnosen er verdt å ha for den som
+  skal rette det. Teksten leseren ser er «Klarte ikke å hente fotballdata
+  akkurat nå», og «Prøv igjen» kaller `visFotball` på nytt — `husket` fylles
+  bare ved suksess, så den prøver faktisk. Venner-feilene (tjenestens egne
+  ord, som før) har samme knapp. Tom Venner-liste har «Gå til Kommende».
 - **Stjerna i `tabell()` har sin egen kolonne, først i raden** (`.kol-stjerne`,
   med `aria-label="Favoritt"` på overskriften). Den sto ytterst i lagcellen,
   inntil tallene, til 25. september 2026. Egen kolonne, ikke først i
