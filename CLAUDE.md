@@ -918,6 +918,13 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   **Nummeret er datoen**, `ÅÅÅÅ.MM.DD`, med én oppføring per dag og flere
   linjer under: et semantisk nummer krever skjønn hver gang, og
   `2026.09.21-2` ville latt nummeret telle utrullinger framfor å si når.
+  **Datoen er norsk tid**, ikke serverens. Natt til 1. oktober 2026 (kl. 01:31)
+  endte en linje under `2026.09.30` fordi ingen hadde sagt hvilken tidssone
+  datoen gjelder. Og **en ny linje går nederst i dagens oppføring**, ikke
+  øverst: adminloggen husker et antall og leser rekkefølgen, så en linje satt
+  inn over noe en admin alt har sett, gjør at den siste linja hen *har* sett
+  vises som nytt, og den nye vises ikke. Det skjedde én gang (#181, fem
+  minutter etter at adminloggen gikk ut).
   **Og stempelet lages ved bygging, ikke ved kall.** Første utgave lot
   `/api/brukere` lese `process.env.COMMIT_REF` når portalen spurte. Den
   svarte `null` hver gang: Netlifys lese-variabler — `COMMIT_REF`,
