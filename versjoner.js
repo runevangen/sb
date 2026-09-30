@@ -29,6 +29,12 @@
 // allerede har sett. En vakt i `unit.mjs` holder rekkefølgen mellom dagene.
 export const VERSJONER = [
   {
+    versjon: "2026.10.01",
+    endringer: [
+      { hva: "Innloggingen: etter at du har skrevet navnet, står markøren i PIN-feltet, og tastaturet blir oppe på iPhone. Enter i PIN-feltet går videre til «Gjenta» når du lager en ny PIN. «Admin» i menyen åpner et passordfelt der, med tastaturet oppe, og tar deg inn i portalen når du trykker Enter." },
+    ],
+  },
+  {
     versjon: "2026.09.30",
     endringer: [
       { hva: "Søk uten treff har en «Fjern søket»-knapp, en fotballfeil sier «Klarte ikke å hente fotballdata akkurat nå» med «Prøv igjen», og tom «Venner» har en knapp til Kommende.", issue: 181 },
@@ -39,7 +45,6 @@ export const VERSJONER = [
       { hva: "Når noe har skjedd siden sist du var inne, står det øverst i portalen under «Nytt siden sist»." },
       { hva: "Portalen sier ikke bare «Logg inn i appen først», men har en knapp til appen: innloggingen ligger per adresse, og en forhåndsvisning har ikke den du har i prod." },
       { hva: "Bildene i feeden og i artiklene lastes i riktig størrelse, ikke originalen på flere tusen piksler: en lettere feed, særlig på mobilnett.", issue: 141 },
-      { hva: "Innloggingen: etter at du har skrevet navnet, står markøren i PIN-feltet, og tastaturet blir oppe på iPhone. Enter i PIN-feltet går videre til «Gjenta» når du lager en ny PIN. «Admin» i menyen åpner et passordfelt der, med tastaturet oppe, og tar deg inn i portalen når du trykker Enter." },
     ],
   },
   {
