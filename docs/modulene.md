@@ -454,6 +454,31 @@ er regnet ut for alle tre delene i alle ligaene fra før.
   › Tabell», «Nyheter › Brann». Ikke en URL: den som leser køen skal forstå
   den uten å åpne noe.
 
+### `admin-logg-data.js` — hvem var inne, og hva er nytt
+
+[ADR 0026](adr/0026-adminloggen.md).
+
+- **Én rad svarer på to spørsmål.** «Hvem har brukt adminkontoen?» er at hver
+  innlogging er en rad. «Hva har skjedd siden sist?» er at raden husker hva
+  portalen viste — nyeste versjon og hvor mange linjer den hadde — så neste
+  innlogging er en sammenlikning mellom to rader, ikke et klokkeslett.
+- **`versjonStand()` teller linjer, ikke bare versjonen.** Én oppføring per
+  dag betyr at en endring klokka 16 havner under samme nummer som den klokka
+  10. Med bare nummeret ville den andre aldri blitt «ny». Det hviler på at
+  nye linjer legges **nederst** i dagens oppføring (øverst i `versjoner.js`),
+  og en vakt i `unit.mjs` holder rekkefølgen mellom dagene.
+- **`nyeEndringer()` skiller tre svar:** `null` (ingen forrige å sammenlikne
+  med — kall ikke hele lista «nytt»), `[]` (ingenting har skjedd) og en liste.
+  En `sist` som peker på en versjon lista ikke har — en forhåndsvisning kan
+  ha vist en dag som ikke er flettet — gir ingenting nytt, ikke alt.
+- **`loggRad()` sender verken `bruker` eller `tid`.** Databasen setter den
+  første fra økta og den andre fra klokka si, og skriveregelen krever at
+  `bruker` er deg. Sendte funksjonen dem, kunne en feil skrive i en annens
+  navn, og en logg der hvem som helst kan påstå å være noen andre er verre
+  enn ingen.
+- **`forrigeInnlogging()` leser raden for samme bruker, og ikke den du
+  nettopp skrev.** Radene kommer nyeste først.
+
 ---
 
 ## De redaksjonelle filene
@@ -988,6 +1013,21 @@ portalen — en leser har ingen nytte av den.
   å si imot, og «Ikke denne kvelden» uteblir. Men den står over en
   avkryssing som ikke er lagret: `tegnKamper` bygger lista på nytt fra
   `visninger`, og hakene ville ryket.
+- **Innloggingen skrives i loggen før portalen åpnes** (`loggInnlogging()`).
+  Feiler den, står det hvorfor i Adgang-seksjonen og portalen blir lukket —
+  «Logg inn i appen først» for en manglende økt, et annet svar for en konto
+  uten adgang. Det er et brudd med «portalen leser stedene uten en økt»
+  (se under): der ble kravet fjernet fordi lesingen er offentlig, her
+  stilles det fordi spørsmålet er *hvem*.
+- **«Nytt siden sist» står øverst og bare når det er noe å si.**
+  `visNytt()` sammenlikner `VERSJONER` med forrige innlogging (`nyeEndringer`).
+  Ingenting nytt gir en skjult boks, ikke en som sier «ingenting»; første
+  innlogging og en forrige vi ikke fikk lest sier hver sin ting, for en boks
+  som tier er ikke til å skille fra at alt er som det skal. Én tegner for en
+  versjon (`versjonBoks`), brukt både her og i «Versjon»: to ville glidd.
+- **«Adminlogg» har navn fra brukerlista og tegnes om når den lander**
+  (`tegnAdminLoggIgjen()` fra `tegnBrukere`), samme runde som køene. Mangler
+  navnet, står det «Ukjent konto» og starten på uid-en, ikke et gjettet navn.
 - **«Feil og ønsker» er en kø, som forslagene.** De nye først, tallet i
   hodet teller dem, og seksjonen åpner seg selv til du har rørt den. Men
   **alle** meldinger står, ikke bare de nye: en som er «Lest» skal kunne
@@ -1134,6 +1174,17 @@ Se [`nokler-og-tokens.md`](nokler-og-tokens.md).
   ikke den andre med seg. Ingen nøkkel, men bak `ADMIN_PASSORD` som de
   andre sondene: et endepunkt hvem som helst kan trykke på, mot en tjeneste
   som ikke er laget for oss, er et endepunkt noen trykker på tusen ganger.
+- **`admin-logg.mjs`** — hvem som er inne i portalen. To handlinger bak
+  `ADMIN_PASSORD`, begge med innloggedes **egen** økt: `innlogget` skriver
+  raden og svarer med forrige innlogging, `liste` leser de siste femti.
+  Ingen `service_role`. **Raden skrives før portalen åpnes**, og uten en økt
+  avvises innloggingen: passordet er en delt hemmelighet, og alene sier det
+  ikke hvem som kom inn. RLS er låsen — `bruker = auth.uid()` og en rad i
+  `visning_skrivere` — og `admin_logg` har ingen policy for oppdatering eller
+  sletting, så loggen er bare å legge til. uid-en i «forrige innlogging»
+  leses av raden databasen satte, ikke av noe appen sa. To ulike feil:
+  en utløpt økt (401, «åpne appen») og en konto som ikke står i
+  `visning_skrivere` (403, «be noen legge deg til»).
 - **`tilbakemelding.mjs`** — feil og ønsker. Fire handlinger: `send` og
   `mine` med leserens egen økt, `liste` og `behandle` med `ADMIN_PASSORD`
   **og** en økt i `visning_skrivere` — samme to låser som forslagskøen.
