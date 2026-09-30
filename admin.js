@@ -669,6 +669,17 @@ function visAdgang(tekst, art) {
   const m = felt("adgangMelding");
   m.textContent = tekst;
   m.className = "melding" + (art ? " " + art : "");
+  // «Logg inn i appen først» sa hva som manglet og ingenting om hvor du
+  // trykker — en blindvei, som kampkortets «logg inn i menyen» var. Lenka
+  // er til «/» pa samme adresse: okta ligger per adresse, sa en forhandsvisning
+  // har ikke den du har i prod.
+  if (tekst.indexOf("Logg inn i appen først") === 0) {
+    const vei = document.createElement("a");
+    vei.className = "melding-vei";
+    vei.href = "/";
+    vei.textContent = "Åpne appen og logg inn";
+    m.appendChild(vei);
+  }
 }
 
 /* ---------- brukerne ---------- */
