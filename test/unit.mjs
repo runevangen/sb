@@ -10,6 +10,10 @@
 import { readFileSync, readdirSync, existsSync, rmSync } from "node:fs";
 import { FANTASY_KILDER, FANTASY_STI, fantasyFunn, fantasySondeTekst,
          TOPPSCORER_FELT } from "../fantasy-data.js";
+import { LOGG_MAKS, VERSJON_MAKS as LOGG_VERSJON_MAKS, ANTALL_MAKS, versjonStand, nyeEndringer,
+         antallNye, sjekkInnlogging, loggRad, tolkAdminLogg, forrigeInnlogging }
+  from "../admin-logg-data.js";
+import { VERSJONER } from "../versjoner.js";
 import { ARTER, TEKST_MIN, TEKST_MAKS, SKJERM_MAKS, VERSJON_MAKS, STATUSER, STATUS_LESER,
          STATUS_HANDLING, sjekkTilbakemelding, tilbakemeldingRad, tolkTilbakemeldinger,
          sorterTilbakemeldinger, skjermTekst } from "../tilbakemelding-data.js";
@@ -35,6 +39,7 @@ import { normaliserEpost, gyldigEpost, normaliserKode, gyldigKode, maskerEpost,
          FORNY_MARGIN } from "../konto-data.js";
 
 import { normaliserPinNavn, pinSlug, gyldigPinNavn, pinEpost, normaliserPin, gyldigPin,
+         navnErEpost, EPOST_SOM_NAVN, EPOST_SOM_NAVN_INNE, initialFor,
          pinPassord, tolkPinOkt, tolkBrukere, sistInneTekst,
          PIN_MIN, PIN_MAKS, PIN_DOMENE,
          rensLag, flettLag, sammeLag, sjekkPinBytte, LAG_MAKS } from "../pin-data.js";
@@ -1681,6 +1686,47 @@ ok("tegnsetting og mellomrom faller bort", pinSlug("Ola-Kari") === "olakari",
 ok("et navn som bare er tegnsetting er ikke et navn",
    !gyldigPinNavn("•••") && !gyldigPinNavn("") && !gyldigPinNavn(null) && !gyldigPinNavn("  "));
 ok("ett tegn er for lite, to er nok", !gyldigPinNavn("J") && gyldigPinNavn("Jo"));
+
+// ---- e-post som fornavn (#142) ----
+//
+// Feltet spor om fornavnet, men noen skriver adressen sin, og da sto den
+// i «blir med»-lista, synlig for alle uten innlogging. Personvernsida
+// lover at vi ikke viser e-post.
+ok("en adresse er ikke et fornavn",
+   navnErEpost("ola@epost.no") && navnErEpost("@ola") && navnErEpost(" ola@x "));
+ok("men et navn uten @ er det",
+   !navnErEpost("Ola") && !navnErEpost("Bj\u00f8rn \u00c5ge") && !navnErEpost("Jo-Ann") &&
+   !navnErEpost("") && !navnErEpost(null) && !navnErEpost(undefined));
+
+// Initialen i den runde knappen ved navnet (#170).
+ok("initialFor tar forste bokstav, stor",
+  initialFor("ola") === "O" && initialFor("Kari") === "K" && initialFor("  ida") === "I");
+ok("initialFor tar norske bokstaver hele, ikke en byte",
+  initialFor("\u00e5se") === "\u00c5" && initialFor("\u00f8ystein") === "\u00d8" &&
+  initialFor("\u00e6rlig") === "\u00c6");
+ok("initialFor hopper over tegnsetting foran navnet",
+  initialFor("'Ola") === "O" && initialFor("-jo") === "J");
+ok("initialFor gir tomt svar uten bokstav, ikke et hull",
+  initialFor("") === "" && initialFor(null) === "" && initialFor(undefined) === "" &&
+  initialFor("...") === "");
+// **Sperra gjelder a LAGE en konto og a VISE et navn, ikke a komme inn.**
+// Den som alt har en konto med en adresse som navn, maa fortsatt kunne
+// logge inn — ellers laaste regelen ute akkurat dem den skulle hjelpe.
+ok("gyldigPinNavn slipper en adresse gjennom, sa de som alt har en konto kommer inn",
+   gyldigPinNavn("ola@epost.no"));
+ok("med samme slug som for, sa den alt lagrede kontoen finnes",
+   pinSlug("ola@epost.no") === "olaepostno", pinSlug("ola@epost.no"));
+ok("men en adresse kan ikke vises som navn", !gyldigNavn("ola@epost.no") && gyldigNavn("Ola"));
+ok("og en rad som alt ligger i basen med en adresse, forsvinner fra lista",
+   tolkSvar([
+     { kamp_id: "k1", navn: "ola@epost.no", bruker: "u-1" },
+     { kamp_id: "k1", navn: "Kari", bruker: "u-2" },
+   ]).map((r) => r.navn).join(",") === "Kari");
+// Tekstene star ved regelen. To avvisninger som sa hver sin ting om det
+// samme ville blitt to sannheter.
+ok("tekstene sier hva som er galt, og den som er inne far en vei videre",
+   EPOST_SOM_NAVN.indexOf("e-postadresse") > -1 && EPOST_SOM_NAVN.indexOf("fornavn") > -1 &&
+   EPOST_SOM_NAVN_INNE.indexOf("Logg ut") > -1, EPOST_SOM_NAVN_INNE);
 
 ok("navnet blir en adresse pa vart eget domene",
    pinEpost("Bjørn Åge") === "bjoernaage@" + PIN_DOMENE, pinEpost("Bjørn Åge"));
@@ -3991,6 +4037,113 @@ ok("tilbakemelding: basens tekstgrenser er TEKST_MIN og TEKST_MAKS",
 ok("tilbakemelding: og skjerm og versjon har samme tak",
    TB_SQL.indexOf("char_length(skjerm) <= " + SKJERM_MAKS) > -1 &&
    TB_SQL.indexOf("char_length(versjon) <= " + VERSJON_MAKS) > -1);
+
+/* ---------------- adminloggen: hvem var inne, hva er nytt ---------------- */
+
+const DAGER = [
+  { versjon: "2026.09.30", endringer: [{ hva: "a" }, { hva: "b" }, { hva: "c" }] },
+  { versjon: "2026.09.27", endringer: [{ hva: "d" }, { hva: "e" }] },
+  { versjon: "2026.09.26", endringer: [{ hva: "f" }] },
+];
+const hva = (nye) => JSON.stringify((nye || []).map((v) => [v.versjon, v.endringer.map((e) => e.hva)]));
+
+ok("adminlogg: standen er nyeste versjon og antall linjer i den",
+   JSON.stringify(versjonStand(DAGER)) === '{"versjon":"2026.09.30","antall":3}');
+ok("adminlogg: en tom liste gir en tom stand, ikke et krasj",
+   JSON.stringify(versjonStand([])) === '{"versjon":"","antall":0}' &&
+   JSON.stringify(versjonStand(null)) === '{"versjon":"","antall":0}');
+
+ok("adminlogg: ingen forrige innlogging gir null, ikke «alt er nytt»",
+   nyeEndringer(DAGER, null) === null && nyeEndringer(DAGER, undefined) === null);
+ok("adminlogg: en forrige uten gyldig versjon gir null",
+   nyeEndringer(DAGER, { versjon: "", antall: 1 }) === null &&
+   nyeEndringer(DAGER, { versjon: "i gar", antall: 1 }) === null);
+ok("adminlogg: samme versjon og samme antall er ingenting nytt",
+   hva(nyeEndringer(DAGER, { versjon: "2026.09.30", antall: 3 })) === "[]");
+// Dette er grunnen til at raden husker et antall: én oppføring per dag.
+ok("adminlogg: en linje til samme dag er ny, og bare den",
+   hva(nyeEndringer(DAGER, { versjon: "2026.09.30", antall: 2 })) === '[["2026.09.30",["c"]]]',
+   hva(nyeEndringer(DAGER, { versjon: "2026.09.30", antall: 2 })));
+ok("adminlogg: en tidligere dag gir resten av den, og alle nyere",
+   hva(nyeEndringer(DAGER, { versjon: "2026.09.27", antall: 1 })) === '[["2026.09.30",["a","b","c"]],["2026.09.27",["e"]]]',
+   hva(nyeEndringer(DAGER, { versjon: "2026.09.27", antall: 1 })));
+ok("adminlogg: nyeste først, og en dag du har sett ferdig er ikke med",
+   hva(nyeEndringer(DAGER, { versjon: "2026.09.26", antall: 1 })) === '[["2026.09.30",["a","b","c"]],["2026.09.27",["d","e"]]]');
+ok("adminlogg: en versjon lista ikke har, teller fra datoen — ikke alt",
+   hva(nyeEndringer(DAGER, { versjon: "2026.09.28", antall: 0 })) === '[["2026.09.30",["a","b","c"]]]',
+   hva(nyeEndringer(DAGER, { versjon: "2026.09.28", antall: 0 })));
+ok("adminlogg: en versjon nyere enn lista er ingenting nytt (forhåndsvisning)",
+   hva(nyeEndringer(DAGER, { versjon: "2026.10.05", antall: 4 })) === "[]");
+ok("adminlogg: et antall utover lista gir ingenting, ikke et krasj",
+   hva(nyeEndringer(DAGER, { versjon: "2026.09.30", antall: 99 })) === "[]");
+ok("adminlogg: et antall som tull behandles som null",
+   hva(nyeEndringer(DAGER, { versjon: "2026.09.30", antall: "x" })) === '[["2026.09.30",["a","b","c"]]]');
+ok("adminlogg: nyeEndringer rører ikke lista den leser",
+   (() => { const f = JSON.stringify(DAGER); nyeEndringer(DAGER, { versjon: "2026.09.26", antall: 0 }); return f === JSON.stringify(DAGER); })());
+ok("adminlogg: antallNye teller linjer, ikke dager",
+   antallNye(nyeEndringer(DAGER, { versjon: "2026.09.26", antall: 1 })) === 5 && antallNye(null) === 0);
+
+ok("adminlogg: en gyldig innlogging har ingen feil",
+   sjekkInnlogging({ versjon: "2026.09.30", antall: 2 }).length === 0);
+ok("adminlogg: versjonen må ha datoformen",
+   sjekkInnlogging({ versjon: "30.09.2026", antall: 2 }).length === 1 &&
+   sjekkInnlogging({ versjon: "", antall: 2 }).length === 1 &&
+   sjekkInnlogging({ antall: 2 }).length === 1);
+ok("adminlogg: antallet må være et helt tall innenfor taket",
+   sjekkInnlogging({ versjon: "2026.09.30", antall: -1 }).length === 1 &&
+   sjekkInnlogging({ versjon: "2026.09.30", antall: 1.5 }).length === 1 &&
+   sjekkInnlogging({ versjon: "2026.09.30", antall: "2" }).length === 1 &&
+   sjekkInnlogging({ versjon: "2026.09.30", antall: ANTALL_MAKS + 1 }).length === 1);
+ok("adminlogg: null og tull gir feil, ikke krasj", sjekkInnlogging(null).length === 2);
+
+const LR = loggRad({ versjon: "2026.09.30", antall: 2, bruker: "en-annen", tid: "2020-01-01", id: "x" });
+ok("adminlogg: raden sender verken bruker, tid eller id — det setter basen",
+   JSON.stringify(LR) === '{"versjon":"2026.09.30","antall":2}', JSON.stringify(LR));
+
+const TL = tolkAdminLogg([
+  { id: "a", bruker: "u1", tid: "2026-09-30T10:00:00Z", versjon: "2026.09.30", antall: 2 },
+  { id: "b", bruker: "u2", tid: null, versjon: null, antall: null },
+  { bruker: "u3" }, { id: "c" }, null,
+]);
+ok("adminlogg: tolkeren beholder rader med id og bruker, og hopper over resten",
+   TL.length === 2 && TL[0].bruker === "u1" && TL[1].antall === 0 && TL[1].versjon === "", JSON.stringify(TL));
+ok("adminlogg: tull gir en tom liste", tolkAdminLogg(null).length === 0 && tolkAdminLogg({ feil: "x" }).length === 0);
+
+const RADER = tolkAdminLogg([
+  { id: "ny", bruker: "u1", tid: "2026-09-30T10:00:00Z", versjon: "2026.09.30", antall: 2 },
+  { id: "andres", bruker: "u2", tid: "2026-09-29T10:00:00Z", versjon: "2026.09.29", antall: 1 },
+  { id: "gammel", bruker: "u1", tid: "2026-09-27T10:00:00Z", versjon: "2026.09.27", antall: 2 },
+]);
+ok("adminlogg: forrige innlogging er din forrige, ikke den du nettopp skrev og ikke en annens",
+   forrigeInnlogging(RADER, RADER[0]).id === "gammel", JSON.stringify(forrigeInnlogging(RADER, RADER[0])));
+ok("adminlogg: uten en tidligere rad er det ingen forrige",
+   forrigeInnlogging([RADER[0]], RADER[0]) === null && forrigeInnlogging([], RADER[0]) === null);
+
+// `nyeEndringer` leser rekkefølgen i versjoner.js: nyeste dag først, og nye
+// linjer nederst i dagens oppføring. Rekkefølgen mellom dagene kan vi holde;
+// den inni en dag er en regel i fila.
+ok("adminlogg: hver versjon har datoformen, og lista går nyeste først uten dobler",
+   VERSJONER.every((v) => /^\d{4}\.\d{2}\.\d{2}$/.test(v.versjon) && v.versjon.length <= LOGG_VERSJON_MAKS) &&
+   VERSJONER.every((v, i) => i === 0 || VERSJONER[i - 1].versjon > v.versjon),
+   VERSJONER.map((v) => v.versjon).join(" "));
+ok("adminlogg: hver versjon har minst en linje, og ingen stor nok til å sprenge antall-taket",
+   VERSJONER.every((v) => v.endringer.length >= 1 && v.endringer.length <= ANTALL_MAKS));
+
+// Grensene star to steder: her og i basen. Glir de fra hverandre, sier
+// portalen «logget» om noe basen avviser.
+const LOGG_SQL = OPPSETT_SQL.slice(OPPSETT_SQL.indexOf("create table if not exists admin_logg"));
+ok("adminlogg: basens tak er ANTALL_MAKS og VERSJON_MAKS",
+   LOGG_SQL.indexOf("antall between 0 and " + ANTALL_MAKS) > -1 &&
+   LOGG_SQL.indexOf("char_length(versjon) <= " + LOGG_VERSJON_MAKS) > -1);
+ok("adminlogg: skrivingen krever at raden er din og at du er skriver",
+   /for insert to authenticated\s+with check \(\s*bruker = auth\.uid\(\)\s+and exists \(select 1 from visning_skrivere/.test(LOGG_SQL));
+// Dette er hele poenget med en logg: den som er logget kan ikke rydde etter seg.
+ok("adminlogg: loggen er bare å legge til — ingen policy for oppdatering eller sletting",
+   !/for (update|delete|all)\b/.test(LOGG_SQL), (LOGG_SQL.match(/for (update|delete|all)\b/) || [""])[0]);
+ok("adminlogg: bare skrivere leser loggen", /for select to authenticated using \(\s*exists \(select 1 from visning_skrivere/.test(LOGG_SQL));
+ok("adminlogg: raden slettes med kontoen, som resten",
+   /references auth\.users \(id\) on delete cascade/.test(LOGG_SQL));
+ok("adminlogg: loggen har et tak for hva portalen leser", LOGG_MAKS === 50);
 
 /* ---------------- rapport ---------------- */
 

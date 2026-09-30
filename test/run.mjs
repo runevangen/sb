@@ -1574,17 +1574,99 @@ const SAK_7 = kjor("fotball-lenke", FELLES + FOTBALL + `
 const SAK_8 = kjor("fotball-feil", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   ` + mockAlt("saker", true) + `
+  // Samme mock, men med en tjeneste som svarer: det leseren far nar hen
+  // trykker «Prov igjen» etter at nettet er tilbake.
+  function tjenestenKommerTilbake() {
+    ` + mockAlt("saker") + `
+  }
 
   window.addEventListener("load", function () { setTimeout(function () {
     document.getElementById("fanenFotball").click();
-    setTimeout(function () {
-      var tekst = document.getElementById("fotballInnhold").textContent;
+    setTimeout(function () { try {
+      var rot = document.getElementById("fotballInnhold");
+      var boks = rot.querySelector(".state");
+      var synlig = boks.querySelector("p").textContent;
       // En feil skal si fra. En tom tabell ser ut som en liga uten kamper.
-      ok("feil fra tjenesten vises", tekst.indexOf("API-Football") > -1, tekst.slice(0, 60));
+      ok("feil fra tjenesten vises i ord leseren kjenner",
+         synlig.indexOf("Klarte ikke") === 0 && synlig.indexOf("akkurat n") > -1, synlig);
+      ok("uten et leverandornavn leseren ikke har hort om",
+         synlig.indexOf("API-Football") === -1, synlig);
       ok("ingen tom tabell tegnes", !document.querySelector(".tabell"));
-      ferdig();
-    }, 600);
+      ok("men diagnosen star i tekniske detaljer, lukket",
+         boks.querySelector("details.err-details") &&
+         boks.querySelector("details.err-details").open === false &&
+         boks.querySelector("details.err-details").textContent.indexOf("API-Football") > -1,
+         boks.innerHTML.slice(0, 300));
+      var knapp = boks.querySelector("button.retry-btn");
+      ok("og det star en Prov igjen-knapp", !!knapp && knapp.textContent === "Prøv igjen",
+         knapp && knapp.textContent);
+      tjenestenKommerTilbake();
+      knapp.click();
+      setTimeout(function () { try {
+        ok("knappen henter pa nytt, og tabellen star der",
+           !!document.querySelector("#fotballInnhold .tabell"),
+           document.getElementById("fotballInnhold").textContent.slice(0, 80));
+        ferdig();
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 600);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 600);
   }, 900); });
+`);
+
+// Et sok uten treff er en blindvei uten en knapp: krysset for a fjerne det
+// star bare i toppfeltet (#181).
+const SAK_8B = kjor("sok-uten-treff", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  ` + mockAlt("saker") + `
+  var fetchFor = window.fetch;
+  window.fetch = function (u) {
+    if (String(u).indexOf("search=") > -1) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve("[]"); } });
+    }
+    return fetchFor(u);
+  };
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.getElementById("sokFelt").value = "qqqzzz";
+    document.getElementById("sokForm").dispatchEvent(new Event("submit", { cancelable: true }));
+    setTimeout(function () { try {
+      var state = document.querySelector("#feed .state");
+      ok("soket uten treff sier det", !!state && state.textContent.indexOf("Ingen artikler funnet") > -1,
+         document.getElementById("feed").textContent.slice(0, 80));
+      var fjern = state && state.querySelector("button.retry-btn");
+      ok("med en knapp som fjerner soket", !!fjern && fjern.textContent === "Fjern søket",
+         fjern && fjern.textContent);
+      fjern.click();
+      setTimeout(function () { try {
+        ok("knappen viser feeden igjen", document.querySelectorAll("#feed .row").length > 0,
+           document.getElementById("feed").textContent.slice(0, 80));
+        ok("og soket er borte, ogsa fra toppfeltet og feltet",
+           document.getElementById("sokFelt").value === "" &&
+           !document.querySelector("#filterTag .filter-chip"),
+           document.getElementById("sokFelt").value);
+        ferdig();
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
+`);
+
+// «Venner» uten svar: teksten var en instruksjon, ikke en vei dit (#181).
+const SAK_8C = kjor("venner-tom", epostSide(false) + `
+  location.hash = "#/fotball/eliteserien/venner";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var rot = document.getElementById("fotballInnhold");
+    ok("ingen har svart, og fanen sier det",
+       rot.textContent.indexOf("Ingen har sagt at de blir med") > -1, rot.textContent.slice(0, 120));
+    var knapp = rot.querySelector("button.retry-btn");
+    ok("med en knapp til Kommende", !!knapp && knapp.textContent === "Gå til Kommende",
+       knapp && knapp.textContent);
+    knapp.click();
+    setTimeout(function () { try {
+      ok("som tar deg dit", location.hash.indexOf("/neste") > -1 &&
+         document.querySelector("#fotballFaner .segment-del[data-verdi='neste']").getAttribute("aria-current") === "true",
+         location.hash);
+      ferdig();
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
 `);
 
 /* ---------------- 9. lag i tabellen soker i nyhetene ---------------- */
@@ -2048,8 +2130,11 @@ const SAK_12 = kjor("kamp-deling", FELLES + FOTBALL + `
          valgtChip && valgtChip.classList.contains("valgt"),
          valgtChip && valgtChip.className);
       ok("og utlogget star det hvorfor man ikke kommer pa lista",
-         panel.querySelector(".kamp-svar").textContent.indexOf("Logg inn") === 0,
+         panel.querySelector(".kamp-svar").textContent.indexOf("Et fornavn og en PIN") === 0 &&
+         panel.querySelector(".kamp-svar").textContent.indexOf("i menyen") === -1,
          panel.querySelector(".kamp-svar").textContent);
+      ok("med en knapp i svaret som apner innloggingen",
+         !!panel.querySelector(".kamp-svar .kamp-logginn"));
       ok("men lista er ikke en port: kortet lover ikke noe annet",
          panel.querySelector(".kamp-note").textContent.indexOf("virker uansett") > -1,
          panel.querySelector(".kamp-note").textContent);
@@ -4507,7 +4592,16 @@ const SAK_15F = kjor("admin-ikke-denne-kvelden", `
 // kvelden» kunne ikke sta noe sted uansett hvor riktig knappen var
 // bygget. Meldt 21. september 2026: «ser ingen forskjell pa admin?»
 const SAK_15H = kjor("admin-uten-okt", `
-  try { localStorage.removeItem("sb-konto"); } catch (e) { /* privat modus */ }
+  // Okta finnes da portalen apnes — uten den apner den ikke (ADR 0026,
+  // innloggingen skrives i loggen med din egen okt). Den forsvinner rett
+  // etterpa, i stubben under: slik utloper den midt i en okt, og det er
+  // den tilstanden scenen handler om.
+  try {
+    localStorage.setItem("sb-konto", JSON.stringify({
+      token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
+      utloper: Date.now() + 3600000,
+    }));
+  } catch (e) { /* privat modus */ }
 
   var IDAG = new Date().toISOString().slice(0, 10);
   var MED = { nokkel: "sportsbaren-bodo", navn: "Sportsbaren Bodø", bydel: "Sentrum",
@@ -4531,6 +4625,11 @@ const SAK_15H = kjor("admin-uten-okt", `
   }
   window.fetch = function (u, opt) {
     u = String(u);
+    if (u.indexOf("/api/admin-logg") === 0) {
+      try { localStorage.removeItem("sb-konto"); } catch (e) { /* privat modus */ }
+      return svar(200, { ok: true, innlogging: { id: "l1", bruker: "u-admin", tid: new Date().toISOString() },
+                         forrige: null, forrigeFeil: false });
+    }
     if (u.indexOf("/api/visninger") === 0) {
       if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [], visninger: [] });
       var v = JSON.parse(opt.body);
@@ -4627,7 +4726,16 @@ const SAK_15H = kjor("admin-uten-okt", `
 // den hele veien. Da er det ingen ting som tegner lista om — uten at noen
 // gjor det med vilje.
 const SAK_15I = kjor("admin-rettelsen-lander-sist", `
-  try { localStorage.removeItem("sb-konto"); } catch (e) { /* privat modus */ }
+  // Okta finnes da portalen apnes — uten den apner den ikke (ADR 0026,
+  // innloggingen skrives i loggen med din egen okt). Den forsvinner rett
+  // etterpa, i stubben under: slik utloper den midt i en okt, og det er
+  // den tilstanden scenen handler om.
+  try {
+    localStorage.setItem("sb-konto", JSON.stringify({
+      token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
+      utloper: Date.now() + 3600000,
+    }));
+  } catch (e) { /* privat modus */ }
 
   var IDAG = new Date().toISOString().slice(0, 10);
   var RETTET = { nokkel: "andyspub", navn: "Andy's Pub", bydel: "Sentrum",
@@ -4657,6 +4765,11 @@ const SAK_15I = kjor("admin-rettelsen-lander-sist", `
   }
   window.fetch = function (u, opt) {
     u = String(u);
+    if (u.indexOf("/api/admin-logg") === 0) {
+      try { localStorage.removeItem("sb-konto"); } catch (e) { /* privat modus */ }
+      return svar(200, { ok: true, innlogging: { id: "l1", bruker: "u-admin", tid: new Date().toISOString() },
+                         forrige: null, forrigeFeil: false });
+    }
     if (u.indexOf("/api/visninger") === 0) {
       if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [], visninger: [] });
       var v = JSON.parse(opt.body);
@@ -5655,6 +5768,248 @@ const SAK_15K = kjor("admin-feil-og-onsker", `
     } catch (e) { ok("ingen unntak i portalen", false, e.message); ferdig(); } }, 300);
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400); });
 `, null, adminSide);
+
+/* ---------------- 15L. adminloggen ---------------- */
+
+// Nyeste versjon og linjene i den, som scenene regner fra. Staar her som
+// kildekode fordi scenene er tekst.
+const VER_HJELP = `
+  function linjer(v) { return v.endringer.length; }
+  function sum(VER) { return VER.reduce(function (s, v) { return s + v.endringer.length; }, 0); }
+`;
+
+// Innloggingen skrives i loggen for portalen apnes, og svaret sier hva som er
+// nytt siden forrige gang. Stubben modellerer TJENESTEN: den svarer med en
+// forrige innlogging, og portalen regner selv ut hva som er nytt av den
+// ekte versjoner.js — sa scenene bryter ikke nar lista vokser.
+//
+// `loggSvar` og `sjekk` er kildekode for funksjoner: scenene er
+// mal-literaler, og en funksjon kan ikke sendes inn i nettleseren som noe
+// annet enn tekst.
+function adminLoggScene(okt, loggSvar, sjekk) {
+  return `
+  try {
+    ` + (okt
+    ? `localStorage.setItem("sb-konto", JSON.stringify({
+         token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
+         utloper: Date.now() + 3600000 }));`
+    : `localStorage.removeItem("sb-konto");`) + `
+  } catch (e) { /* privat modus */ }
+
+  window.__logg = [];
+  var VER = null;
+  var LISTE = [
+    { id: "l3", bruker: "u-admin", tid: new Date().toISOString(), versjon: "2026.09.30", antall: 2 },
+    { id: "l2", bruker: "u-2", tid: "2026-09-28T10:00:00Z", versjon: "2026.09.27", antall: 2 },
+    { id: "l1", bruker: "u-borte", tid: "2026-09-20T10:00:00Z", versjon: "2026.09.26", antall: 1 }
+  ];
+  function svar(status, kropp) {
+    return Promise.resolve({ ok: status < 400, status: status, text: function () {
+      return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  var loggSvar = ` + loggSvar + `;
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("/api/admin-logg") === 0) {
+      var k = JSON.parse(opt.body);
+      window.__logg.push(k);
+      if (k.passord !== "hemmelig") return svar(401, { feil: "Feil passord" });
+      if (k.handling === "liste") return svar(200, { logg: LISTE });
+      return loggSvar(VER, k, svar);
+    }
+    if (u.indexOf("/api/fotball") === 0) {
+      return svar(200, { liga: "Eliteserien", sesong: 2026, kilde: "TheSportsDB",
+                         runde: "Runde 21", runder: ["Runde 21"], kamper: [] });
+    }
+    if (u.indexOf("/api/pub-liste") === 0) return svar(200, { puber: [], klar: true });
+    if (u.indexOf("/api/pub-forslag") === 0) return svar(200, { forslag: [] });
+    if (u.indexOf("/api/tilbakemelding") === 0) return svar(200, { meldinger: [] });
+    if (u.indexOf("/api/brukere") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [] });
+      // Brukerlista lander ETTER loggen, som pa en telefon.
+      return new Promise(function (ferdigSvar) { setTimeout(function () {
+        ferdigSvar(svar(200, { brukere: [
+          { id: "u-admin", navn: "Rune", slug: "rune", forst: "2026-09-01T10:00:00Z",
+            sist: "2026-09-12T19:00:00Z", aktiv: "" },
+          { id: "u-2", navn: "Kari", slug: "kari", forst: "2026-09-01T10:00:00Z",
+            sist: "2026-09-12T19:00:00Z", aktiv: "" }
+        ] }));
+      }, 600); });
+    }
+    if (u.indexOf("/api/visninger") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [], visninger: [] });
+      var v = JSON.parse(opt.body);
+      if (v.handling === "sjekk") {
+        return v.passord === "hemmelig" ? svar(200, { ok: true }) : svar(401, { feil: "Feil passord" });
+      }
+      return svar(200, { ok: true, visninger: [] });
+    }
+    return svar(200, {});
+  };
+
+  function felt(id) { return document.getElementById(id); }
+  ` + VER_HJELP + `
+  var sjekkFn = ` + sjekk + `;
+
+  window.addEventListener("load", function () {
+    import("/versjoner.js").then(function (m) {
+      VER = m.VERSJONER;
+      setTimeout(function () { try {
+        felt("passord").value = "hemmelig";
+        felt("loggInn").click();
+        setTimeout(function () { try {
+          sjekkFn(VER, felt);
+        } catch (e) { ok("ingen unntak i sjekken", false, e.message); ferdig(); } }, 250);
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 200);
+    });
+  });
+`;
+}
+
+// Samme dag, en linje til: DETTE er grunnen til at raden husker et antall og
+// ikke bare en versjon. Med bare nummeret ville den ikke vaert ny.
+const SAK_15L = kjor("admin-logg-delvis-nytt", adminLoggScene(true, `function (VER, k, svar) {
+    var n = VER[0];
+    return svar(200, { ok: true, innlogging: { id: "l3", bruker: "u-admin", tid: new Date().toISOString() },
+      forrige: { id: "l2", bruker: "u-admin", tid: new Date(Date.now() - 7200000).toISOString(),
+                 versjon: n.versjon, antall: n.endringer.length - 1 },
+      forrigeFeil: false });
+  }`, `function (VER, felt) {
+    var n = VER[0];
+    var innlogget = window.__logg.filter(function (k) { return k.handling === "innlogget"; });
+    ok("portalen er apnet", felt("portal").hidden === false);
+    ok("innloggingen sender nyeste versjon og antall linjer",
+       innlogget.length === 1 && innlogget[0].versjon === n.versjon &&
+       innlogget[0].antall === n.endringer.length && innlogget[0].token === "okt-token",
+       JSON.stringify(innlogget));
+    ok("og ikke hvem du er: det sier basen",
+       !("bruker" in innlogget[0]) && !("tid" in innlogget[0]), JSON.stringify(innlogget[0]));
+    ok("boksen star der", felt("nyttSiden").hidden === false);
+    var li = felt("nyttListe").querySelectorAll("li");
+    ok("med akkurat den ene nye linja", li.length === 1, li.length);
+    ok("som er den siste i dagens oppforing",
+       li.length === 1 && li[0].textContent.indexOf(n.endringer[n.endringer.length - 1].hva) === 0,
+       li.length ? li[0].textContent : "ingen");
+    ok("under riktig versjon",
+       felt("nyttListe").querySelector(".versjon-nr").textContent === n.versjon);
+    ok("og hinten sier en endring, ikke flere",
+       felt("nyttHint").textContent.indexOf("1 endring siden du var inne") === 0,
+       felt("nyttHint").textContent);
+    felt("nyttSkjul").click();
+    ok("Skjul legger den bort", felt("nyttSiden").hidden === true);
+    ferdig();
+  }`), null, adminSide);
+
+// Alt er nytt: forrige gang var for lenge siden.
+const SAK_15M = kjor("admin-logg-alt-nytt", adminLoggScene(true, `function (VER, k, svar) {
+    return svar(200, { ok: true, innlogging: { id: "l3", bruker: "u-admin", tid: new Date().toISOString() },
+      forrige: { id: "l1", bruker: "u-admin", tid: "2026-01-01T10:00:00Z", versjon: "2000.01.01", antall: 0 },
+      forrigeFeil: false });
+  }`, `function (VER, felt) {
+    ok("boksen star der", felt("nyttSiden").hidden === false);
+    ok("med hver linje i hver versjon",
+       felt("nyttListe").querySelectorAll("li").length === sum(VER),
+       felt("nyttListe").querySelectorAll("li").length + " mot " + sum(VER));
+    ok("og en boks per versjon, nyeste forst",
+       felt("nyttListe").querySelectorAll(".versjon-boks").length === VER.length &&
+       felt("nyttListe").querySelector(".versjon-nr").textContent === VER[0].versjon);
+    ok("hinten teller linjer",
+       felt("nyttHint").textContent.indexOf(sum(VER) + " endringer siden du var inne") === 0,
+       felt("nyttHint").textContent);
+    ferdig();
+  }`), null, adminSide);
+
+// Ingenting er nytt: da skal boksen tie. En boks som sier «ingenting nytt»
+// er en pastand portalen ikke kan vite er sann.
+const SAK_15N = kjor("admin-logg-ingenting-nytt", adminLoggScene(true, `function (VER, k, svar) {
+    var n = VER[0];
+    return svar(200, { ok: true, innlogging: { id: "l3", bruker: "u-admin", tid: new Date().toISOString() },
+      forrige: { id: "l2", bruker: "u-admin", tid: new Date(Date.now() - 600000).toISOString(),
+                 versjon: n.versjon, antall: n.endringer.length },
+      forrigeFeil: false });
+  }`, `function (VER, felt) {
+    ok("portalen er apnet", felt("portal").hidden === false);
+    ok("boksen er skjult nar ingenting er nytt", felt("nyttSiden").hidden === true);
+    ok("og den er tom", felt("nyttListe").children.length === 0);
+    ferdig();
+  }`), null, adminSide);
+
+// Forste innlogging: ingen forrige a sammenlikne med. Hele lista kalt
+// «nytt» ville vaert en pastand uten grunn. Her testes ogsa loggseksjonen,
+// fordi navnene kommer fra brukerlista som lander etterpa.
+const SAK_15O = kjor("admin-logg-forste-og-seksjon", adminLoggScene(true, `function (VER, k, svar) {
+    return svar(200, { ok: true, innlogging: { id: "l3", bruker: "u-admin", tid: new Date().toISOString() },
+      forrige: null, forrigeFeil: false });
+  }`, `function (VER, felt) {
+    ok("forste innlogging sier det", felt("nyttSiden").hidden === false &&
+       felt("nyttTittel").textContent === "Første innlogging", felt("nyttTittel").textContent);
+    ok("og kaller ikke hele lista nytt", felt("nyttListe").children.length === 0);
+
+    // Loggseksjonen, for brukerlista har landet: navnet er ikke kjent, og da
+    // star det hva vi vet framfor et gjettet navn.
+    var rader = felt("loggListe").querySelectorAll(".logg-rad");
+    ok("loggen viser alle radene", rader.length === 3, rader.length);
+    ok("tallet i hodet teller dem", felt("loggTall").textContent === "3", felt("loggTall").textContent);
+    ok("for brukerlista har landet, star det ingen gjettet navn",
+       rader[0].querySelector(".logg-navn").textContent.indexOf("Ukjent konto") === 0,
+       rader[0].querySelector(".logg-navn").textContent);
+    setTimeout(function () { try {
+      var r2 = felt("loggListe").querySelectorAll(".logg-rad");
+      ok("nar brukerlista lander, far loggen navnene",
+         r2[0].querySelector(".logg-navn").textContent === "Rune (deg)" &&
+         r2[1].querySelector(".logg-navn").textContent === "Kari",
+         r2[0].querySelector(".logg-navn").textContent + " / " + r2[1].querySelector(".logg-navn").textContent);
+      ok("en konto som ikke finnes lenger, far ikke et navn",
+         r2[2].querySelector(".logg-navn").textContent === "Ukjent konto u-borte",
+         r2[2].querySelector(".logg-navn").textContent);
+      ok("og versjonen star ved tidspunktet",
+         r2[1].querySelector(".logg-tid").textContent.indexOf("versjon 2026.09.27") > -1,
+         r2[1].querySelector(".logg-tid").textContent);
+      ferdig();
+    } catch (e) { ok("ingen unntak etter brukerlista", false, e.message); ferdig(); } }, 700);
+  }`), null, adminSide);
+
+// Loggen ble skrevet, men forrige gang lot seg ikke lese: da sier boksen det.
+const SAK_15P = kjor("admin-logg-forrige-feilet", adminLoggScene(true, `function (VER, k, svar) {
+    return svar(200, { ok: true, innlogging: { id: "l3", bruker: "u-admin", tid: new Date().toISOString() },
+      forrige: null, forrigeFeil: true });
+  }`, `function (VER, felt) {
+    ok("portalen er apnet", felt("portal").hidden === false);
+    ok("boksen sier at forrige gang ikke ble lest",
+       felt("nyttSiden").hidden === false && felt("nyttHint").textContent.indexOf("Fikk ikke hentet") === 0,
+       felt("nyttHint").textContent);
+    ok("og den sier ikke at noe er nytt", felt("nyttListe").children.length === 0);
+    ferdig();
+  }`), null, adminSide);
+
+// Uten okt vet vi ikke hvem som kom inn, og da apner ikke portalen.
+const SAK_15Q = kjor("admin-logg-uten-okt", adminLoggScene(false, `function (VER, k, svar) {
+    return svar(200, { ok: true, innlogging: { id: "l3", bruker: "u-admin", tid: "2026-09-30T10:00:00Z" },
+      forrige: null, forrigeFeil: false });
+  }`, `function (VER, felt) {
+    ok("portalen er ikke apnet uten okt", felt("portal").hidden === true);
+    ok("og sier hvorfor, med det leseren kan gjore",
+       felt("adgangMelding").textContent.indexOf("Logg inn i appen først") === 0,
+       felt("adgangMelding").textContent);
+    ok("uten a rore loggen", window.__logg.length === 0, JSON.stringify(window.__logg));
+    ok("knappen kan proves igjen", felt("loggInn").disabled === false);
+    ok("og passordet ligger ikke i variabelen som apner noe",
+       felt("adgang").hidden === false);
+    ferdig();
+  }`), null, adminSide);
+
+// Innlogget, men ikke skriver: databasen sier nei, og portalen sier det i
+// dens ord. Ikke «logg inn pa nytt» — det hjelper ikke.
+const SAK_15R = kjor("admin-logg-uten-adgang", adminLoggScene(true, `function (VER, k, svar) {
+    return svar(403, { feil: "Kontoen din har ikke adgang til portalen: den står ikke i visning_skrivere. Be en som har adgang om å legge deg til." });
+  }`, `function (VER, felt) {
+    ok("portalen er ikke apnet", felt("portal").hidden === true);
+    ok("og meldingen navngir tabellen, sa den kan gjores noe med",
+       felt("adgangMelding").textContent.indexOf("visning_skrivere") > -1,
+       felt("adgangMelding").textContent);
+    ok("knappen kan proves igjen", felt("loggInn").disabled === false);
+    ferdig();
+  }`), null, adminSide);
 
 /* ---------------- 16. puben bekrefter kampen ---------------- */
 
@@ -6691,8 +7046,9 @@ const SAK_17 = kjor("kamp-lenke", FELLES + FOTBALL + `
     // Den som kommer fra en delt lenke er utlogget. Da skal det sta hva
     // som mangler — og at resten virker uansett.
     ok("utlogget star det hva som skal til for a bli med",
-       panel.querySelector(".kamp-note").textContent.indexOf("Logg inn i menyen") > -1 &&
-       panel.querySelector(".kamp-note").textContent.indexOf("virker uansett") > -1,
+       panel.querySelector(".kamp-note").textContent.indexOf("Et fornavn og en PIN") > -1 &&
+       panel.querySelector(".kamp-note").textContent.indexOf("virker uansett") > -1 &&
+       panel.querySelector(".kamp-note").textContent.indexOf("i menyen") === -1,
        panel.querySelector(".kamp-note").textContent);
 
     // Trykker du pa et sted uten a vaere logget inn, skal du fa vite det
@@ -6701,7 +7057,8 @@ const SAK_17 = kjor("kamp-lenke", FELLES + FOTBALL + `
     // lagret, sier at det virket.
     pekt.querySelector(".sted-knapp").click();
     ok("et trykk utlogget sier at det krever innlogging",
-       panel.querySelector(".kamp-svar").textContent.indexOf("Logg inn i menyen") === 0,
+       panel.querySelector(".kamp-svar").textContent.indexOf("Et fornavn og en PIN") === 0 &&
+       !!panel.querySelector(".kamp-svar .kamp-logginn"),
        panel.querySelector(".kamp-svar").textContent);
     ok("og det sier hva stedet da er godt for",
        panel.querySelector(".kamp-svar").textContent.indexOf("deler kampen") > -1,
@@ -7005,6 +7362,219 @@ const SAK_18 = kjor("innlogging", FELLES + `
       try { f(); } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); }
     }, 300);
   }
+`);
+
+/* ---------------- 18f. en adresse er ikke et fornavn (#142) ---------------- */
+
+// Feltet spor om fornavnet, men noen skriver adressen sin, og da sto den
+// i «blir med»-lista, synlig for alle uten innlogging. To veier inn, og
+// begge maa stoppes hvor leseren ser det — derfor to scener: den ene
+// starter innlogget, den andre utlogget, og en okt i minnet kan ikke
+// «logges ut» av a rore localStorage.
+//
+//   A. Innloggingen: et NYTT navn med @ avvises for PIN-en tastes.
+//   B. Den som alt er inne med en adresse som navn: «Jeg skal hit» sier
+//      hva som er galt og hva som kan gjores — ikke «vi mangler
+//      fornavnet ditt», for navnet er der, og det er det som er galt.
+//
+// Stubben modellerer tjenestens SVAR (teksten tjenesten faktisk sender),
+// ikke koden som lager det.
+function epostSide(innlogget) {
+  return FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  var ARETS = KOMMENDE.map(function (k) { return Object.assign({}, k, { arena: "Brann Stadion" }); });
+  window.__konto = [];
+  window.__svarKall = [];
+  function svarMed(kropp, status) {
+    return Promise.resolve({ ok: !status || status < 400, status: status || 200,
+      statusText: "OK", text: function () { return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, o) {
+    u = String(u);
+    var inn = o && o.body ? JSON.parse(o.body) : null;
+    if (u.indexOf("/api/konto") === 0) {
+      window.__konto.push(inn ? inn.handling : "oppsett");
+      if (!inn) return svarMed({ klar: true, mangler: [] });
+      if (inn.handling === "finnes") {
+        if (String(inn.navn).indexOf("@") > -1) {
+          return svarMed({ feil: "Skriv fornavnet ditt, ikke en e-postadresse. Vi trenger ingen e-post, og vi viser aldri noen." }, 400);
+        }
+        return svarMed({ navn: inn.navn, finnes: false });
+      }
+      return svarMed({ feil: "Ukjent handling" }, 400);
+    }
+    if (u.indexOf("/api/svar") === 0) {
+      window.__svarKall.push(inn);
+      return svarMed({ svar: [], visninger: [] });
+    }
+    if (u.indexOf("/api/puber?") === 0 || u.indexOf("/api/vaer?") === 0 ||
+        u.indexOf("/api/pub-liste") === 0 || u.indexOf("overpass") > -1) return svarMed({}, 502);
+    if (u.indexOf("/api/fotball/") === 0) {
+      var del = u.split("?")[0].split("/").pop();
+      var kropp = { liga: "Eliteserien", sesong: 2026, sisteSesong: true, del: del,
+                    kilde: "TheSportsDB", oppdatert: new Date().toISOString(),
+                    kamper: ARETS, runde: "Runde 21" };
+      if (del === "tabell") kropp.tabell = TABELL;
+      return svarMed(kropp);
+    }
+    return svarMed(u.indexOf("/wp-api/categories") === 0 ? KATEGORIER : saker);
+  };
+  ${innlogget ? `
+  // En konto fra for regelen kom, med adressen som navn.
+  localStorage.setItem("sb-konto", JSON.stringify({ token: "okt-1",
+    navn: "ola@epost.no", bruker: "u-1",
+    utloper: new Date(Date.now() + 3600000).toISOString() }));
+  location.hash = "#/fotball/eliteserien/neste";` : ""}
+
+  function setFo(f) {
+    setTimeout(function () {
+      try { f(); } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); }
+    }, 300);
+  }
+`;
+}
+
+// B: innlogget med en adresse som navn.
+const SAK_18F = kjor("epost-som-navn-inne", epostSide(true) + `
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.querySelectorAll(".kamp.delbar")[0].querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    setFo(function () {
+      var knapp = panel.querySelector(".sted-knapp");
+      ok("kortet har et sted aa trykke paa", !!knapp);
+      knapp.click();
+      setFo(function () {
+        var tekst = panel.textContent;
+        ok("«Jeg skal hit» sier at navnet er en adresse", tekst.indexOf("e-postadresse") > -1, tekst.slice(-240));
+        ok("og hva som kan gjores: logge ut og lage en konto med fornavnet",
+           tekst.indexOf("Logg ut") > -1 && tekst.indexOf("fornavnet") > -1, tekst.slice(-240));
+        // «Vi mangler fornavnet ditt» hadde faatt leseren til a skrive det
+        // samme en gang til.
+        ok("ikke «vi mangler fornavnet ditt»: navnet er der, det er det som er galt",
+           tekst.indexOf("vi mangler fornavnet") === -1, tekst.slice(-240));
+        ok("og ingenting ble sendt til lista",
+           window.__svarKall.filter(Boolean).length === 0, JSON.stringify(window.__svarKall));
+        ferdig();
+      });
+    });
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
+`);
+
+// A: utlogget, et nytt navn med @.
+const SAK_18G = kjor("epost-som-navn-ny", epostSide(false) + `
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.getElementById("menuBtn").click();
+    document.getElementById("kontoBtn").click();
+    var feltNavn = document.getElementById("kontoNavn");
+    var feltPin = document.getElementById("kontoPin");
+    var send = document.getElementById("kontoSend");
+    ok("innloggingen star paa navnesteget", !feltNavn.hidden && feltPin.hidden,
+       feltNavn.hidden + " " + feltPin.hidden);
+    feltNavn.value = "ola@epost.no";
+    send.click();
+    setFo(function () {
+      var svar = document.getElementById("kontoSvar").textContent;
+      ok("en adresse som nytt navn avvises med tjenestens ord",
+         svar.indexOf("e-postadresse") > -1, svar);
+      // Skjemaet skal ikke gaa videre: PIN-en ville blitt tastet to ganger
+      // til en konto som aldri kan lages.
+      ok("og man star fortsatt paa navnesteget, uten PIN-felt",
+         !feltNavn.hidden && feltPin.hidden && send.textContent === "Fortsett",
+         feltNavn.hidden + " " + feltPin.hidden + " " + send.textContent);
+      ok("navnet staar igjen, saa det kan rettes i stedet for skrives paa nytt",
+         feltNavn.value === "ola@epost.no", feltNavn.value);
+      ok("det ble spurt om navnet, men ingen konto ble forsoekt laget",
+         window.__konto.indexOf("finnes") > -1 && window.__konto.indexOf("logg-inn") === -1,
+         window.__konto.join(","));
+      ferdig();
+    });
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
+`);
+
+// «Logg inn» i kampkortet er en knapp, og den apner innloggingen der leseren
+// er (#180). Malt hele veien: trykk i kortet, meny med feltet i fokus,
+// innlogging, og kortet som ikke lenger ber deg logge inn. Utlogget, med
+// en mock som tar imot et ekte navn og en ekte PIN.
+const SAK_18H = kjor("logg-inn-fra-kortet", epostSide(false) + `
+  location.hash = "#/fotball/eliteserien/neste";
+  var fetchFor = window.fetch;
+  window.fetch = function (u, o) {
+    var inn = o && o.body ? JSON.parse(o.body) : null;
+    if (String(u).indexOf("/api/konto") === 0 && inn) {
+      if (inn.handling === "finnes") return svarMed({ navn: inn.navn, finnes: true });
+      if (inn.handling === "logg-inn") {
+        return svarMed({ token: "okt-7", navn: inn.navn, bruker: "u-7",
+          utloper: new Date(Date.now() + 3600000).toISOString() });
+      }
+    }
+    return fetchFor(u, o);
+  };
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.querySelectorAll(".kamp.delbar")[0].querySelector(".kamp-del").click();
+    var panel = document.querySelector(".kamp-panel");
+    setFo(function () {
+      var note = panel.querySelector(".kamp-note");
+      var knapp = note && note.querySelector("button.kamp-logginn");
+      ok("notatet i kortet har en Logg inn-knapp", !!knapp, note && note.innerHTML);
+      ok("og setningen peker ikke lenger pa menyen",
+         note.textContent.indexOf("i menyen") === -1 && note.textContent.indexOf("virker uansett") > -1,
+         note.textContent);
+      ok("menyen er lukket for trykket",
+         !document.getElementById("menuPanel").classList.contains("open"));
+      knapp.click();
+      ok("trykket apner menyen", document.getElementById("menuPanel").classList.contains("open"));
+      ok("med innloggingen ute", document.getElementById("kontoPanel").hidden === false &&
+         document.getElementById("kontoBtn").getAttribute("aria-expanded") === "true");
+      ok("og navnefeltet i fokus, sa du kan skrive med en gang",
+         document.activeElement === document.getElementById("kontoNavn"),
+         document.activeElement && document.activeElement.id);
+      var feltNavn = document.getElementById("kontoNavn");
+      var feltPin = document.getElementById("kontoPin");
+      var send = document.getElementById("kontoSend");
+      feltNavn.value = "Ola";
+      send.click();
+      setFo(function () {
+        feltPin.value = "1234";
+        send.click();
+        setFo(function () {
+          ok("innloggingen gar gjennom", !!localStorage.getItem("sb-konto"));
+          ok("menyen lukkes og du star i kortet igjen",
+             !document.getElementById("menuPanel").classList.contains("open") &&
+             !!document.querySelector(".kamp-panel"));
+          ok("og kortet ber deg ikke lenger logge inn",
+             !document.querySelector(".kamp-panel .kamp-note") &&
+             !document.querySelector(".kamp-panel .kamp-logginn"),
+             document.querySelector(".kamp-panel").innerHTML.slice(-300));
+          ferdig();
+        });
+      });
+    });
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
+`);
+
+// Den runde initialen i toppfeltet (#170). Bokstaven er CSS (::before), sa
+// teksten i knappen er fortsatt navnet; malt pa den ferdige siden.
+const SAK_18I = kjor("rund-initial", epostSide(true) + `
+  localStorage.setItem("sb-konto", JSON.stringify({ token: "okt-1",
+    navn: "ola", bruker: "u-1",
+    utloper: new Date(Date.now() + 3600000).toISOString() }));
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var hvem = document.getElementById("hvemTag");
+    var ring = getComputedStyle(hvem, "::before");
+    ok("knappen viser navnet, uten initialen i teksten",
+       !hvem.hidden && hvem.textContent === "ola", hvem.textContent);
+    ok("initialen er den forste bokstaven, stor", ring.content === '"O"', ring.content);
+    ok("og den er en sirkel",
+       ring.borderRadius === "50%" && ring.width === ring.height && parseFloat(ring.width) >= 20,
+       ring.borderRadius + " " + ring.width + " " + ring.height);
+    ok("lys bla bakgrunn, morkt bla bokstav (#142680)",
+       ring.color === "rgb(20, 38, 128)" && ring.backgroundColor === "rgb(220, 232, 255)",
+       ring.color + " " + ring.backgroundColor);
+    var boks = hvem.getBoundingClientRect();
+    ok("knappen er innenfor toppfeltet og minst 28 px hoy", boks.height >= 28 && boks.width > 40,
+       boks.width + "x" + boks.height);
+    ferdig();
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
 `);
 
 /* ---------------- 18c. favorittlagene folger kontoen, og PIN-en byttes ---------------- */
@@ -8593,6 +9163,10 @@ const SAK_20B = kjor("venner-tak", FELLES + FOTBALL + `
         ok("og pastar ikke at ingen blir med",
            rot.textContent.indexOf("Ingen har sagt at de blir med") === -1,
            rot.textContent.slice(0, 200));
+        // Feilen stopper, og da skal det sta hva som kan gjores na.
+        var prov = rot.querySelector("button.retry-btn");
+        ok("og fanen har en Prov igjen-knapp", !!prov && prov.textContent === "Prøv igjen",
+           prov && prov.textContent);
         ferdig();
       } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
@@ -9142,7 +9716,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

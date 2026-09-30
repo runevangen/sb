@@ -22,8 +22,23 @@
 // denne lista. Sto bare denne der, kunne den si 21. september over en app
 // som ble bygget den 12.
 //
-// Nyeste først.
+// **Nyeste versjon først — og nye linjer nederst i dagens oppføring.**
+// Adminloggen (`admin-logg-data.js`) husker hvor mange linjer nyeste versjon
+// hadde da du sist var inne, og regner «nytt siden sist» ut fra det: en linje
+// som legges til øverst eller midt i en dag, ville blitt telt som den du
+// allerede har sett. En vakt i `unit.mjs` holder rekkefølgen mellom dagene.
 export const VERSJONER = [
+  {
+    versjon: "2026.09.30",
+    endringer: [
+      { hva: "Søk uten treff har en «Fjern søket»-knapp, en fotballfeil sier «Klarte ikke å hente fotballdata akkurat nå» med «Prøv igjen», og tom «Venner» har en knapp til Kommende.", issue: 181 },
+      { hva: "«Logg inn» er en knapp i kampkortet, ikke en setning som peker på menyen: ett trykk, og innloggingen står framme med feltet klart.", issue: 180 },
+      { hva: "Navnet ditt i toppfeltet har en rund initial foran seg, lys blå med mørk blå bokstav.", issue: 170 },
+      { hva: "Fornavnsfeltet avviser e-postadresser, og en adresse som alt sto som navn vises ikke lenger i «blir med»-lista.", issue: 142 },
+      { hva: "Portalen logger hvem som er inne: hver innlogging blir en rad med navn og tidspunkt, og du ser loggen under «Adminlogg». Portalen åpner bare når du er innlogget i appen." },
+      { hva: "Når noe har skjedd siden sist du var inne, står det øverst i portalen under «Nytt siden sist»." },
+    ],
+  },
   {
     versjon: "2026.09.27",
     endringer: [

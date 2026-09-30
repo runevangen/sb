@@ -17,6 +17,7 @@
 // de, svarer funksjonen 503 og sier hva som mangler, framfor å sende en
 // PostgREST-feil videre til leseren.
 
+import { navnErEpost, EPOST_SOM_NAVN_INNE } from "../../pin-data.js";
 import { tolkSvar, svarRad, gyldigNavn, gyldigKampId, SVAR_MAKS, KAMPER_MAKS }
   from "../../svar-data.js";
 import { tolkVisninger } from "../../visning-data.js";
@@ -104,6 +105,10 @@ async function settSvar(inn) {
 
   const kampId = String(inn.kampId == null ? "" : inn.kampId);
   if (!gyldigKampId(kampId)) return svar({ feil: "Ukjent kamp" }, 400);
+  // Adressen før den generelle sjekken: «Skriv navnet vennene ser deg som»
+  // er feil svar til den som alt har skrevet noe, og som ikke kan skrive
+  // det om igjen (#142).
+  if (navnErEpost(inn.navn)) return svar({ feil: EPOST_SOM_NAVN_INNE }, 400);
   if (!gyldigNavn(inn.navn)) return svar({ feil: "Skriv navnet vennene ser deg som" }, 400);
 
   // Upsert: svarer du to ganger pa samme kamp, endrer du svaret ditt.

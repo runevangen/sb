@@ -52,6 +52,8 @@ modul for modul.
                     nummeret, til en melding om feil
     tilbakemelding-data.js / netlify/functions/tilbakemelding.mjs
                     feil og ønsker fra leserne, køen i portalen
+    admin-logg-data.js / netlify/functions/admin-logg.mjs
+                    hvem som er inne i portalen, og hva som er nytt siden sist
     bygg.js         hvilken utrulling dette ER — generert av
                     verktoy/lag-bygg.mjs, i .gitignore, finnes ikke lokalt
     konto-data.js / pin-data.js / netlify/functions/konto.mjs
@@ -71,6 +73,8 @@ modul for modul.
     docs/           adr/, modulene.md, hendelser.md, testing.md,
                     nokler-og-tokens.md, oppsett.sql, kampdag-dypdykk.md
                     kom-i-gang.md: veien inn for en ny person, som PDF
+                    swift-skall.md: plan for App Store, push og AdMob
+                    uten omskriving — ikke besluttet
     BACKLOGG.md     peker til issues, som er den ekte backloggen
 
 **Mønsteret:** `*-data.js` er rene funksjoner — ingen DOM, ingen
@@ -186,6 +190,38 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   svar tilbake er et hull i veggen. Bare innlogget, som pubforslagene:
   kontoen er sperren mot spam, og alternativet var å telle IP-adresser.
   [ADR 0025](docs/adr/0025-feil-og-onsker.md)
+- **«Logg inn» er en knapp der leseren står.** «Logg inn i menyen — et
+  fornavn og en PIN — …» sto i kampkortet til 30. september 2026, og
+  «Jeg skal hit» er appens viktigste handling: den hadde ingen vei inn
+  fra stedet den ble trykket. En setning som peker et annet sted enn en
+  knapp du kan trykke på, er verre enn ingen ([#180](https://github.com/runevangen/sb/issues/180)).
+  Knappen åpner **det samme** panelet som menyen, med feltet i fokus
+  (`apneInnlogging`) — ett panel, ikke to. Og når innloggingen lykkes,
+  sender appen `sb:innlogget`, og kortet river ned notatet og svaret som
+  ba deg logge inn: kortet tegnes ikke om, og en knapp som ber om noe du
+  nettopp har gjort, er den motsatte feilen.
+  **Navnet i toppfeltet har en rund initial foran seg** (#170), tegnet av
+  `::before` med `data-initial`. Teksten i knappen er fortsatt bare navnet.
+  Fargene er `--avatar-bg` og `--avatar-ink`, ikke skrevet inn.
+- **Et fornavn er ikke en e-postadresse.** Feltet spør om fornavnet, men
+  noen skrev adressen sin, og den sto i «blir med»-lista, synlig for alle
+  uten innlogging — mens personvernsida lover at vi ikke viser e-post
+  ([#142](https://github.com/runevangen/sb/issues/142)). `navnErEpost()` er
+  `@`, og ikke mer. **Den gjelder å lage en konto og å vise et navn, ikke
+  å komme inn:** en konto som alt finnes med en adresse som navn kan
+  fortsatt logge inn, men navnet vises ikke, og «Jeg skal hit» sier at hen
+  må logge ut og lage en ny. Navnet kommer fra klienten ved hvert svar,
+  så sperra må stå i `gyldigNavn` også — en sperre bare ved opprettelsen
+  hjelper ikke mot dem som er inne fra før.
+- **Portalen logger hvem som er inne, og åpner ikke uten.** Hver innlogging
+  er en rad i `admin_logg`, skrevet med din **egen** økt — passordet er delt
+  og sier ikke hvem. Uten en økt åpner portalen ikke: «logg inn i appen
+  først». Loggen er bare å legge til (ingen policy for oppdatering eller
+  sletting), og raden husker nyeste versjon og antall linjer, så neste
+  innlogging kan si hva som er nytt siden sist. **Derfor legges nye linjer
+  nederst i dagens oppføring i `versjoner.js`**: et antall leser rekkefølgen.
+  Dette er ikke telling av lesere — det rører bare dem i `visning_skrivere`.
+  [ADR 0026](docs/adr/0026-adminloggen.md)
 - **Bytt PIN krever den gamle, og logger ut alle andre telefoner.** PIN-en
   er en sperre mellom folk som deler en telefon; kunne den byttes uten den
   gamle, kunne hvem som helst med telefonen ta kontoen. Den gamle prøves
@@ -535,6 +571,16 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   flagget. Foreldelsen er ikke pynt — hver annen opplysning her dør av seg
   selv når kampen er spilt, mens et stående flagg ellers ville lovet
   kamper lenge etter at stedet sluttet å vise dem.
+- **En skjerm som stopper leseren gir én knapp til neste fornuftige
+  handling.** Søk uten treff sa «Ingen artikler funnet.», og krysset som
+  fjerner søket sto bare i toppfeltet. Fotballfeil sa «Fikk ikke svar fra
+  API-Football» — en leverandør ingen leser har hørt om — uten noe å trykke
+  på. Tom Venner sa «Åpne en kamp under Kommende» som en instruksjon, ikke en
+  vei dit ([#181](https://github.com/runevangen/sb/issues/181)). Nå har de
+  «Fjern søket», «Prøv igjen» og «Gå til Kommende». **Diagnosen blir, men
+  den flytter:** leverandørnavnet står i en lukket «Tekniske detaljer», og
+  teksten leseren ser er i ord hen kjenner. Samme mønster som nyhetsfeilen,
+  og `feilTilstand()` er stedet det står.
 - **En stille tom liste er ikke til å skille fra «ingen svarte».** Feiler
   et kall der lista *er* hele visningen, si det. Er lista et tillegg til
   noe annet, ti — men da får den som handlet beskjed.

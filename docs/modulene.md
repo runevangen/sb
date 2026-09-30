@@ -310,6 +310,31 @@ kastet. `oktGyldig` og `oktUtloper` brukes av begge veier.
   grunner: fire siffer er 10 000 forsøk som ellers kunne gjettes rett mot
   Supabase, og Supabase krever minst seks tegn. Et nytt pepper låser alle
   ute.
+- **`initialFor()` er bokstaven i den runde knappen ved navnet** (#170).
+  Første bokstav eller siffer, stor, med `\p{L}` og ikke en håndskrevet
+  liste — «Åse» er «Å», ikke «Ã». Tomt svar når navnet ikke har noen, og da
+  tegner CSS-en ingenting framfor et hull. Initialen settes som
+  `data-initial` og tegnes av `::before`, så teksten i knappen forblir bare
+  navnet: skjermleseren sier «Ola», ikke «O Ola».
+- **`navnErEpost()` er `@`, og ikke mer.** Fornavnsfeltet tok imot
+  adressen til noen, og den sto i «blir med»-lista, synlig for alle uten
+  innlogging ([#142](https://github.com/runevangen/sb/issues/142)).
+  Ingen fornavn har en `@`, og en regel som fanget «ola.hansen på gmail»
+  måtte avvise ekte navn. Sperra tar den vanlige feilen, ikke den tenkte.
+  **Den står ikke i `gyldigPinNavn`**, og det er hele poenget: den som
+  alt har en konto med en adresse som navn, må fortsatt kunne logge inn.
+  Sperra gjelder å *lage* en konto (`finnes` for et navn som er nytt, og
+  `signup` som siste sjanse — et kall som hopper over `finnes` kommer hit
+  likevel) og å *vise* et navn (`gyldigNavn` i `svar-data.js`, som skriving
+  og alle lister bruker). Den siste er grunnen til at en rad som alt ligger
+  i basen, forsvinner fra lista i stedet for å stå der til noen rydder.
+  Navnet kommer fra klienten ved hvert svar, så en sperre bare ved
+  opprettelsen hjelper ikke mot den som er inne fra før, eller mot et
+  direkte kall.
+  **Tekstene står ved regelen** (`EPOST_SOM_NAVN`, `EPOST_SOM_NAVN_INNE`):
+  den som er inne får ikke «skriv fornavnet ditt», for navnet er der, og
+  det er det som er galt. Veien videre står i setningen: logg ut og lag
+  en konto med fornavnet.
 - **`PIN_DOMENE` er en nøkkel, ikke en postkasse.** Ingen e-post sendes
   dit, og adressen vises aldri i appen.
 - **`tolkPinOkt()` setter `lag` bare når kontoen har lagret en liste.**
@@ -428,6 +453,31 @@ er regnet ut for alle tre delene i alle ligaene fra før.
 - **`skjermTekst()` sier hvor leseren sto, i ord** — «Fotball › Eliteserien
   › Tabell», «Nyheter › Brann». Ikke en URL: den som leser køen skal forstå
   den uten å åpne noe.
+
+### `admin-logg-data.js` — hvem var inne, og hva er nytt
+
+[ADR 0026](adr/0026-adminloggen.md).
+
+- **Én rad svarer på to spørsmål.** «Hvem har brukt adminkontoen?» er at hver
+  innlogging er en rad. «Hva har skjedd siden sist?» er at raden husker hva
+  portalen viste — nyeste versjon og hvor mange linjer den hadde — så neste
+  innlogging er en sammenlikning mellom to rader, ikke et klokkeslett.
+- **`versjonStand()` teller linjer, ikke bare versjonen.** Én oppføring per
+  dag betyr at en endring klokka 16 havner under samme nummer som den klokka
+  10. Med bare nummeret ville den andre aldri blitt «ny». Det hviler på at
+  nye linjer legges **nederst** i dagens oppføring (øverst i `versjoner.js`),
+  og en vakt i `unit.mjs` holder rekkefølgen mellom dagene.
+- **`nyeEndringer()` skiller tre svar:** `null` (ingen forrige å sammenlikne
+  med — kall ikke hele lista «nytt»), `[]` (ingenting har skjedd) og en liste.
+  En `sist` som peker på en versjon lista ikke har — en forhåndsvisning kan
+  ha vist en dag som ikke er flettet — gir ingenting nytt, ikke alt.
+- **`loggRad()` sender verken `bruker` eller `tid`.** Databasen setter den
+  første fra økta og den andre fra klokka si, og skriveregelen krever at
+  `bruker` er deg. Sendte funksjonen dem, kunne en feil skrive i en annens
+  navn, og en logg der hvem som helst kan påstå å være noen andre er verre
+  enn ingen.
+- **`forrigeInnlogging()` leser raden for samme bruker, og ikke den du
+  nettopp skrev.** Radene kommer nyeste først.
 
 ---
 
@@ -708,6 +758,18 @@ portalen — en leser har ingen nytte av den.
 
 [ADR 0012](adr/0012-kampkortet.md).
 
+- **`tilstand()` tar en knapp, og `feilTilstand()` er den som feiler**
+  (#181). En tilstand som stopper leseren — feil, tom Venner-liste — sa hva
+  som var galt og ingenting om hva du gjør nå. `tilstand(tekst, knapp,
+  detaljer)`: knappen er `{tekst, gjor}`, og `detaljer` er diagnosen i en
+  lukket «Tekniske detaljer» (samme `.err-details` som nyhetsfeilen i
+  `app.js`). **Leverandørnavnet hører i detaljene**, ikke i teksten:
+  «Fikk ikke svar fra API-Football» navnga en tjeneste ingen leser kjenner
+  og ga ingenting å trykke på, mens diagnosen er verdt å ha for den som
+  skal rette det. Teksten leseren ser er «Klarte ikke å hente fotballdata
+  akkurat nå», og «Prøv igjen» kaller `visFotball` på nytt — `husket` fylles
+  bare ved suksess, så den prøver faktisk. Venner-feilene (tjenestens egne
+  ord, som før) har samme knapp. Tom Venner-liste har «Gå til Kommende».
 - **Stjerna i `tabell()` har sin egen kolonne, først i raden** (`.kol-stjerne`,
   med `aria-label="Favoritt"` på overskriften). Den sto ytterst i lagcellen,
   inntil tallene, til 25. september 2026. Egen kolonne, ikke først i
@@ -981,6 +1043,21 @@ portalen — en leser har ingen nytte av den.
   å si imot, og «Ikke denne kvelden» uteblir. Men den står over en
   avkryssing som ikke er lagret: `tegnKamper` bygger lista på nytt fra
   `visninger`, og hakene ville ryket.
+- **Innloggingen skrives i loggen før portalen åpnes** (`loggInnlogging()`).
+  Feiler den, står det hvorfor i Adgang-seksjonen og portalen blir lukket —
+  «Logg inn i appen først» for en manglende økt, et annet svar for en konto
+  uten adgang. Det er et brudd med «portalen leser stedene uten en økt»
+  (se under): der ble kravet fjernet fordi lesingen er offentlig, her
+  stilles det fordi spørsmålet er *hvem*.
+- **«Nytt siden sist» står øverst og bare når det er noe å si.**
+  `visNytt()` sammenlikner `VERSJONER` med forrige innlogging (`nyeEndringer`).
+  Ingenting nytt gir en skjult boks, ikke en som sier «ingenting»; første
+  innlogging og en forrige vi ikke fikk lest sier hver sin ting, for en boks
+  som tier er ikke til å skille fra at alt er som det skal. Én tegner for en
+  versjon (`versjonBoks`), brukt både her og i «Versjon»: to ville glidd.
+- **«Adminlogg» har navn fra brukerlista og tegnes om når den lander**
+  (`tegnAdminLoggIgjen()` fra `tegnBrukere`), samme runde som køene. Mangler
+  navnet, står det «Ukjent konto» og starten på uid-en, ikke et gjettet navn.
 - **«Feil og ønsker» er en kø, som forslagene.** De nye først, tallet i
   hodet teller dem, og seksjonen åpner seg selv til du har rørt den. Men
   **alle** meldinger står, ikke bare de nye: en som er «Lest» skal kunne
@@ -1127,6 +1204,17 @@ Se [`nokler-og-tokens.md`](nokler-og-tokens.md).
   ikke den andre med seg. Ingen nøkkel, men bak `ADMIN_PASSORD` som de
   andre sondene: et endepunkt hvem som helst kan trykke på, mot en tjeneste
   som ikke er laget for oss, er et endepunkt noen trykker på tusen ganger.
+- **`admin-logg.mjs`** — hvem som er inne i portalen. To handlinger bak
+  `ADMIN_PASSORD`, begge med innloggedes **egen** økt: `innlogget` skriver
+  raden og svarer med forrige innlogging, `liste` leser de siste femti.
+  Ingen `service_role`. **Raden skrives før portalen åpnes**, og uten en økt
+  avvises innloggingen: passordet er en delt hemmelighet, og alene sier det
+  ikke hvem som kom inn. RLS er låsen — `bruker = auth.uid()` og en rad i
+  `visning_skrivere` — og `admin_logg` har ingen policy for oppdatering eller
+  sletting, så loggen er bare å legge til. uid-en i «forrige innlogging»
+  leses av raden databasen satte, ikke av noe appen sa. To ulike feil:
+  en utløpt økt (401, «åpne appen») og en konto som ikke står i
+  `visning_skrivere` (403, «be noen legge deg til»).
 - **`tilbakemelding.mjs`** — feil og ønsker. Fire handlinger: `send` og
   `mine` med leserens egen økt, `liste` og `behandle` med `ADMIN_PASSORD`
   **og** en økt i `visning_skrivere` — samme to låser som forslagskøen.

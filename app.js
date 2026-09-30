@@ -11,7 +11,7 @@ import { ofteBrukt, noterPub } from "./pub-data.js";
 import { maskerEpost, oktGyldig, kanFornyes, maaFornyes,
          FORNY_MARGIN } from "./konto-data.js";
 import { normaliserPinNavn, gyldigPinNavn, normaliserPin, gyldigPin, PIN_MIN,
-         rensLag, flettLag, sammeLag, sjekkPinBytte }
+         rensLag, flettLag, sammeLag, sjekkPinBytte, initialFor }
   from "./pin-data.js";
 import { normaliserNavn } from "./svar-data.js";
 import { initFotball, visFotball, merkFavoritter, tegnMittLag } from "./fotball.js";
@@ -784,6 +784,15 @@ function renderFeed(saker, opts) {
   if (!posts.length) {
     const state = el("div", "state");
     state.appendChild(el("p", null, "Ingen artikler funnet."));
+    // Krysset for a fjerne et sok star bare i toppfeltet, og da er dette en
+    // blindvei: teksten sier hva som er galt og ingenting om hva du gjor na
+    // (#181). Knappen bruker den samme veien som krysset.
+    if (sokeord || activeCategory !== null) {
+      const fjern = el("button", "retry-btn", sokeord ? "Fjern søket" : "Vis alle saker");
+      fjern.type = "button";
+      fjern.addEventListener("click", visAlleSaker);
+      state.appendChild(fjern);
+    }
     feed.appendChild(state);
     return;
   }
@@ -1930,6 +1939,9 @@ function visHvem() {
   const navn = kontoOkt && (kontoOkt.navn || "");
   merke.hidden = !navn;
   merke.textContent = navn || "";
+  // Initialen tegnes av CSS (::before), sa teksten i knappen er fortsatt
+  // bare navnet — skjermleseren og den som kopierer far ikke «ROla».
+  merke.dataset.initial = initialFor(navn);
   if (navn) merke.setAttribute("aria-label", "Logget inn som " + navn + ". Åpne kontoen.");
 }
 
@@ -2170,6 +2182,7 @@ async function kontoPinSteget() {
     // er et trykk til uten grunn.
     lukkKontoPanel();
     closeMenu();
+    document.dispatchEvent(new CustomEvent("sb:innlogget"));
   } catch (err) {
     kontoSvar(err.message);
   } finally {
@@ -2463,6 +2476,20 @@ document.getElementById("kontoBtn").addEventListener("click", () => {
   panel.hidden = apen;
   knapp.setAttribute("aria-expanded", apen ? "false" : "true");
   if (apen) return;
+  fyllKontoPanel();
+});
+
+// Innloggingen fra stedet leseren star: «Logg inn» i kampkortet apner menyen
+// med panelet ute og feltet i fokus. Samme panel som knappen i menyen — ett
+// panel, ikke to — sa de to veiene inn ikke kan bli uenige om hva som star der.
+function apneInnlogging() {
+  openMenu();
+  document.getElementById("kontoPanel").hidden = false;
+  document.getElementById("kontoBtn").setAttribute("aria-expanded", "true");
+  fyllKontoPanel();
+}
+
+function fyllKontoPanel() {
   lukkPinBytte();
   kontoSvar("");
   visKonto();
@@ -2472,7 +2499,7 @@ document.getElementById("kontoBtn").addEventListener("click", () => {
   if (!kontoOkt) {
     document.getElementById(kontoSteg === "navn" ? "kontoNavn" : "kontoPin").focus();
   }
-});
+}
 
 document.getElementById("kontoSend").addEventListener("click", kontoSteget);
 document.getElementById("kontoBytt").addEventListener("click", kontoTilbake);
@@ -2818,7 +2845,7 @@ initFotball(
   { liste: dinePuber, noter: noterDinPub },
   // Innlogging og navn eies av app.js (det er lagring). Modulen far tre
   // sporsmal: har du en okt, hva heter du for vennene, og husk navnet.
-  { okt: () => kontoOkt, navn: svarNavn, settNavn: settSvarNavn });
+  { okt: () => kontoOkt, navn: svarNavn, settNavn: settSvarNavn, apneInnlogging });
 
 document.getElementById("fanenNyheter").addEventListener("click", () => {
   if (aktivVisning !== "nyheter") settFane("nyheter");

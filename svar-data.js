@@ -7,6 +7,7 @@
 // tilbake til appen. Na har det det, for den som er logget inn.
 
 import { listeTekst } from "./lib.js";
+import { navnErEpost } from "./pin-data.js";
 import { HVOR, stedtekst, gyldigKampId, kampNokkel } from "./fotball-data.js";
 
 // Kampens identitet, som i fotball.js og visning-data.js: nokkelen, ikke
@@ -39,9 +40,17 @@ export function normaliserNavn(verdi) {
 
 // Et navn ma ha en bokstav eller et tall i seg. Ellers er «•••» et navn,
 // og lista blir uleselig for alle andre.
+//
+// Og ingen e-postadresse (#142). Navnet kommer fra klienten ved hvert
+// svar, så en sperre bare ved kontoopprettelse hjelper ikke mot den som
+// alt har en slik konto, eller mot et direkte kall. Reglene her står på
+// begge sider av databasen: skrivinga avviser navnet, og alle lister
+// filtrerer på samme funksjon — så en rad som alt ligger der med en
+// adresse som navn, forsvinner fra lista i stedet for å stå der til noen
+// rydder den bort.
 export function gyldigNavn(verdi) {
   const n = normaliserNavn(verdi);
-  return n.length > 0 && /[\p{L}\p{N}]/u.test(n);
+  return n.length > 0 && /[\p{L}\p{N}]/u.test(n) && !navnErEpost(n);
 }
 
 // Raden vi skriver. Brukeren settes av databasen fra okta, ikke herfra:
