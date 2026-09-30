@@ -22,6 +22,7 @@ import svarfunksjon from "../netlify/functions/svar.mjs";
 import tsdbsonde from "../netlify/functions/tsdbsonde.mjs";
 import fantasysonde from "../netlify/functions/fantasysonde.mjs";
 import tilbakemelding from "../netlify/functions/tilbakemelding.mjs";
+import adminLogg from "../netlify/functions/admin-logg.mjs";
 
 // SUITEN SETTER SITT EGET MILJO, framfor a arve maskinens.
 //
@@ -1321,6 +1322,165 @@ kall = stubMelding({ status: 401, melding: "JWT expired" });
 r = await tilbakemelding(meldBe(EN_MELDING));
 ok("tilbakemelding: en utlopt okt sier det", r.status === 401
    && (await r.json()).feil.indexOf("Økten") > -1, r.status);
+
+/* ---------------- adminloggen ---------------- */
+
+// Stubben modellerer PostgREST: en POST med return=representation gir raden
+// tilbake med basens egne felt (id, bruker fra okta, tid) — det er databasen
+// som setter dem, ikke funksjonen. Lesingen gir radene for en bruker nyeste
+// forst, sa «forrige» er nummer to.
+const LOGG_BRUKER = "12345678-1234-1234-1234-123456789abc";
+const LOGG_ID = "aaaaaaaa-0000-0000-0000-000000000003";
+
+function stubLogg(opts) {
+  const o = opts || {};
+  const kall = [];
+  global.fetch = async (url, opsjoner) => {
+    const op = opsjoner || {};
+    kall.push({ url: String(url), metode: op.method || "GET", opsjoner: op });
+    if (o.status && (!o.bare || o.bare === (op.method || "GET"))) {
+      return new Response(JSON.stringify({ message: o.melding || "nei", code: o.kode || "x" }),
+        { status: o.status });
+    }
+    if (op.method === "POST") {
+      if (o.tom) return new Response("[]", { status: 201 });
+      const rad = JSON.parse(op.body);
+      return new Response(JSON.stringify([Object.assign({
+        id: LOGG_ID, bruker: LOGG_BRUKER, tid: "2026-09-30T10:00:00Z" }, rad)]), { status: 201 });
+    }
+    return new Response(JSON.stringify(o.rader || [
+      { id: LOGG_ID, bruker: LOGG_BRUKER, tid: "2026-09-30T10:00:00Z", versjon: "2026.09.30", antall: 2 },
+      { id: "aaaaaaaa-0000-0000-0000-000000000002", bruker: LOGG_BRUKER,
+        tid: "2026-09-27T10:00:00Z", versjon: "2026.09.27", antall: 2 },
+    ]), { status: 200 });
+  };
+  return kall;
+}
+
+function loggBe(kropp, metode) {
+  return new Request("https://mvp-sb.netlify.app/api/admin-logg", {
+    method: metode || "POST",
+    headers: { "Content-Type": "application/json" },
+    body: metode === "GET" ? undefined : JSON.stringify(kropp),
+  });
+}
+
+const INNLOGGET = { handling: "innlogget", passord: PASSORD, token: FORSLAG_OKT,
+  versjon: "2026.09.30", antall: 2 };
+
+delete process.env.ADMIN_PASSORD;
+kall = stubLogg();
+r = await adminLogg(loggBe(INNLOGGET));
+ok("adminlogg: uten oppsett svarer den 503 og sier hva som mangler",
+   r.status === 503 && (await r.json()).mangler.indexOf("ADMIN_PASSORD") > -1, r.status);
+ok("adminlogg: og ingenting ble sendt noe sted", kall.length === 0, kall.length);
+process.env.ADMIN_PASSORD = PASSORD;
+
+r = await adminLogg(loggBe(null, "GET"));
+ok("adminlogg: GET avvises med 405", r.status === 405, r.status);
+
+kall = stubLogg();
+r = await adminLogg(loggBe(Object.assign({}, INNLOGGET, { passord: "feil" })));
+ok("adminlogg: feil passord gir 401", r.status === 401, r.status);
+ok("adminlogg: og feil passord nar aldri Supabase", kall.length === 0, kall.length);
+
+kall = stubLogg();
+r = await adminLogg(loggBe(Object.assign({}, INNLOGGET, { token: "" })));
+const loggUtenOkt = await r.json();
+ok("adminlogg: riktig passord uten okt slipper ikke inn — vi vet ikke hvem det er",
+   r.status === 401 && loggUtenOkt.feil.indexOf("Logg inn i appen") === 0, loggUtenOkt.feil);
+ok("adminlogg: og det nar heller ikke Supabase", kall.length === 0, kall.length);
+
+kall = stubLogg();
+r = await adminLogg(loggBe(Object.assign({}, INNLOGGET, { handling: "slett-alt" })));
+ok("adminlogg: en ukjent handling avvises (og det finnes ingen som sletter)",
+   r.status === 400 && kall.length === 0, r.status);
+
+kall = stubLogg();
+r = await adminLogg(loggBe(Object.assign({}, INNLOGGET, { versjon: "i dag" })));
+ok("adminlogg: en versjon uten datoform avvises for basen", r.status === 400 && kall.length === 0, r.status);
+kall = stubLogg();
+r = await adminLogg(loggBe(Object.assign({}, INNLOGGET, { antall: -3 })));
+ok("adminlogg: et negativt antall avvises for basen", r.status === 400 && kall.length === 0, r.status);
+
+kall = stubLogg();
+r = await adminLogg(loggBe(INNLOGGET));
+const loggSvar = await r.json();
+const loggSkriv = kall.find((k) => k.metode === "POST");
+const loggRadInn = JSON.parse(loggSkriv.opsjoner.body);
+ok("adminlogg: en innlogging skrives og svarer ok med raden",
+   r.status === 200 && loggSvar.ok === true && loggSvar.innlogging.bruker === LOGG_BRUKER,
+   r.status + " " + JSON.stringify(loggSvar));
+ok("adminlogg: skrivingen gar med din egen okt, ikke en nokkel",
+   loggSkriv.opsjoner.headers["Authorization"] === "Bearer " + FORSLAG_OKT);
+ok("adminlogg: raden sender aldri bruker eller tid — det setter basen",
+   !("bruker" in loggRadInn) && !("tid" in loggRadInn) && loggRadInn.versjon === "2026.09.30"
+   && loggRadInn.antall === 2, loggSkriv.opsjoner.body);
+ok("adminlogg: adminpassordet nar aldri Supabase",
+   kall.every((k) => JSON.stringify(k.opsjoner).indexOf(PASSORD) === -1));
+const loggLes = kall.find((k) => k.metode === "GET");
+ok("adminlogg: forrige innlogging leses for uid-en basen satte, ikke for noe appen sa",
+   loggLes.url.indexOf("bruker=eq." + LOGG_BRUKER) > -1 && loggLes.url.indexOf("limit=2") > -1, loggLes.url);
+ok("adminlogg: og svaret har forrige — ikke den du nettopp skrev",
+   loggSvar.forrige && loggSvar.forrige.id === "aaaaaaaa-0000-0000-0000-000000000002"
+   && loggSvar.forrige.versjon === "2026.09.27" && loggSvar.forrigeFeil === false, JSON.stringify(loggSvar.forrige));
+
+kall = stubLogg({ rader: [
+  { id: LOGG_ID, bruker: LOGG_BRUKER, tid: "2026-09-30T10:00:00Z", versjon: "2026.09.30", antall: 2 }] });
+r = await adminLogg(loggBe(INNLOGGET));
+const forste = await r.json();
+ok("adminlogg: forste innlogging har ingen forrige, og sier ikke at lesingen feilet",
+   forste.ok === true && forste.forrige === null && forste.forrigeFeil === false, JSON.stringify(forste));
+
+kall = stubLogg({ status: 500, bare: "GET", melding: "kaos" });
+r = await adminLogg(loggBe(INNLOGGET));
+const lesFeil = await r.json();
+ok("adminlogg: feiler bare lesingen av forrige, er du likevel logget — og svaret sier at den feilet",
+   r.status === 200 && lesFeil.ok === true && lesFeil.forrige === null && lesFeil.forrigeFeil === true,
+   r.status + " " + JSON.stringify(lesFeil));
+
+kall = stubLogg({ tom: true });
+r = await adminLogg(loggBe(INNLOGGET));
+ok("adminlogg: en skriving uten rad tilbake meldes som feil", r.status === 502, r.status);
+
+// To ulike nei, og de krever ulike ting av den som leser dem.
+kall = stubLogg({ status: 403, bare: "POST", kode: "42501",
+  melding: "new row violates row-level security policy for table \"admin_logg\"" });
+r = await adminLogg(loggBe(INNLOGGET));
+const utenAdgang = await r.json();
+ok("adminlogg: en konto som ikke star i visning_skrivere far 403 og sier hvorfor",
+   r.status === 403 && utenAdgang.feil.indexOf("visning_skrivere") > -1, r.status + " " + utenAdgang.feil);
+ok("adminlogg: og det er ikke det samme svaret som en utlopt okt",
+   utenAdgang.feil.indexOf("Åpne appen") === -1);
+
+kall = stubLogg({ status: 401, melding: "JWT expired", kode: "PGRST303" });
+r = await adminLogg(loggBe(INNLOGGET));
+const utlopt = await r.json();
+ok("adminlogg: en utlopt okt far 401 og en vei videre",
+   r.status === 401 && utlopt.feil.indexOf("Åpne appen") > -1, r.status + " " + utlopt.feil);
+
+kall = stubLogg({ status: 404, kode: "42P01", melding: "relation \"admin_logg\" does not exist" });
+r = await adminLogg(loggBe(INNLOGGET));
+const utenLoggTabell = await r.json();
+ok("adminlogg: mangler tabellen, star det hvor SQL-en er",
+   r.status === 503 && utenLoggTabell.feil.indexOf("del 10") > -1, utenLoggTabell.feil);
+
+kall = stubLogg();
+r = await adminLogg(loggBe({ handling: "liste", passord: "feil", token: FORSLAG_OKT }));
+ok("adminlogg: feil passord slipper ikke inn i lista", r.status === 401 && kall.length === 0, r.status);
+kall = stubLogg();
+r = await adminLogg(loggBe({ handling: "liste", passord: PASSORD, token: "" }));
+ok("adminlogg: lista uten okt slipper heller ikke inn", r.status === 401 && kall.length === 0, r.status);
+kall = stubLogg();
+r = await adminLogg(loggBe({ handling: "liste", passord: PASSORD, token: FORSLAG_OKT }));
+const loggListe = await r.json();
+ok("adminlogg: lista leses med din okt, nyeste forst, og med et tak",
+   r.status === 200 && loggListe.logg.length === 2 &&
+   kall[0].opsjoner.headers["Authorization"] === "Bearer " + FORSLAG_OKT &&
+   kall[0].url.indexOf("order=tid.desc") > -1 && kall[0].url.indexOf("limit=50") > -1,
+   r.status + " " + kall[0].url);
+ok("adminlogg: og den eneste skrivingen som finnes er innloggingen — ingen PATCH eller DELETE",
+   !kall.some((k) => k.metode === "PATCH" || k.metode === "DELETE"));
 
 delete process.env.ADMIN_PASSORD;
 delete process.env.SUPABASE_URL;

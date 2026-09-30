@@ -22,8 +22,19 @@
 // denne lista. Sto bare denne der, kunne den si 21. september over en app
 // som ble bygget den 12.
 //
-// Nyeste først.
+// **Nyeste versjon først — og nye linjer nederst i dagens oppføring.**
+// Adminloggen (`admin-logg-data.js`) husker hvor mange linjer nyeste versjon
+// hadde da du sist var inne, og regner «nytt siden sist» ut fra det: en linje
+// som legges til øverst eller midt i en dag, ville blitt telt som den du
+// allerede har sett. En vakt i `unit.mjs` holder rekkefølgen mellom dagene.
 export const VERSJONER = [
+  {
+    versjon: "2026.09.30",
+    endringer: [
+      { hva: "Portalen logger hvem som er inne: hver innlogging blir en rad med navn og tidspunkt, og du ser loggen under «Adminlogg». Portalen åpner bare når du er innlogget i appen." },
+      { hva: "Når noe har skjedd siden sist du var inne, står det øverst i portalen under «Nytt siden sist»." },
+    ],
+  },
   {
     versjon: "2026.09.27",
     endringer: [
