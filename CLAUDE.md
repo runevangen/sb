@@ -558,6 +558,16 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   flagget. Foreldelsen er ikke pynt — hver annen opplysning her dør av seg
   selv når kampen er spilt, mens et stående flagg ellers ville lovet
   kamper lenge etter at stedet sluttet å vise dem.
+- **En skjerm som stopper leseren gir én knapp til neste fornuftige
+  handling.** Søk uten treff sa «Ingen artikler funnet.», og krysset som
+  fjerner søket sto bare i toppfeltet. Fotballfeil sa «Fikk ikke svar fra
+  API-Football» — en leverandør ingen leser har hørt om — uten noe å trykke
+  på. Tom Venner sa «Åpne en kamp under Kommende» som en instruksjon, ikke en
+  vei dit ([#181](https://github.com/runevangen/sb/issues/181)). Nå har de
+  «Fjern søket», «Prøv igjen» og «Gå til Kommende». **Diagnosen blir, men
+  den flytter:** leverandørnavnet står i en lukket «Tekniske detaljer», og
+  teksten leseren ser er i ord hen kjenner. Samme mønster som nyhetsfeilen,
+  og `feilTilstand()` er stedet det står.
 - **En stille tom liste er ikke til å skille fra «ingen svarte».** Feiler
   et kall der lista *er* hele visningen, si det. Er lista et tillegg til
   noe annet, ti — men da får den som handlet beskjed.

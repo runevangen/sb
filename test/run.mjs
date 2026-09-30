@@ -1574,17 +1574,99 @@ const SAK_7 = kjor("fotball-lenke", FELLES + FOTBALL + `
 const SAK_8 = kjor("fotball-feil", FELLES + FOTBALL + `
   var saker = lagSaker(12);
   ` + mockAlt("saker", true) + `
+  // Samme mock, men med en tjeneste som svarer: det leseren far nar hen
+  // trykker «Prov igjen» etter at nettet er tilbake.
+  function tjenestenKommerTilbake() {
+    ` + mockAlt("saker") + `
+  }
 
   window.addEventListener("load", function () { setTimeout(function () {
     document.getElementById("fanenFotball").click();
-    setTimeout(function () {
-      var tekst = document.getElementById("fotballInnhold").textContent;
+    setTimeout(function () { try {
+      var rot = document.getElementById("fotballInnhold");
+      var boks = rot.querySelector(".state");
+      var synlig = boks.querySelector("p").textContent;
       // En feil skal si fra. En tom tabell ser ut som en liga uten kamper.
-      ok("feil fra tjenesten vises", tekst.indexOf("API-Football") > -1, tekst.slice(0, 60));
+      ok("feil fra tjenesten vises i ord leseren kjenner",
+         synlig.indexOf("Klarte ikke") === 0 && synlig.indexOf("akkurat n") > -1, synlig);
+      ok("uten et leverandornavn leseren ikke har hort om",
+         synlig.indexOf("API-Football") === -1, synlig);
       ok("ingen tom tabell tegnes", !document.querySelector(".tabell"));
-      ferdig();
-    }, 600);
+      ok("men diagnosen star i tekniske detaljer, lukket",
+         boks.querySelector("details.err-details") &&
+         boks.querySelector("details.err-details").open === false &&
+         boks.querySelector("details.err-details").textContent.indexOf("API-Football") > -1,
+         boks.innerHTML.slice(0, 300));
+      var knapp = boks.querySelector("button.retry-btn");
+      ok("og det star en Prov igjen-knapp", !!knapp && knapp.textContent === "Prøv igjen",
+         knapp && knapp.textContent);
+      tjenestenKommerTilbake();
+      knapp.click();
+      setTimeout(function () { try {
+        ok("knappen henter pa nytt, og tabellen star der",
+           !!document.querySelector("#fotballInnhold .tabell"),
+           document.getElementById("fotballInnhold").textContent.slice(0, 80));
+        ferdig();
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 600);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 600);
   }, 900); });
+`);
+
+// Et sok uten treff er en blindvei uten en knapp: krysset for a fjerne det
+// star bare i toppfeltet (#181).
+const SAK_8B = kjor("sok-uten-treff", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  ` + mockAlt("saker") + `
+  var fetchFor = window.fetch;
+  window.fetch = function (u) {
+    if (String(u).indexOf("search=") > -1) {
+      return Promise.resolve({ ok: true, status: 200, statusText: "OK",
+        text: function () { return Promise.resolve("[]"); } });
+    }
+    return fetchFor(u);
+  };
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.getElementById("sokFelt").value = "qqqzzz";
+    document.getElementById("sokForm").dispatchEvent(new Event("submit", { cancelable: true }));
+    setTimeout(function () { try {
+      var state = document.querySelector("#feed .state");
+      ok("soket uten treff sier det", !!state && state.textContent.indexOf("Ingen artikler funnet") > -1,
+         document.getElementById("feed").textContent.slice(0, 80));
+      var fjern = state && state.querySelector("button.retry-btn");
+      ok("med en knapp som fjerner soket", !!fjern && fjern.textContent === "Fjern søket",
+         fjern && fjern.textContent);
+      fjern.click();
+      setTimeout(function () { try {
+        ok("knappen viser feeden igjen", document.querySelectorAll("#feed .row").length > 0,
+           document.getElementById("feed").textContent.slice(0, 80));
+        ok("og soket er borte, ogsa fra toppfeltet og feltet",
+           document.getElementById("sokFelt").value === "" &&
+           !document.querySelector("#filterTag .filter-chip"),
+           document.getElementById("sokFelt").value);
+        ferdig();
+      } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
+`);
+
+// «Venner» uten svar: teksten var en instruksjon, ikke en vei dit (#181).
+const SAK_8C = kjor("venner-tom", epostSide(false) + `
+  location.hash = "#/fotball/eliteserien/venner";
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    var rot = document.getElementById("fotballInnhold");
+    ok("ingen har svart, og fanen sier det",
+       rot.textContent.indexOf("Ingen har sagt at de blir med") > -1, rot.textContent.slice(0, 120));
+    var knapp = rot.querySelector("button.retry-btn");
+    ok("med en knapp til Kommende", !!knapp && knapp.textContent === "Gå til Kommende",
+       knapp && knapp.textContent);
+    knapp.click();
+    setTimeout(function () { try {
+      ok("som tar deg dit", location.hash.indexOf("/neste") > -1 &&
+         document.querySelector("#fotballFaner .segment-del[data-verdi='neste']").getAttribute("aria-current") === "true",
+         location.hash);
+      ferdig();
+    } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 1200); });
 `);
 
 /* ---------------- 9. lag i tabellen soker i nyhetene ---------------- */
@@ -8811,6 +8893,10 @@ const SAK_20B = kjor("venner-tak", FELLES + FOTBALL + `
         ok("og pastar ikke at ingen blir med",
            rot.textContent.indexOf("Ingen har sagt at de blir med") === -1,
            rot.textContent.slice(0, 200));
+        // Feilen stopper, og da skal det sta hva som kan gjores na.
+        var prov = rot.querySelector("button.retry-btn");
+        ok("og fanen har en Prov igjen-knapp", !!prov && prov.textContent === "Prøv igjen",
+           prov && prov.textContent);
         ferdig();
       } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 500);
     } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 400);
@@ -9360,7 +9446,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

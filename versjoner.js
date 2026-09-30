@@ -27,6 +27,7 @@ export const VERSJONER = [
   {
     versjon: "2026.09.30",
     endringer: [
+      { hva: "Søk uten treff har en «Fjern søket»-knapp, en fotballfeil sier «Klarte ikke å hente fotballdata akkurat nå» med «Prøv igjen», og tom «Venner» har en knapp til Kommende.", issue: 181 },
       { hva: "«Logg inn» er en knapp i kampkortet, ikke en setning som peker på menyen: ett trykk, og innloggingen står framme med feltet klart.", issue: 180 },
       { hva: "Navnet ditt i toppfeltet har en rund initial foran seg, lys blå med mørk blå bokstav.", issue: 170 },
       { hva: "Fornavnsfeltet avviser e-postadresser, og en adresse som alt sto som navn vises ikke lenger i «blir med»-lista.", issue: 142 },
