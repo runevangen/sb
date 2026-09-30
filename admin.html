@@ -93,6 +93,19 @@
   }
   .versjon-liste li { margin-bottom: 5px; }
   .versjon-issue { white-space: nowrap; }
+  /* «Nytt siden sist» star over alle seksjonene, apen: den er grunnen til
+     at du skal se den, ikke noe du ma lete fram. Kanten i aksentfargen
+     sier at den venter pa deg, som tallet i et seksjonshode gjor. */
+  .nytt { border-left: 4px solid var(--aksent); background: var(--kort);
+          border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+  .nytt h2 { margin-bottom: 6px; }
+  .nytt .hint { margin: 0 0 4px; }
+  .nytt-skjul { margin-top: 6px; }
+  .logg-rad { display: flex; justify-content: space-between; gap: 12px;
+              padding: 6px 0; border-top: 1px solid var(--ramme); font-size: 14px; }
+  .logg-rad:first-child { border-top: 0; }
+  .logg-navn { font-weight: 600; }
+  .logg-tid { color: var(--tekst-dim); text-align: right; }
 
   .seksjon-hode[aria-expanded="true"] .seksjon-pil,
   .trinn-hode[aria-expanded="true"] .seksjon-pil { transform: rotate(180deg); }
@@ -382,6 +395,17 @@
   </section>
 
   <div id="portal" hidden>
+  <!-- Hva som har skjedd siden sist DU var inne. Fylles av `visNytt` nar
+       portalen har fatt svar om forrige innlogging, og ligger skjult til
+       det er noe a si: en tom boks ville sagt «ingenting nytt» uten a vite
+       det. -->
+  <section class="nytt" id="nyttSiden" aria-live="polite" hidden>
+    <h2 id="nyttTittel">Nytt siden sist</h2>
+    <p class="hint" id="nyttHint"></p>
+    <div id="nyttListe"></div>
+    <button class="lenke nytt-skjul" id="nyttSkjul" type="button">Skjul</button>
+  </section>
+
   <!-- Pub og kamper er ÉN oppgave, og sto i to bokser. Pubvelgeren svarer
        ikke pa noe uten lista under seg, og lista svarer pa feil sted uten
        velgeren over. Hodet sier hvilken pub du star i — `settKamptittel`
@@ -827,6 +851,24 @@
     <div class="seksjon-kropp" id="versjonKropp" hidden>
       <p class="hint" id="versjonKjorer">Henter …</p>
       <div id="versjonListe"></div>
+    </div>
+  </section>
+
+  <!-- Hvem har vaert inne. Hver innlogging i portalen er en rad, skrevet med
+       den innloggedes egen okt — sa «hvem» er basens svar, ikke noe portalen
+       pastar. Navnene kommer fra brukerlista. -->
+  <section class="seksjon">
+    <h2 class="seksjon-tittel">
+      <button class="seksjon-hode" id="loggHode" type="button"
+              aria-expanded="false" aria-controls="loggKropp">
+        <span class="seksjon-navn">Adminlogg</span>
+        <span class="seksjon-tall" id="loggTall"></span>
+        <span class="seksjon-pil" aria-hidden="true">▾</span>
+      </button>
+    </h2>
+    <div class="seksjon-kropp" id="loggKropp" hidden>
+      <p class="hint" id="loggHint">Henter loggen …</p>
+      <div id="loggListe"></div>
     </div>
   </section>
 

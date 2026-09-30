@@ -52,6 +52,8 @@ modul for modul.
                     nummeret, til en melding om feil
     tilbakemelding-data.js / netlify/functions/tilbakemelding.mjs
                     feil og ønsker fra leserne, køen i portalen
+    admin-logg-data.js / netlify/functions/admin-logg.mjs
+                    hvem som er inne i portalen, og hva som er nytt siden sist
     bygg.js         hvilken utrulling dette ER — generert av
                     verktoy/lag-bygg.mjs, i .gitignore, finnes ikke lokalt
     konto-data.js / pin-data.js / netlify/functions/konto.mjs
@@ -209,6 +211,15 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   må logge ut og lage en ny. Navnet kommer fra klienten ved hvert svar,
   så sperra må stå i `gyldigNavn` også — en sperre bare ved opprettelsen
   hjelper ikke mot dem som er inne fra før.
+- **Portalen logger hvem som er inne, og åpner ikke uten.** Hver innlogging
+  er en rad i `admin_logg`, skrevet med din **egen** økt — passordet er delt
+  og sier ikke hvem. Uten en økt åpner portalen ikke: «logg inn i appen
+  først». Loggen er bare å legge til (ingen policy for oppdatering eller
+  sletting), og raden husker nyeste versjon og antall linjer, så neste
+  innlogging kan si hva som er nytt siden sist. **Derfor legges nye linjer
+  nederst i dagens oppføring i `versjoner.js`**: et antall leser rekkefølgen.
+  Dette er ikke telling av lesere — det rører bare dem i `visning_skrivere`.
+  [ADR 0026](docs/adr/0026-adminloggen.md)
 - **Bytt PIN krever den gamle, og logger ut alle andre telefoner.** PIN-en
   er en sperre mellom folk som deler en telefon; kunne den byttes uten den
   gamle, kunne hvem som helst med telefonen ta kontoen. Den gamle prøves

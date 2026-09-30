@@ -27,6 +27,8 @@ import { fantasySondeTekst } from "./fantasy-data.js";
 import { sistInneTekst, PIN_MIN, PIN_MAKS } from "./pin-data.js";
 import { ARTER, STATUS_LESER, STATUS_HANDLING, tolkTilbakemeldinger,
          sorterTilbakemeldinger } from "./tilbakemelding-data.js";
+import { LOGG_MAKS, versjonStand, nyeEndringer, antallNye }
+  from "./admin-logg-data.js";
 import { publisteRad, alleredeILista, erTips, forslagVekt, sorterForslagKo }
   from "./pub-forslag-data.js";
 import { PUBTYPER, PUBSIKKERHET, pubNokkel, sjekkPubRad, slaSammenPuber,
@@ -270,6 +272,19 @@ async function loggInn() {
     return;
   }
 
+  // **Loggen skrives for portalen apnes.** Passordet er en delt hemmelighet,
+  // og alene sier det ikke hvem som kom inn. Raden skrives med din egen okt,
+  // sa «hvem» er basens svar, ikke noe portalen pastar — og kommer den ikke
+  // inn, apner ikke portalen. Et passord uten en logg er en dor uten navn.
+  let logg;
+  try {
+    logg = await loggInnlogging(forsok);
+  } catch (err) {
+    visAdgang(err.message, "feil");
+    felt("loggInn").disabled = false;
+    return;
+  }
+
   // Feltet tommes: passordet lever i variabelen, ikke i DOM-en.
   passord = forsok;
   felt("passord").value = "";
@@ -291,6 +306,8 @@ async function loggInn() {
   hentSteder();
   fyllSondeLigaer();
   tegnVersjon();
+  visNytt(logg);
+  hentAdminLogg();
 }
 
 /* ---------- versjon ---------- */
@@ -316,29 +333,169 @@ function tegnVersjon() {
   const nyeste = VERSJONER[0];
   settTall("versjonTall", nyeste ? nyeste.versjon : "");
 
-  VERSJONER.forEach((v) => {
-    const boks = celle("div", "versjon-boks", "");
-    boks.appendChild(celle("p", "versjon-nr", v.versjon));
-    const ul = celle("ul", "versjon-liste", "");
-    (v.endringer || []).forEach((e) => {
-      const li = celle("li", null, e.hva);
-      // Issue-nummeret er en lenke, ikke et tall: staar det «#146» uten
-      // vei videre, ma du lete den opp selv — og da er det pynt.
-      if (e.issue) {
-        li.appendChild(document.createTextNode(" "));
-        const a = celle("a", "versjon-issue", "#" + e.issue);
-        a.href = "https://github.com/runevangen/sb/issues/" + e.issue;
-        a.target = "_blank";
-        a.rel = "noopener";
-        li.appendChild(a);
-      }
-      ul.appendChild(li);
-    });
-    boks.appendChild(ul);
-    liste.appendChild(boks);
-  });
+  VERSJONER.forEach((v) => liste.appendChild(versjonBoks(v.versjon, v.endringer)));
 
   hentKjorer();
+}
+
+// Én tegner for en versjon, brukt av lista under «Versjon» og av «Nytt siden
+// sist»: to tegnere kunne glidd fra hverandre, og da sa boksen øverst noe
+// annet enn lista den peker på.
+function versjonBoks(nr, endringer) {
+  const boks = celle("div", "versjon-boks", "");
+  boks.appendChild(celle("p", "versjon-nr", nr));
+  const ul = celle("ul", "versjon-liste", "");
+  (endringer || []).forEach((e) => {
+    const li = celle("li", null, e.hva);
+    // Issue-nummeret er en LENKE, ikke et tall: staar det «#146» uten
+    // vei videre, ma du lete den opp selv — og da er det pynt.
+    if (e.issue) {
+      li.appendChild(document.createTextNode(" "));
+      const a = celle("a", "versjon-issue", "#" + e.issue);
+      a.href = "https://github.com/runevangen/sb/issues/" + e.issue;
+      a.target = "_blank";
+      a.rel = "noopener";
+      li.appendChild(a);
+    }
+    ul.appendChild(li);
+  });
+  boks.appendChild(ul);
+  return boks;
+}
+
+/* ---------- adminloggen ---------- */
+
+// To spørsmål på én rad: hvem har vært inne, og hva har skjedd siden sist
+// jeg var det. Raden skrives med din egen økt (se netlify/functions/
+// admin-logg.mjs), og husker hva portalen viste da — nyeste versjon og hvor
+// mange linjer den hadde. Neste innlogging er en sammenlikning mellom to rader.
+async function loggKall(passordet, kropp) {
+  const okt = lesOkt();
+  if (!okt || !okt.token) {
+    throw new Error("Logg inn i appen først. Portalen logger hvem som er inne,"
+      + " og det vet den bare fra din egen økt: åpne appen, vent til navnet"
+      + " ditt står øverst, og prøv igjen.");
+  }
+  const respons = await fetch("/api/admin-logg", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(Object.assign({ passord: passordet, token: okt.token }, kropp)),
+  });
+  let data = null;
+  try { data = JSON.parse(await respons.text()); } catch (e) { data = null; }
+  if (!respons.ok || !data || data.feil) {
+    throw new Error((data && data.feil) || ("Tjenesten svarte " + respons.status + "."));
+  }
+  return data;
+}
+
+async function loggInnlogging(passordet) {
+  const stand = versjonStand(VERSJONER);
+  return loggKall(passordet, { handling: "innlogget", versjon: stand.versjon, antall: stand.antall });
+}
+
+// Boksen øverst. Den står bare når det er noe å si: er ingenting nytt,
+// ligger den skjult, og «Versjon» under har hele lista for den som vil se.
+// Første innlogging har ingen forrige å sammenlikne med, og skal si det
+// framfor å kalle hele lista «nytt».
+function visNytt(logg) {
+  const boks = felt("nyttSiden");
+  const liste = felt("nyttListe");
+  liste.replaceChildren();
+  boks.hidden = true;
+  if (!logg) return;
+
+  const forrige = logg.forrige;
+  if (logg.forrigeFeil) {
+    // Loggen ble skrevet, men forrige gang ble ikke lest. Ikke lat som at
+    // ingenting er nytt.
+    felt("nyttTittel").textContent = "Nytt siden sist";
+    felt("nyttHint").textContent = "Fikk ikke hentet forrige innlogging din, så portalen"
+      + " vet ikke hva som er nytt. «Versjon» lenger ned har hele lista.";
+    boks.hidden = false;
+    return;
+  }
+  if (!forrige) {
+    felt("nyttTittel").textContent = "Første innlogging";
+    felt("nyttHint").textContent = "Innloggingen din er logget. Neste gang sier portalen"
+      + " hva som har skjedd siden du var her. «Versjon» lenger ned har hele lista.";
+    boks.hidden = false;
+    return;
+  }
+
+  const nye = nyeEndringer(VERSJONER, { versjon: forrige.versjon, antall: forrige.antall });
+  if (nye === null) {
+    felt("nyttTittel").textContent = "Nytt siden sist";
+    felt("nyttHint").textContent = "Forrige innlogging din mangler versjon, så portalen vet"
+      + " ikke hva som er nytt. «Versjon» lenger ned har hele lista.";
+    boks.hidden = false;
+    return;
+  }
+  if (!nye.length) return;
+
+  const n = antallNye(nye);
+  felt("nyttTittel").textContent = "Nytt siden sist";
+  felt("nyttHint").textContent = n + (n === 1 ? " endring" : " endringer")
+    + " siden du var inne " + sistInneTekst(forrige.tid).toLowerCase() + ".";
+  nye.forEach((v) => liste.appendChild(versjonBoks(v.versjon, v.endringer)));
+  boks.hidden = false;
+}
+
+felt("nyttSkjul").addEventListener("click", () => { felt("nyttSiden").hidden = true; });
+
+// Loggen slik den sist ble hentet. Holdes fordi navnene kommer fra
+// brukerlista, som lander i sitt eget tempo — samme runde som køene:
+// kommer den etter loggen, tegnes loggen om.
+let adminLogg = null;
+
+async function hentAdminLogg() {
+  felt("loggHint").textContent = "Henter loggen …";
+  felt("loggHint").hidden = false;
+  try {
+    const data = await loggKall(passord, { handling: "liste" });
+    tegnAdminLogg(Array.isArray(data.logg) ? data.logg : []);
+  } catch (err) {
+    // Et tall som blir staende etter et feilet kall, pastar en logg vi ikke
+    // har spurt om.
+    adminLogg = null;
+    settTall("loggTall", "");
+    felt("loggListe").textContent = "";
+    felt("loggHint").textContent = err.message;
+  }
+}
+
+function tegnAdminLoggIgjen() {
+  if (adminLogg) tegnAdminLogg(adminLogg);
+}
+
+function tegnAdminLogg(liste) {
+  adminLogg = liste;
+  const boks = felt("loggListe");
+  boks.textContent = "";
+
+  // «50+» nar taket er nadd: et tall som stopper pa taket og ikke sier det,
+  // pastar at det var alt.
+  settTall("loggTall", liste.length
+    ? (liste.length >= LOGG_MAKS ? LOGG_MAKS + "+" : String(liste.length)) : "");
+  felt("loggHint").hidden = false;
+  felt("loggHint").textContent = liste.length
+    ? "De " + (liste.length >= LOGG_MAKS ? LOGG_MAKS + " siste" : liste.length)
+      + " innloggingene i portalen, nyeste først. Hver er skrevet med den innloggedes egen økt."
+    : "Ingen innlogginger ennå.";
+
+  const okt = lesOkt();
+  liste.forEach((r) => {
+    const rad = celle("div", "logg-rad", "");
+    // Navnet fra brukerlista. Mangler det — lista svarte ikke, eller kontoen
+    // er slettet — star det hva vi vet framfor et gjettet navn.
+    const navn = brukerNavn[r.bruker];
+    const deg = okt && okt.bruker && String(okt.bruker) === r.bruker ? " (deg)" : "";
+    rad.appendChild(celle("span", "logg-navn",
+      (navn || "Ukjent konto " + r.bruker.slice(0, 8)) + deg));
+    rad.appendChild(celle("span", "logg-tid",
+      sistInneTekst(r.tid) + (r.versjon ? " · versjon " + r.versjon : "")));
+    boks.appendChild(rad);
+  });
 }
 
 // **Stempelet leses fra en fil, ikke fra en funksjon.** Forste utgave lot
@@ -980,6 +1137,7 @@ function tegnBrukere(liste) {
   brukerNavn = {};
   liste.forEach((b) => { if (b && b.id) brukerNavn[String(b.id)] = b.navn || ""; });
   tegnTilbakemeldingerIgjen();
+  tegnAdminLoggIgjen();
 
   settTall("brukerTall", liste.length ? String(liste.length) : "");
 
