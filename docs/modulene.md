@@ -310,6 +310,12 @@ kastet. `oktGyldig` og `oktUtloper` brukes av begge veier.
   grunner: fire siffer er 10 000 forsøk som ellers kunne gjettes rett mot
   Supabase, og Supabase krever minst seks tegn. Et nytt pepper låser alle
   ute.
+- **`initialFor()` er bokstaven i den runde knappen ved navnet** (#170).
+  Første bokstav eller siffer, stor, med `\p{L}` og ikke en håndskrevet
+  liste — «Åse» er «Å», ikke «Ã». Tomt svar når navnet ikke har noen, og da
+  tegner CSS-en ingenting framfor et hull. Initialen settes som
+  `data-initial` og tegnes av `::before`, så teksten i knappen forblir bare
+  navnet: skjermleseren sier «Ola», ikke «O Ola».
 - **`navnErEpost()` er `@`, og ikke mer.** Fornavnsfeltet tok imot
   adressen til noen, og den sto i «blir med»-lista, synlig for alle uten
   innlogging ([#142](https://github.com/runevangen/sb/issues/142)).

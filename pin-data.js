@@ -77,6 +77,15 @@ export const EPOST_SOM_NAVN =
 export const EPOST_SOM_NAVN_INNE =
   "Navnet ditt er en e-postadresse, og vi viser ikke e-post. Logg ut og lag en konto med fornavnet ditt.";
 
+// Bokstaven i den runde knappen ved navnet (#170). Forste bokstav eller
+// siffer, stor: et navn kan begynne med en apostrof eller et mellomrom, og
+// en sirkel med «'» i er ikke en initial. Tomt svar betyr ingen initial —
+// den som kaller, tegner da ingenting framfor et hull.
+export function initialFor(navn) {
+  const m = String(navn == null ? "" : navn).match(/[\p{L}\p{N}]/u);
+  return m ? m[0].toLocaleUpperCase("nb") : "";
+}
+
 // To bokstaver er nok — «Jo» er et fornavn. Men et navn som bare er
 // tegnsetting blir en tom nokkel, og en tom nokkel er alles konto.
 export function gyldigPinNavn(verdi) {

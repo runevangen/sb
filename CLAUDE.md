@@ -186,6 +186,19 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   svar tilbake er et hull i veggen. Bare innlogget, som pubforslagene:
   kontoen er sperren mot spam, og alternativet var å telle IP-adresser.
   [ADR 0025](docs/adr/0025-feil-og-onsker.md)
+- **«Logg inn» er en knapp der leseren står.** «Logg inn i menyen — et
+  fornavn og en PIN — …» sto i kampkortet til 30. september 2026, og
+  «Jeg skal hit» er appens viktigste handling: den hadde ingen vei inn
+  fra stedet den ble trykket. En setning som peker et annet sted enn en
+  knapp du kan trykke på, er verre enn ingen ([#180](https://github.com/runevangen/sb/issues/180)).
+  Knappen åpner **det samme** panelet som menyen, med feltet i fokus
+  (`apneInnlogging`) — ett panel, ikke to. Og når innloggingen lykkes,
+  sender appen `sb:innlogget`, og kortet river ned notatet og svaret som
+  ba deg logge inn: kortet tegnes ikke om, og en knapp som ber om noe du
+  nettopp har gjort, er den motsatte feilen.
+  **Navnet i toppfeltet har en rund initial foran seg** (#170), tegnet av
+  `::before` med `data-initial`. Teksten i knappen er fortsatt bare navnet.
+  Fargene er `--avatar-bg` og `--avatar-ink`, ikke skrevet inn.
 - **Et fornavn er ikke en e-postadresse.** Feltet spør om fornavnet, men
   noen skrev adressen sin, og den sto i «blir med»-lista, synlig for alle
   uten innlogging — mens personvernsida lover at vi ikke viser e-post
