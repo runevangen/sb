@@ -33,6 +33,8 @@
   /* Bunnen i den valgte kampen: sa svak at rammen gjor jobben, men nok
      til at raden loftes fra lista. */
   --accent-wash:   #EDF1FD;
+  --avatar-bg:     #DCE8FF;
+  --avatar-ink:    #142680;
 
   /* Bekreftet: en pub har sagt at den viser nettopp denne kampen. */
   --bekreftet: #1F7A4D;
@@ -795,7 +797,53 @@ body {
   cursor: pointer;
 }
 
+/* Den runde initialen, i stil med Google og GitHub (#170). Bokstaven settes
+   av app.js som data-initial og tegnes her, sa teksten i knappen forblir
+   bare navnet. Lys bla sirkel med morkt bla bokstav — leses mot toppfeltets
+   gradient i begge temaene, og fargene er tokens, ikke skrevet inn her. */
+.hvem-tag {
+  padding-left: 3px;
+}
+
+.hvem-tag::before {
+  content: attr(data-initial);
+  display: inline-block;
+  vertical-align: middle;
+  box-sizing: border-box;
+  width: calc(24px * var(--fs));
+  height: calc(24px * var(--fs));
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--avatar-bg);
+  color: var(--avatar-ink);
+  font-size: calc(13px * var(--fs));
+  font-weight: 700;
+  line-height: calc(24px * var(--fs));
+  text-align: center;
+}
+
 .hvem-tag[hidden] { display: none; }
+
+/* «Logg inn» i kampkortet: en knapp, ikke en setning som peker pa en (#180). */
+.kamp-logginn {
+  display: block;
+  margin-top: 8px;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: inherit;
+  font-size: calc(13px * var(--fs));
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+
+.kamp-logginn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .hvem-tag:focus-visible { outline: 2px solid var(--on-brand); outline-offset: 2px; }
 
 .filter-tag {

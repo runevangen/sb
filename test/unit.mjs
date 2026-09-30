@@ -34,7 +34,7 @@ import { normaliserEpost, gyldigEpost, normaliserKode, gyldigKode, maskerEpost,
          FORNY_MARGIN } from "../konto-data.js";
 
 import { normaliserPinNavn, pinSlug, gyldigPinNavn, pinEpost, normaliserPin, gyldigPin,
-         navnErEpost, EPOST_SOM_NAVN, EPOST_SOM_NAVN_INNE,
+         navnErEpost, EPOST_SOM_NAVN, EPOST_SOM_NAVN_INNE, initialFor,
          pinPassord, tolkPinOkt, tolkBrukere, sistInneTekst,
          PIN_MIN, PIN_MAKS, PIN_DOMENE,
          rensLag, flettLag, sammeLag, sjekkPinBytte, LAG_MAKS } from "../pin-data.js";
@@ -1692,6 +1692,18 @@ ok("en adresse er ikke et fornavn",
 ok("men et navn uten @ er det",
    !navnErEpost("Ola") && !navnErEpost("Bj\u00f8rn \u00c5ge") && !navnErEpost("Jo-Ann") &&
    !navnErEpost("") && !navnErEpost(null) && !navnErEpost(undefined));
+
+// Initialen i den runde knappen ved navnet (#170).
+ok("initialFor tar forste bokstav, stor",
+  initialFor("ola") === "O" && initialFor("Kari") === "K" && initialFor("  ida") === "I");
+ok("initialFor tar norske bokstaver hele, ikke en byte",
+  initialFor("\u00e5se") === "\u00c5" && initialFor("\u00f8ystein") === "\u00d8" &&
+  initialFor("\u00e6rlig") === "\u00c6");
+ok("initialFor hopper over tegnsetting foran navnet",
+  initialFor("'Ola") === "O" && initialFor("-jo") === "J");
+ok("initialFor gir tomt svar uten bokstav, ikke et hull",
+  initialFor("") === "" && initialFor(null) === "" && initialFor(undefined) === "" &&
+  initialFor("...") === "");
 // **Sperra gjelder a LAGE en konto og a VISE et navn, ikke a komme inn.**
 // Den som alt har en konto med en adresse som navn, maa fortsatt kunne
 // logge inn — ellers laaste regelen ute akkurat dem den skulle hjelpe.

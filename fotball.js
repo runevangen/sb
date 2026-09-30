@@ -73,7 +73,7 @@ let deling = async () => "feil";
 let puber = { liste: () => [], noter: () => {} };
 // Innlogging og navn eies ogsa av app.js: modulen sporr bare om okta og
 // om navnet vennene ser.
-let konto = { okt: () => null, navn: () => "", settNavn: () => {} };
+let konto = { okt: () => null, navn: () => "", settNavn: () => {}, apneInnlogging: () => {} };
 let aktivLiga = "eliteserien";
 let aktivDel = "tabell";
 
@@ -81,6 +81,26 @@ let aktivDel = "tabell";
 // koste et nytt kall — kanten har allerede svart en gang.
 const husket = new Map();
 const HUSKE_MS = 10 * 60 * 1000;
+
+// Veien inn fra stedet leseren star. «Logg inn i menyen» var en setning som
+// pekte pa en knapp nederst i et panel leseren matte finne selv (#180) —
+// og en setning som peker et annet sted enn en knapp du kan trykke pa, er
+// verre enn ingen. Knappen apner innloggingen uten a ga via hamburgeren.
+function innloggingsknapp() {
+  const knapp = el("button", "kamp-logginn", "Logg inn");
+  knapp.type = "button";
+  knapp.addEventListener("click", () => konto.apneInnlogging());
+  return knapp;
+}
+
+// Logget du inn mens kortet sto apent, sier notatet og svaret fortsatt at
+// du ma. De to rives ned nar innloggingen lykkes; kortet tegnes ikke om.
+document.addEventListener("sb:innlogget", () => {
+  document.querySelectorAll(".kamp-note").forEach((n) => n.remove());
+  document.querySelectorAll(".kamp-svar").forEach((m) => {
+    if (m.querySelector(".kamp-logginn")) m.textContent = "";
+  });
+});
 
 function el(tag, klasse, tekst) {
   const node = document.createElement(tag);
@@ -1373,8 +1393,9 @@ function delPanel(kamp) {
       // Innlogging er ikke en port inn i appen, bare veien til a stille
       // seg pa lista.
       const note = el("p", "kamp-note",
-        "Logg inn i menyen — et fornavn og en PIN — for å si at du skal dit."
+        "Et fornavn og en PIN, så kan du si at du skal dit."
         + " Å se hvem som blir med, og å dele kampen, virker uansett.");
+      note.appendChild(innloggingsknapp());
       panel.insertBefore(note, melding);
     }
   };
@@ -1736,8 +1757,9 @@ async function svarSted(kamp, panel, hvor, sted, melding, avmeld) {
     // appen krever at noen har sagt det, og det star her.
     panel.settLokalt(avmeld ? null : { hvor, sted });
     melding.textContent = avmeld ? ""
-      : "Logg inn i menyen — et fornavn og en PIN — for å si at du skal hit."
+      : "Et fornavn og en PIN, så kan du si at du skal hit."
         + " Stedet blir med når du deler kampen.";
+    if (!avmeld) melding.appendChild(innloggingsknapp());
     if (panel.tegnSteder) panel.tegnSteder();
     return;
   }
