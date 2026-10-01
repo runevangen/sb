@@ -21,7 +21,8 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
          foldTekst, treffScore, rangerTreff, listeTekst,
-         BILDE_BRUK, bildeFor, renSrcset, renSizes, renMaal, kategoriVisningsnavn } from "../lib.js";
+         BILDE_BRUK, bildeFor, renSrcset, renSizes, renMaal, kategoriVisningsnavn,
+         sveipRetning, sveipMal, sveipStartOk, sveipFullfor } from "../lib.js";
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          SPORTER, sportFor, tolkDatasett, kommendeKamper, kallPerSport, DOGNKVOTE,
          ligaForKategori,
@@ -1720,6 +1721,23 @@ ok("andre kategorier star som de kommer",
   kategoriVisningsnavn("Fotballtransfers") === "Fotballtransfers");
 ok("og tomt eller ukjent gir ikke et unntak",
   kategoriVisningsnavn("") === "" && kategoriVisningsnavn(null) === "" && kategoriVisningsnavn(undefined) === "");
+// Sveip mellom nyheter og fotball (1. oktober 2026): beslutningene er rene.
+ok("under ti piksler er det for tidlig a si hvilken vei", sveipRetning(6, 3) === "vent" && sveipRetning(0, 0) === "vent");
+ok("klart mer sideveis enn opp/ned er et vannrett sveip",
+  sveipRetning(-40, 10) === "vannrett" && sveipRetning(40, -20) === "vannrett");
+ok("et skratt sveip er en rulling som skled", sveipRetning(-40, 30) === "loddrett" && sveipRetning(-30, 20) === "loddrett");
+ok("og loddrett er loddrett", sveipRetning(3, 60) === "loddrett");
+ok("fingeren mot venstre apner fotballen, mot hogre tar deg tilbake",
+  sveipMal("nyheter", -50) === "fotball" && sveipMal("fotball", 50) === "nyheter");
+ok("og den andre veien er det ingen side",
+  sveipMal("nyheter", 50) === null && sveipMal("fotball", -50) === null && sveipMal("noe", -50) === null);
+ok("et sveip som starter i kanten er telefonens",
+  !sveipStartOk(10, 0, 390) && !sveipStartOk(380, 0, 390) && sveipStartOk(24, 0, 390) && sveipStartOk(366, 0, 390));
+ok("kanten males fra flata, ikke fra vinduet", sveipStartOk(130, 100, 490) && !sveipStartOk(110, 100, 490));
+ok("langt nok fullforer, selv sakte", sveipFullfor(-120, 390, 2000) && sveipFullfor(120, 390, 2000));
+ok("kort og sakte gar tilbake", !sveipFullfor(-60, 390, 2000) && !sveipFullfor(-60, 390, 0));
+ok("kort og rask fullforer", sveipFullfor(-60, 390, 80) && !sveipFullfor(-30, 390, 20));
+ok("uten bredde fullfores ingenting", !sveipFullfor(-500, 0, 10) && !sveipFullfor(-500, NaN, 10));
 // **Sperra gjelder a LAGE en konto og a VISE et navn, ikke a komme inn.**
 // Den som alt har en konto med en adresse som navn, maa fortsatt kunne
 // logge inn — ellers laaste regelen ute akkurat dem den skulle hjelpe.

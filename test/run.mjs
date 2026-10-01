@@ -7915,6 +7915,141 @@ const SAK_25 = kjor("meny-nyheter-fotball", FELLES + FOTBALL + `
   }); });
 `);
 
+// Sveip: fingeren mot venstre apner fotballen, mot hogre tar deg tilbake, og
+// visningen folger fingeren. Et tillegg til menyraden — og aldri det som tar
+// fra deg tabellen du ruller, kanten telefonen eier, eller rulling opp og ned.
+const SAK_26 = kjor("sveip", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  ` + mockAlt("saker") + `
+  function etter(ms, f) { setTimeout(function () { try { f(); } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, ms); }
+  var flate, feed, fb;
+  function p(type, el, x, y, o) {
+    var h = new PointerEvent(type, Object.assign({ pointerType: "touch", isPrimary: true, pointerId: 7,
+      clientX: x, clientY: y, bubbles: true, cancelable: true }, o || {}));
+    el.dispatchEvent(h); return h;
+  }
+  // Et helt sveip pa tre steg, fra midten av flata. Returnerer for den slippes, sa en test kan se midt i.
+  function dra(el, dx, dy, o) {
+    var r = flate.getBoundingClientRect(), x0 = Math.round(r.left + r.width / 2), y0 = Math.round(r.top + r.height / 2);
+    p("pointerdown", el, x0, y0, o);
+    p("pointermove", el, x0 + dx / 3, y0 + dy / 3, o); p("pointermove", el, x0 + dx * 2 / 3, y0 + dy * 2 / 3, o);
+    p("pointermove", el, x0 + dx, y0 + dy, o);
+    return { slipp: function () { p("pointerup", el, x0 + dx, y0 + dy, o); }, avbryt: function () { p("pointercancel", el, x0 + dx, y0 + dy, o); } };
+  }
+  function iNyhetene() { return !feed.hidden && fb.hidden && !flate.classList.contains("sveiper"); }
+  function iFotballen() { return feed.hidden && !fb.hidden && !flate.classList.contains("sveiper"); }
+
+  window.addEventListener("load", function () { etter(900, function () {
+    flate = document.getElementById("visninger"); feed = document.getElementById("feed"); fb = document.getElementById("fotball");
+    ok("vi starter i nyhetene", iNyhetene());
+    ok("rullefeltene overlater loddrett rulling og klyping til nettleseren, og tar bare sideveis selv",
+       /pan-y/.test(getComputedStyle(feed).touchAction) && /pinch-zoom/.test(getComputedStyle(feed).touchAction) &&
+       /pan-y/.test(getComputedStyle(document.getElementById("fotballInnhold")).touchAction),
+       getComputedStyle(feed).touchAction);
+
+    // 1. Midt i sveipet star begge flatene der, og feeden folger fingeren.
+    var d = dra(feed, -150, 4);
+    ok("midt i sveipet ligger begge flatene oppa hverandre",
+       flate.classList.contains("sveiper") && !fb.hidden && !feed.hidden);
+    var bredde = Math.round(flate.getBoundingClientRect().width);
+    ok("feeden folger fingeren mot venstre", /translate3d\\(-150px/.test(feed.style.transform), feed.style.transform);
+    ok("og fotballen kommer inn fra hogre, en bredde unna", fb.style.transform.indexOf("translate3d(" + (bredde - 150) + "px") === 0, fb.style.transform + " bredde " + bredde);
+    d.slipp();
+    etter(400, function () {
+      ok("sveip mot venstre apner fotballen", iFotballen());
+      ok("og adressen sier det, som menyraden", location.hash.indexOf("#/fotball/") === 0, location.hash);
+      ok("uten rester av sveipet pa flatene", feed.style.transform === "" && fb.style.transform === "" &&
+         feed.style.transition === "" && fb.style.transition === "");
+
+      // 2. Tilbake: mot hogre.
+      var t = dra(fb, 170, -3); t.slipp();
+      etter(400, function () {
+        ok("sveip mot hogre tar deg tilbake til nyhetene", iNyhetene());
+
+        // 3. For kort: glir tilbake, og ingenting er byttet.
+        var hist = history.length;
+        var k = dra(feed, -60, 2);
+        ok("et kort sveip folger fingeren", flate.classList.contains("sveiper"));
+        k.slipp();
+        etter(400, function () {
+          ok("for kort og for sakte: ingenting byttes", iNyhetene() && history.length === hist, history.length + " vs " + hist);
+
+          // 4. Feil vei: ingen side til hogre for nyhetene.
+          var f = dra(feed, 200, 0);
+          ok("mot hogre i nyhetene skjer ingenting", !flate.classList.contains("sveiper") && fb.hidden);
+          f.slipp();
+
+          // 5. Rulling opp og ned er ikke et sveip.
+          var o = dra(feed, -30, 160);
+          ok("loddrett rulling starter ikke noe sveip", !flate.classList.contains("sveiper") && fb.hidden);
+          o.slipp();
+          // Et skratt sveip er en rulling som skled.
+          var sk = dra(feed, -120, 100);
+          ok("et skratt sveip er rulling", !flate.classList.contains("sveiper"));
+          sk.slipp();
+
+          // 6. Kanten er telefonens (iOS bruker venstre kant til tilbake).
+          var r = flate.getBoundingClientRect();
+          p("pointerdown", feed, r.right - 8, r.top + 200); p("pointermove", feed, r.right - 120, r.top + 200);
+          p("pointermove", feed, r.right - 200, r.top + 200);
+          ok("et sveip som starter i kanten er nettleserens", !flate.classList.contains("sveiper"));
+          p("pointerup", feed, r.right - 200, r.top + 200);
+
+          // 7. Mus og penn er ikke fingre.
+          var m = dra(feed, -200, 0, { pointerType: "mouse" });
+          ok("musedrag er ikke sveip", !flate.classList.contains("sveiper"));
+          m.slipp();
+
+          // 8. Noe som ruller sidelengs er dets.
+          var skall = document.createElement("div");
+          skall.id = "testRull"; skall.style.cssText = "overflow-x:auto;width:200px;height:40px";
+          skall.innerHTML = "<div style='width:900px;height:20px'></div>";
+          feed.insertBefore(skall, feed.firstChild);
+          var rr = skall.getBoundingClientRect();
+          p("pointerdown", skall, rr.left + 100, rr.top + 10); p("pointermove", skall, rr.left + 60, rr.top + 10);
+          p("pointermove", skall, rr.left - 40, rr.top + 10);
+          ok("et sveip som starter pa noe som ruller sidelengs, bytter ikke visning", !flate.classList.contains("sveiper"));
+          p("pointerup", skall, rr.left - 40, rr.top + 10);
+          skall.remove();
+
+          // 9. Avbrutt av nettleseren (den tok loddrett rulling): alt tilbake.
+          var a = dra(feed, -150, 5);
+          ok("midt i et sveip", flate.classList.contains("sveiper"));
+          a.avbryt();
+          etter(400, function () {
+            ok("pointercancel gir tilbake nyhetene, uten bytte", iNyhetene() && feed.style.transform === "" && fb.style.transform === "");
+
+            // 10. Apen meny: sveip er ikke noe der.
+            document.getElementById("menuBtn").click();
+            var me = dra(feed, -200, 0);
+            ok("med menyen apen skjer ingenting", !flate.classList.contains("sveiper") && fb.hidden);
+            me.slipp();
+            document.getElementById("menuLukk").click();
+
+            // 11. Trykket etter et fullfort sveip er ikke et trykk.
+            var klikk = 0; feed.addEventListener("click", function () { klikk++; });
+            var s2 = dra(feed, -200, 0); s2.slipp();
+            // Klikket kommer i det fingeren lettes, for animasjonen er ferdig.
+            feed.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+            ok("et klikk rett etter sveipet nar ikke fram", klikk === 0, "klikk=" + klikk);
+            etter(600, function () {
+              ok("fotballen er apnet igjen", iFotballen());
+              feed.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+              ok("men et vanlig trykk senere gjelder", klikk === 1, "klikk=" + klikk);
+              etter(100, function () {
+                // 12. Menyraden er fortsatt veien tilbake.
+                tilNyheter();
+                ok("menyen virker like fullt", iNyhetene());
+                ferdig();
+              });
+            });
+          });
+        });
+      });
+    });
+  }); });
+`);
+
 // Portalen: passordet er det første du gjør, så feltet har fokus når siden åpnes.
 const SAK_15S = kjor("admin-fokus", `
   window.addEventListener("load", function () { setTimeout(function () { try {
@@ -10099,7 +10234,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_2B, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_18J, SAK_18K, SAK_25, SAK_15S, SAK_15T, SAK_15U, SAK_15V, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_2B, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_18J, SAK_18K, SAK_25, SAK_26, SAK_15S, SAK_15T, SAK_15U, SAK_15V, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

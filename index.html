@@ -217,6 +217,9 @@
         <button class="menu-lukk" id="menuLukk" type="button">Lukk menyen</button>
       </div>
     </nav>
+    <!-- Nyheter og fotball ligger i en felles flate, sa sveipet kan la dem
+         skli forbi hverandre uten at resten av appen flytter seg. -->
+    <div class="visninger" id="visninger">
     <div class="feed" id="feed" aria-live="polite" aria-busy="true">
       <div class="state"><p>Henter nyheter …</p></div>
     </div>
@@ -230,6 +233,7 @@
       </div>
       <div class="fotball-innhold" id="fotballInnhold" aria-live="polite"></div>
     </section>
+    </div>
 
   </div>
 
