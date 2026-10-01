@@ -1088,6 +1088,70 @@ body {
    rullefeltene, for touch-action regnes bare opp til nermeste rullefelt. */
 .feed, .fotball-innhold { touch-action: pan-y pinch-zoom; }
 
+/* Forklaringen av sveipet, første gang. Ligger i kortet, ikke i flata som
+   glir, og tar ingen trykk bort: bare selve kortet fanger trykk. */
+.sveip-hint {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg-app);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  box-shadow: 0 6px 22px rgba(10, 18, 45, 0.25);
+  font-size: 14px;
+  line-height: 1.35;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.sveip-hint.synlig { opacity: 1; transform: translateY(0); }
+
+.sveip-hint strong { color: var(--text-strong); }
+
+.sveip-pil {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-size: 20px;
+  font-weight: 700;
+  animation: sveip-pil 1.6s ease-in-out 3;
+}
+
+@keyframes sveip-pil {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(-5px); }
+}
+
+.sveip-ok {
+  flex: none;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sveip-hint { transition: none; transform: none; }
+  .sveip-pil { animation: none; }
+}
+
 .visninger.sveiper > .feed,
 .visninger.sveiper > .fotball {
   position: absolute;

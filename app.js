@@ -5,7 +5,7 @@
 
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug, rangerTreff, listeTekst,
          bildeFor, renSrcset, renSizes, renMaal, kategoriVisningsnavn,
-         sveipRetning, sveipMal, sveipStartOk, sveipFullfor }
+         sveipRetning, sveipMal, sveipStartOk, sveipFullfor, antallLoftet }
   from "./lib.js";
 import { LIGAER, tolkFotballHash, fotballHash, tolkKamplenke,
          ligaForKategori, DEL_NAVN } from "./fotball-data.js";
@@ -836,8 +836,11 @@ function renderFeed(saker, opts) {
   feed.scrollTop = 0;
 
   // Rekkefolgen er endret, og det skal sta hvorfor. Linja er en vei til
-  // tabellen, der valget gjores om.
-  if (!sokeord && favorittlag().length) feed.appendChild(favorittLinje());
+  // tabellen, der valget gjores om. Den star bare nar noe ER lofta: uten
+  // en sak om laget er rekkefolgen den vanlige, og «Rosenborg overst» over en
+  // toppsak om Bordeaux sa noe usant om sin egen liste.
+  const loftet = sokeord ? 0 : antallLoftet(saker, favorittlag(), 2);
+  if (loftet > 0) feed.appendChild(favorittLinje(loftet));
 
   feed.appendChild(buildHero(posts[0]));
 
@@ -897,11 +900,12 @@ async function hentFlere() {
   return false;
 }
 
-function favorittLinje() {
+function favorittLinje(antall) {
   const knapp = el("button", "favoritt-linje");
   knapp.type = "button";
   knapp.appendChild(el("span", "favoritt-stjerne", "★"));
-  knapp.appendChild(el("span", null, listeTekst(favorittlag()) + " øverst"));
+  knapp.appendChild(el("span", null, listeTekst(favorittlag()) + " øverst · " +
+    antall + (antall === 1 ? " sak" : " saker")));
   knapp.title = "Velg lag i tabellen";
   knapp.addEventListener("click", () => settFane("fotball", fotballLiga, "tabell"));
   return knapp;
@@ -1694,6 +1698,7 @@ function settFane(visning, liga, del) {
 
 function visFane(visning, liga, del) {
   aktivVisning = visning;
+  if (visning === "fotball") skjulSveipHint();
   if (visning === "fotball") {
     fotballLiga = liga || fotballLiga;
     fotballDel = del || fotballDel;
@@ -1714,6 +1719,69 @@ function visFane(visning, liga, del) {
   // kortene bytter ingen visning, og lar siden sta.
   if (isMenuOpen() && erKontoModus()) closeMenu();
   else if (isMenuOpen()) visMeny();
+}
+
+/* ---------- sveip-forklaringen ---------- */
+
+// Første gang appen åpnes, står det en liten forklaring nederst: sveipet er
+// usynlig, og en gest ingen har fortalt om finnes ikke. Den er et kort, ikke
+// et lag over skjermen — den stopper ingen, og sveipet virker mens den står.
+// Vises én gang: «sett» lagres i det kortet vises, ikke når det lukkes, for en
+// som lukket appen etter ett sekund skal ikke få den igjen og igjen. Lagres
+// som visningsvalg lokalt (personvern.html sier det), aldri hos oss.
+//
+// Bare der sveip finnes: på en berøringsskjerm. Med mus er det ingenting å
+// forklare, og et kort som beskriver noe du ikke kan gjøre er verre enn ingen.
+const SVEIP_HINT_MS = 8000;
+let sveipHintEl = null;
+let sveipHintTimer = null;
+
+// Valget bor på det delte `prefs`-objektet, ikke i en egen kopi: resten av
+// appen skriver `prefs` tilbake hver gang du endrer tekststørrelse eller tema,
+// og en kopi ville blitt overskrevet — da kom forklaringen igjen.
+function sveipHintSett() {
+  return !!prefs.sveipHint;
+}
+
+function visSveipHint() {
+  if (sveipHintEl || sveipHintSett()) return;
+  if (!(navigator.maxTouchPoints > 0)) return;
+  // Ikke oppå noe leseren holder på med: en åpen sak, menyen, fotballen
+  // (da har hen alt funnet veien), eller en delt lenke til en kamp.
+  if (aktivVisning !== "nyheter" || isMenuOpen() ||
+      document.getElementById("detailWrap").classList.contains("open")) return;
+
+  prefs.sveipHint = true;
+  savePrefs(prefs);
+
+  const kort = el("div", "sveip-hint");
+  kort.setAttribute("role", "status");
+  kort.appendChild(el("span", "sveip-pil", "←"));
+  const tekst = el("div", "sveip-tekst");
+  const forst = el("strong", null, "Sveip mot venstre");
+  tekst.appendChild(forst);
+  tekst.appendChild(document.createTextNode(" for Tabeller og kamper. Sveip mot høyre for å komme tilbake."));
+  kort.appendChild(tekst);
+  const ok = el("button", "sveip-ok", "Skjønner");
+  ok.type = "button";
+  ok.addEventListener("click", skjulSveipHint);
+  kort.appendChild(ok);
+
+  document.querySelector(".phone").appendChild(kort);
+  sveipHintEl = kort;
+  // Neste bildeovergang, så transisjonen har en start å gå fra.
+  requestAnimationFrame(() => requestAnimationFrame(() => kort.classList.add("synlig")));
+  sveipHintTimer = setTimeout(skjulSveipHint, SVEIP_HINT_MS);
+}
+
+// Kalles når leseren har vist at hen kan: et fullført sveip, menyen, fotballen.
+function skjulSveipHint() {
+  clearTimeout(sveipHintTimer);
+  const kort = sveipHintEl;
+  sveipHintEl = null;
+  if (!kort) return;
+  kort.classList.remove("synlig");
+  setTimeout(() => kort.remove(), 250);
 }
 
 /* ---------- sveip ---------- */
@@ -2021,6 +2089,7 @@ function openMenu() {
   // og den skal ikke henge igjen til neste gang.
   settKontoModus(false);
   settAdminSteg(false);
+  skjulSveipHint();
   panel.classList.add("open");
   btn.setAttribute("aria-expanded", "true");
   document.getElementById("menuClose").focus();
@@ -3200,6 +3269,9 @@ if (startrute) visFane("fotball", startrute.liga, startrute.del);
 loadFeed().then(() => {
   const slug = slugFraHash();
   if (slug) apneSlug(slug);
+  // Et øyeblikk etter at feeden står: forklaringen skal ikke konkurrere med
+  // det første leseren ser.
+  setTimeout(visSveipHint, 1500);
 });
 
 // Feeden oppdateres i bakgrunnen så lenge fanen er synlig. loadFeed lar

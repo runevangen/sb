@@ -210,6 +210,15 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   som bunnfanen aldri gjorde. Et *emne* valgt fra fotballen bytter visning og
   filtrerer. Søkefeltet («Søk i alle saker») og emnemerket på hver sak heter
   fortsatt det de gjorde — det ble ikke bedt om.
+- **«Laget ditt øverst» står bare når noe ER løftet.** Linja over feeden
+  («Rosenborg øverst · 2 saker») sto så lenge du fulgte et lag, også når
+  ingen sak handlet om det og toppsaken var en helt annen (1. oktober 2026:
+  «Rosenborg øverst» over en sak om Bordeaux). Da sa den noe usant om sin egen
+  liste. `antallLoftet()` i `lib.js` teller det `rangerTreff()` faktisk løfter,
+  med samme terskel (2: laget i tittelen eller emnet, ikke bare nevnt i
+  teksten), og linja tegnes bare når tallet er over null. Trykket tar deg
+  fortsatt til tabellen, der valget gjøres om — så uten saker er veien til å
+  endre laget stjernene i tabellen, ikke linja.
 - **Et sveip bytter mellom nyhetene og fotballen, og er et tillegg.**
   Fingeren mot venstre åpner «Tabeller og kamper», mot høyre tar deg tilbake
   (1. oktober 2026) — som om fotballen lå på en side til høyre. Menyraden er
@@ -244,6 +253,23 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   veiledning for feil telefon er verre enn ingen, og dialogen kan bare brukes
   én gang: sier leseren nei, står veiledningen igjen, ikke en dialog som er
   brukt opp.
+- **Sveipet forklares én gang, første gang appen åpnes.** En gest ingen har
+  fortalt om finnes ikke (1. oktober 2026). Et lite kort nederst — «Sveip mot
+  venstre for Tabeller og kamper. Sveip mot høyre for å komme tilbake.» med en
+  «Skjønner»-knapp — og **ikke** et lag over skjermen: det stopper ingen, og
+  sveipet virker mens det står. Det kommer 1,5 sekunder etter at feeden står,
+  så det ikke konkurrerer med det første leseren ser; det går bort av seg selv
+  etter åtte sekunder, ved «Skjønner», ved et sveip, og når menyen eller
+  fotballen åpnes — leseren har da funnet veien. **Bare på en berøringsskjerm**
+  (`maxTouchPoints`): med mus er det ingenting å forklare, og et kort som
+  beskriver noe du ikke kan gjøre er verre enn ingen. **Og ikke oppå noe:** ikke
+  i fotballen, ikke med en sak eller menyen åpen — da regnes det ikke som sett.
+  **«Sett» lagres i det kortet vises, ikke når det lukkes**, så den som lukker
+  appen etter ett sekund ikke får det igjen og igjen. Det ligger på `prefs`
+  (visningsvalg, lokalt) og står på personvernsida. Det ligger på det delte
+  objektet, ikke i en kopi: resten av appen skriver `prefs` tilbake ved hvert
+  favorittlag, og en kopi ville blitt overskrevet. `prefers-reduced-motion`
+  fjerner både glidet og pilen.
 - **«Logg inn» er en knapp der leseren står.** «Logg inn i menyen — et
   fornavn og en PIN — …» sto i kampkortet til 30. september 2026, og
   «Jeg skal hit» er appens viktigste handling: den hadde ingen vei inn

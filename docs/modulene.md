@@ -55,6 +55,9 @@ Tre ting følger av mønsteret:
 Hjelpefunksjonene til nyhetsdelen. De ligger her og ikke i `app.js` for å
 kunne testes i Node på millisekunder.
 
+- **`antallLoftet` er det `rangerTreff` faktisk løfter, talt med samme
+  poengsum og terskel.** Linja «Brann øverst · 1 sak» i feeden leser det:
+  ett sted å regne, så linja og lista aldri blir uenige om hva som er løftet.
 - **`sveipRetning`, `sveipMal`, `sveipStartOk`, `sveipFullfor` er sveipets
   beslutninger, uten finger.** Hvilken vei (vannrett må være 1,5 ganger
   loddrett), hvilken side fingeren leder til, om starten er langt nok fra
@@ -698,6 +701,11 @@ portalen — en leser har ingen nytte av den.
 
 ### `app.js`
 
+- **Sveip-forklaringen bor på `prefs`, ikke i en egen kopi.** `prefs.sveipHint`
+  settes i det kortet vises. Resten av appen skriver `prefs` tilbake ved
+  hvert favorittlag, og en kopi fra `readPrefs()` ville blitt overskrevet —
+  da kom forklaringen igjen. Kortet legges i `.phone`, ikke i `#visninger`:
+  det skal ikke ligge i flata som glir, og ikke ta sveipet.
 - **Sveipet er en egen blokk i `app.js`, og `#visninger` er flaten det
   glir på.** `#feed` og `#fotball` ligger i `.visninger`; til vanlig er den en
   boks som fyller kortet, og under et sveip legger de seg oppå hverandre
