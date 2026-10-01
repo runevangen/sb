@@ -5,7 +5,7 @@
 
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug, rangerTreff, listeTekst,
          bildeFor, renSrcset, renSizes, renMaal, kategoriVisningsnavn,
-         sveipRetning, sveipMal, sveipStartOk, sveipFullfor }
+         sveipRetning, sveipMal, sveipStartOk, sveipFullfor, antallLoftet }
   from "./lib.js";
 import { LIGAER, tolkFotballHash, fotballHash, tolkKamplenke,
          ligaForKategori, DEL_NAVN } from "./fotball-data.js";
@@ -834,8 +834,11 @@ function renderFeed(saker, opts) {
   feed.scrollTop = 0;
 
   // Rekkefolgen er endret, og det skal sta hvorfor. Linja er en vei til
-  // tabellen, der valget gjores om.
-  if (!sokeord && favorittlag().length) feed.appendChild(favorittLinje());
+  // tabellen, der valget gjores om. Den star bare nar noe ER lofta: uten
+  // en sak om laget er rekkefolgen den vanlige, og «Rosenborg overst» over en
+  // toppsak om Bordeaux sa noe usant om sin egen liste.
+  const loftet = sokeord ? 0 : antallLoftet(saker, favorittlag(), 2);
+  if (loftet > 0) feed.appendChild(favorittLinje(loftet));
 
   feed.appendChild(buildHero(posts[0]));
 
@@ -895,11 +898,12 @@ async function hentFlere() {
   return false;
 }
 
-function favorittLinje() {
+function favorittLinje(antall) {
   const knapp = el("button", "favoritt-linje");
   knapp.type = "button";
   knapp.appendChild(el("span", "favoritt-stjerne", "★"));
-  knapp.appendChild(el("span", null, listeTekst(favorittlag()) + " øverst"));
+  knapp.appendChild(el("span", null, listeTekst(favorittlag()) + " øverst · " +
+    antall + (antall === 1 ? " sak" : " saker")));
   knapp.title = "Velg lag i tabellen";
   knapp.addEventListener("click", () => settFane("fotball", fotballLiga, "tabell"));
   return knapp;

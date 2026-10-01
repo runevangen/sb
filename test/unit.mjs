@@ -20,7 +20,7 @@ import { ARTER, TEKST_MIN, TEKST_MAKS, SKJERM_MAKS, VERSJON_MAKS, STATUSER, STAT
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
-         foldTekst, treffScore, rangerTreff, listeTekst,
+         foldTekst, treffScore, rangerTreff, antallLoftet, listeTekst,
          BILDE_BRUK, bildeFor, renSrcset, renSizes, renMaal, kategoriVisningsnavn,
          sveipRetning, sveipMal, sveipStartOk, sveipFullfor } from "../lib.js";
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
@@ -298,6 +298,20 @@ ok("tittel-treff forst, sa brodtekst, sa resten etter dato",
    RANGERT.map((p) => p.id).join(",") === "2,1,4,5,3", RANGERT.map((p) => p.id).join(","));
 ok("rangering endrer ikke original-lista",
    FEED[0].id === 5, FEED[0].id);
+
+// «Laget ditt øverst» skal være sant om lista: antallet er det rangerTreff
+// faktisk løfter, med samme terskel (1. oktober 2026).
+ok("antallLoftet teller tittel-treffene, ikke brodtekst-treffet, med terskel 2",
+   antallLoftet(FEED, "Fulham", 2) === 2, antallLoftet(FEED, "Fulham", 2));
+ok("uten terskel teller brodtekst-treffet ogsa", antallLoftet(FEED, "Fulham") === 3, antallLoftet(FEED, "Fulham"));
+ok("ingen sak om laget gir null — da er det ingenting a si «overst» om",
+   antallLoftet(FEED, ["Rosenborg"], 2) === 0);
+ok("flere lag teller hver sak en gang", antallLoftet(FEED, ["Fulham", "City"], 2) === 3,
+   antallLoftet(FEED, ["Fulham", "City"], 2));
+ok("tomt valg, tom liste og manglende liste gir null",
+   antallLoftet(FEED, [], 2) === 0 && antallLoftet([], ["Fulham"], 2) === 0 && antallLoftet(null, ["Fulham"], 2) === 0);
+ok("og antallet er det rangerTreff løfter: de forste N star der",
+   rangerTreff(FEED, ["Fulham"], 2).slice(0, antallLoftet(FEED, ["Fulham"], 2)).every((p) => treffScore(p, ["Fulham"]) >= 2));
 ok("tomt sokeord gir lista urort", rangerTreff(FEED, "") === FEED && rangerTreff(FEED, null) === FEED);
 // Sortering er stabil: uten dato og med lik score skal rekkefolgen sta.
 const UDATERT = [sak(8, "A", null), sak(9, "B", null), sak(10, "C", null)];

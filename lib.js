@@ -173,6 +173,16 @@ export function rangerTreff(posts, ord, terskel) {
     .map((r) => r.post);
 }
 
+// Hvor mange saker rangerTreff() faktisk loftet. Samme terskel, samme
+// poengsum — ett sted a regne, sa linja som sier «øverst» og lista som
+// sorteres aldri kan bli uenige om hva som er lofta.
+export function antallLoftet(posts, ord, terskel) {
+  const ordene = (Array.isArray(ord) ? ord : [ord]).filter((o) => foldTekst(o));
+  if (!ordene.length) return 0;
+  const minst = terskel || 1;
+  return (posts || []).filter((post) => treffScore(post, ordene) >= minst).length;
+}
+
 // «Brann», «Brann og Viking», «Brann, Viking og Molde».
 export function listeTekst(navn) {
   const l = (navn || []).filter(Boolean);
