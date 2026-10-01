@@ -673,6 +673,11 @@ portalen — en leser har ingen nytte av den.
 
 ### `app.js`
 
+- **Sveip-forklaringen bor på `prefs`, ikke i en egen kopi.** `prefs.sveipHint`
+  settes i det kortet vises. Resten av appen skriver `prefs` tilbake ved
+  hvert favorittlag, og en kopi fra `readPrefs()` ville blitt overskrevet —
+  da kom forklaringen igjen. Kortet legges i `.phone`, ikke i `#visninger`:
+  det skal ikke ligge i flata som glir, og ikke ta sveipet.
 - **Sveipet er en egen blokk i `app.js`, og `#visninger` er flaten det
   glir på.** `#feed` og `#fotball` ligger i `.visninger`; til vanlig er den en
   boks som fyller kortet, og under et sveip legger de seg oppå hverandre

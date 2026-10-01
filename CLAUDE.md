@@ -241,6 +241,23 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   gir et hopp i stedet for glid. **Målt i Chromium med pekerhendelser, ikke på en
   iPhone** — om glidet hakker der, er det bare en telefon som kan si, og da er
   veien tilbake enkelt bytte uten glid.
+- **Sveipet forklares én gang, første gang appen åpnes.** En gest ingen har
+  fortalt om finnes ikke (1. oktober 2026). Et lite kort nederst — «Sveip mot
+  venstre for Tabeller og kamper. Sveip mot høyre for å komme tilbake.» med en
+  «Skjønner»-knapp — og **ikke** et lag over skjermen: det stopper ingen, og
+  sveipet virker mens det står. Det kommer 1,5 sekunder etter at feeden står,
+  så det ikke konkurrerer med det første leseren ser; det går bort av seg selv
+  etter åtte sekunder, ved «Skjønner», ved et sveip, og når menyen eller
+  fotballen åpnes — leseren har da funnet veien. **Bare på en berøringsskjerm**
+  (`maxTouchPoints`): med mus er det ingenting å forklare, og et kort som
+  beskriver noe du ikke kan gjøre er verre enn ingen. **Og ikke oppå noe:** ikke
+  i fotballen, ikke med en sak eller menyen åpen — da regnes det ikke som sett.
+  **«Sett» lagres i det kortet vises, ikke når det lukkes**, så den som lukker
+  appen etter ett sekund ikke får det igjen og igjen. Det ligger på `prefs`
+  (visningsvalg, lokalt) og står på personvernsida. Det ligger på det delte
+  objektet, ikke i en kopi: resten av appen skriver `prefs` tilbake ved hvert
+  favorittlag, og en kopi ville blitt overskrevet. `prefers-reduced-motion`
+  fjerner både glidet og pilen.
 - **«Logg inn» er en knapp der leseren står.** «Logg inn i menyen — et
   fornavn og en PIN — …» sto i kampkortet til 30. september 2026, og
   «Jeg skal hit» er appens viktigste handling: den hadde ingen vei inn
