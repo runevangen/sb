@@ -726,8 +726,17 @@ function installScene(forspill, sjekk) {
       return orig(q);
     };
   }
+  // Full Chrome sender en EKTE beforeinstallprompt nar appen er installerbar —
+  // etter at scenen har svart pa den forste, og da star knappen der igjen.
+  // Koden er riktig (en ny dialog skal gi en knapp), men scenen styrer
+  // dialogen selv: bare den som er merket kommer gjennom til appen. Lokalt
+  // med headless_shell kommer den aldri, og det var derfor CI feilet alene.
+  window.addEventListener("beforeinstallprompt", function (e) {
+    if (!e.__scene) e.stopImmediatePropagation();
+  }, true);
   function dialog(utfall) {
     var ev = new Event("beforeinstallprompt");
+    ev.__scene = true;
     window.__prompt = 0;
     ev.prompt = function () { window.__prompt += 1; };
     ev.userChoice = Promise.resolve({ outcome: utfall });

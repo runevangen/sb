@@ -319,3 +319,14 @@ til angring, og hele fotballmodulen.
   glemmes.
 - **En `pull_request`-kjøring tester grenen flettet med `main`.** En test
   som er ny på main kjører der før den finnes lokalt.
+
+- **Full Chrome sender hendelser headless_shell aldri sender.** CI bruker
+  Google Chrome, lokalt er det ofte `headless_shell`, og de er ikke samme
+  nettleser. `beforeinstallprompt` er et eksempel: nettleseren sender en
+  **ekte** hendelse når appen er installerbar, og den kommer etter at en
+  scene har svart på den simulerte — så knappen står der igjen, og en test
+  som er grønn lokalt feiler på CI. Det traff 1. oktober 2026 (#177): én
+  test av 1168, bare på CI. Sceneformen er å stoppe alt som ikke er merket
+  av scenen (`e.__scene`) i fangstfasen. **Gjenta en rød CI-test med den
+  nettleseren CI bruker** (`CHROME=/opt/pw-browsers/chromium-1194/chrome-linux/chrome
+  node test/run.mjs`) framfor å lete etter en feil som ikke finnes i koden.
