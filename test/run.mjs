@@ -1919,6 +1919,10 @@ const SAK_11 = kjor("favorittlag", FELLES + FOTBALL + `
     ok("favorittlinja viser laget",
        (document.querySelector(".favoritt-linje") || {}).textContent.indexOf("Brann øverst") > -1,
        (document.querySelector(".favoritt-linje") || {}).textContent);
+    ok("og sier hvor mange saker som er løftet — bare den ene som handler om laget",
+       (document.querySelector(".favoritt-linje") || {}).textContent.indexOf("Brann øverst · 1 sak") > -1 &&
+       (document.querySelector(".favoritt-linje") || {}).textContent.indexOf("saker") === -1,
+       (document.querySelector(".favoritt-linje") || {}).textContent);
     ok("sak som bare nevner laget i forbifarten loftes ikke", andre() === "Sak 1", andre());
 
     // Linja er veien tilbake til tabellen, der valget gjores om.
@@ -1933,6 +1937,14 @@ const SAK_11 = kjor("favorittlag", FELLES + FOTBALL + `
     ok("lagringen tommes", lagredeLag().length === 0, JSON.stringify(lagredeLag()));
     ok("uten favoritt er nyeste sak toppsak igjen", topp() === "Sak 1", topp());
     ok("favorittlinja forsvinner", !document.querySelector(".favoritt-linje"));
+
+    // Et lag uten en eneste sak i feeden: ingenting er løftet, så linja lover ingenting.
+    stjerner[2].click();
+    ok("et lag uten saker lagres likevel", lagredeLag().length === 1, JSON.stringify(lagredeLag()));
+    ok("og toppsaken er den vanlige", topp() === "Sak 1", topp());
+    ok("men linja som sier «øverst» står ikke der, for ingenting er løftet",
+       !document.querySelector(".favoritt-linje"), (document.querySelector(".favoritt-linje") || {}).textContent);
+    stjerner[2].click();
     } catch (e) { ok("ingen unntak underveis", false, e.message + " @ " + (e.stack || "").split("\\n")[1]); }
     ferdig();
   }, 900); });

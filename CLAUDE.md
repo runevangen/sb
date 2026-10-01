@@ -210,6 +210,15 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   som bunnfanen aldri gjorde. Et *emne* valgt fra fotballen bytter visning og
   filtrerer. Søkefeltet («Søk i alle saker») og emnemerket på hver sak heter
   fortsatt det de gjorde — det ble ikke bedt om.
+- **«Laget ditt øverst» står bare når noe ER løftet.** Linja over feeden
+  («Rosenborg øverst · 2 saker») sto så lenge du fulgte et lag, også når
+  ingen sak handlet om det og toppsaken var en helt annen (1. oktober 2026:
+  «Rosenborg øverst» over en sak om Bordeaux). Da sa den noe usant om sin egen
+  liste. `antallLoftet()` i `lib.js` teller det `rangerTreff()` faktisk løfter,
+  med samme terskel (2: laget i tittelen eller emnet, ikke bare nevnt i
+  teksten), og linja tegnes bare når tallet er over null. Trykket tar deg
+  fortsatt til tabellen, der valget gjøres om — så uten saker er veien til å
+  endre laget stjernene i tabellen, ikke linja.
 - **Et sveip bytter mellom nyhetene og fotballen, og er et tillegg.**
   Fingeren mot venstre åpner «Tabeller og kamper», mot høyre tar deg tilbake
   (1. oktober 2026) — som om fotballen lå på en side til høyre. Menyraden er
