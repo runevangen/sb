@@ -704,6 +704,160 @@ const SAK_2B = kjor("bilder-riktig-storrelse", FELLES + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
 `);
 
+// Appen pa hjemskjermen (#177). «Installer appen» gjorde noe pa iPhone — en
+// grå 12 px-linje langt under knappen — men en knapp som svarer sa svakt at
+// ingen ser det, er en knapp som ikke svarer. Hver scene later som om den er
+// en bestemt telefon: UA og plattform settes for appen leses, og
+// installasjonsdialogen sendes som den hendelsen nettleseren ville sendt.
+function installScene(forspill, sjekk) {
+  return FELLES + `
+  var saker = lagSaker(3);
+  ` + mockFetch("saker") + `
+  function settNav(navn, verdi) {
+    Object.defineProperty(navigator, navn, { get: function () { return verdi; }, configurable: true });
+  }
+  function standalone() {
+    var orig = window.matchMedia.bind(window);
+    window.matchMedia = function (q) {
+      if (String(q).indexOf("display-mode: standalone") > -1) {
+        return { matches: true, media: q, addEventListener: function () {}, removeEventListener: function () {},
+                 addListener: function () {}, removeListener: function () {} };
+      }
+      return orig(q);
+    };
+  }
+  // Full Chrome sender en EKTE beforeinstallprompt nar appen er installerbar —
+  // etter at scenen har svart pa den forste, og da star knappen der igjen.
+  // Koden er riktig (en ny dialog skal gi en knapp), men scenen styrer
+  // dialogen selv: bare den som er merket kommer gjennom til appen. Lokalt
+  // med headless_shell kommer den aldri, og det var derfor CI feilet alene.
+  window.addEventListener("beforeinstallprompt", function (e) {
+    if (!e.__scene) e.stopImmediatePropagation();
+  }, true);
+  function dialog(utfall) {
+    var ev = new Event("beforeinstallprompt");
+    ev.__scene = true;
+    window.__prompt = 0;
+    ev.prompt = function () { window.__prompt += 1; };
+    ev.userChoice = Promise.resolve({ outcome: utfall });
+    window.dispatchEvent(ev);
+  }
+  function synlig(id) { return document.getElementById(id).getClientRects().length > 0; }
+  var UA_IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1";
+  var UA_ANDROID = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/126.0 Mobile Safari/537.36";
+  var UA_MAC = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15";
+  ` + forspill + `
+  window.addEventListener("load", function () { setTimeout(function () { try {
+    document.getElementById("menuBtn").click();
+    var sjekk = ` + sjekk + `;
+    sjekk();
+  } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 700); });
+`;
+}
+
+// iPhone: ingen dialog finnes, sa svaret er en veiledning — og den star rett
+// under knappen, ikke nederst i menyen.
+const SAK_2C = kjor("installer-iphone", installScene(`settNav("userAgent", UA_IPHONE);`, `function () {
+    var knapp = document.getElementById("installBtn");
+    var veil = document.getElementById("installVeiledning");
+    ok("knappen star framme pa en iPhone", synlig("installBtn"));
+    ok("og veiledningen er skjult til du trykker", veil.hidden === true && !synlig("installVeiledning"));
+    knapp.click();
+    ok("et trykk viser veiledningen", !veil.hidden && synlig("installVeiledning"));
+    var trinn = veil.querySelectorAll("ol li");
+    ok("med tre trinn", trinn.length === 3, trinn.length);
+    ok("det forste viser Del-knappen, ikke bare ordet", !!trinn[0].querySelector("svg.install-ikon"));
+    ok("og navngir Hjem-skjerm, ikke Android sine ord",
+       veil.textContent.indexOf("Legg til på Hjem-skjerm") > -1 && veil.textContent.indexOf("Installer app") === -1,
+       veil.textContent);
+    // Svaret star ved knappen. Til 1. oktober 2026 sto det nederst under
+    // kontopanelet, to hundre piksler unna — og leses da som at ingenting skjedde.
+    var par = document.querySelector(".action-par").getBoundingClientRect();
+    var v = veil.getBoundingClientRect();
+    ok("veiledningen star rett under knappene", v.top - par.bottom >= 0 && v.top - par.bottom < 24,
+       Math.round(v.top - par.bottom) + " px under");
+    ok("og er lesbar, ikke en 12 px grå linje",
+       parseFloat(getComputedStyle(veil).fontSize) >= 13, getComputedStyle(veil).fontSize);
+    ok("knappen sier at noe er apent", knapp.getAttribute("aria-expanded") === "true");
+    knapp.click();
+    ok("et trykk til lukker den igjen", veil.hidden === true && knapp.getAttribute("aria-expanded") === "false");
+    knapp.click();
+    veil.querySelector(".install-lukk").click();
+    ok("og Lukk gjor det samme", veil.hidden === true);
+    ferdig();
+  }`));
+
+// iPad kaller seg «Macintosh». Uten berøringssjekken fikk den ingen knapp.
+const SAK_2D = kjor("installer-ipad", installScene(`settNav("userAgent", UA_MAC); settNav("platform", "MacIntel"); settNav("maxTouchPoints", 5);`, `function () {
+    ok("knappen star framme pa en iPad som kaller seg Macintosh", synlig("installBtn"));
+    document.getElementById("installBtn").click();
+    ok("og gir iPhone-veiledningen",
+       document.getElementById("installVeiledning").textContent.indexOf("Hjem-skjerm") > -1);
+    ferdig();
+  }`));
+
+// Android uten dialog: en veiledning for Android, ikke for iPhone. Til
+// 1. oktober 2026 var knappen skjult her, og etter et «nei» viste den
+// iPhone-teksten.
+const SAK_2E = kjor("installer-android-uten-dialog", installScene(`settNav("userAgent", UA_ANDROID);`, `function () {
+    var veil = document.getElementById("installVeiledning");
+    ok("knappen star framme pa Android selv om nettleseren ikke har gitt en dialog", synlig("installBtn"));
+    document.getElementById("installBtn").click();
+    ok("veiledningen er for Android",
+       veil.textContent.indexOf("Installer app") > -1 && veil.textContent.indexOf("Hjem-skjerm") === -1 &&
+       veil.textContent.indexOf("Del-knappen") === -1, veil.textContent);
+    ok("og har menysymbolet i forste trinn", !!veil.querySelector("li svg.install-ikon"));
+    // Dialogen kan komme etter at veiledningen er apnet. Da er den bedre, og
+    // trinnene skal ikke bli stående for en tilstand som ikke gjelder lenger.
+    ok("veiledningen star apen for dialogen kommer", !veil.hidden);
+    dialog("dismissed");
+    ok("kommer dialogen mens veiledningen star, lukkes den", veil.hidden === true && synlig("installBtn"));
+    ferdig();
+  }`));
+
+// Android med dialog: dialogen, ikke ord. Sier leseren nei, star knappen der
+// fortsatt, og da med veiledning — dialogen er brukt opp.
+const SAK_2F = kjor("installer-android-med-dialog", installScene(`settNav("userAgent", UA_ANDROID);`, `function () {
+    var veil = document.getElementById("installVeiledning");
+    dialog("dismissed");
+    ok("knappen star framme", synlig("installBtn"));
+    document.getElementById("installBtn").click();
+    setTimeout(function () { try {
+      ok("trykket brukte nettleserens dialog", window.__prompt === 1, window.__prompt);
+      ok("og viste ingen veiledning i tillegg", veil.hidden === true);
+      ok("takket leseren nei, star knappen der fortsatt", synlig("installBtn"));
+      document.getElementById("installBtn").click();
+      ok("og trykket gir na veiledningen — dialogen kan ikke brukes to ganger",
+         window.__prompt === 1 && !veil.hidden && veil.textContent.indexOf("Installer app") > -1,
+         window.__prompt + " / " + veil.textContent);
+      ferdig();
+    } catch (e) { ok("ingen unntak etter dialogen", false, e.message); ferdig(); } }, 150);
+  }`));
+
+// Installert: ingenting a tilby, uansett telefon.
+const SAK_2G = kjor("installer-allerede-installert", installScene(`settNav("userAgent", UA_IPHONE); standalone();`, `function () {
+    ok("en installert app tilbyr ikke a installeres", !synlig("installBtn"));
+    ok("og ingen veiledning star igjen", document.getElementById("installVeiledning").hidden === true);
+    dialog("accepted");
+    ok("heller ikke nar en dialog dukker opp", !synlig("installBtn"));
+    ferdig();
+  }`));
+
+// Datamaskin: ingenting a si uten en dialog, og en knapp som ikke gir noe er
+// verre enn ingen. Kommer dialogen, star knappen — og forsvinner igjen nar
+// den er brukt, for da er det ingen veiledning a falle tilbake til.
+const SAK_2H = kjor("installer-datamaskin", installScene(`settNav("userAgent", UA_MAC); settNav("platform", "MacIntel"); settNav("maxTouchPoints", 0);`, `function () {
+    ok("uten dialog star ingen knapp pa en datamaskin", !synlig("installBtn"));
+    dialog("dismissed");
+    ok("med dialog star den", synlig("installBtn"));
+    document.getElementById("installBtn").click();
+    setTimeout(function () { try {
+      ok("trykket brukte dialogen", window.__prompt === 1, window.__prompt);
+      ok("og etter et nei er det ingenting a falle tilbake til, sa knappen gar", !synlig("installBtn"));
+      ferdig();
+    } catch (e) { ok("ingen unntak etter dialogen", false, e.message); ferdig(); } }, 150);
+  }`));
+
 /* ---------------- 3. rulling og endringssjekk ---------------- */
 
 const SAK_3 = kjor("oppdatering", FELLES + `
@@ -10330,7 +10484,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_2B, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_18J, SAK_18K, SAK_25, SAK_26, SAK_27, SAK_27B, SAK_27C, SAK_27D, SAK_27E, SAK_27F, SAK_27G, SAK_15S, SAK_15T, SAK_15U, SAK_15V, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_2B, SAK_2C, SAK_2D, SAK_2E, SAK_2F, SAK_2G, SAK_2H, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_18J, SAK_18K, SAK_25, SAK_26, SAK_27, SAK_27B, SAK_27C, SAK_27D, SAK_27E, SAK_27F, SAK_27G, SAK_15S, SAK_15T, SAK_15U, SAK_15V, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

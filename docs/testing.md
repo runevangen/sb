@@ -4,9 +4,9 @@
 kommandoene, men ikke tallene: de sto i tre filer og glei fire ganger på to
 dager. Legger du til tester, er det denne fila som skal rettes.
 
-    node test/unit.mjs      1015 tester, ~90 ms, ingen nettleser
+    node test/unit.mjs      1028 tester, ~90 ms, ingen nettleser
     node test/funksjon.mjs  514 tester, ~250 ms, ingen nettleser
-    node test/run.mjs       1161 tester, 3–20 s, headless Chromium
+    node test/run.mjs       1191 tester, 3–20 s, headless Chromium
 
 Alle tre kjøres på hver pull request via `.github/workflows/test.yml`. De
 raske først, så en åpenbar feil stopper kjøringen før nettleseren i det
@@ -319,3 +319,14 @@ til angring, og hele fotballmodulen.
   glemmes.
 - **En `pull_request`-kjøring tester grenen flettet med `main`.** En test
   som er ny på main kjører der før den finnes lokalt.
+
+- **Full Chrome sender hendelser headless_shell aldri sender.** CI bruker
+  Google Chrome, lokalt er det ofte `headless_shell`, og de er ikke samme
+  nettleser. `beforeinstallprompt` er et eksempel: nettleseren sender en
+  **ekte** hendelse når appen er installerbar, og den kommer etter at en
+  scene har svart på den simulerte — så knappen står der igjen, og en test
+  som er grønn lokalt feiler på CI. Det traff 1. oktober 2026 (#177): én
+  test av 1168, bare på CI. Sceneformen er å stoppe alt som ikke er merket
+  av scenen (`e.__scene`) i fangstfasen. **Gjenta en rød CI-test med den
+  nettleseren CI bruker** (`CHROME=/opt/pw-browsers/chromium-1194/chrome-linux/chrome
+  node test/run.mjs`) framfor å lete etter en feil som ikke finnes i koden.

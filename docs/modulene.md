@@ -514,6 +514,34 @@ er regnet ut for alle tre delene i alle ligaene fra før.
 - **`forrigeInnlogging()` leser raden for samme bruker, og ikke den du
   nettopp skrev.** Radene kommer nyeste først.
 
+### `installasjon-data.js` — appen på hjemskjermen
+
+([#177](https://github.com/runevangen/sb/issues/177)). Knappen «Installer
+appen» gjorde noe da du trykket på iPhone — en 12 px grå linje langt under
+knappen — men en knapp som svarer så svakt at ingen ser det, er en knapp
+som ikke svarer.
+
+- **`installTilstand()` har en rekkefølge, og rekkefølgen er poenget.**
+  `installert` slår alt (en installert app skal aldri tilby å installeres),
+  så `prompt` (en dialog er alltid bedre enn en veiledning), så `ios`, så
+  `android`, ellers `ingen`.
+- **iPad kaller seg «Macintosh».** iPadOS 13 og nyere sender en Mac-UA, for at
+  nettsider skal gi skrivebordsutgaven; det som røper den er at en Mac ikke
+  har berøringsskjerm (`MacIntel` med mer enn ett berøringspunkt). Uten den
+  sjekken fikk en iPad ingen knapp i det hele tatt.
+- **Veiledningen er data, ikke tekst i `app.js`.** `installVeiledning()` gir
+  tittel og trinn, så en test kan holde at iPhone og Android ikke får
+  hverandres: «Legg til på Hjem-skjerm» hører til iPhone, «Installer app»
+  til Android, og en veiledning for feil telefon er verre enn ingen.
+- **Knappen står der den kan gi noe** (`visInstallKnapp`): en dialog eller en
+  veiledning som passer telefonen. På en datamaskin uten dialog har vi
+  ingenting å si, og da står den ikke.
+- **Dialogen kan brukes én gang.** `beforeinstallprompt` gir en hendelse som
+  er brukt opp når leseren har svart. Takket hen nei, står knappen der
+  fortsatt — og viser da veiledningen, ikke en dialog som ikke lenger finnes.
+  Det var feilen i den gamle koden: etter «nei» på Android viste den
+  iPhone-teksten.
+
 ---
 
 ## De redaksjonelle filene
@@ -705,6 +733,16 @@ portalen — en leser har ingen nytte av den.
   artikkelteksten slipper nå `srcset`, `sizes`, `width` og `height` gjennom
   sanitizeren — renset — så WordPress sine egne størrelser brukes også der
   (#141). `id` og alt annet på bildet fjernes som før.
+- **Svaret på Del og Installer står rett under knappene** (`#installVeiledning`
+  og `#actionNote`), ikke nederst under kontopanelet. Et svar som havner to
+  hundre piksler fra knappen du trykket på, leses som at ingenting skjedde.
+  Installveiledningen er et kort med nummererte trinn og symbolet leseren
+  leter etter (Del-knappen, tre prikker), tegnet som SVG — «⬆︎» og «⋮» ser
+  ulike ut fra telefon til telefon. Den er skjult til du trykker, så footeren
+  vokser ikke av den (SAK_1 holder taket på 220 px), og et trykk til lukker
+  den. `oppdaterInstallKnapp()` regnes på nytt når dialogen kommer, når
+  leseren har svart og når appen er installert: tilstanden endrer seg etter
+  at siden er tegnet.
 - **Hash-ruting, ikke sti-ruting.** [ADR 0002](adr/0002-hash-ruting.md). En
   sti ville gitt 404 ved oppfriskning uten en ny regel i `netlify.toml`, og
   den regelen skal holdes smal.

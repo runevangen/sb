@@ -19,6 +19,8 @@ import { normaliserNavn } from "./svar-data.js";
 import { initFotball, visFotball, merkFavoritter, tegnMittLag } from "./fotball.js";
 import { ARTER, TEKST_MAKS, STATUS_LESER, skjermTekst, sjekkTilbakemelding }
   from "./tilbakemelding-data.js";
+import { installTilstand, installVeiledning, installHandling, visInstallKnapp }
+  from "./installasjon-data.js";
 import { VERSJONER } from "./versjoner.js";
 
 // Bytt WP_HOST til din egen WordPress-side når som helst.
@@ -1418,10 +1420,6 @@ function alleredeInstallert() {
          window.navigator.standalone === true;
 }
 
-function erIos() {
-  return /iphone|ipad|ipod/i.test(navigator.userAgent);
-}
-
 // Ett sted for all deling: appen fra menyen, en kamp fra fotball. Svarer
 // «delt», «kopiert», «avbrutt» eller «feil», sa den som kaller kan si
 // noe riktig til leseren der leseren star.
@@ -1455,33 +1453,132 @@ document.getElementById("shareBtn").addEventListener("click", async () => {
 });
 
 const installKnapp = document.getElementById("installBtn");
+const installBoks = document.getElementById("installVeiledning");
 
-window.addEventListener("beforeinstallprompt", (e) => {
-  // Vi vil vise vår egen knapp i menyen, ikke nettleserens banner.
-  e.preventDefault();
-  installasjonsvarsel = e;
-  if (!alleredeInstallert()) installKnapp.hidden = false;
-});
-
-// iOS har ingen installasjonshendelse. Der er eneste vei en instruksjon.
-if (erIos() && !alleredeInstallert()) {
-  installKnapp.hidden = false;
+// Hva nettleseren kan akkurat na. Regnes pa nytt hver gang noe endrer seg:
+// dialogen kommer av seg selv, ofte etter at siden er tegnet, og en
+// installert app star ikke lenger i en nettleser.
+function installMiljo() {
+  return {
+    ua: navigator.userAgent,
+    plattform: navigator.platform,
+    beroring: navigator.maxTouchPoints,
+    standalone: alleredeInstallert(),
+    harPrompt: !!installasjonsvarsel,
+  };
 }
 
+function oppdaterInstallKnapp() {
+  const tilstand = installTilstand(installMiljo());
+  installKnapp.hidden = !visInstallKnapp(tilstand);
+  // Veiledningen horer til en tilstand. Er den borte — appen ble
+  // installert, eller dialogen kom — skal ikke trinnene bli stående.
+  if (installHandling(tilstand) !== "veiledning") lukkInstallVeiledning();
+}
+
+// Veiledningen tegnes med createElement, aldri innerHTML: teksten er var
+// egen, men regelen om at fremmed HTML ikke parses staar uansett.
+function tegnInstallVeiledning(tilstand) {
+  const v = installVeiledning(tilstand);
+  if (!v) return false;
+  installBoks.replaceChildren();
+  installBoks.appendChild(el("p", "install-tittel", v.tittel));
+  const liste = el("ol", "install-steg");
+  v.steg.forEach((steg) => {
+    const li = el("li", null, steg.tekst);
+    // Symbolet leseren leter etter pa skjermen, ved siden av ordet for det.
+    if (steg.ikon) li.insertBefore(installIkon(steg.ikon), li.firstChild);
+    liste.appendChild(li);
+  });
+  installBoks.appendChild(liste);
+  const lukk = el("button", "install-lukk", "Lukk");
+  lukk.type = "button";
+  lukk.addEventListener("click", lukkInstallVeiledning);
+  installBoks.appendChild(lukk);
+  installBoks.hidden = false;
+  installKnapp.setAttribute("aria-expanded", "true");
+  return true;
+}
+
+function lukkInstallVeiledning() {
+  installBoks.hidden = true;
+  installBoks.replaceChildren();
+  installKnapp.setAttribute("aria-expanded", "false");
+}
+
+// Del-knappen i iOS er en firkant med en pil opp; menyen i Android er tre
+// prikker. Tegnet som SVG, ikke som et tegn fra en skrifttype: «⬆︎» og «⋮»
+// ser ulike ut fra telefon til telefon, og det er utseendet leseren leter
+// etter.
+function installIkon(navn) {
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("width", "18");
+  svg.setAttribute("height", "18");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", "install-ikon");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  const tegn = (tag, attr) => {
+    const n = document.createElementNS(NS, tag);
+    Object.keys(attr).forEach((k) => n.setAttribute(k, attr[k]));
+    svg.appendChild(n);
+  };
+  if (navn === "del") {
+    tegn("path", { d: "M12 3v12" });
+    tegn("path", { d: "M8 7l4-4 4 4" });
+    tegn("path", { d: "M5 11v9h14v-9" });
+  } else {
+    [5, 12, 19].forEach((y) => tegn("circle", { cx: "12", cy: String(y), r: "1.4", fill: "currentColor" }));
+  }
+  return svg;
+}
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  // Vi vil vise var egen knapp i menyen, ikke nettleserens banner.
+  e.preventDefault();
+  installasjonsvarsel = e;
+  oppdaterInstallKnapp();
+});
+
+// Knappen settes for forste gang her, ikke bare nar en hendelse kommer: iOS
+// har ingen installasjonshendelse, og Android gir den ikke alltid. Der er
+// eneste vei en veiledning, og den skal ikke vente pa noe som aldri kommer.
+oppdaterInstallKnapp();
+
 installKnapp.addEventListener("click", async () => {
-  if (installasjonsvarsel) {
+  const tilstand = installTilstand(installMiljo());
+  const handling = installHandling(tilstand);
+
+  if (handling === "dialog") {
     installasjonsvarsel.prompt();
     const svar = await installasjonsvarsel.userChoice;
     track("Installasjon", { valg: svar.outcome });
+    // Hendelsen kan bare brukes en gang. Takket leseren nei, star knappen
+    // der fortsatt — og da med veiledning for telefonen, ikke en dialog
+    // som ikke lenger finnes.
     installasjonsvarsel = null;
-    if (svar.outcome === "accepted") installKnapp.hidden = true;
+    oppdaterInstallKnapp();
     return;
   }
-  visNotat("Trykk Del nederst i Safari, og velg «Legg til på Hjem-skjerm».");
-  track("Installasjon", { valg: "ios-veiledning" });
+
+  // Trykker du pa den en gang til, lukkes den: en knapp som bare apner er
+  // ikke noe a komme seg ut av.
+  if (!installBoks.hidden) { lukkInstallVeiledning(); return; }
+  if (tegnInstallVeiledning(tilstand)) {
+    track("Installasjon", { valg: tilstand + "-veiledning" });
+    // Veiledningen kan ligge under bretten pa en liten telefon.
+    installBoks.scrollIntoView({ block: "nearest" });
+  }
 });
 
 window.addEventListener("appinstalled", () => {
+  installasjonsvarsel = null;
+  lukkInstallVeiledning();
   installKnapp.hidden = true;
   visNotat("");
   track("Installasjon", { valg: "fullfort" });

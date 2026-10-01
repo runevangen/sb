@@ -502,6 +502,55 @@ body {
 }
 
 
+/* Veiledningen for a legge appen pa hjemskjermen. Et kort med trinn, ikke en
+   grå 12 px-linje: den er svaret pa et trykk, og skal sees. Kanten i
+   aksentfargen sier at den hører til knappen over, som tallet i et
+   seksjonshode gjor i portalen. */
+.install-veiledning {
+  border: 1px solid var(--border-btn);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.install-veiledning[hidden] { display: none; }
+
+.install-tittel {
+  margin: 0 0 6px;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.install-steg {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.install-steg li { margin: 0 0 5px; }
+
+.install-ikon {
+  display: inline-block;
+  vertical-align: -3px;
+  margin: 0 2px;
+  color: var(--accent);
+}
+
+.install-lukk {
+  margin: 4px 0 0;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .action-note {
   margin: 2px 0 0;
   font-size: 12px;
