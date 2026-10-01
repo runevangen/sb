@@ -1023,6 +1023,30 @@ body {
   padding: 14px 14px 24px;
 }
 
+/* Nyheter og fotball deler en flate. Til vanlig er den bare en boks som
+   fyller resten av kortet, slik de to sto for seg for; under et sveip legger
+   de seg oppa hverandre og glir sideveis. */
+.visninger {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Loddrett rulling og klyping er nettleserens; sideveis er vart. Pa selve
+   rullefeltene, for touch-action regnes bare opp til nermeste rullefelt. */
+.feed, .fotball-innhold { touch-action: pan-y pinch-zoom; }
+
+.visninger.sveiper > .feed,
+.visninger.sveiper > .fotball {
+  position: absolute;
+  inset: 0;
+  flex: none;
+  will-change: transform;
+}
+
 .state {
   color: var(--text-dimmer);
   font-size: 14px;

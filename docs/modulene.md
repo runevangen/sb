@@ -55,6 +55,12 @@ Tre ting følger av mønsteret:
 Hjelpefunksjonene til nyhetsdelen. De ligger her og ikke i `app.js` for å
 kunne testes i Node på millisekunder.
 
+- **`sveipRetning`, `sveipMal`, `sveipStartOk`, `sveipFullfor` er sveipets
+  beslutninger, uten finger.** Hvilken vei (vannrett må være 1,5 ganger
+  loddrett), hvilken side fingeren leder til, om starten er langt nok fra
+  kanten, og om det er langt eller raskt nok til å fullføres. DOM-en som
+  bruker dem står i `app.js`; tallene (`SVEIP_*`) står her, og flyttes de, må
+  CLAUDE.md-regelen om sveipet leses på nytt.
 - **`safeUrl` slipper kun `http` og `https`.** En manipulert respons skal
   ikke kunne smugle `javascript:` inn i `src` eller `href`.
 - **`videoUrl` sammenlikner hele `hostname`, ikke en delstreng.** `iframe`
@@ -664,6 +670,12 @@ portalen — en leser har ingen nytte av den.
 
 ### `app.js`
 
+- **Sveipet er en egen blokk i `app.js`, og `#visninger` er flaten det
+  glir på.** `#feed` og `#fotball` ligger i `.visninger`; til vanlig er den en
+  boks som fyller kortet, og under et sveip legger de seg oppå hverandre
+  (`.sveiper`). Flyttes en av dem ut av den, mister sveipet flaten det glir på.
+  Fullført sveip kaller `settFane()`; klikket som følger fingeren slukes av
+  `fersk`, som settes ved slipp.
 - **Feeden hentes fra proxyen først, WordPress direkte som reserve.** Den
   gamle offentlige CORS-proxyen er fjernet med vilje: ratelimitet, uten
   SLA, og årsaken til at feeden ble stående tom.

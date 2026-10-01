@@ -33,6 +33,7 @@ export const VERSJONER = [
     endringer: [
       { hva: "Innloggingen: etter at du har skrevet navnet, står markøren i PIN-feltet, og tastaturet blir oppe på iPhone. Enter i PIN-feltet går videre til «Gjenta» når du lager en ny PIN. «Admin» i menyen åpner et passordfelt der, med tastaturet oppe, og tar deg inn i portalen når du trykker Enter." },
       { hva: "Menyen: «Alle saker» heter «Nyheter», og rett under den står «Tabeller og kamper» (beta). Kategorien «Fotball» heter «Fotballnyheter», for den er nyhetene, ikke tabellene. Fanene nederst er fjernet: begge områdene nås fra hamburgermenyen." },
+      { hva: "Sveip: dra fingeren mot venstre for å åpne Tabeller og kamper, og mot høyre for å komme tilbake til nyhetene. Visningen følger fingeren. Menyen virker som før." },
     ],
   },
   {

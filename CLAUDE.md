@@ -210,6 +210,28 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   som bunnfanen aldri gjorde. Et *emne* valgt fra fotballen bytter visning og
   filtrerer. Søkefeltet («Søk i alle saker») og emnemerket på hver sak heter
   fortsatt det de gjorde — det ble ikke bedt om.
+- **Et sveip bytter mellom nyhetene og fotballen, og er et tillegg.**
+  Fingeren mot venstre åpner «Tabeller og kamper», mot høyre tar deg tilbake
+  (1. oktober 2026) — som om fotballen lå på en side til høyre. Menyraden er
+  fortsatt veien: den er den eneste en skjermleser eller en som ikke sveiper
+  finner, så sveipet kan aldri være det eneste. **Visningen følger fingeren**:
+  begge flatene legges oppå hverandre i `.visninger.sveiper` og glir sammen;
+  slippes fingeren for tidlig, glir den tilbake og ingenting er byttet. Bare et
+  fullført sveip kaller `settFane()` — samme vei som menyraden, med
+  `pushState`. Beslutningene (hvilken vei, langt nok, bort fra kanten) er rene
+  funksjoner i `lib.js`; `app.js` bærer bare DOM-en.
+  **Det tar aldri fra deg noe du allerede kan.** Det starter ikke i de 24
+  pikslene ved kanten (iOS bruker venstre kant til «tilbake»), ikke på noe som
+  ruller sidelengs (tabellen, målt på `overflow-x` og faktisk innhold — ikke på
+  en klasse), ikke i et felt, ikke med mus eller penn, ikke med menyen åpen, og
+  et skrått sveip er rulling som skled. Loddrett rulling og klyping er
+  nettleserens: `touch-action: pan-y pinch-zoom` står på rullefeltene, for
+  `touch-action` regnes bare opp til nærmeste rullefelt. **Og klikket etter et
+  sveip er ikke et trykk:** det kommer i det fingeren lettes, før animasjonen er
+  ferdig, så `fersk` settes ved slipp, ikke etter glidet. `prefers-reduced-motion`
+  gir et hopp i stedet for glid. **Målt i Chromium med pekerhendelser, ikke på en
+  iPhone** — om glidet hakker der, er det bare en telefon som kan si, og da er
+  veien tilbake enkelt bytte uten glid.
 - **«Logg inn» er en knapp der leseren står.** «Logg inn i menyen — et
   fornavn og en PIN — …» sto i kampkortet til 30. september 2026, og
   «Jeg skal hit» er appens viktigste handling: den hadde ingen vei inn

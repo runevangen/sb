@@ -319,3 +319,47 @@ export function kategoriVisningsnavn(navn) {
   const nokkel = tekst.trim().toLowerCase();
   return Object.prototype.hasOwnProperty.call(VISNINGSNAVN, nokkel) ? VISNINGSNAVN[nokkel] : tekst;
 }
+
+// ---------- sveip mellom nyheter og fotball ----------
+//
+// Beslutningene bak sveipet er rene, sa de kan males uten en finger:
+// DOM-koden i app.js male bare leser koordinater og kaller dem.
+
+export const SVEIP_KANT = 24;       // px fra skjermkanten som ikke teller som start
+export const SVEIP_FORSTE = 10;     // px for fingeren har sagt hvilken vei den skal
+export const SVEIP_ANDEL = 0.3;     // brokdel av bredden som er nok uten fart
+export const SVEIP_FART = 0.5;      // px/ms som er nok etter 40 px
+export const SVEIP_MINST = 40;      // px som ma til for at fart teller
+
+// Er dette et vannrett sveip, et loddrett (rulling), eller for tidlig a si?
+// Vannrett krever klart mer sideveis enn opp/ned: et skratt sveip er en
+// rulling som skled.
+export function sveipRetning(dx, dy) {
+  const x = Math.abs(dx), y = Math.abs(dy);
+  if (Math.max(x, y) < SVEIP_FORSTE) return "vent";
+  return x > y * 1.5 ? "vannrett" : "loddrett";
+}
+
+// Hvilken visning et sveip fra `visning` leder til, eller null.
+// Fingeren mot venstre apner fotballen, mot hogre tar deg tilbake — som en
+// side som ligger til hogre for nyhetene.
+export function sveipMal(visning, dx) {
+  if (visning === "nyheter" && dx < 0) return "fotball";
+  if (visning === "fotball" && dx > 0) return "nyheter";
+  return null;
+}
+
+// Begynner sveipet langt nok inne fra begge kantene? iOS bruker venstre kant
+// til «tilbake», og et sveip der skal vaere nettleserens.
+export function sveipStartOk(x, venstre, hoyre) {
+  return x - venstre >= SVEIP_KANT && hoyre - x >= SVEIP_KANT;
+}
+
+// Skal sveipet fullfores nar fingeren slippes, eller gar visningen tilbake?
+// Langt nok, eller kort og raskt.
+export function sveipFullfor(dx, bredde, ms) {
+  const lengde = Math.abs(dx);
+  if (!(bredde > 0)) return false;
+  if (lengde >= bredde * SVEIP_ANDEL) return true;
+  return lengde >= SVEIP_MINST && ms > 0 && lengde / ms >= SVEIP_FART;
+}

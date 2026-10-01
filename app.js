@@ -4,7 +4,8 @@
 // nettleser. Alt her nede rorer DOM, nettverk eller lagring.
 
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug, rangerTreff, listeTekst,
-         bildeFor, renSrcset, renSizes, renMaal, kategoriVisningsnavn }
+         bildeFor, renSrcset, renSizes, renMaal, kategoriVisningsnavn,
+         sveipRetning, sveipMal, sveipStartOk, sveipFullfor }
   from "./lib.js";
 import { LIGAER, tolkFotballHash, fotballHash, tolkKamplenke,
          ligaForKategori, DEL_NAVN } from "./fotball-data.js";
@@ -1617,6 +1618,124 @@ function visFane(visning, liga, del) {
   if (isMenuOpen() && erKontoModus()) closeMenu();
   else if (isMenuOpen()) visMeny();
 }
+
+/* ---------- sveip ---------- */
+
+// Fingeren mot venstre apner fotballen, mot hogre tar deg tilbake til
+// nyhetene. Et TILLEGG: menyraden er fortsatt veien, og den eneste en
+// skjermleser eller en som ikke sveiper finner. Beslutningene (hvilken vei,
+// langt nok, bort fra kanten) er rene funksjoner i lib.js; her star bare det
+// som rorer DOM.
+//
+// Visningen FOLGER fingeren: begge flatene legges oppa hverandre
+// (.visninger.sveiper) og glir sammen. Slippes fingeren for tidlig, glir den
+// tilbake, og ingenting er byttet. Bare et fullfort sveip kaller settFane() —
+// samme vei som menyraden, med pushState og alt.
+(function () {
+  const flate = document.getElementById("visninger");
+  const feed = document.getElementById("feed");
+  const fotball = document.getElementById("fotball");
+  const flater = { nyheter: feed, fotball };
+  const MS = 220;
+  let s = null;   // { id, x0, y0, t0, last, laas, mal, fra, bredde }
+  let fersk = 0;  // nar fingeren sist slapp et sveip: klikket som folger er ikke et trykk
+
+  const rolig = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Ligger det noe som ruller sidelengs mellom fingeren og kanten av
+  // flaten? Da er sveipet dets: en tabell du ruller skal ikke bytte side.
+  function rullerSidelengs(el) {
+    for (; el && el !== flate; el = el.parentElement) {
+      if (el.matches && el.matches("input, textarea, select")) return true;
+      const st = getComputedStyle(el);
+      if ((st.overflowX === "auto" || st.overflowX === "scroll") && el.scrollWidth > el.clientWidth + 1) return true;
+    }
+    return false;
+  }
+
+  function ryddOpp() {
+    flate.classList.remove("sveiper");
+    for (const el of [feed, fotball]) {
+      el.style.transform = "";
+      el.style.transition = "";
+    }
+    s = null;
+  }
+
+  function sett(el, px, glid) {
+    el.style.transition = glid ? `transform ${rolig() ? 0 : MS}ms ease-out` : "none";
+    el.style.transform = `translate3d(${px}px,0,0)`;
+  }
+
+  function start(e) {
+    if (e.pointerType !== "touch" || !e.isPrimary || s) return;
+    if (isMenuOpen() || document.getElementById("detailWrap").classList.contains("open")) return;
+    const r = flate.getBoundingClientRect();
+    if (!sveipStartOk(e.clientX, r.left, r.right)) return;
+    if (rullerSidelengs(e.target)) return;
+    s = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: e.timeStamp, last: 0,
+          laas: "vent", mal: null, fra: aktivVisning, bredde: r.width };
+  }
+
+  function flytt(e) {
+    if (!s || e.pointerId !== s.id) return;
+    const dx = e.clientX - s.x0, dy = e.clientY - s.y0;
+    if (s.laas === "vent") {
+      s.laas = sveipRetning(dx, dy);
+      if (s.laas === "vannrett") {
+        s.mal = sveipMal(s.fra, dx);
+        if (!s.mal) s.laas = "loddrett";   // feil vei: ingen side der
+        else {
+          flate.classList.add("sveiper");
+          flater[s.mal].hidden = false;
+        }
+      }
+    }
+    if (s.laas !== "vannrett") return;
+    // Ikke lenger enn en bredde, og ikke bakover forbi startpunktet.
+    const retning = s.mal === "fotball" ? -1 : 1;
+    const d = Math.max(0, Math.min(s.bredde, dx * retning)) * retning;
+    s.last = d;
+    s.tid = e.timeStamp;
+    sett(flater[s.fra], d, false);
+    sett(flater[s.mal], d - retning * s.bredde, false);
+  }
+
+  function slipp(e) {
+    if (!s || e.pointerId !== s.id) return;
+    const naa = s;
+    if (naa.laas !== "vannrett") { s = null; return; }
+    const fullfor = e.type === "pointerup"
+      && sveipFullfor(naa.last, naa.bredde, (naa.tid || e.timeStamp) - naa.t0);
+    // Klikket kommer samtidig med at fingeren lettes, for animasjonen er ferdig.
+    fersk = Date.now();
+    const retning = naa.mal === "fotball" ? -1 : 1;
+    // Ferdig-tilstanden i to trinn: glid ut, og bytt sa for ekte.
+    sett(flater[naa.fra], fullfor ? retning * naa.bredde : 0, true);
+    sett(flater[naa.mal], fullfor ? 0 : -retning * naa.bredde, true);
+    s = { ...naa, id: -1, laas: "glir" };   // en ny finger far vente til vi er ferdige
+    setTimeout(() => {
+      const mal = naa.mal;
+      ryddOpp();
+      if (fullfor) {
+        settFane(mal);
+      } else {
+        flater[mal].hidden = true;
+      }
+    }, rolig() ? 0 : MS + 20);
+  }
+
+  flate.addEventListener("pointerdown", start);
+  flate.addEventListener("pointermove", flytt);
+  flate.addEventListener("pointerup", slipp);
+  flate.addEventListener("pointercancel", slipp);
+
+  // Etter et fullfort sveip kan nettleseren fortsatt sende et klikk til det
+  // som lå under fingeren. Det er ikke et trykk leseren mente.
+  flate.addEventListener("click", (e) => {
+    if (Date.now() - fersk < 350) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+})();
 
 /* ---------- meny ---------- */
 
