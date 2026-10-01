@@ -197,6 +197,19 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   `srcset` så nettleseren velger etter skjermtetthet. Mangler størrelsene, er
   originalen svaret. **`srcset` fra artikkelteksten er alt eller ingenting:**
   én adresse som ikke er `http(s)` forkaster hele lista.
+- **Hamburgermenyen er veien til begge områdene, og bunnfanene er borte.**
+  Fra 1. oktober 2026 står det «Nyheter» (het «Alle saker»), rett under den
+  «Tabeller og kamper» med beta-merke, og så emnene. **«Fotball» i menyen er
+  nyhetene om fotball** — en kategori på sportsbibelen.no med 412 saker — og
+  het det samme som modulen. Den heter «Fotballnyheter» i appen
+  (`kategoriVisningsnavn()` i `lib.js`), fordi navnet ikke kan endres på
+  sportsbibelen.no, og vises slik både i menyen og i filterbrikka. De to første
+  radene tegnes med en gang og venter ikke på emnene; fotballraden er valgt når
+  du står i fotballen. **Veien tilbake er «Nyheter»**, og den bytter bare
+  visning: fra fotballen til det du alt sto i laster den ikke feeden på nytt,
+  som bunnfanen aldri gjorde. Et *emne* valgt fra fotballen bytter visning og
+  filtrerer. Søkefeltet («Søk i alle saker») og emnemerket på hver sak heter
+  fortsatt det de gjorde — det ble ikke bedt om.
 - **«Logg inn» er en knapp der leseren står.** «Logg inn i menyen — et
   fornavn og en PIN — …» sto i kampkortet til 30. september 2026, og
   «Jeg skal hit» er appens viktigste handling: den hadde ingen vei inn
@@ -842,7 +855,7 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   **Bredden og flex-oppsettet blir stående**, og det er ikke forsiktighet:
   den faste høyden og `flex-direction: column` er det som gjør at `.feed`
   og `.fotball-innhold` ruller inni appen framfor at vinduet gjør det. På
-  den henger `.tabbar` (siste barn, ikke overlegg), `.menu-panel`
+  den henger `.menu-panel`
   (`position: absolute; inset: 0` — uten en boks å dekke, dekker den
   skjermen), `.tabell-skall` (ruller sidelengs *fordi* `overflow: hidden`
   klipper) og `folgMedPaRulling()`, som lytter på `.feed` og ikke på

@@ -21,7 +21,7 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
          foldTekst, treffScore, rangerTreff, listeTekst,
-         BILDE_BRUK, bildeFor, renSrcset, renSizes, renMaal } from "../lib.js";
+         BILDE_BRUK, bildeFor, renSrcset, renSizes, renMaal, kategoriVisningsnavn } from "../lib.js";
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          SPORTER, sportFor, tolkDatasett, kommendeKamper, kallPerSport, DOGNKVOTE,
          ligaForKategori,
@@ -1710,6 +1710,16 @@ ok("initialFor hopper over tegnsetting foran navnet",
 ok("initialFor gir tomt svar uten bokstav, ikke et hull",
   initialFor("") === "" && initialFor(null) === "" && initialFor(undefined) === "" &&
   initialFor("...") === "");
+
+// Kategorien «Fotball» er nyhetene om fotball, ikke modulen (1. oktober 2026).
+ok("kategorien Fotball heter Fotballnyheter i appen",
+  kategoriVisningsnavn("Fotball") === "Fotballnyheter" && kategoriVisningsnavn(" fotball ") === "Fotballnyheter" &&
+  kategoriVisningsnavn("FOTBALL") === "Fotballnyheter");
+ok("andre kategorier star som de kommer",
+  kategoriVisningsnavn("Eliteserien") === "Eliteserien" && kategoriVisningsnavn("Kommentar") === "Kommentar" &&
+  kategoriVisningsnavn("Fotballtransfers") === "Fotballtransfers");
+ok("og tomt eller ukjent gir ikke et unntak",
+  kategoriVisningsnavn("") === "" && kategoriVisningsnavn(null) === "" && kategoriVisningsnavn(undefined) === "");
 // **Sperra gjelder a LAGE en konto og a VISE et navn, ikke a komme inn.**
 // Den som alt har en konto med en adresse som navn, maa fortsatt kunne
 // logge inn — ellers laaste regelen ute akkurat dem den skulle hjelpe.
