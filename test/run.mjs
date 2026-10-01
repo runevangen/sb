@@ -8062,6 +8062,90 @@ const SAK_26 = kjor("sveip", FELLES + FOTBALL + `
   }); });
 `);
 
+// Forklaringen av sveipet: første gang, på en berøringsskjerm, én gang.
+const TOUCH = `Object.defineProperty(navigator, "maxTouchPoints", { value: 5, configurable: true });`;
+function sveipHintScene(forspill, skript) {
+  return FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  ` + mockAlt("saker") + forspill + `
+  function etter(ms, f) { setTimeout(function () { try { f(); } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, ms); }
+  function kort() { return document.querySelector(".sveip-hint"); }
+  function prefsLagret() { try { return JSON.parse(localStorage.getItem("sb-visning")) || {}; } catch (e) { return {}; } }
+  function dra(el, dx) {
+    var f = document.getElementById("visninger").getBoundingClientRect(), x0 = Math.round(f.left + f.width / 2), y0 = Math.round(f.top + 300);
+    function p(t, x) { el.dispatchEvent(new PointerEvent(t, { pointerType: "touch", isPrimary: true, pointerId: 3, clientX: x, clientY: y0, bubbles: true, cancelable: true })); }
+    p("pointerdown", x0); p("pointermove", x0 + dx / 3); p("pointermove", x0 + dx * 2 / 3); p("pointermove", x0 + dx); p("pointerup", x0 + dx);
+  }
+  window.addEventListener("load", function () { ` + skript + ` });
+`;
+}
+
+// Fersk berøringsskjerm: kortet kommer etter at feeden står, forklarer begge veier, huskes — og et sveip tar det bort.
+const SAK_27 = kjor("sveip-hint", sveipHintScene(TOUCH, `
+    etter(600, function () {
+      ok("ingenting før feeden har stått et øyeblikk", !kort());
+      etter(2300, function () {
+        ok("forklaringen står der første gang", !!kort());
+        var t = kort() ? kort().textContent : "";
+        ok("og navngir begge veier", t.indexOf("Sveip mot venstre") > -1 && t.indexOf("Tabeller og kamper") > -1 &&
+           t.indexOf("Sveip mot høyre") > -1 && t.indexOf("tilbake") > -1, t);
+        ok("den sier fra til skjermleseren", !!kort() && kort().getAttribute("role") === "status");
+        ok("og er huskt lokalt, i det den vises", prefsLagret().sveipHint === true, JSON.stringify(prefsLagret()));
+        ok("kortet ligger utenfor flata som glir, så det ikke tar sveipet",
+           !document.getElementById("visninger").contains(kort()));
+        dra(document.getElementById("feed"), -220);
+        etter(600, function () {
+          ok("sveipet virker mens kortet står", document.getElementById("feed").hidden && !document.getElementById("fotball").hidden);
+          ok("og tar kortet bort", !kort());
+          ferdig();
+        });
+      });
+    });`));
+
+// «Skjønner» tar det bort.
+const SAK_27B = kjor("sveip-hint-ok", sveipHintScene(TOUCH, `
+    etter(2800, function () {
+      ok("forklaringen står der", !!kort());
+      kort().querySelector(".sveip-ok").click();
+      etter(500, function () { ok("Skjønner tar den bort", !kort()); ferdig(); });
+    });`));
+
+// Menyen tar den bort — leseren har funnet veien.
+const SAK_27C = kjor("sveip-hint-meny", sveipHintScene(TOUCH, `
+    etter(2800, function () {
+      ok("forklaringen står der", !!kort());
+      document.getElementById("menuBtn").click();
+      etter(500, function () { ok("å åpne menyen tar den bort", !kort()); ferdig(); });
+    });`));
+
+// Står den uten at noen rører den, går den av seg selv (virtuell tid rekker bare 12 s i testen).
+const SAK_27D = kjor("sveip-hint-tid", sveipHintScene(TOUCH, `
+    etter(2800, function () {
+      ok("forklaringen står der", !!kort());
+      etter(8400, function () { ok("og går av seg selv etter åtte sekunder", !kort()); ferdig(); });
+    });`));
+
+// Sett før: den kommer ikke igjen.
+const SAK_27E = kjor("sveip-hint-sett", sveipHintScene(
+  TOUCH + `localStorage.setItem("sb-visning", JSON.stringify({ tema: "lys", sveipHint: true }));`, `
+    etter(3500, function () { ok("sett én gang, ikke igjen", !kort()); ferdig(); });`));
+
+// Åpner du rett i fotballen (en delt lenke), har du alt funnet veien dit.
+const SAK_27G = kjor("sveip-hint-fotball", sveipHintScene(TOUCH + `location.hash = "#/fotball/eliteserien/tabell";`, `
+    etter(3500, function () {
+      ok("rett i fotballen står det ingen forklaring", !kort() && !document.getElementById("fotball").hidden);
+      ok("og den regnes ikke som sett — den ble aldri vist", !prefsLagret().sveipHint, JSON.stringify(prefsLagret()));
+      ferdig();
+    });`));
+
+// Uten berøring er det ingenting å forklare.
+const SAK_27F = kjor("sveip-hint-mus", sveipHintScene("", `
+    etter(3500, function () {
+      ok("uten berøringsskjerm står det ingen forklaring", !kort());
+      ok("og ingenting er lagret som sett", !prefsLagret().sveipHint, JSON.stringify(prefsLagret()));
+      ferdig();
+    });`));
+
 // Portalen: passordet er det første du gjør, så feltet har fokus når siden åpnes.
 const SAK_15S = kjor("admin-fokus", `
   window.addEventListener("load", function () { setTimeout(function () { try {
@@ -10246,7 +10330,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_2B, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_18J, SAK_18K, SAK_25, SAK_26, SAK_15S, SAK_15T, SAK_15U, SAK_15V, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_2B, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_18J, SAK_18K, SAK_25, SAK_26, SAK_27, SAK_27B, SAK_27C, SAK_27D, SAK_27E, SAK_27F, SAK_27G, SAK_15S, SAK_15T, SAK_15U, SAK_15V, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

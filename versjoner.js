@@ -35,6 +35,7 @@ export const VERSJONER = [
       { hva: "Menyen: «Alle saker» heter «Nyheter», og rett under den står «Tabeller og kamper» (beta). Kategorien «Fotball» heter «Fotballnyheter», for den er nyhetene, ikke tabellene. Fanene nederst er fjernet: begge områdene nås fra hamburgermenyen." },
       { hva: "Sveip: dra fingeren mot venstre for å åpne Tabeller og kamper, og mot høyre for å komme tilbake til nyhetene. Visningen følger fingeren. Menyen virker som før." },
       { hva: "Linja «Rosenborg øverst» (laget du følger) står bare der når en sak om laget faktisk ligger øverst, og sier hvor mange. Før sto den også når ingenting var løftet." },
+      { hva: "Første gang du åpner appen på en telefon, står det et lite kort nederst som forklarer sveipet: mot venstre for Tabeller og kamper, mot høyre for å komme tilbake. Det forsvinner av seg selv, og kommer ikke igjen." },
     ],
   },
   {
