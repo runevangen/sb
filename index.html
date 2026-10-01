@@ -111,6 +111,12 @@
             <span class="action-ico" aria-hidden="true">⤓</span>Installer appen
           </button>
         </div>
+        <!-- Svaret pa Del og Installer star RETT under knappene, ikke nederst
+             under kontopanelet: et svar som havner to hundre piksler fra
+             knappen du trykket pa, leses som at ingenting skjedde (#177).
+             Veiledningen tegnes av app.js; den er skjult til du trykker. -->
+        <div class="install-veiledning" id="installVeiledning" hidden></div>
+        <p class="action-note" id="actionNote" hidden></p>
         <!-- Innlogging. Panelet ligger i menyen, ikke pa en egen side:
              det er to felt, og menyen er der leseren alt er. -->
         <button class="action-btn" id="kontoBtn" type="button"
@@ -192,7 +198,6 @@
           </div>
           <p class="konto-svar" id="kontoSvar" aria-live="polite"></p>
         </div>
-        <p class="action-note" id="actionNote" hidden></p>
         <!-- To bokser pa én rad, som Del og Installer. Adminportalen er
              apen, men uten passord skjer ingenting der. Personvern star
              forst: den gjelder alle som apner menyen, admin gjelder én. -->

@@ -232,6 +232,18 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   gir et hopp i stedet for glid. **Målt i Chromium med pekerhendelser, ikke på en
   iPhone** — om glidet hakker der, er det bare en telefon som kan si, og da er
   veien tilbake enkelt bytte uten glid.
+- **«Installer appen» svarer rett under knappen, og med riktig telefon.**
+  Den gjorde noe på iPhone — en 12 px grå linje nederst i menyen, to hundre
+  piksler fra knappen — men en knapp som svarer så svakt at ingen ser det, er
+  en knapp som ikke svarer ([#177](https://github.com/runevangen/sb/issues/177)).
+  Nå står svaret i `#installVeiledning`, et kort med nummererte trinn og
+  symbolet leseren leter etter, og `installTilstand()` i `installasjon-data.js`
+  avgjør hva som gjelder: installert (ingen knapp), dialog (nettleserens egen),
+  iPhone/iPad (veiledning — **iPad kaller seg «Macintosh»**, så den leses av
+  berøringsskjermen) eller Android uten dialog (veiledning for menyen). En
+  veiledning for feil telefon er verre enn ingen, og dialogen kan bare brukes
+  én gang: sier leseren nei, står veiledningen igjen, ikke en dialog som er
+  brukt opp.
 - **«Logg inn» er en knapp der leseren står.** «Logg inn i menyen — et
   fornavn og en PIN — …» sto i kampkortet til 30. september 2026, og
   «Jeg skal hit» er appens viktigste handling: den hadde ingen vei inn

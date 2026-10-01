@@ -5,7 +5,7 @@
 // ferskhetslogikk, og en cache oppa den ville gitt to sannheter om hva som
 // er nyeste sak.
 
-const CACHE = "sb-skall-v10";
+const CACHE = "sb-skall-v11";
 const SKALL = [
   "/",
   "/index.html",
@@ -19,6 +19,7 @@ const SKALL = [
   "/mittlag-data.js",
   "/tilbakemelding-data.js",
   "/versjoner.js",
+  "/installasjon-data.js",
   "/pub-forslag-data.js",
   "/puber.js",
   "/kanaler.js",

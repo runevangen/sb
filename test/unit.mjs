@@ -13,6 +13,8 @@ import { FANTASY_KILDER, FANTASY_STI, fantasyFunn, fantasySondeTekst,
 import { LOGG_MAKS, VERSJON_MAKS as LOGG_VERSJON_MAKS, ANTALL_MAKS, versjonStand, nyeEndringer,
          antallNye, sjekkInnlogging, loggRad, tolkAdminLogg, forrigeInnlogging }
   from "../admin-logg-data.js";
+import { installTilstand, erIos, installVeiledning, visInstallKnapp, installHandling }
+  from "../installasjon-data.js";
 import { VERSJONER } from "../versjoner.js";
 import { ARTER, TEKST_MIN, TEKST_MAKS, SKJERM_MAKS, VERSJON_MAKS, STATUSER, STATUS_LESER,
          STATUS_HANDLING, sjekkTilbakemelding, tilbakemeldingRad, tolkTilbakemeldinger,
@@ -4295,6 +4297,60 @@ ok("mål: alt annet fjernes",
    renMaal("abc") === null && renMaal("-5") === null && renMaal("0") === null &&
    renMaal("12.5") === null && renMaal("100%") === null && renMaal("") === null &&
    renMaal(null) === null && renMaal("123456") === null && renMaal("1e3") === null);
+
+/* ---------------- appen pa hjemskjermen (#177) ---------------- */
+
+const UA_IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1";
+const UA_ANDROID = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/126.0 Mobile Safari/537.36";
+const UA_MAC = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15";
+
+ok("installer: en iPhone uten dialog far veiledning",
+   installTilstand({ ua: UA_IPHONE }) === "ios");
+ok("installer: en Android uten dialog far veiledning",
+   installTilstand({ ua: UA_ANDROID }) === "android");
+ok("installer: en datamaskin uten dialog har ingenting a tilby",
+   installTilstand({ ua: UA_MAC, plattform: "MacIntel", beroring: 0 }) === "ingen" &&
+   installTilstand({}) === "ingen" && installTilstand() === "ingen");
+// iPadOS sender en Mac-UA. Uten denne sjekken fikk en iPad ingen knapp.
+ok("installer: en iPad som kaller seg Macintosh gjenkjennes pa berøringsskjermen",
+   installTilstand({ ua: UA_MAC, plattform: "MacIntel", beroring: 5 }) === "ios" &&
+   erIos({ ua: UA_MAC, plattform: "MacIntel", beroring: 5 }) === true);
+ok("installer: en Mac med ett berøringspunkt er fortsatt en Mac",
+   erIos({ ua: UA_MAC, plattform: "MacIntel", beroring: 1 }) === false &&
+   erIos({ ua: UA_MAC, plattform: "MacIntel", beroring: 0 }) === false);
+ok("installer: en installert app tilbys aldri a installeres, uansett telefon",
+   installTilstand({ ua: UA_IPHONE, standalone: true }) === "installert" &&
+   installTilstand({ ua: UA_ANDROID, standalone: true, harPrompt: true }) === "installert");
+ok("installer: en dialog er bedre enn en veiledning",
+   installTilstand({ ua: UA_ANDROID, harPrompt: true }) === "prompt" &&
+   installTilstand({ ua: UA_IPHONE, harPrompt: true }) === "prompt");
+
+ok("installer: knappen star bare der den kan gi noe",
+   visInstallKnapp("prompt") && visInstallKnapp("ios") && visInstallKnapp("android") &&
+   !visInstallKnapp("installert") && !visInstallKnapp("ingen"));
+ok("installer: dialog gir dialog, telefoner gir veiledning, resten ingenting",
+   installHandling("prompt") === "dialog" && installHandling("ios") === "veiledning" &&
+   installHandling("android") === "veiledning" && installHandling("installert") === "ingenting" &&
+   installHandling("ingen") === "ingenting");
+
+const V_IOS = installVeiledning("ios");
+const V_AND = installVeiledning("android");
+ok("installer: iPhone far trinn som peker pa Del-knappen og Hjem-skjerm",
+   V_IOS.steg.length === 3 && V_IOS.steg[0].ikon === "del" &&
+   V_IOS.steg.some((s) => s.tekst.indexOf("Legg til på Hjem-skjerm") > -1), JSON.stringify(V_IOS));
+ok("installer: Android far trinn som peker pa menyen og Installer app",
+   V_AND.steg.length === 3 && V_AND.steg[0].ikon === "meny" &&
+   V_AND.steg.some((s) => s.tekst.indexOf("Installer app") > -1), JSON.stringify(V_AND));
+// Hele poenget med at veiledningen er data: en veiledning for feil telefon
+// er verre enn ingen.
+ok("installer: iPhone far ikke Androids ord, og Android ikke iPhones",
+   JSON.stringify(V_IOS).indexOf("Installer app") === -1 &&
+   JSON.stringify(V_IOS).indexOf("tre prikker") === -1 &&
+   JSON.stringify(V_AND).indexOf("Hjem-skjerm") === -1 &&
+   JSON.stringify(V_AND).indexOf("Del-knappen") === -1);
+ok("installer: ingen veiledning uten en telefon a veilede",
+   installVeiledning("prompt") === null && installVeiledning("ingen") === null &&
+   installVeiledning("installert") === null && installVeiledning() === null);
 
 /* ---------------- rapport ---------------- */
 
