@@ -373,3 +373,33 @@ export function sveipFullfor(dx, bredde, ms) {
   if (lengde >= bredde * SVEIP_ANDEL) return true;
   return lengde >= SVEIP_MINST && ms > 0 && lengde / ms >= SVEIP_FART;
 }
+
+// ---------- Tastaturet i portalen ----------
+//
+// Et tastatur på iPhone dekker halve skjermen, og «Lagre» i et langt skjema
+// ligger bak det. Nettleseren sier ikke at tastaturet er oppe — men den
+// visuelle visningen (`visualViewport`) krymper, mens layoutvisningen
+// (`innerHeight`) blir stående. Forskjellen er tastaturet.
+
+// Hvor stor forskjellen må være. Det minste iOS-tastaturet er godt over
+// dette; en adresselinje som glir inn og ut, er langt under.
+export const TASTATUR_MINST = 150;
+
+// Er et skjermtastatur oppe? Med et maskinvaretastatur eller en datamaskin
+// er forskjellen null, og da er det ingenting å legge en linje over.
+export function tastaturOppe(innerHoyde, vvHoyde) {
+  const inner = Number(innerHoyde);
+  const vv = Number(vvHoyde);
+  if (!(inner > 0) || !(vv > 0)) return false;
+  return inner - vv >= TASTATUR_MINST;
+}
+
+// Hvor en `position: fixed`-linje skal ligge for å stå helt nederst i det
+// leseren SER. Fixed regnes fra layoutvisningen, som tastaturet ikke
+// krymper; `vvTopp` er hvor langt den visuelle visningen er rullet ned i den.
+export function tastaturBarTopp(vvTopp, vvHoyde, barHoyde) {
+  const topp = Number(vvTopp) || 0;
+  const hoyde = Number(vvHoyde) || 0;
+  const bar = Number(barHoyde) || 0;
+  return Math.max(0, Math.round(topp + hoyde - bar));
+}

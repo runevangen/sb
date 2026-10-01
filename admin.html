@@ -283,6 +283,19 @@
     color: var(--aksent-blekk); font: inherit; font-weight: 600; cursor: pointer;
   }
   button:disabled { opacity: 0.45; cursor: default; }
+  /* Lagre-linja over tastaturet. Fixed regnes fra layoutvisningen, som et
+     skjermtastatur ikke krymper — derfor setter admin.js `top` ut fra
+     visualViewport. Uten `top` star den nederst, som er riktig nar det
+     ikke finnes noe a regne ut. [hidden] sier hva det betyr: display: flex
+     under slar nettleserens eget stilark. */
+  .tastatur-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    display: flex; align-items: center; gap: 14px;
+    padding: 8px 16px; background: var(--kort);
+    border-top: 1px solid var(--ramme-sterk);
+  }
+  .tastatur-bar[hidden] { display: none; }
+  .tastatur-bar button:first-child { flex: 1 1 auto; }
   button.lenke { background: none; color: var(--aksent); padding: 4px 0; font-weight: 500; text-decoration: underline; }
   .melding { margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; font-size: 14px; }
   .melding.ok { background: var(--ok-bg); color: var(--ok); }
@@ -887,6 +900,14 @@
     Endringen er ute for leserne med det samme.
   </p>
 </main>
+
+<!-- Lagre-linja som folger med opp over tastaturet. Den tar ikke over for
+     «Lagre stedet» i skjemaet: den er samme handling, sa den er ikke bak
+     tastaturet. Se tastaturBar i admin.js. -->
+<div class="tastatur-bar" id="stedBar" hidden>
+  <button id="stedBarLagre" type="button">Lagre stedet</button>
+  <button class="lenke" id="stedBarFerdig" type="button">Skjul tastaturet</button>
+</div>
 <script type="module" src="/admin.js"></script>
 </body>
 </html>

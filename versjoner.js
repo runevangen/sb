@@ -37,6 +37,7 @@ export const VERSJONER = [
       { hva: "Linja «Rosenborg øverst» (laget du følger) står bare der når en sak om laget faktisk ligger øverst, og sier hvor mange. Før sto den også når ingenting var løftet." },
       { hva: "Første gang du åpner appen på en telefon, står det et lite kort nederst som forklarer sveipet: mot venstre for Tabeller og kamper, mot høyre for å komme tilbake. Det forsvinner av seg selv, og kommer ikke igjen." },
       { hva: "«Installer appen» svarer nå: på iPhone og iPad får du en veiledning rett under knappen, med Del-knappen tegnet, og på Android bruker den installasjonsdialogen når nettleseren gir en, ellers en veiledning for menyen. Er appen alt installert, står ikke knappen der.", issue: 177 },
+      { hva: "Portalen: når tastaturet er oppe i stedsskjemaet på en telefon, står en linje med «Lagre stedet» og «Skjul tastaturet» rett over det. Før lå Lagre nederst i skjemaet, bak tastaturet." },
     ],
   },
   {

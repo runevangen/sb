@@ -64,6 +64,13 @@ kunne testes i Node på millisekunder.
   kanten, og om det er langt eller raskt nok til å fullføres. DOM-en som
   bruker dem står i `app.js`; tallene (`SVEIP_*`) står her, og flyttes de, må
   CLAUDE.md-regelen om sveipet leses på nytt.
+- **`tastaturOppe` og `tastaturBarTopp` er lagre-linja i portalen, uten
+  telefon.** iOS krymper den visuelle visningen (`visualViewport`) og lar
+  layoutvisningen (`innerHeight`) stå; forskjellen er tastaturet. `TASTATUR_MINST`
+  er 150 px — det minste iOS-tastaturet er godt over, en adresselinje som
+  glir er langt under. Manglende eller tullete tall gir **nei**, ikke et
+  gjett: en linje som står over ingenting er verre enn ingen. DOM-en står i
+  `admin.js`.
 - **`safeUrl` slipper kun `http` og `https`.** En manipulert respons skal
   ikke kunne smugle `javascript:` inn i `src` eller `href`.
 - **`videoUrl` sammenlikner hele `hostname`, ikke en delstreng.** `iframe`
@@ -1041,6 +1048,18 @@ portalen — en leser har ingen nytte av den.
 [ADR 0018](adr/0018-visninger-i-supabase.md),
 [ADR 0020](adr/0020-stedene-i-portalen.md).
 
+- **Lagre-linja over tastaturet er samme handling, ikke en ny.**
+  `#stedBarLagre` klikker `#stedLagre` — lagringen står ett sted. Linja står
+  bare når et felt (`input`, `select`, `textarea`) i skjemaet har fokus **og**
+  `tastaturOppe()` svarer ja; `oppdaterTastaturBar()` regner begge hver gang
+  fokus eller `visualViewport` rører seg, og `lukkSted()` kaller den, for et
+  lukket skjema har ingenting å legge en linje over. **Skjulingen etter
+  `focusout` er utsatt 250 ms med vilje:** et trykk på linja kan i seg selv ta
+  fokus fra feltet, og en linje som forsvinner før klikket kommer, har gjort
+  trykket om til intet. `mousedown` på linja avbrytes for samme grunn.
+  **Lagre tar tastaturet ned først**, så svaret («navnet mangler») står der du
+  ser det og ikke bak noe, og feltet rulles til midten når tastaturet er
+  kommet, så linja ikke dekker det du skriver i.
 - **Seksjonene er sammenleggbare, og mekanikken er appens.**
   `settApen()` skriver `aria-expanded` på knappen og `[hidden]` på panelet
   den peker på med `aria-controls` — samme mønster som `fotball.js`, ikke

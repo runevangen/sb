@@ -873,6 +873,20 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   en melding som peker inn i noe du ikke ser er verre enn ingen. Begge,
   ikke det ene: å regne ut hvilket trinn den *første* feilen hører til
   ville vært enda en liste som kan gli fra `PUBLISTE_FELT`.
+- **Lagre-linja følger med opp over tastaturet.** Et skjermtastatur dekker
+  halve skjermen, og «Lagre stedet» lå nederst i skjemaet — bak det (meldt
+  1. oktober 2026 med skjermbilde). Nå står «Lagre stedet» og «Skjul
+  tastaturet» i en linje rett over tastaturet, bare når et felt i skjemaet
+  har fokus og et tastatur faktisk er oppe (`tastaturOppe()` i `lib.js`:
+  `visualViewport` krymper, `innerHeight` gjør ikke). Linja er **samme
+  handling**, ikke en ny — den klikker knappen i skjemaet. Og den forsvinner
+  ikke før klikket: skjulingen er utsatt 250 ms, for et trykk på linja kan ta
+  fokus fra feltet. **«Autoutfyll kontakt»-linja til iOS er ikke tatt bort**:
+  `autocomplete="off"` ignoreres på felt som ser ut som navn og adresse, og
+  det finnes ingen kjent måte å slå den av som kan måles uten en iPhone.
+  **Plasseringen er målt i Chromium med et falskt `visualViewport`, ikke over
+  et ekte iOS-tastatur** — om linja står nøyaktig over det, er det bare en
+  telefon som kan si.
 - **Et felt som må fylles ut, sier det — før du trykker lagre.** Stjernene
   i stedskjemaet settes av `merkPakrevde()` **ut av `PUBLISTE_FELT`**, ikke
   skrevet i markupen: en liste i HTML-en kunne glidd fra den lista
