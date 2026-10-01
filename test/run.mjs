@@ -1268,6 +1268,24 @@ const SAK_5 = kjor("visning", FELLES + `
 
 // Fotballdata, i den formen Netlify-funksjonen leverer dem.
 const FOTBALL = `
+  // Bunnfanene er borte (1. oktober 2026): veien til fotballen er raden
+  // «Tabeller og kamper» i hamburgermenyen, og veien tilbake er «Nyheter».
+  function tilFotball() {
+    document.getElementById("menuBtn").click();
+    document.getElementById("menuFotball").click();
+  }
+  // Er raden valgt i hamburgermenyen? Menyen tegnes ved apning, sa den apnes og lukkes her.
+  function menyRadValgt(katId) {
+    document.getElementById("menuBtn").click();
+    var rad = document.querySelector("#menuList .menu-item[data-cat-id='" + katId + "']");
+    var valgt = !!rad && rad.getAttribute("aria-current") === "true";
+    document.getElementById("menuLukk").click();
+    return valgt;
+  }
+  function tilNyheter() {
+    document.getElementById("menuBtn").click();
+    document.querySelector("#menuList .menu-item[data-cat-id='']").click();
+  }
   var TABELL = [
     // Merket kommer fra kilden, ikke fra oss. Radene her dekker de tre
     // tilfellene: et merke vi stoler pa, ingenting, og en adresse som
@@ -1355,7 +1373,7 @@ const SAK_6B = kjor("logo-hjem", FELLES + FOTBALL + `
       ok("soket filtrerer, og det star i toppfeltet",
          !!document.querySelector("#filterTag .filter-chip"));
       feed.scrollTop = 400;
-      document.getElementById("fanenFotball").click();
+      tilFotball();
       ok("og fotballen star framme", document.getElementById("fotball").hidden === false);
 
       // Et trykk med Ctrl gar til nettleseren: ny fane pa forsiden.
@@ -1369,7 +1387,7 @@ const SAK_6B = kjor("logo-hjem", FELLES + FOTBALL + `
       ok("et vanlig trykk laster ikke sida pa nytt", vanlig.defaultPrevented === true);
       ok("og tar deg til nyhetene", document.getElementById("feed").hidden === false &&
          document.getElementById("fotball").hidden === true &&
-         document.getElementById("fanenNyheter").getAttribute("aria-current") === "true");
+         menyRadValgt("") === true);
       ok("uten sok", !document.querySelector("#filterTag .filter-chip") &&
          document.getElementById("sokFelt").value === "",
          document.getElementById("filterTag").textContent);
@@ -1393,19 +1411,19 @@ const SAK_6 = kjor("fotball", FELLES + FOTBALL + `
   ` + mockAlt("saker") + `
 
   function synlig(id) { return !document.getElementById(id).hidden; }
-  function fane(id) { return document.getElementById(id).getAttribute("aria-current") === "true"; }
+
   function valgt(rot) {
     var n = document.querySelector("#" + rot + " .segment-del[aria-current='true']");
     return n ? n.dataset.verdi : null;
   }
 
   window.addEventListener("load", function () { setTimeout(function () {
-    ok("appen starter i nyheter", synlig("feed") && !synlig("fotball") && fane("fanenNyheter"));
+    ok("appen starter i nyheter", synlig("feed") && !synlig("fotball") && menyRadValgt("") === true);
 
-    document.getElementById("fanenFotball").click();
+    tilFotball();
     setTimeout(function () {
       ok("fotballfanen bytter visning",
-         !synlig("feed") && synlig("fotball") && fane("fanenFotball"));
+         !synlig("feed") && synlig("fotball") && menyRadValgt("fotball") === true);
       ok("adressen folger fanen", location.hash.indexOf("#/fotball/") === 0, location.hash);
       ok("tabellen er forstevalget", valgt("fotballFaner") === "tabell", valgt("fotballFaner"));
 
@@ -1647,7 +1665,7 @@ const SAK_7 = kjor("fotball-lenke", FELLES + FOTBALL + `
     ok("ligaen er ren tekst, ikke en filterbrikke",
        !document.querySelector("#filterTag .filter-chip"));
 
-    document.getElementById("fanenNyheter").click();
+    tilNyheter();
     setTimeout(function () {
       ok("veien tilbake til nyheter virker", !document.getElementById("feed").hidden);
       // Feeden lastes selv om appen apnet i fotball, sa byttet er umiddelbart.
@@ -1668,7 +1686,7 @@ const SAK_8 = kjor("fotball-feil", FELLES + FOTBALL + `
   }
 
   window.addEventListener("load", function () { setTimeout(function () {
-    document.getElementById("fanenFotball").click();
+    tilFotball();
     setTimeout(function () { try {
       var rot = document.getElementById("fotballInnhold");
       var boks = rot.querySelector(".state");
@@ -1904,7 +1922,7 @@ const SAK_11 = kjor("favorittlag", FELLES + FOTBALL + `
     ok("sak som bare nevner laget i forbifarten loftes ikke", andre() === "Sak 1", andre());
 
     // Linja er veien tilbake til tabellen, der valget gjores om.
-    document.getElementById("fanenNyheter").click();
+    tilNyheter();
     document.querySelector(".favoritt-linje").click();
     ok("favorittlinja forer til tabellen",
        !document.getElementById("fotball").hidden && location.hash === "#/fotball/eliteserien/tabell",
@@ -7826,6 +7844,77 @@ const SAK_18K = kjor("admin-fra-menyen", FELLES + FOTBALL + `
   } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, 900); });
 `);
 
+// Hamburgermenyen er veien til begge omradene (1. oktober 2026): bunnfanene er
+// fjernet. «Nyheter» (het «Alle saker»), «Tabeller og kamper» med beta-merke, og
+// kategorien «Fotball» heter «Fotballnyheter» fordi den er nyhetene, ikke modulen.
+const SAK_25 = kjor("meny-nyheter-fotball", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  ` + mockAlt("saker") + `
+  function etter(ms, f) { setTimeout(function () { try { f(); } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, ms); }
+  window.addEventListener("load", function () { etter(900, function () {
+    ok("bunnfanene er borte", !document.querySelector(".tabbar") &&
+       !document.getElementById("fanenNyheter") && !document.getElementById("fanenFotball"));
+
+    document.getElementById("menuBtn").click();
+    // Emnene kommer fra sportsbibelen.no etter at menyen er apnet; de to forste raden star der med en gang.
+    var forst = Array.prototype.map.call(document.querySelectorAll("#menuList .menu-item"),
+      function (r) { return r.querySelector("span").textContent.replace(/beta$/, "").trim(); });
+    ok("Nyheter og Tabeller og kamper star der for emnene er hentet",
+       forst[0] === "Nyheter" && forst[1] === "Tabeller og kamper", forst.join(" | "));
+    etter(400, function () {
+      var rader = Array.prototype.map.call(document.querySelectorAll("#menuList .menu-item"),
+        function (r) { return r.querySelector("span").textContent.replace(/beta$/, "").trim(); });
+      ok("menyen starter med Nyheter, og Tabeller og kamper rett under",
+         rader[0] === "Nyheter" && rader[1] === "Tabeller og kamper", rader.join(" | "));
+      ok("\u00abAlle saker\u00bb finnes ikke lenger", rader.indexOf("Alle saker") === -1, rader.join(" | "));
+      ok("kategorien Fotball heter Fotballnyheter, resten som f\u00f8r",
+         rader.indexOf("Fotballnyheter") === 2 && rader.indexOf("Fotball") === -1 &&
+         rader.indexOf("Eliteserien") > -1 && rader.indexOf("Kommentar") > -1, rader.join(" | "));
+      var fb = document.getElementById("menuFotball");
+      ok("fotballraden bar beta-merket", !!fb.querySelector(".beta") &&
+         fb.querySelector(".beta").getAttribute("aria-label") === "beta", fb.innerHTML);
+      ok("Nyheter er valgt, fotballraden ikke",
+         document.querySelector("#menuList .menu-item[data-cat-id='']").getAttribute("aria-current") === "true" &&
+         !fb.hasAttribute("aria-current"));
+
+      fb.click();
+      ok("fotballraden apner fotballen og lukker menyen",
+         document.getElementById("fotball").hidden === false && document.getElementById("feed").hidden === true &&
+         !document.getElementById("menuPanel").classList.contains("open"));
+      document.getElementById("menuBtn").click();
+      ok("og i fotballen er det fotballraden som er valgt",
+         document.getElementById("menuFotball").getAttribute("aria-current") === "true" &&
+         !document.querySelector("#menuList .menu-item[data-cat-id='']").hasAttribute("aria-current"));
+
+      etter(400, function () {
+        // Veien tilbake: Nyheter bytter visning, og laster ikke feeden pa nytt.
+        var feedKall = window.__kall.length;
+        document.querySelector("#menuList .menu-item[data-cat-id='']").click();
+        ok("Nyheter tar deg tilbake til feeden",
+           document.getElementById("feed").hidden === false && document.getElementById("fotball").hidden === true);
+        etter(400, function () {
+          ok("uten a laste den pa nytt", window.__kall.length === feedKall,
+             feedKall + " -> " + window.__kall.length + " " + window.__kall.slice(-3).join(","));
+
+          // Et emne valgt fra fotballen bytter visning og filtrerer.
+          tilFotball();
+          document.getElementById("menuBtn").click();
+          document.querySelector("#menuList .menu-item[data-cat-id='7']").click();
+          ok("et emne valgt fra fotballen apner nyhetene", document.getElementById("feed").hidden === false &&
+             document.getElementById("fotball").hidden === true);
+          var chip = document.querySelector("#filterTag .filter-chip");
+          ok("og filterbrikka bruker navnet appen viser",
+             !!chip && chip.textContent.indexOf("Fotballnyheter") === 0, chip && chip.textContent);
+          ok("og sier at krysset viser alle nyheter",
+             !!chip && chip.getAttribute("aria-label").indexOf("alle nyheter") > -1,
+             chip && chip.getAttribute("aria-label"));
+          ferdig();
+        });
+      });
+    });
+  }); });
+`);
+
 // Portalen: passordet er det første du gjør, så feltet har fokus når siden åpnes.
 const SAK_15S = kjor("admin-fokus", `
   window.addEventListener("load", function () { setTimeout(function () { try {
@@ -10010,7 +10099,7 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_2B, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_18J, SAK_18K, SAK_15S, SAK_15T, SAK_15U, SAK_15V, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_2B, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_18J, SAK_18K, SAK_25, SAK_15S, SAK_15T, SAK_15U, SAK_15V, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

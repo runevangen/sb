@@ -4,7 +4,7 @@
 // nettleser. Alt her nede rorer DOM, nettverk eller lagring.
 
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug, rangerTreff, listeTekst,
-         bildeFor, renSrcset, renSizes, renMaal }
+         bildeFor, renSrcset, renSizes, renMaal, kategoriVisningsnavn }
   from "./lib.js";
 import { LIGAER, tolkFotballHash, fotballHash, tolkKamplenke,
          ligaForKategori, DEL_NAVN } from "./fotball-data.js";
@@ -818,7 +818,7 @@ function renderFeed(saker, opts) {
     // blindvei: teksten sier hva som er galt og ingenting om hva du gjor na
     // (#181). Knappen bruker den samme veien som krysset.
     if (sokeord || activeCategory !== null) {
-      const fjern = el("button", "retry-btn", sokeord ? "Fjern søket" : "Vis alle saker");
+      const fjern = el("button", "retry-btn", sokeord ? "Fjern søket" : "Vis alle nyheter");
       fjern.type = "button";
       fjern.addEventListener("click", visAlleSaker);
       state.appendChild(fjern);
@@ -1529,7 +1529,7 @@ function visToppTekst() {
 
   const knapp = el("button", "filter-chip");
   knapp.type = "button";
-  knapp.setAttribute("aria-label", toppTekst + " — trykk for å vise alle saker");
+  knapp.setAttribute("aria-label", toppTekst + " — trykk for å vise alle nyheter");
   knapp.appendChild(el("span", "filter-navn", toppTekst));
 
   const kryss = el("span", "filter-kryss", "×");
@@ -1604,9 +1604,6 @@ function visFane(visning, liga, del) {
   document.getElementById("feed").hidden = visning !== "nyheter";
   document.getElementById("fotball").hidden = visning !== "fotball";
 
-  merkFane("fanenNyheter", visning === "nyheter");
-  merkFane("fanenFotball", visning === "fotball");
-
   visToppTekst();
   // Adressen tolkes her, ikke i modulen: ruting er app.js sin jobb. Kom
   // leseren fra en delt lenke, folger kampen med inn.
@@ -1619,12 +1616,6 @@ function visFane(visning, liga, del) {
   // kortene bytter ingen visning, og lar siden sta.
   if (isMenuOpen() && erKontoModus()) closeMenu();
   else if (isMenuOpen()) visMeny();
-}
-
-function merkFane(id, aktiv) {
-  const knapp = document.getElementById(id);
-  if (aktiv) knapp.setAttribute("aria-current", "true");
-  else knapp.removeAttribute("aria-current");
 }
 
 /* ---------- meny ---------- */
@@ -1672,7 +1663,15 @@ async function loadMenu() {
 // snarveiene pa emneradene er veien inn dit. Menyen skulle aldri vaert
 // det andre stedet.
 function visMeny() {
-  if (kategorier) renderMenu(kategorier);
+  // Nyheter og Tabeller og kamper star der med en gang. Emnene kommer fra
+  // sportsbibelen.no, og de to forste skal ikke vente pa dem: de er veien til
+  // fotballen na som bunnfanene er borte.
+  renderMenu(kategorier || []);
+  if (!kategorier) {
+    const note = document.createElement("li");
+    note.appendChild(el("p", "menu-state", "Henter emner …"));
+    document.getElementById("menuList").appendChild(note);
+  }
   loadMenu();
 }
 
@@ -1681,8 +1680,32 @@ function renderMenu(categories) {
   const list = document.getElementById("menuList");
   list.replaceChildren();
 
-  list.appendChild(menuEntry({ id: null, name: "Alle saker" }));
+  list.appendChild(menuEntry({ id: null, name: "Nyheter" }));
+  list.appendChild(fotballRad());
   categories.forEach((cat) => list.appendChild(menuEntry(cat)));
+}
+
+// Veien til tabeller og kamper. Bunnfanene ble fjernet 1. oktober 2026, og
+// da matte fotballmodulen ha en rad her: «Fotball» i menyen er nyhetene om
+// fotball (en kategori fra sportsbibelen.no), ikke modulen.
+function fotballRad() {
+  const item = document.createElement("li");
+  item.className = "menu-rad";
+  const knapp = el("button", "menu-item");
+  knapp.type = "button";
+  knapp.id = "menuFotball";
+  knapp.dataset.catId = "fotball";
+  knapp.appendChild(el("span", null, "Tabeller og kamper"));
+  const beta = el("span", "beta", "beta");
+  beta.setAttribute("aria-label", "beta");
+  knapp.firstChild.appendChild(beta);
+  if (aktivVisning === "fotball") knapp.setAttribute("aria-current", "true");
+  knapp.addEventListener("click", () => {
+    if (aktivVisning !== "fotball") settFane("fotball", fotballLiga, fotballDel);
+    closeMenu();
+  });
+  item.appendChild(knapp);
+  return item;
 }
 
 function menuEntry(cat) {
@@ -1691,7 +1714,7 @@ function menuEntry(cat) {
   const button = el("button", "menu-item");
   button.type = "button";
   button.dataset.catId = cat.id ? String(cat.id) : "";
-  button.appendChild(el("span", null, cat.name || "Uten navn"));
+  button.appendChild(el("span", null, kategoriVisningsnavn(cat.name) || "Uten navn"));
 
   const treff = ligaForKategori(cat.name);
 
@@ -1701,7 +1724,8 @@ function menuEntry(cat) {
     button.appendChild(el("span", "count", String(cat.count)));
   }
 
-  if ((cat.id || null) === activeCategory) {
+  // Merket gjelder nyhetene: star du i fotballmodulen, er det den raden som er valgt.
+  if ((cat.id || null) === activeCategory && aktivVisning === "nyheter") {
     button.setAttribute("aria-current", "true");
   }
 
@@ -1749,6 +1773,13 @@ function merkValgtKategori(id) {
 
 function selectCategory(cat) {
   const id = cat.id || null;
+  // Fra fotballen tilbake til det du alt sto i: bare bytt visning. Bunnfanen
+  // gjorde det uten a laste noe, og feeden star med rulleposisjonen sin.
+  if (aktivVisning !== "nyheter" && id === activeCategory && !sokeord) {
+    closeMenu();
+    settFane("nyheter");
+    return;
+  }
   activeCategory = id;
   sokeord = "";
   document.getElementById("sokFelt").value = "";
@@ -1756,11 +1787,14 @@ function selectCategory(cat) {
   merkValgtKategori(id);
 
   // Vis i toppen hvilken del av feeden man star i.
-  toppTekst = id ? cat.name : "";
+  toppTekst = id ? kategoriVisningsnavn(cat.name) : "";
   visToppTekst();
 
   track("Kategori valgt", { kategori: id ? cat.name : "alle" });
   closeMenu();
+  // Bunnfanen var veien tilbake til nyhetene fra fotballen; na er det dette.
+  // Uten byttet filtrerte feeden seg bak en fotballvisning som sto igjen.
+  if (aktivVisning !== "nyheter") settFane("nyheter");
   loadFeed();
 }
 
@@ -2940,14 +2974,6 @@ initFotball(
   // Innlogging og navn eies av app.js (det er lagring). Modulen far tre
   // sporsmal: har du en okt, hva heter du for vennene, og husk navnet.
   { okt: () => kontoOkt, navn: svarNavn, settNavn: settSvarNavn, apneInnlogging });
-
-document.getElementById("fanenNyheter").addEventListener("click", () => {
-  if (aktivVisning !== "nyheter") settFane("nyheter");
-});
-
-document.getElementById("fanenFotball").addEventListener("click", () => {
-  if (aktivVisning !== "fotball") settFane("fotball", fotballLiga, fotballDel);
-});
 
 // Apner appen pa en fotballenke, star modulen framme med en gang.
 const startrute = tolkFotballHash(location.hash);

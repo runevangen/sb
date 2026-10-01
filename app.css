@@ -974,8 +974,7 @@ body {
    **Bredden og hoyden er ikke pynt**, og derfor rores de ikke her.
    `.phone` har fast hoyde og `flex-direction: column`, og det er DET som
    gjor at `.feed` og `.fotball-innhold` ruller inni appen framfor at
-   vinduet ruller. Pa den henger ogsa `.tabbar`, som ligger som siste
-   barn framfor a flyte over; `.menu-panel`, som er `position: absolute;
+   vinduet ruller. Pa den henger `.menu-panel`, som er `position: absolute;
    inset: 0` og ville dekket hele skjermen uten en boks a dekke;
    `.tabell-skall`, som ruller sidelengs nettopp fordi `overflow: hidden`
    klipper; og `folgMedPaRulling()` i app.js, som lytter pa `.feed` og
@@ -1799,43 +1798,11 @@ a.ad-cta:focus-visible {
   outline-offset: 2px;
 }
 
-/* ---------- bunnfaner ---------- */
+/* ---------- beta-merket ---------- */
 
-/* Faneraden ligger som siste barn i .phone, sa den tar plass i stedet for
-   a legge seg over feeden. En overlagt rad ville skjult den siste saken. */
-.tabbar {
-  display: flex;
-  flex-shrink: 0;
-  border-top: 1px solid var(--border);
-  background: var(--bg-app);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-.tab {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 11px 8px;
-  border: 0;
-  background: none;
-  color: var(--text-dim);
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-}
-
-.tab[aria-current="true"] { color: var(--accent); }
-
-.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
-
-.tab-ico { font-size: 15px; line-height: 1; }
-
-/* Merkingen skal si «tidlig versjon» uten a rope. Den star bade her og i
-   toppfeltet nar modulen er apen. */
+/* Merkingen skal si «tidlig versjon» uten a rope. Den star pa menyraden som
+   apner fotballmodulen. Bunnfanene (#fanenNyheter, #fanenFotball) ble fjernet
+   1. oktober 2026: begge omradene ligger i hamburgermenyen na. */
 .beta {
   font-size: 9px;
   font-weight: 700;
@@ -1847,7 +1814,13 @@ a.ad-cta:focus-visible {
   color: var(--text-dim);
 }
 
-.tab[aria-current="true"] .beta { background: var(--accent); color: var(--accent-ink); }
+.menu-item .beta {
+  margin-left: 8px;
+  font-family: 'Inter', sans-serif;
+  vertical-align: middle;
+}
+
+.menu-item[aria-current="true"] .beta { background: var(--accent); color: var(--accent-ink); }
 
 /* ---------- fotball (beta) ---------- */
 

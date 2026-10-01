@@ -306,3 +306,16 @@ export function renMaal(verdi) {
   const n = Number(tekst);
   return n >= 1 ? String(n) : null;
 }
+
+// Navnet appen viser for en kategori fra sportsbibelen.no. Kategorien
+// «Fotball» (412 saker) er nyhetene om fotball, ikke fotballmodulen med
+// tabeller og kamper, og de to het det samme i menyen. Navnet kan ikke
+// endres pa sportsbibelen.no, sa appen viser sitt eget. Alt annet star som
+// det kommer.
+const VISNINGSNAVN = { fotball: "Fotballnyheter" };
+
+export function kategoriVisningsnavn(navn) {
+  const tekst = String(navn == null ? "" : navn);
+  const nokkel = tekst.trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(VISNINGSNAVN, nokkel) ? VISNINGSNAVN[nokkel] : tekst;
+}
