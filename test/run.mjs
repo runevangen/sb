@@ -10482,9 +10482,156 @@ ${ELITESERIEN.map((lag, i) => `    { plass: ${i + 1}, lag: ${JSON.stringify(lag)
 
 /* ---------------- rapport ---------------- */
 
+/* ---------------- 15W. lagre-linja over tastaturet ---------------- */
+
+// Et skjermtastatur dekker halve skjermen, og «Lagre stedet» ligger nederst
+// i et langt skjema. Chromium har ikke et skjermtastatur, så scenen later som:
+// den bytter ut `visualViewport` med et objekt der høyden krymper, slik iOS
+// gjør. Plasseringen over et ekte tastatur er målt her og IKKE på en iPhone.
+const SAK_15W = kjor("admin-lagre-linje", `
+  try {
+    localStorage.setItem("sb-konto", JSON.stringify({
+      token: "okt-token", fornyer: "fornyer", bruker: "u-admin", navn: "Rune",
+      utloper: Date.now() + 3600000,
+    }));
+  } catch (e) { /* privat modus */ }
+
+  var inner = window.innerHeight;
+  var vv = new EventTarget();
+  vv.height = inner; vv.offsetTop = 0;
+  Object.defineProperty(window, "visualViewport", { value: vv, configurable: true });
+
+  function svar(status, kropp) {
+    return Promise.resolve({ ok: status < 400, status: status, text: function () {
+      return Promise.resolve(JSON.stringify(kropp)); } });
+  }
+  window.fetch = function (u, opt) {
+    u = String(u);
+    if (u.indexOf("/api/fotball") === 0) {
+      return svar(200, { liga: "Eliteserien", sesong: 2026, kilde: "TheSportsDB",
+                         runde: "Runde 21", runder: ["Runde 21"], kamper: [] });
+    }
+    if (u.indexOf("/api/pub-liste") === 0) {
+      var k = JSON.parse(opt.body);
+      if (k.handling === "liste") return svar(200, { puber: [], klar: true });
+      return svar(200, { ok: true, pub: k.pub, merknad: "Lagret." });
+    }
+    if (u.indexOf("/api/pub-forslag") === 0) return svar(200, { forslag: [] });
+    if (u.indexOf("/api/brukere") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [] });
+      return svar(200, { brukere: [] });
+    }
+    if (u.indexOf("/api/visninger") === 0) {
+      if (!opt || opt.method !== "POST") return svar(200, { klar: true, mangler: [] });
+      return svar(200, { ok: true, visninger: [] });
+    }
+    return svar(200, {});
+  };
+
+  function felt(id) { return document.getElementById(id); }
+  function etter(ms, f) { setTimeout(function () { try { f(); } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, ms); }
+  function tastatur(opp, topp) {
+    vv.height = opp ? inner - 300 : inner;
+    vv.offsetTop = topp || 0;
+    vv.dispatchEvent(new Event("resize"));
+  }
+
+  window.addEventListener("load", function () { etter(400, function () {
+    felt("passord").value = "hemmelig";
+    felt("loggInn").click();
+    etter(700, function () {
+      felt("stedHode").click();
+      felt("stedNytt").click();
+      var navn = felt("stedNavn"), bar = felt("stedBar");
+
+      ok("linja er skjult for du har gjort noe", bar.hidden === true, "synlig");
+
+      navn.focus();
+      ok("et felt i fokus, men uten skjermtastatur: ingen linje",
+         bar.hidden === true, "synlig");
+
+      tastatur(true);
+      ok("med tastatur oppe og et felt i fokus star linja der",
+         bar.hidden === false, "skjult");
+      var r = bar.getBoundingClientRect();
+      ok("og den star rett over tastaturet, ikke bak det",
+         Math.abs(r.bottom - vv.height) <= 1, r.bottom + " mot " + vv.height);
+
+      vv.offsetTop = 120; vv.dispatchEvent(new Event("scroll"));
+      r = bar.getBoundingClientRect();
+      ok("rulles den visuelle visningen, folger linja med",
+         Math.abs(r.bottom - (120 + vv.height)) <= 1, r.bottom + " mot " + (120 + vv.height));
+      vv.offsetTop = 0; vv.dispatchEvent(new Event("scroll"));
+
+      var md = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+      felt("stedBarLagre").dispatchEvent(md);
+      ok("et trykk pa linja tar ikke fokus fra feltet", md.defaultPrevented === true, "fokus tapt");
+
+      felt("stedLagre").focus();
+      ok("fokus pa en knapp apner ikke linja: ingen tastatur kommer der",
+         bar.hidden === true, "synlig");
+      navn.focus();
+      ok("tilbake i et felt star den igjen", bar.hidden === false, "skjult");
+
+      // Lagre fra linja: samme handling som knappen i skjemaet. Skjemaet er
+      // tomt, sa svaret er at navnet mangler — og tastaturet er ned, sa
+      // meldingen star der du ser den.
+      felt("stedBarLagre").click();
+      ok("Lagre i linja kjorer lagringen i skjemaet",
+         felt("stedMelding").className.indexOf("feil") > -1 && felt("stedMelding").textContent.length > 0,
+         felt("stedMelding").className + " / " + felt("stedMelding").textContent);
+      ok("og tar tastaturet ned for meldingen skal sees",
+         document.activeElement !== navn, "feltet har fokus");
+
+      navn.focus();
+      felt("stedBarFerdig").click();
+      ok("Skjul tastaturet tar fokus fra feltet og linja bort",
+         document.activeElement !== navn && bar.hidden === true,
+         "aktiv: " + document.activeElement.id + ", skjult: " + bar.hidden);
+
+      // En utsatt skjuling: fokus som forsvinner midt i et trykk skal ikke ta
+      // linja for klikket kommer.
+      navn.focus();
+      navn.blur();
+      ok("linja star et oyeblikk etter at fokus gikk", bar.hidden === false, "skjult med en gang");
+      etter(450, function () {
+        ok("og er borte nar det oyeblikket er over", bar.hidden === true, "synlig");
+
+        var rullet = [];
+        Element.prototype.scrollIntoView = function (o) { rullet.push({ id: this.id, block: o && o.block }); };
+        navn.focus();
+        ok("fokus igjen: linja tilbake", bar.hidden === false, "skjult");
+        // Feltet du skriver i skal ikke ende bak linja: det rulles til midten
+        // av det du ser, etter at tastaturet er ferdig med a komme.
+        etter(450, function () {
+          ok("feltet rulles til midten, sa linja ikke dekker det",
+             rullet.some(function (r) { return r.id === "stedNavn" && r.block === "center"; }),
+             JSON.stringify(rullet));
+        felt("stedAvbryt").click();
+        ok("lukkes skjemaet, gar linja med", bar.hidden === true, "star over et skjema som er borte");
+
+        // Nettleseren slipper fokus pa et skjult felt i neste oyeblikk;
+        // et nytt skjema apnes ikke i samme tikk som det gamle lukkes.
+        etter(60, function () {
+          felt("stedNytt").click();
+          navn.blur();
+          navn.focus();
+          ok("nytt skjema, fokus i feltet: linja", bar.hidden === false, "skjult");
+          // Tastaturet gar ned for seg selv.
+          tastatur(false);
+          ok("tastaturet ned: linja bort", bar.hidden === true, "synlig");
+          ferdig();
+        });
+        });
+      });
+    });
+  }); });
+`, null, adminSide);
+
+
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_2B, SAK_2C, SAK_2D, SAK_2E, SAK_2F, SAK_2G, SAK_2H, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_18J, SAK_18K, SAK_25, SAK_26, SAK_27, SAK_27B, SAK_27C, SAK_27D, SAK_27E, SAK_27F, SAK_27G, SAK_15S, SAK_15T, SAK_15U, SAK_15V, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_2B, SAK_2C, SAK_2D, SAK_2E, SAK_2F, SAK_2G, SAK_2H, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_18J, SAK_18K, SAK_25, SAK_26, SAK_27, SAK_27B, SAK_27C, SAK_27D, SAK_27E, SAK_27F, SAK_27G, SAK_15S, SAK_15T, SAK_15U, SAK_15V, SAK_15W, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {

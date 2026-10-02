@@ -63,6 +63,7 @@ import { PUBTYPER, PUBSIKKERHET, pubNokkel, sjekkPubRad, slaSammenPuber,
   ligaflaggGjelder } from "./pub-data.js";
 import { visningsHint, rundeTall, lagreKnappTekst,
          rundeKnappTekst } from "./visning-data.js";
+import { tastaturOppe, tastaturBarTopp } from "./lib.js";
 
 const felt = (id) => document.getElementById(id);
 
@@ -2048,6 +2049,7 @@ function lukkSted() {
   stedRedigeres = "";
   felt("stedSkjema").hidden = true;
   felt("stedAvbryt").hidden = true;
+  oppdaterTastaturBar();
 }
 
 function stedMelding(tekst, art) {
@@ -2558,6 +2560,70 @@ felt("stedHer").addEventListener("click", hentHer);
 felt("stedNytt").addEventListener("click", () => apneSted(null, ""));
 felt("stedAvbryt").addEventListener("click", lukkSted);
 felt("stedLagre").addEventListener("click", lagreSted);
+
+/* ---------- lagre-linja over tastaturet ----------
+
+   Et skjermtastatur dekker halve skjermen, og «Lagre stedet» ligger nederst
+   i et langt skjema — bak tastaturet. Linja har samme handling og følger med
+   opp. Den står bare når et felt i skjemaet har fokus OG et skjermtastatur er
+   oppe (`tastaturOppe`): med mus eller maskinvaretastatur er det ingenting å
+   legge den over, og en linje som ikke trengs er støy.
+
+   Plassen regnes av `tastaturBarTopp` ut av `visualViewport`. Fixed regnes
+   fra layoutvisningen, som tastaturet ikke krymper. */
+const TASTATUR_FELT = ["INPUT", "SELECT", "TEXTAREA"];
+let tastaturSkjul = 0;
+
+function oppdaterTastaturBar() {
+  const bar = felt("stedBar");
+  const vv = window.visualViewport;
+  const aktiv = document.activeElement;
+  const iSkjemaet = !felt("stedSkjema").hidden && !!aktiv &&
+    felt("stedSkjema").contains(aktiv) && TASTATUR_FELT.indexOf(aktiv.tagName) > -1;
+  const vis = !!vv && iSkjemaet && tastaturOppe(window.innerHeight, vv.height);
+  bar.hidden = !vis;
+  if (!vis) return;
+  bar.style.bottom = "auto";
+  bar.style.top = tastaturBarTopp(vv.offsetTop, vv.height, bar.offsetHeight) + "px";
+}
+
+// Feltet du skriver i skal ikke ende bak linja: iOS ruller feltet fram til
+// tastaturet, ikke til linja som nå står over det.
+function holdFeltSynlig() {
+  const aktiv = document.activeElement;
+  if (aktiv && aktiv.scrollIntoView) aktiv.scrollIntoView({ block: "center" });
+}
+
+felt("stedSkjema").addEventListener("focusin", () => {
+  clearTimeout(tastaturSkjul);
+  oppdaterTastaturBar();
+  // Tastaturet kommer med en animasjon; `visualViewport` sier fra når den er
+  // ferdig, og da settes linja på plass igjen — men feltet rulles først da.
+  setTimeout(() => { oppdaterTastaturBar(); holdFeltSynlig(); }, 350);
+});
+// En utsatt skjuling: trykket på linja kan i seg selv ta fokus fra feltet, og
+// en linje som forsvinner før klikket kommer, har gjort trykket om til intet.
+felt("stedSkjema").addEventListener("focusout", () => {
+  clearTimeout(tastaturSkjul);
+  tastaturSkjul = setTimeout(oppdaterTastaturBar, 250);
+});
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", oppdaterTastaturBar);
+  window.visualViewport.addEventListener("scroll", oppdaterTastaturBar);
+}
+// Trykk på linja skal ikke ta fokus fra feltet (desktop og Android).
+felt("stedBar").addEventListener("mousedown", (e) => e.preventDefault());
+felt("stedBarFerdig").addEventListener("click", () => {
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  oppdaterTastaturBar();
+});
+felt("stedBarLagre").addEventListener("click", () => {
+  // Tastaturet ned først: da står meldingen under skjemaet i det du ser, ikke
+  // bak noe. Selve lagringen er knappen i skjemaet — ett sted, ikke to.
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  felt("stedLagre").click();
+  setTimeout(() => felt("stedMelding").scrollIntoView({ block: "center" }), 350);
+});
 ["stedLat", "stedLon"].forEach((id) => felt(id).addEventListener("input", synkBy));
 felt("stedSok").addEventListener("click", sokSted);
 felt("stedSokAdresse").addEventListener("click", sokAdresseSted);

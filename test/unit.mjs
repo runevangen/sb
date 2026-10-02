@@ -24,7 +24,8 @@ import { tmpdir } from "node:os";
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
          foldTekst, treffScore, rangerTreff, antallLoftet, listeTekst,
          BILDE_BRUK, bildeFor, renSrcset, renSizes, renMaal, kategoriVisningsnavn,
-         sveipRetning, sveipMal, sveipStartOk, sveipFullfor } from "../lib.js";
+         sveipRetning, sveipMal, sveipStartOk, sveipFullfor,
+         tastaturOppe, tastaturBarTopp, TASTATUR_MINST } from "../lib.js";
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          SPORTER, sportFor, tolkDatasett, kommendeKamper, kallPerSport, DOGNKVOTE,
          ligaForKategori,
@@ -4365,6 +4366,29 @@ ok("installer: iPhone far ikke Androids ord, og Android ikke iPhones",
 ok("installer: ingen veiledning uten en telefon a veilede",
    installVeiledning("prompt") === null && installVeiledning("ingen") === null &&
    installVeiledning("installert") === null && installVeiledning() === null);
+
+/* ---------------- tastaturet i portalen ---------------- */
+
+// iOS krymper den visuelle visningen, ikke layoutvisningen. Forskjellen er
+// tastaturet — og en adresselinje som glir er langt under terskelen.
+ok("tastatur: 300 px mindre synlig hoyde er et tastatur", tastaturOppe(800, 500) === true);
+ok("tastatur: like hoyt er ingenting a legge noe over", tastaturOppe(800, 800) === false);
+ok("tastatur: en adresselinje er ikke et tastatur", tastaturOppe(800, 740) === false);
+ok("tastatur: grensa ligger pa TASTATUR_MINST",
+   tastaturOppe(800, 800 - TASTATUR_MINST) === true && tastaturOppe(800, 800 - TASTATUR_MINST + 1) === false);
+ok("tastatur: manglende eller tullete tall gir nei, ikke et gjett",
+   tastaturOppe(undefined, 500) === false && tastaturOppe(800, undefined) === false &&
+   tastaturOppe(0, 0) === false && tastaturOppe(800, 0) === false && tastaturOppe("x", "y") === false);
+ok("tastatur: linja ligger med nedre kant i bunnen av det som sees",
+   tastaturBarTopp(0, 500, 56) === 444);
+ok("tastatur: og folger med nar den visuelle visningen er rullet",
+   tastaturBarTopp(120, 500, 56) === 564);
+ok("tastatur: aldri over toppen av siden", tastaturBarTopp(0, 30, 56) === 0);
+ok("tastatur: brokdeler rundes, sa kanten ikke flimrer mellom to piksler",
+   tastaturBarTopp(0.4, 500.3, 56) === 445);
+ok("tastatur: mangler tallene, havner linja ikke i NaN",
+   Number.isFinite(tastaturBarTopp(undefined, undefined, undefined)) &&
+   tastaturBarTopp(undefined, 500, 56) === 444);
 
 /* ---------------- rapport ---------------- */
 
