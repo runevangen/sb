@@ -25,6 +25,7 @@ import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug,
          foldTekst, treffScore, rangerTreff, antallLoftet, listeTekst,
          BILDE_BRUK, bildeFor, renSrcset, renSizes, renMaal, kategoriVisningsnavn,
          sveipRetning, sveipMal, sveipStartOk, sveipFullfor,
+         sveipFart, sveipGlidMs, SVEIP_ANDEL, SVEIP_FART, SVEIP_MS, SVEIP_MS_MIN,
          tastaturOppe, tastaturBarTopp, TASTATUR_MINST } from "../lib.js";
 import { LIGAER, ligaFor, sesongFor, tolkTabell, apiFeil, kallPerDogn, LEVETID,
          SPORTER, sportFor, tolkDatasett, kommendeKamper, kallPerSport, DOGNKVOTE,
@@ -1751,10 +1752,43 @@ ok("og den andre veien er det ingen side",
 ok("et sveip som starter i kanten er telefonens",
   !sveipStartOk(10, 0, 390) && !sveipStartOk(380, 0, 390) && sveipStartOk(24, 0, 390) && sveipStartOk(366, 0, 390));
 ok("kanten males fra flata, ikke fra vinduet", sveipStartOk(130, 100, 490) && !sveipStartOk(110, 100, 490));
-ok("langt nok fullforer, selv sakte", sveipFullfor(-120, 390, 2000) && sveipFullfor(120, 390, 2000));
-ok("kort og sakte gar tilbake", !sveipFullfor(-60, 390, 2000) && !sveipFullfor(-60, 390, 0));
-ok("kort og rask fullforer", sveipFullfor(-60, 390, 80) && !sveipFullfor(-30, 390, 20));
+// «Man ma dra langt for den slar til» (#202): lengde og fart er to veier inn,
+// og farten er farten ved slipp — ikke snittet over hele sveipet.
+ok("langt nok fullforer uten fart", sveipFullfor(-90, 390, 0) && sveipFullfor(90, 390, 0));
+ok("og grensa ligger pa SVEIP_ANDEL av bredden",
+  sveipFullfor(-390 * SVEIP_ANDEL, 390, 0) && !sveipFullfor(-390 * SVEIP_ANDEL + 1, 390, 0));
+ok("kort og uten fart gar tilbake", !sveipFullfor(-60, 390, 0) && !sveipFullfor(-60, 390, -0.05));
+ok("kort og rask fullforer, mot venstre og mot hogre", sveipFullfor(-40, 390, -0.6) && sveipFullfor(40, 390, 0.6));
+ok("grensa for fart ligger pa SVEIP_FART",
+  sveipFullfor(-40, 390, -SVEIP_FART) && !sveipFullfor(-40, 390, -SVEIP_FART + 0.01));
+ok("men for kort er for kort, selv med fart", !sveipFullfor(-15, 390, -2));
+// Tallene selv, ikke bare konstantene: det er dem leseren kjenner pa fingeren.
+// 30 px med en rolig flikk (0.4 px/ms) skal sla til; for #202 trengte den 40 px og 0.5.
+ok("30 px med en rolig flikk slar til", sveipFullfor(-30, 390, -0.4) && sveipFullfor(30, 390, 0.4));
+ok("80 px, 20 prosent av en telefon, slar til uten fart", sveipFullfor(-80, 390, 0) && !sveipFullfor(-70, 390, 0));
+ok("en finger som snudde i slippet har ombestemt seg", !sveipFullfor(-40, 390, 0.8) && !sveipFullfor(40, 390, -0.8));
+ok("uten fart oppgitt er det bare lengden som teller", !sveipFullfor(-40, 390) && !sveipFullfor(-40, 390, NaN) && sveipFullfor(-120, 390, undefined));
 ok("uten bredde fullfores ingenting", !sveipFullfor(-500, 0, 10) && !sveipFullfor(-500, NaN, 10));
+// Farten ved slipp, over de siste 100 ms.
+ok("fart: 45 px pa 30 ms mot venstre er negativ og rask",
+  Math.abs(sveipFart([{ t: 1000, x: 200 }, { t: 1030, x: 155 }]) - (-1.5)) < 1e-9);
+ok("fart: bare de siste 100 ms teller, ikke et langsomt oppstart",
+  Math.abs(sveipFart([{ t: 0, x: 300 }, { t: 400, x: 290 }, { t: 450, x: 250 }, { t: 480, x: 200 }]) - (-90 / 80)) < 1e-9);
+ok("fart: en finger som sto stille for slippet har ingen fart",
+  sveipFart([{ t: 0, x: 300 }, { t: 40, x: 200 }, { t: 600, x: 200 }]) === 0);
+ok("fart: to hendelser i samme bilde er stoy, ikke en finger",
+  sveipFart([{ t: 100, x: 300 }, { t: 103, x: 100 }]) === 0 && sveipFart([{ t: 5, x: 1 }, { t: 5, x: 99 }]) === 0);
+ok("fart: for lite a male pa gir null, ikke et unntak",
+  sveipFart([]) === 0 && sveipFart([{ t: 1, x: 1 }]) === 0 && sveipFart(null) === 0 && sveipFart(undefined) === 0 &&
+  sveipFart([{ t: NaN, x: 1 }, { t: NaN, x: 2 }]) === 0);
+ok("fart: farten til et sveip fra venstre mot hogre er positiv",
+  sveipFart([{ t: 0, x: 100 }, { t: 20, x: 140 }]) > 0);
+// Glidet etter slipp varer etter hvor langt det er igjen.
+ok("glid: hele veien igjen er det lengste, men aldri over SVEIP_MS", sveipGlidMs(390, 390) === SVEIP_MS && sveipGlidMs(900, 390) === SVEIP_MS);
+ok("glid: nesten framme er kort, men aldri et hopp", sveipGlidMs(5, 390) === SVEIP_MS_MIN && sveipGlidMs(0, 390) === SVEIP_MS_MIN);
+ok("glid: en strekning mellom de to gir en tid mellom de to", sveipGlidMs(300, 390) > SVEIP_MS_MIN && sveipGlidMs(300, 390) < SVEIP_MS);
+ok("glid: ukjent bredde eller strekning gir det korteste", sveipGlidMs(100, 0) === SVEIP_MS_MIN && sveipGlidMs(NaN, 390) === SVEIP_MS_MIN);
+ok("glid: kortere enn de 220 ms som sto der for", SVEIP_MS < 220);
 // **Sperra gjelder a LAGE en konto og a VISE et navn, ikke a komme inn.**
 // Den som alt har en konto med en adresse som navn, maa fortsatt kunne
 // logge inn — ellers laaste regelen ute akkurat dem den skulle hjelpe.

@@ -235,7 +235,14 @@ tjenesten uenige om en regel, får leseren en feilmelding som ikke stemmer.
   en klasse), ikke i et felt, ikke med mus eller penn, ikke med menyen åpen, og
   et skrått sveip er rulling som skled. Loddrett rulling og klyping er
   nettleserens: `touch-action: pan-y pinch-zoom` står på rullefeltene, for
-  `touch-action` regnes bare opp til nærmeste rullefelt. **Og klikket etter et
+  `touch-action` regnes bare opp til nærmeste rullefelt. **Det skal føles lett,
+  ikke tungt** (#202, testet på telefon: «man må dra langt, og overgangen er
+  treg»): det slår til etter en femtedel av bredden, eller etter 24 px med en
+  rolig flikk (0,3 px/ms), og farten er **farten i det fingeren løftes** — de
+  siste 100 ms — ikke snittet over hele sveipet, som straffet et hvil før dra.
+  Glidet etter slipp er 80–160 ms etter hvor mye som er igjen. Tallene står i
+  `lib.js` og er målt i Chromium, **ikke på en iPhone**: om de føles riktige, er
+  det bare en telefon som kan si. **Og klikket etter et
   sveip er ikke et trykk:** det kommer i det fingeren lettes, før animasjonen er
   ferdig, så `fersk` settes ved slipp, ikke etter glidet. `prefers-reduced-motion`
   gir et hopp i stedet for glid. **Målt i Chromium med pekerhendelser, ikke på en

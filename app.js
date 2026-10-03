@@ -5,7 +5,7 @@
 
 import { safeUrl, videoUrl, postDate, timeAgo, feedSignature, internSlug, rangerTreff, listeTekst,
          bildeFor, renSrcset, renSizes, renMaal, kategoriVisningsnavn,
-         sveipRetning, sveipMal, sveipStartOk, sveipFullfor, antallLoftet }
+         sveipRetning, sveipMal, sveipStartOk, sveipFullfor, sveipFart, sveipGlidMs, antallLoftet }
   from "./lib.js";
 import { LIGAER, tolkFotballHash, fotballHash, tolkKamplenke,
          ligaForKategori, DEL_NAVN } from "./fotball-data.js";
@@ -1801,8 +1801,7 @@ function skjulSveipHint() {
   const feed = document.getElementById("feed");
   const fotball = document.getElementById("fotball");
   const flater = { nyheter: feed, fotball };
-  const MS = 220;
-  let s = null;   // { id, x0, y0, t0, last, laas, mal, fra, bredde }
+  let s = null;   // { id, x0, y0, pkt, last, laas, mal, fra, bredde }
   let fersk = 0;  // nar fingeren sist slapp et sveip: klikket som folger er ikke et trykk
 
   const rolig = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1828,7 +1827,7 @@ function skjulSveipHint() {
   }
 
   function sett(el, px, glid) {
-    el.style.transition = glid ? `transform ${rolig() ? 0 : MS}ms ease-out` : "none";
+    el.style.transition = glid ? `transform ${glid}ms ease-out` : "none";
     el.style.transform = `translate3d(${px}px,0,0)`;
   }
 
@@ -1838,7 +1837,7 @@ function skjulSveipHint() {
     const r = flate.getBoundingClientRect();
     if (!sveipStartOk(e.clientX, r.left, r.right)) return;
     if (rullerSidelengs(e.target)) return;
-    s = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: e.timeStamp, last: 0,
+    s = { id: e.pointerId, x0: e.clientX, y0: e.clientY, pkt: [], last: 0,
           laas: "vent", mal: null, fra: aktivVisning, bredde: r.width };
   }
 
@@ -1861,7 +1860,9 @@ function skjulSveipHint() {
     const retning = s.mal === "fotball" ? -1 : 1;
     const d = Math.max(0, Math.min(s.bredde, dx * retning)) * retning;
     s.last = d;
-    s.tid = e.timeStamp;
+    // De siste punktene, til farten i slippet. Tolv er mer enn vinduet trenger.
+    s.pkt.push({ t: e.timeStamp, x: e.clientX });
+    if (s.pkt.length > 12) s.pkt.shift();
     sett(flater[s.fra], d, false);
     sett(flater[s.mal], d - retning * s.bredde, false);
   }
@@ -1870,14 +1871,20 @@ function skjulSveipHint() {
     if (!s || e.pointerId !== s.id) return;
     const naa = s;
     if (naa.laas !== "vannrett") { s = null; return; }
+    // Slippet er selv et punkt: sto fingeren stille for den lettet, er farten
+    // null, ikke farten den hadde for en halv sekund siden.
+    if (e.type === "pointerup") naa.pkt.push({ t: e.timeStamp, x: e.clientX });
     const fullfor = e.type === "pointerup"
-      && sveipFullfor(naa.last, naa.bredde, (naa.tid || e.timeStamp) - naa.t0);
+      && sveipFullfor(naa.last, naa.bredde, sveipFart(naa.pkt));
     // Klikket kommer samtidig med at fingeren lettes, for animasjonen er ferdig.
     fersk = Date.now();
     const retning = naa.mal === "fotball" ? -1 : 1;
+    // Glidet varer etter hvor langt det er igjen, ikke like lenge hver gang.
+    const rest = fullfor ? naa.bredde - Math.abs(naa.last) : Math.abs(naa.last);
+    const ms = rolig() ? 0 : sveipGlidMs(rest, naa.bredde);
     // Ferdig-tilstanden i to trinn: glid ut, og bytt sa for ekte.
-    sett(flater[naa.fra], fullfor ? retning * naa.bredde : 0, true);
-    sett(flater[naa.mal], fullfor ? 0 : -retning * naa.bredde, true);
+    sett(flater[naa.fra], fullfor ? retning * naa.bredde : 0, ms);
+    sett(flater[naa.mal], fullfor ? 0 : -retning * naa.bredde, ms);
     s = { ...naa, id: -1, laas: "glir" };   // en ny finger far vente til vi er ferdige
     setTimeout(() => {
       const mal = naa.mal;
@@ -1887,7 +1894,7 @@ function skjulSveipHint() {
       } else {
         flater[mal].hidden = true;
       }
-    }, rolig() ? 0 : MS + 20);
+    }, ms ? ms + 20 : 0);
   }
 
   flate.addEventListener("pointerdown", start);

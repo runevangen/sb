@@ -58,12 +58,21 @@ kunne testes i Node på millisekunder.
 - **`antallLoftet` er det `rangerTreff` faktisk løfter, talt med samme
   poengsum og terskel.** Linja «Brann øverst · 1 sak» i feeden leser det:
   ett sted å regne, så linja og lista aldri blir uenige om hva som er løftet.
-- **`sveipRetning`, `sveipMal`, `sveipStartOk`, `sveipFullfor` er sveipets
-  beslutninger, uten finger.** Hvilken vei (vannrett må være 1,5 ganger
-  loddrett), hvilken side fingeren leder til, om starten er langt nok fra
-  kanten, og om det er langt eller raskt nok til å fullføres. DOM-en som
-  bruker dem står i `app.js`; tallene (`SVEIP_*`) står her, og flyttes de, må
-  CLAUDE.md-regelen om sveipet leses på nytt.
+- **`sveipRetning`, `sveipMal`, `sveipStartOk`, `sveipFullfor`, `sveipFart`
+  og `sveipGlidMs` er sveipets beslutninger, uten finger.** Hvilken vei
+  (vannrett må være 1,5 ganger loddrett), hvilken side fingeren leder til, om
+  starten er langt nok fra kanten, om det er langt eller raskt nok til å
+  fullføres, hvor fort fingeren var da den slapp, og hvor lenge glidet skal
+  vare. DOM-en som bruker dem står i `app.js`; tallene (`SVEIP_*`) står her, og
+  flyttes de, må CLAUDE.md-regelen om sveipet leses på nytt.
+  **`sveipFart` måles over de siste 100 ms før slipp, ikke over hele sveipet.**
+  Snittet fra fingeren traff skjermen straffet hvert sekund leseren ventet for
+  hen begynte, og et kort, raskt dra sto som tregt (#202). Slippet er selv et
+  punkt: sto fingeren stille, er farten null. En strekning under 8 ms sier
+  ingenting — to hendelser i samme bilde er støy.
+  **`sveipFullfor` tar farten med fortegn**, og en finger som snudde i slippet
+  har ombestemt seg. **`sveipGlidMs` regner glidet etter hvor mye som er igjen**
+  (80–160 ms): 220 ms uansett var det som gjorde overgangen tung.
 - **`tastaturOppe` og `tastaturBarTopp` er lagre-linja i portalen, uten
   telefon.** iOS krymper den visuelle visningen (`visualViewport`) og lar
   layoutvisningen (`innerHeight`) stå; forskjellen er tastaturet. `TASTATUR_MINST`
