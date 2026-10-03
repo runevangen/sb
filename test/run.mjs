@@ -275,7 +275,8 @@ function mockFetch(saker) {
 /* ---------------- 1. feed, tidsstempler, annonser, XSS i tittel ---------------- */
 
 const SAK_1 = kjor("feed", FELLES + `
-  var saker = lagSaker(12);
+  // Første side er PER_SIDE (30) saker: med færre ville «Vis flere» ikke stå der (#201).
+  var saker = lagSaker(30);
   // Slik WordPress returnerer en tittel som bokstavelig inneholder en img-tag.
   saker[0].title.rendered = "&lt;img src=x onerror=&quot;document.body.setAttribute('pwned','ja')&quot;&gt; Toppsak";
 
@@ -326,9 +327,19 @@ const SAK_1 = kjor("feed", FELLES + `
     var tid = document.querySelector(".hero-overlay time");
     ok("tidsstempel bruker date_gmt", tid.textContent === "2t siden", tid.textContent);
 
-    ok("annonse etter hver fjerde sak",
-       sekvens() === "topp sak sak sak ledig-portrett sak sak sak sak ledig-bred sak sak sak sak mer",
+    var tegn = sekvens().split(" ");
+    ok("forsiden viser tretti saker for «Vis flere saker» (#201)",
+       tegn.filter(function (n) { return n === "topp" || n === "sak"; }).length === 30 && tegn[tegn.length - 1] === "mer",
        sekvens());
+    ok("og starter med de to første plassene",
+       sekvens().indexOf("topp sak sak sak ledig-portrett sak sak sak sak ledig-bred sak") === 0, sekvens());
+    // Toppsaken teller som den første: en plass etter hver fjerde sak, hele veien.
+    var siden = 0, riktig = true;
+    tegn.forEach(function (n) {
+      if (n === "topp" || n === "sak") siden += 1;
+      else if (n !== "mer") { if (siden !== 4) riktig = false; siden = 0; }   // en annonse, i hvilken som helst fasong
+    });
+    ok("annonse etter hver fjerde sak", riktig && tegn.filter(function (n) { return n !== "topp" && n !== "sak" && n !== "mer"; }).length === 7, sekvens());
 
     // Den forste plassen selger plassen. Sju spoker sto forst i rotasjonen
     // til 21. september 2026, og da var det forste en leser motte en vits —
@@ -367,7 +378,7 @@ const SAK_1 = kjor("feed", FELLES + `
 // samme skjerm. Tre like bokser leses som stoy; tre ulike leses som tre
 // plasser. Testen blar gjennom feeden til alle tre har vaert innom.
 const SAK_1B = kjor("annonse-varianter", FELLES + `
-  // Hver side gir tolv nye saker, sa «Vis flere» kan trykkes sa mange
+  // Hver side gir tretti nye saker (PER_SIDE), sa «Vis flere» kan trykkes sa mange
   // ganger vi trenger for a komme forbi alle annonseplassene.
   var side = 0;
   window.fetch = function (u) {
@@ -377,7 +388,7 @@ const SAK_1B = kjor("annonse-varianter", FELLES + `
     else if (u.indexOf("_fields=") > -1) svar = [];
     else {
       side += 1;
-      svar = lagSaker(12).map(function (p, i) {
+      svar = lagSaker(30).map(function (p, i) {
         p.id = side * 100 + i; p.slug = "s" + side + "-" + i; return p;
       });
     }
@@ -984,11 +995,11 @@ const SAK_3 = kjor("oppdatering", FELLES + `
 /* ---------------- 4. ruting, paginering og interne lenker ---------------- */
 
 const SAK_4 = kjor("ruting", FELLES + `
-  var saker = lagSaker(12);
+  var saker = lagSaker(30);
   saker[0].content.rendered =
     "<p>Se ogsa <a href=\\"https://sportsbibelen.no/annen-sak/\\">denne saken</a> " +
     "og <a href=\\"https://vg.no/noe/\\">en ekstern</a>.</p>";
-  var side2 = lagSaker(12).map(function (p, i) { p.id = 100 + i; p.slug = "side2-" + i; return p; });
+  var side2 = lagSaker(30).map(function (p, i) { p.id = 100 + i; p.slug = "side2-" + i; return p; });
 
   window.__kall = [];
   window.fetch = function (u) {
@@ -1020,6 +1031,10 @@ const SAK_4 = kjor("ruting", FELLES + `
       var etterSider = feed.querySelectorAll(".row").length;
       ok("Vis flere legger til flere saker", etterSider > forSider,
          forSider + " -> " + etterSider);
+      ok("feeden ber om tretti saker per side, og side 2 er den neste av tretti (#201)",
+         window.__kall.some(function (u) { return u.indexOf("per_page=30") > -1 && u.indexOf("_embed=1") > -1 && u.indexOf("&page=") === -1; }) &&
+         window.__kall.filter(function (u) { return u.indexOf("page=2") > -1; }).every(function (u) { return u.indexOf("per_page=30") > -1; }),
+         window.__kall.join(" | "));
       ok("henter side 2, ikke side 1 pa nytt",
          window.__kall.filter(function (u) { return u.indexOf("page=2") > -1; }).length === 1);
       ok("paginering beholder rulleposisjonen", feed.scrollTop > 100, feed.scrollTop);

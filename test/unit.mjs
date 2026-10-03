@@ -1738,6 +1738,21 @@ ok("andre kategorier star som de kommer",
   kategoriVisningsnavn("Fotballtransfers") === "Fotballtransfers");
 ok("og tomt eller ukjent gir ikke et unntak",
   kategoriVisningsnavn("") === "" && kategoriVisningsnavn(null) === "" && kategoriVisningsnavn(undefined) === "");
+// Forsiden henter tretti saker (#201), og tallet star ETT sted: spørringen,
+// endringssjekken og «finnes det flere?» leser alle PER_SIDE. Et tall skrevet
+// inn i en av dem ville latt siste side si at det ikke finnes mer enn den gjør.
+{
+  const kilde = readFileSync(new URL("../app.js", import.meta.url), "utf8");
+  const per = kilde.match(/const PER_SIDE = (\d+);/);
+  ok("PER_SIDE er tretti", !!per && Number(per[1]) === 30, per && per[1]);
+  ok("spørringen og endringssjekken leser PER_SIDE, ingen egne tall",
+     /WP_QUERY = "\?_embed=1&per_page=" \+ PER_SIDE/.test(kilde) && /SIG_QUERY = "\?per_page=" \+ PER_SIDE/.test(kilde) &&
+     // Kategoriene (20) og de relaterte (3) har sine egne, og er ikke feeden.
+     (kilde.match(/per_page=\d+/g) || []).every((q) => q === "per_page=20" || q === "per_page=3"),
+     (kilde.match(/per_page=\d+/g) || []).join(","));
+  ok("og «finnes det flere?» teller mot samme tall", (kilde.match(/>= PER_SIDE/g) || []).length === 2);
+}
+
 // Sveip mellom nyheter og fotball (1. oktober 2026): beslutningene er rene.
 ok("under ti piksler er det for tidlig a si hvilken vei", sveipRetning(6, 3) === "vent" && sveipRetning(0, 0) === "vent");
 ok("klart mer sideveis enn opp/ned er et vannrett sveip",

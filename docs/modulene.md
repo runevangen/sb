@@ -774,6 +774,12 @@ portalen — en leser har ingen nytte av den.
   ingenting.
 - **En knapp uten mål blir ren tekst.** Mangler Messenger-brukernavnet, er
   en død knapp verre enn en setning.
+- **`PER_SIDE` er sidestørrelsen, og den står ett sted (#201).** Spørringen
+  (`WP_QUERY`), endringssjekken (`SIG_QUERY`) og «finnes det flere?» leser
+  alle tallet. Et tall skrevet inn i en av dem lar siste side si at det ikke
+  finnes mer enn den gjør. En vakt i `unit.mjs` leser kilden. Annonsene kommer
+  etter hver fjerde sak uansett sidestørrelse, så første side har sju plasser
+  mot to da den var tolv saker.
 - **Feeden bygges om i sin helhet, aldri lappes på.** Da forblir
   annonseplasseringen én regel og ikke to kodeveier.
 - **Bakgrunnsoppdateringen skal aldri kunne fryse feeden.** Klarer vi ikke

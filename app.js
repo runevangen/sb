@@ -25,7 +25,15 @@ import { VERSJONER } from "./versjoner.js";
 
 // Bytt WP_HOST til din egen WordPress-side når som helst.
 const WP_HOST  = "https://sportsbibelen.no";
-const WP_QUERY = "?_embed=1&per_page=12&orderby=date&order=desc";
+
+// Hvor mange saker forsiden viser for «Vis flere saker» (#201). Var tolv, og
+// da var det en knapp å trykke på etter noen få trykk med tommelen. Tretti
+// gir en forside å rulle i. Stå ETT sted: spørringen, endringssjekken og
+// «finnes det flere?» må mene det samme tallet, ellers sier siste side at
+// det ikke finnes mer enn den gjør. Bildene lenger ned lastes sent
+// (`loading="lazy"` på radene), så det er brødteksten som veier, ikke bildene.
+const PER_SIDE = 30;
+const WP_QUERY = "?_embed=1&per_page=" + PER_SIDE + "&orderby=date&order=desc";
 const WP_URL   = WP_HOST + "/wp-json/wp/v2/posts" + WP_QUERY;
 
 // Feeden hentes fra første kilde som svarer med gyldig JSON.
@@ -42,7 +50,7 @@ function catParam(categoryId) {
 }
 
 // Et sok sorteres etter relevans hos WordPress, ikke dato. Ellers ville
-// de tolv nyeste sakene som nevner laget i forbifarten fylt forste side,
+// de nyeste sakene som nevner laget i forbifarten fylt forste side,
 // mens saken som handler om laget la pa side to. Innenfor siden legger
 // rangerTreff() tittelen overst (se lib.js).
 function sokParam(q) {
@@ -58,9 +66,9 @@ function postSources(categoryId, sideNr) {
 }
 
 // Samme vindu som feeden, men kun id og endringstidspunkt. _fields kutter
-// svaret fra full brodtekst for tolv saker til noen fa hundre byte, sa
+// svaret fra full brodtekst for en hel side saker til noen fa hundre byte, sa
 // dette er billig nok til a kjore hvert femte minutt.
-const SIG_QUERY = "?per_page=12&orderby=date&order=desc&_fields=id,modified_gmt";
+const SIG_QUERY = "?per_page=" + PER_SIDE + "&orderby=date&order=desc&_fields=id,modified_gmt";
 
 function signatureSources(categoryId) {
   return sourcesFor(sokParam(SIG_QUERY + catParam(categoryId)));
@@ -101,7 +109,6 @@ let side = 1;
 let flereFinnes = true;
 let sokeord = "";
 let harPushet = false;
-const PER_SIDE = 12;
 const WP_VERT = new URL(WP_HOST).hostname;       // feedens tilstand ved forrige vellykkede lasting
 let menuLoaded = false;
 let kategorier = null;          // hentet meny, sa den kan tegnes pa nytt uten a hentes
@@ -385,7 +392,7 @@ async function fetchList(url, extra) {
 // fa bygge feeden pa nytt.
 const TOP_THRESHOLD = 40;
 
-// Henter kun id og endringstidspunkt for de samme tolv sakene og
+// Henter kun id og endringstidspunkt for de samme sakene og
 // sammenligner med forrige lasting. Klarer vi ikke å sjekke, sier vi at
 // noe kan være nytt og henter alt som før — sjekken skal aldri kunne
 // fryse feeden fast.
@@ -415,7 +422,7 @@ async function loadFeed(options) {
     // langt nede i en liste som har endret seg under føttene på dem.
     if (feed.scrollTop > TOP_THRESHOLD) return;
 
-    // Er ingenting endret, er det ingen grunn til å hente tolv saker med
+    // Er ingenting endret, er det ingen grunn til å hente en hel side med
     // full brødtekst på nytt.
     if (await nothingNew()) return;
   }
@@ -461,7 +468,7 @@ async function loadFeed(options) {
 /* ---------- annonser ---------- */
 
 // Én annonseplass etter hver fjerde sak, med toppsaken talt som den
-// første. Feeden henter tolv saker, så det gir to plasser per lasting.
+// første. Feeden henter PER_SIDE saker, så det gir én plass per fjerde sak.
 const ADS_EVERY = 4;
 
 // Messenger-brukernavnet til den som selger annonsene — det som står

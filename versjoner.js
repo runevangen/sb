@@ -29,6 +29,12 @@
 // allerede har sett. En vakt i `unit.mjs` holder rekkefølgen mellom dagene.
 export const VERSJONER = [
   {
+    versjon: "2026.10.03",
+    endringer: [
+      { hva: "Forsiden viser tretti saker før «Vis flere saker», mot tolv før — så det er mer å rulle i uten å trykke. Bildene lenger ned lastes etter hvert, som før. (#201)" },
+    ],
+  },
+  {
     versjon: "2026.10.01",
     endringer: [
       { hva: "Innloggingen: etter at du har skrevet navnet, står markøren i PIN-feltet, og tastaturet blir oppe på iPhone. Enter i PIN-feltet går videre til «Gjenta» når du lager en ny PIN. «Admin» i menyen åpner et passordfelt der, med tastaturet oppe, og tar deg inn i portalen når du trykker Enter." },
