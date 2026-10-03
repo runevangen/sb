@@ -29,6 +29,12 @@
 // allerede har sett. En vakt i `unit.mjs` holder rekkefølgen mellom dagene.
 export const VERSJONER = [
   {
+    versjon: "2026.10.03",
+    endringer: [
+      { hva: "Sveipet mellom nyhetene og Tabeller og kamper er lettere: det slår til etter en femtedel av skjermbredden (før nesten en tredjedel), og et kort, raskt sveip er nok. Farten måles der fingeren løftes, ikke over hele sveipet, så et hvil før du begynner ikke teller mot deg. Glidet etter slipp er kortere, og kortere jo mindre som er igjen.", issue: 202 },
+    ],
+  },
+  {
     versjon: "2026.10.01",
     endringer: [
       { hva: "Innloggingen: etter at du har skrevet navnet, står markøren i PIN-feltet, og tastaturet blir oppe på iPhone. Enter i PIN-feltet går videre til «Gjenta» når du lager en ny PIN. «Admin» i menyen åpner et passordfelt der, med tastaturet oppe, og tar deg inn i portalen når du trykker Enter." },

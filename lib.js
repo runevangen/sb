@@ -337,9 +337,13 @@ export function kategoriVisningsnavn(navn) {
 
 export const SVEIP_KANT = 24;       // px fra skjermkanten som ikke teller som start
 export const SVEIP_FORSTE = 10;     // px for fingeren har sagt hvilken vei den skal
-export const SVEIP_ANDEL = 0.3;     // brokdel av bredden som er nok uten fart
-export const SVEIP_FART = 0.5;      // px/ms som er nok etter 40 px
-export const SVEIP_MINST = 40;      // px som ma til for at fart teller
+export const SVEIP_ANDEL = 0.2;     // brokdel av bredden som er nok uten fart
+export const SVEIP_FART = 0.3;      // px/ms ved slipp som er nok etter SVEIP_MINST
+export const SVEIP_MINST = 24;      // px som ma til for at fart teller
+export const SVEIP_VINDU = 100;     // ms bakover fra slipp som farten males over
+export const SVEIP_SPENN = 8;       // ms: kortere enn et bilde sier ikke noe om fart
+export const SVEIP_MS = 160;        // lengste glid etter slipp; kortere for en kortere vei
+export const SVEIP_MS_MIN = 80;     // kortere enn dette ser ut som et hopp
 
 // Er dette et vannrett sveip, et loddrett (rulling), eller for tidlig a si?
 // Vannrett krever klart mer sideveis enn opp/ned: et skratt sveip er en
@@ -365,13 +369,52 @@ export function sveipStartOk(x, venstre, hoyre) {
   return x - venstre >= SVEIP_KANT && hoyre - x >= SVEIP_KANT;
 }
 
+// Farten fingeren hadde da den slapp: px/ms, med fortegn (mot venstre er
+// negativ), regnet over de siste SVEIP_VINDU ms. `punkter` er {t, x} eldst
+// forst, og siste er slippet selv.
+//
+// Den ble regnet over HELE sveipet for: lengde fra start til slipp, delt pa
+// tiden siden fingeren traff skjermen. Da straffet et sveip hver
+// ventesekund for det startet, og et kort, raskt dra etter et kort hvil sto
+// som tregt. «Man ma dra langt for den slar til» (#202). Farten i slippet er
+// den leseren kjenner.
+//
+// En strekning kortere enn SVEIP_SPENN sier ingenting: to hendelser i samme
+// bilde gir en fart som er stoy, ikke en finger.
+export function sveipFart(punkter) {
+  if (!Array.isArray(punkter) || punkter.length < 2) return 0;
+  const ny = punkter[punkter.length - 1];
+  if (!(Number(ny && ny.t) >= 0)) return 0;
+  let eldst = ny;
+  for (let i = punkter.length - 2; i >= 0; i--) {
+    const p = punkter[i];
+    if (!(Number(p && p.t) >= 0) || ny.t - p.t > SVEIP_VINDU) break;
+    eldst = p;
+  }
+  const dt = ny.t - eldst.t;
+  if (!(dt >= SVEIP_SPENN)) return 0;
+  const v = (ny.x - eldst.x) / dt;
+  return Number.isFinite(v) ? v : 0;
+}
+
 // Skal sveipet fullfores nar fingeren slippes, eller gar visningen tilbake?
-// Langt nok, eller kort og raskt.
-export function sveipFullfor(dx, bredde, ms) {
+// Langt nok, eller kort og raskt — og raskt MOT sidens retning: en finger som
+// snudde i det den slapp, ombestemte seg.
+export function sveipFullfor(dx, bredde, fart) {
   const lengde = Math.abs(dx);
   if (!(bredde > 0)) return false;
   if (lengde >= bredde * SVEIP_ANDEL) return true;
-  return lengde >= SVEIP_MINST && ms > 0 && lengde / ms >= SVEIP_FART;
+  const f = Number(fart);
+  return lengde >= SVEIP_MINST && f * dx > 0 && Math.abs(f) >= SVEIP_FART;
+}
+
+// Hvor lenge glidet etter slipp skal vare. En visning som har igjen en tiendedel
+// av veien skal ikke bruke like lang tid som en som har hele: 220 ms uansett
+// var det som gjorde overgangen tung (#202).
+export function sveipGlidMs(rest, bredde) {
+  if (!(bredde > 0)) return SVEIP_MS_MIN;
+  const ms = Math.round(SVEIP_MS * Math.abs(Number(rest) || 0) / bredde);
+  return Math.max(SVEIP_MS_MIN, Math.min(SVEIP_MS, ms));
 }
 
 // ---------- Tastaturet i portalen ----------

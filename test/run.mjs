@@ -8216,6 +8216,113 @@ const SAK_26 = kjor("sveip", FELLES + FOTBALL + `
   }); });
 `);
 
+// «Man ma dra langt for den slar til, og overgangen er treg» (#202). Her gar
+// tiden for ekte: farten males ved slipp, og kjøres ikke i samme bilde.
+const SAK_26B = kjor("sveip-fart", FELLES + FOTBALL + `
+  var saker = lagSaker(12);
+  ` + mockAlt("saker") + `
+  // Testkjoreren tvinger «reduser bevegelse», og da er glidet et hopp. Her er det
+  // glidet som males, sa den ene sporringen far svaret en leser uten innstillingen gir.
+  var mm = window.matchMedia.bind(window);
+  window.matchMedia = function (q) {
+    if (String(q).indexOf("prefers-reduced-motion") > -1) {
+      return { matches: false, media: String(q), addEventListener: function () {}, removeEventListener: function () {},
+               addListener: function () {}, removeListener: function () {} };
+    }
+    return mm(q);
+  };
+  function etter(ms, f) { setTimeout(function () { try { f(); } catch (e) { ok("ingen unntak underveis", false, e.message); ferdig(); } }, ms); }
+  var flate, feed, fb, x0, y0;
+  function p(type, el, dx) {
+    el.dispatchEvent(new PointerEvent(type, { pointerType: "touch", isPrimary: true, pointerId: 7,
+      clientX: x0 + dx, clientY: y0, bubbles: true, cancelable: true }));
+  }
+  function iNyhetene() { return !feed.hidden && fb.hidden && !flate.classList.contains("sveiper"); }
+  function iFotballen() { return feed.hidden && !fb.hidden && !flate.classList.contains("sveiper"); }
+
+  window.addEventListener("load", function () { etter(900, function () {
+    flate = document.getElementById("visninger"); feed = document.getElementById("feed"); fb = document.getElementById("fotball");
+    var r = flate.getBoundingClientRect(); x0 = Math.round(r.left + r.width / 2); y0 = Math.round(r.top + r.height / 2);
+    var bredde = Math.round(r.width);
+    ok("45 px er kortere enn grensa uten fart, ellers beviser ikke scenen noe", 45 < bredde * 0.2, bredde);
+
+    // A. Kort og raskt: 45 px pa 25 ms.
+    p("pointerdown", feed, 0); p("pointermove", feed, -15);
+    etter(25, function () {
+      p("pointermove", feed, -45); p("pointerup", feed, -45);
+      etter(350, function () {
+        ok("et kort, raskt sveip slar til", iFotballen());
+        window.tilNyheter ? 0 : 0;
+        document.getElementById("menuBtn").click();
+        document.getElementById("menuLukk").click();
+        tilNyheter();
+        ok("tilbake i nyhetene for neste", iNyhetene());
+
+        // B. Like kort, men sakte, med hvil for hvert steg: ingenting byttes.
+        p("pointerdown", feed, 0); p("pointermove", feed, -15);
+        etter(150, function () { p("pointermove", feed, -30);
+          etter(150, function () { p("pointermove", feed, -45);
+            etter(150, function () {
+              p("pointerup", feed, -45);
+              etter(350, function () {
+                ok("like kort, men sakte: ingenting byttes", iNyhetene());
+
+                // C. Fingeren hvilte for den begynte: farten er farten na, ikke snittet.
+                p("pointerdown", feed, 0);
+                etter(300, function () {
+                  p("pointermove", feed, -15);
+                  etter(25, function () {
+                    p("pointermove", feed, -45); p("pointerup", feed, -45);
+                    etter(350, function () {
+                      ok("et raskt sveip etter et hvil slar til, og hvilet teller ikke mot det", iFotballen());
+
+                      // D. Tilbake med det samme: kort og raskt mot hogre.
+                      p("pointerdown", fb, 0); p("pointermove", fb, 15);
+                      etter(25, function () {
+                        p("pointermove", fb, 45); p("pointerup", fb, 45);
+                        etter(350, function () {
+                          ok("et kort, raskt sveip mot hogre tar deg tilbake", iNyhetene());
+
+                          // E. Raskt, men fingeren sto stille for den lettet: farten er null.
+                          p("pointerdown", feed, 0); p("pointermove", feed, -15);
+                          etter(25, function () {
+                            p("pointermove", feed, -45);
+                            etter(150, function () {
+                              p("pointerup", feed, -45);
+                              etter(350, function () {
+                                ok("et raskt dra etterfulgt av hvil for slippet byttes ikke: farten er fingerens na", iNyhetene());
+
+                                // F. Glidet er kort, og kortere jo mindre som er igjen.
+                                p("pointerdown", feed, 0); p("pointermove", feed, -100); p("pointermove", feed, -150);
+                                p("pointerup", feed, -150);
+                                var glid = parseInt(feed.style.transition.split(" ")[1], 10);
+                                ok("glidet etter slipp er under 220 ms", glid > 0 && glid < 220, feed.style.transition);
+                                ok("og det er avpasset: 150 av " + bredde + " px er gjort, resten tar under 160", glid <= 160, glid);
+                                etter(300, function () {
+                                  ok("sveipet fullfort", iFotballen());
+                                  p("pointerdown", fb, 0); p("pointermove", fb, 100); p("pointermove", fb, 330);
+                                  p("pointerup", fb, 330);
+                                  var kort = parseInt(fb.style.transition.split(" ")[1], 10);
+                                  ok("nesten framme gir et kortere glid enn halvveis", kort > 0 && kort < glid, kort + " mot " + glid);
+                                  etter(300, function () { ferdig(); });
+                                });
+                              });
+                            });
+                          });
+                        });
+                      });
+                    });
+                  });
+                });
+              });
+            });
+          });
+        });
+      });
+    });
+  }); });
+`);
+
 // Forklaringen av sveipet: første gang, på en berøringsskjerm, én gang.
 const TOUCH = `Object.defineProperty(navigator, "maxTouchPoints", { value: 5, configurable: true });`;
 function sveipHintScene(forspill, skript) {
@@ -10631,7 +10738,7 @@ const SAK_15W = kjor("admin-lagre-linje", `
 
 // Scenene er satt i gang over; her ventes det pa alle. Rekkefolgen i
 // rapporten er filas, uansett hvilken som ble ferdig forst.
-const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_2B, SAK_2C, SAK_2D, SAK_2E, SAK_2F, SAK_2G, SAK_2H, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_18J, SAK_18K, SAK_25, SAK_26, SAK_27, SAK_27B, SAK_27C, SAK_27D, SAK_27E, SAK_27F, SAK_27G, SAK_15S, SAK_15T, SAK_15U, SAK_15V, SAK_15W, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
+const alle = (await Promise.all([SAK_1, SAK_1B, SAK_2, SAK_2B, SAK_2C, SAK_2D, SAK_2E, SAK_2F, SAK_2G, SAK_2H, SAK_3, SAK_4, SAK_5, SAK_6, SAK_6B, SAK_7, SAK_8, SAK_8B, SAK_8C, SAK_9, SAK_10, SAK_11, SAK_12, SAK_12C, SAK_13, SAK_14, SAK_14B, SAK_14C, SAK_14D, SAK_14E, SAK_14F, SAK_14G, SAK_14H, SAK_14I, SAK_14J, SAK_14K, SAK_14L, SAK_15, SAK_15B, SAK_15C, SAK_15D, SAK_15E, SAK_15F, SAK_15G, SAK_15H, SAK_15I, SAK_15J, SAK_15K, SAK_15L, SAK_15M, SAK_15N, SAK_15O, SAK_15P, SAK_15Q, SAK_15R, SAK_16, SAK_16B, SAK_16C, SAK_16D, SAK_16E, SAK_16F, SAK_16G, SAK_16H, SAK_17, SAK_18, SAK_18B, SAK_18C, SAK_18D, SAK_18E, SAK_18F, SAK_18G, SAK_18H, SAK_18I, SAK_18J, SAK_18K, SAK_25, SAK_26, SAK_26B, SAK_27, SAK_27B, SAK_27C, SAK_27D, SAK_27E, SAK_27F, SAK_27G, SAK_15S, SAK_15T, SAK_15U, SAK_15V, SAK_15W, SAK_19, SAK_19A, SAK_19D, SAK_19B, SAK_19C, SAK_20, SAK_20B, SAK_20C, SAK_20D, SAK_21, SAK_22, SAK_22B, SAK_23, SAK_24])).flat();
 let feilet = 0;
 
 for (const t of alle) {
