@@ -32,6 +32,7 @@ export const VERSJONER = [
     versjon: "2026.10.03",
     endringer: [
       { hva: "Sveipet mellom nyhetene og Tabeller og kamper er lettere: det slår til etter en femtedel av skjermbredden (før nesten en tredjedel), og et kort, raskt sveip er nok. Farten måles der fingeren løftes, ikke over hele sveipet, så et hvil før du begynner ikke teller mot deg. Glidet etter slipp er kortere, og kortere jo mindre som er igjen.", issue: 202 },
+      { hva: "Forsiden viser tretti saker før «Vis flere saker», mot tolv før — så det er mer å rulle i uten å trykke. Bildene lenger ned lastes etter hvert, som før.", issue: 201 },
     ],
   },
   {
